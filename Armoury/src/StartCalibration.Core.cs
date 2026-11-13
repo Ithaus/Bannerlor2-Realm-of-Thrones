@@ -156,6 +156,8 @@ namespace Armoury
         public double[] MarketFactor;                                  // czynnik popytu targu uzyty w kroku 8
         // m107 K4: ostatnia rownowaga kroku 8 z miara targu - towarow z ta miara, zbiezna, rund, najwieksze odchylenie targu (rynek towar stosunek); MktOn - liczona w tym Planie
         public bool MktOn, MktConv; public int MktN, MktRounds; public string MktWorst = "-";
+        // 479-h (sam pomiar): mieso Planu wedlug zrodla [m * MeatN + k] kg/d (KsCore.MeatK*), rece swine_farm; null - nie policzone; MeatSt - potkniecia pomiaru
+        public double[] MeatSrc; public int MeatSt;
     }
 
     /// <summary>KS-R3 krok 5: przewoz Planu na korytarzu krain (szt. gry na dobe).</summary>
@@ -1141,6 +1143,43 @@ namespace Armoury
             foreach (var d in x.D) if (d.TownFields) R.TownFieldHands += d.Wf;
             try { FeedStats(x, xs); } catch (Exception e) { R.Feed = null; R.CorrLine = (R.CorrLine ?? "") + " [wyzywienie krain: " + e.GetType().Name + "]"; }   // r4-polnoc
             try { FachFinish(x, xs); } catch (Exception e) { R.DistFach = null; R.FachLine = "KS: fach wsi (m106) plan doba {DOBA} | blad linii (" + e.GetType().Name + ")."; }   // m106
+            try { R.MeatSrc = MeatSplit(x, xs, S); } catch { R.MeatSrc = null; R.MeatSt++; }   // 479-h: sam pomiar
+        }
+
+        // 479-h (noc 13.11, sam pomiar): mieso Planu wedlug zrodla - tylko odczyt wyniku po rownowadze (te same pary, xs i BlockScale co Supply); nic nie zmienia
+        internal const int MeatN = 9, MeatKSide = 0, MeatKCattle = 1, MeatKSheep = 2, MeatKSwine = 3, MeatKHunt = 4, MeatKHorse = 5, MeatKOther = 6, MeatKSwineH = 7, MeatKAll = 8;
+        private static double[] MeatSplit(Ctx x, double[] xs, double[] S)
+        {
+            if (x == null || xs == null || S == null || x.OStart == null || x.BlockScale == null) return null;
+            var a = new double[NM * MeatN];
+            for (int k = 0; k < x.NP; k++)
+            {
+                int b = x.Pb[k], c = x.Pc[k], m = x.Pm[k];
+                if (m < 0 || m >= NM) continue;
+                double w = xs[k] * x.BlockScale[b];
+                if (w == 0) continue;
+                double meat = 0;
+                for (int j = x.OStart[k]; j < x.OStart[k + 1]; j++) if (x.OGood[j] == KsTab.GMeat) meat += w * x.OVal[j];
+                int src = c == KsTab.CCattle || c == KsTab.CCattleB ? MeatKCattle : c == KsTab.CSheep ? MeatKSheep : c == KsTab.CSwine ? MeatKSwine
+                        : c == KsTab.CHunter || c == KsTab.CWhaler || c == KsTab.CWalrus ? MeatKHunt : c >= KsTab.CHorse0 && c <= KsTab.CHorse5 ? MeatKHorse : MeatKSide;
+                a[m * MeatN + src] += meat;
+                if (c == KsTab.CSwine)
+                {
+                    // rece pola swine_farm (ten sam wzor co R.CraftLabour w Finish)
+                    var d = x.BD[b]; var blk = x.B[b];
+                    double rem = x.W[b] - x.WH[b], lg = KsTab.Land2(KsTab.CWheat, blk.O, d.Type), sb = 0;
+                    if (lg > 0) sb = Math.Min(rem, KsTab.OwnGrainShare(lg) * GrainOwnNeed(d.Need0) * blk.Share / (KsTab.PGrainSub * lg));
+                    a[m * MeatN + MeatKSwineH] += xs[k] * (rem - sb) * (1.0 - HomeOf(d)) * x.BlockScale[b];
+                }
+            }
+            for (int m = 0; m < NM; m++)
+            {
+                double all = S[m * KsTab.NG + KsTab.GMeat], sum = 0;
+                for (int i = 0; i <= MeatKHorse; i++) sum += a[m * MeatN + i];
+                a[m * MeatN + MeatKOther] = all - sum;                 // regale i reszta (kontrola - powinno byc ok. 0)
+                a[m * MeatN + MeatKAll] = all;
+            }
+            return a;
         }
 
         // ============================================================ 8. pieniadze (projekt rozdz. 9 i 11.1 krok 8; poprawka po autotescie 16.10)

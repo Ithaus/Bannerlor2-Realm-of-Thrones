@@ -464,7 +464,49 @@ namespace Armoury
             sb.Append(" | pieniadze i towar: bez przelewow - zmiana tylko podzialu rak bloku (rece zajec + rece przy zlozach = rece bloku)")
               .Append(" | czas ").Append(ms.ToString("0.0", inv)).Append(" ms | potkniecia ").Append(_f20Stum).Append('.');
             Log.Info(sb.ToString());
+            try { Log.Info(MeatOwnLine(today)); } catch { _meatOwnSt++; }   // 479-h: sam pomiar
             _f20Stum = 0;
+        }
+
+        // 479-h (noc 13.11, sam pomiar): co krok f20 (7 dob) - zywiec (cow/hog/sheep) i mieso (mieso + wieloryb) wsi wedlug rynku z ostatniego rachunku okregu
+        // (ld.Res - KsDeliver.Own po zimie i czynnikach rak): produkcja, zjedzone na wlasny stol (Own), na targ; do porownania z linia "KS: mieso Planu (479-h)". Tylko odczyt
+        private static int _meatOwnSt;
+        private static string MeatOwnLine(int today)
+        {
+            var inv = CultureInfo.InvariantCulture;
+            var a = new double[2 * 9]; var nv = new int[2];
+            // [m * 9 + k]: 0 zywiec produkcja, 1 zywiec zjedzony, 2 zywiec na targ, 3 mieso produkcja, 4 mieso zjedzone, 5 mieso na targ, 6 potrzeba miesa z wlasnego pola, 7 hog na targ, 8 hog zjedzony
+            int[] live = { KsDeliver.ICow, KsDeliver.IHog, KsDeliver.ISheep }, meat = { KsDeliver.IMeat, KsDeliver.IWhaleMeat };
+            if (_live != null)
+                foreach (var ld in _live.Values)
+                {
+                    try
+                    {
+                        if (ld == null || ld.TF || ld.Res == null) continue;
+                        var r = ld.Res; int o = (ld.Market == 0 ? 0 : 1) * 9;
+                        nv[o / 9]++;
+                        foreach (int i in live) { a[o + 0] += r.Prod[i]; a[o + 1] += r.Own[i]; a[o + 2] += r.MarketKg[i]; }
+                        foreach (int i in meat) { a[o + 3] += r.Prod[i]; a[o + 4] += r.Own[i]; a[o + 5] += r.MarketKg[i]; }
+                        if (ld.OwnNeed != null && ld.OwnNeed.Length > KsTab.NMeat) a[o + 6] += ld.OwnNeed[KsTab.NMeat];
+                        a[o + 7] += r.MarketKg[KsDeliver.IHog]; a[o + 8] += r.Own[KsDeliver.IHog];
+                    }
+                    catch { _meatOwnSt++; }
+                }
+            var sb = new StringBuilder(700);
+            sb.Append("Jedzenie KS (479-h): mieso wsi dzien ").Append(today).Append(" (sam pomiar; kg/d z ostatniego rachunku okregu - po zimie i czynnikach rak; zywiec w kg zywca, mieso = zywiec x ")
+              .Append(KsTab.MeatOfLive.ToString("0.00", inv)).Append(")");
+            for (int m = 0; m < 2; m++)
+            {
+                int o = m * 9;
+                sb.Append(m == 0 ? " | Westeros" : " | Essos").Append(" (wsi ").Append(nv[m]).Append("): zywiec cow/hog/sheep produkcja ").Append(a[o].ToString("0", inv))
+                  .Append(", na wlasny stol (KsDeliver.Own) ").Append(a[o + 1].ToString("0", inv)).Append(" (= mieso ").Append((a[o + 1] * KsTab.MeatOfLive).ToString("0", inv)).Append(")")
+                  .Append(", na targ ").Append(a[o + 2].ToString("0", inv)).Append(" (= mieso ").Append((a[o + 2] * KsTab.MeatOfLive).ToString("0", inv)).Append(")")
+                  .Append(", z tego hog: stol ").Append(a[o + 8].ToString("0", inv)).Append(", targ ").Append(a[o + 7].ToString("0", inv))
+                  .Append("; mieso i wieloryb produkcja ").Append(a[o + 3].ToString("0", inv)).Append(", na wlasny stol ").Append(a[o + 4].ToString("0", inv)).Append(", na targ ").Append(a[o + 5].ToString("0", inv))
+                  .Append("; potrzeba miesa z wlasnego pola ").Append(a[o + 6].ToString("0", inv));
+            }
+            sb.Append(" | potkniecia pomiaru ").Append(_meatOwnSt).Append(" | gra bez zmian.");
+            return sb.ToString();
         }
 
         private static string F20Sg(double v, CultureInfo inv) { return (v >= 0 ? "+" : "") + v.ToString("0", inv); }

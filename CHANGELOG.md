@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 479-h (13.11) - KS: pomiar miesa (Plan wedlug zrodel, Own wsi, cele wstrzymanych przejsc A7)
+
+**Problem:** testy at-220c/e/g: polki miesa 0.15-0.28 T*, indeks ceny miesa 1.8-2.8; cena cienia miesa w Planie na podlodze PLo 0.05 (Core.cs PLo), "KS: bilans" mowi, ze miesa jest dosc; swine_farm z ok. 447 tys. rak przy starcie ZW do 0 w Planie. Linia A7 pokazuje cele tylko przepuszczonych przejsc, a hamulec 479-e/479-f i 479-g wstrzymuja/zawracaja setki przejsc na krok - nie wiadomo dokad chcialy isc.
+
+**Przyczyna (hipoteza do sprawdzenia pomiarem):** Plan liczy zywiec uboczny wheat_farm (P0 hog 0.15, sheep 0.08, cow 0.10, Tables.cs) jako mieso (BlockOutput x MeatOfLive) i podaz na targ, a w grze KsDeliver.Own najpierw karmi wies jej wlasnym zywcem - na targ idzie mniej, niz widzi Plan. Brak liczb, zeby to potwierdzic.
+
+**Zmiana:** SAM POMIAR - bez zmiany decyzji, liczb wejsciowych decyzji ani zapisu. (M1) StartCalibration.A7s.cs: A7hNote w A7eGate (sciezki _a7eCap i _a7eOutCap) i w A7eFallback (przed zamiana celu) - slowniki "zrodlo->cel z polek" [bloki, rece]; linia "KS: A7 regula zajec" konczy sie "; 479-h cele z polek (top wedlug rak; blokow i rak): wstrzymane wzrostem: ...; wstrzymane odplywem: ...; 479-g zawrocone z: ...; potkniecia pomiaru 479-h N" (top 6), zerowane w A7sZero. (M2) StartCalibration.Core.cs: KsCore.MeatSplit w Finish (jeden przebieg par po rownowadze, tylko odczyt: xs x BlockScale x OVal miesa) -> KsResult.MeatSrc; StartCalibration.Plan.cs: nowa linia po bilansach "KS: mieso Planu (479-h) plan doba N" - na rynek: uboczne zywca (wheat_farm i inne zajecia), cattle_farm + maslo, sheep_farm, swine_farm, hunter/wieloryb/mors, stadniny, inne (regale/reszta = kontrola, ok. 0), razem, rece swine_farm, podaz, popyt, zjedzone w okregach, cena cienia. (M3) StartCalibration.Jedzenie.cs: po linii f20 (co 7 dob) nowa linia "Jedzenie KS (479-h): mieso wsi dzien N" - z ld.Res wsi (KsDeliver.Own w grze, po zimie i czynnikach rak) na rynek: zywiec cow/hog/sheep produkcja / na wlasny stol / na targ (i w miesie x0.5), z tego hog, mieso i wieloryb produkcja / stol / targ, potrzeba miesa z wlasnego pola. Kazdy nowy rachunek w try/catch z licznikiem potkniec (bez wylacznikow).
+
+**Ryzyko / co sprawdzic:** regresja: nowe tylko liczniki i tekst; A7hNote nie zmienia best/zwrotu (wolane przed `best = ob` z wartoscia sprzed zamiany); MeatSplit nie pisze do Ctx ani S (wynik w nowym polu KsResult), koszt jeden przebieg par (ok. 120 tys.) na Plan w watku roboczym; MeatOwnLine czyta _live/ld.Res raz na 7 dob. Zapis bez zmian. W tescie: linia "KS: mieso Planu (479-h)" przy kazdym Planie ("inne" ok. 0 - inaczej podzial nie zgadza sie z S), linia "Jedzenie KS (479-h)" co krok f20, koniec linii A7 z "479-h"; potkniecia 0. Porownac: Plan "uboczne zywca" vs gra "zywiec na targ (= mieso)".
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 479-g (13.11) - KS: pelny hamulec 479-e nie zabiera bloku przejscia, ktore robil bez 479-e
 
 **Problem:** at-220e (m220e, Armoury-2026-11-13_10-20-30.log): technicznie OK (220 dob, 23 bledy cudze, 0 BLAD), ale indeks cen miast gorszy niz at-220c: ser 1.32-1.87 (220c 0.81-1.22), maslo 1.10-1.66 (0.86-1.13), zboze 1.13-1.52 (0.63-1.02), ryby 0.90-1.84 (0.80-1.29); mieso bez zmian (ok. 1.9-2.8). Linia "KS: A7 regula zajec" co krok: "inny cel dzieki 479-e 0", "hamulec wzrostu ... wstrzymal 588-1040 (rak 0.9-2.1 mln)".

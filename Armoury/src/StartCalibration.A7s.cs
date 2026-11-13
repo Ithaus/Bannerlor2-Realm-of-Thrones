@@ -119,8 +119,8 @@ namespace Armoury
             else _a7eNoTab++;
             double cap = Math.Max(A7eGrowCap * baseH, A7eGrowFloor * all);
             double capOut = Math.Max(A7eGrowCap * srcH, A7eGrowFloor * all);
-            if (_a7eSeaH[m * NC + best] + hands > cap) { _a7eCap++; _a7eCapH += hands; return false; }
-            if (_a7eSeaOut[m * NC + cur] + hands > capOut) { _a7eOutCap++; _a7eOutCapH += hands; return false; }   // 479-f: odplyw zrodla
+            if (_a7eSeaH[m * NC + best] + hands > cap) { _a7eCap++; _a7eCapH += hands; A7hNote(_a7hCap, cur, best, hands); return false; }
+            if (_a7eSeaOut[m * NC + cur] + hands > capOut) { _a7eOutCap++; _a7eOutCapH += hands; A7hNote(_a7hOut, cur, best, hands); return false; }   // 479-f: odplyw zrodla
             _a7eSeaH[m * NC + best] += hands; _a7eSeaOut[m * NC + cur] += hands;
             if (oldPress) { _a7eDiff++; _a7eDiffH += hands; } else { _a7eNew++; _a7eNewH += hands; }
             string key = KsTab.Crafts[cur] + "->" + KsTab.Crafts[best]; int n; _a7eTr.TryGetValue(key, out n); _a7eTr[key] = n + 1;
@@ -148,8 +148,41 @@ namespace Armoury
             double ic = A7sIncome(b, type, cur, o, oV, rent, nfU != null ? nfU[cur] : 1.0), ib = double.NegativeInfinity; int ob = -1;
             foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, o, oV, rent, nfU != null ? nfU[c] : 1.0); if (v > ib) { ib = v; ob = c; } }
             if (ob == best) return;                                          // ten sam cel bez 479-e - bramka przepusci (jak bez 479-e)
+            A7hNote(_a7hFall, cur, best, hands);                             // 479-h: sam pomiar - cel z polek (przed zamiana)
             best = ob; incCur = ic; incBest = ib;
             if (ob >= 0 && ib >= SwitchRatio * Math.Max(0.02, ic)) { _a7gFall++; _a7gFallH += hands; } else _a7gNone++;
+        }
+
+        // 479-h (noc 13.11, sam pomiar): cele przejsc WSTRZYMANYCH hamulcem wzrostu (479-e) i odplywu (479-f) oraz ZAWROCONYCH przez 479-g - klucz "zrodlo->cel z polek",
+        // [bloki, rece]; dotad linia pokazywala cele tylko przepuszczonych przejsc. Nic nie zmienia w decyzjach
+        private static readonly Dictionary<string, double[]> _a7hCap = new Dictionary<string, double[]>(), _a7hOut = new Dictionary<string, double[]>(), _a7hFall = new Dictionary<string, double[]>();
+        private static int _a7hSt;
+        private static void A7hNote(Dictionary<string, double[]> d, int cur, int best, double hands)
+        {
+            try
+            {
+                if (cur < 0 || best < 0 || cur >= KsTab.Crafts.Length || best >= KsTab.Crafts.Length) return;
+                string key = KsTab.Crafts[cur] + "->" + KsTab.Crafts[best]; double[] a;
+                if (!d.TryGetValue(key, out a)) { a = new double[2]; d[key] = a; }
+                a[0] += 1; a[1] += hands;
+            }
+            catch { _a7hSt++; }
+        }
+        private static string A7hTop(Dictionary<string, double[]> d)
+        {
+            var top = new List<KeyValuePair<string, double[]>>(d); top.Sort((x, y) => y.Value[1].CompareTo(x.Value[1]));
+            var parts = new List<string>();
+            for (int i = 0; i < top.Count && i < 6; i++) parts.Add(top[i].Key + " " + top[i].Value[0].ToString("0", Inv) + " (rak " + top[i].Value[1].ToString("0", Inv) + ")");
+            return parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "-";
+        }
+        private static string A7hText()
+        {
+            try
+            {
+                return "; 479-h cele z polek (top wedlug rak; blokow i rak): wstrzymane wzrostem: " + A7hTop(_a7hCap) + "; wstrzymane odplywem: " + A7hTop(_a7hOut)
+                     + "; 479-g zawrocone z: " + A7hTop(_a7hFall) + "; potkniecia pomiaru 479-h " + _a7hSt;
+            }
+            catch { _a7hSt++; return "; 479-h: blad pomiaru (potkniecia " + _a7hSt + ")"; }
         }
 
         private static string A7eText()
@@ -165,7 +198,8 @@ namespace Armoury
                  + "; 479-f: hamulec odplywu (10% rak zajecia zrodla na sezon) wstrzymal " + _a7eOutCap + " (rak " + _a7eOutCapH.ToString("0", inv) + "), bez wiersza dawnego - bramka zamknieta " + _a7eNoOld
                  + ", bez zywej tablicy f20 (cap 0) " + _a7eNoTab + ", krokow sygnalu z tablica przeterminowana albo f20 nieczynnym (sygnal jak dotad) " + _a7eStale + ", ZW wsie poboczne na wierszu bez polek"
                  + "; 479-g: hamulec pelny - cel wedlug sygnalu bez 479-e " + _a7gFall + " (rak " + _a7gFallH.ToString("0", inv) + "), bez nacisku " + _a7gNone
-                 + (parts.Count > 0 ? "; dzieki 479-e (top): " + string.Join(", ", parts.ToArray()) : "");
+                 + (parts.Count > 0 ? "; dzieki 479-e (top): " + string.Join(", ", parts.ToArray()) : "")
+                 + A7hText();
         }
 
         private static double A7sBand { get { var s = Settings.Current; double b = s != null ? s.KsSwitchMarketBand : 0.15; if (!(b >= 0)) b = 0; return Math.Min(0.5, b); } }
@@ -219,6 +253,7 @@ namespace Armoury
             _a7eDev = _a7eSame = _a7eDiff = _a7eNew = _a7eCap = _a7eNoOld = 0; _a7eDiffH = _a7eNewH = _a7eCapH = 0; _a7eTr.Clear();   // 479-e
             _a7eOutCap = _a7eStale = _a7eNoTab = 0; _a7eOutCapH = 0;                                                               // 479-f
             _a7gFall = _a7gNone = 0; _a7gFallH = 0;                                                                               // 479-g
+            _a7hCap.Clear(); _a7hOut.Clear(); _a7hFall.Clear(); _a7hSt = 0;                                                       // 479-h
         }
 
         // ------------------------------------------------------------ cena sygnalu

@@ -454,6 +454,33 @@ namespace Armoury
         // towary, ktorych stosunek nie musi miescic sie w pasmie (projekt rozdz. 4.1/14: uboczne gospodarstw i rzeczy bez osobnych rak)
         private static readonly HashSet<string> BandExceptions = new HashSet<string>(StringComparer.Ordinal) { "carrot", "apple", "fur", "honey", "spice", "whale_oil", "walrus_tusk", "Egg", "hides" };
 
+        // 479-h (noc 13.11, sam pomiar): linia "KS: mieso Planu (479-h)" - podaz miesa Planu wedlug zrodla (kg/d), popyt, cena cienia, rece swine_farm (z wyniku Planu, tylko odczyt)
+        private static int _meatPlanSt;
+        private static string MeatPlanLine(KsResult r)
+        {
+            if (r == null || r.Error != null || r.P == null || r.S == null || r.D == null) return null;
+            var sb = new StringBuilder(900);
+            sb.Append(PK).Append("mieso Planu (479-h) plan doba ").Append(_wDay).Append(" (sam pomiar; kg/d miesa - zywiec x ").Append(KsTab.MeatOfLive.ToString("0.00", Inv)).Append(")");
+            var a = r.MeatSrc;
+            for (int m = 0; m < 2; m++)
+            {
+                int g = m * KsTab.NG + KsTab.GMeat; int o = m * KsCore.MeatN;
+                sb.Append(" | ").Append(r.Markets[m]).Append(":");
+                if (a == null || a.Length != 2 * KsCore.MeatN) sb.Append(" podzial zrodel - brak (potkniecia Planu ").Append(r.MeatSt).Append(")");
+                else
+                    sb.Append(" uboczne zywca (wheat_farm i inne zajecia) ").Append(F0(a[o + KsCore.MeatKSide])).Append(", cattle_farm + maslo ").Append(F0(a[o + KsCore.MeatKCattle]))
+                      .Append(", sheep_farm ").Append(F0(a[o + KsCore.MeatKSheep])).Append(", swine_farm ").Append(F0(a[o + KsCore.MeatKSwine]))
+                      .Append(", hunter/wieloryb/mors ").Append(F0(a[o + KsCore.MeatKHunt])).Append(", stadniny ").Append(F0(a[o + KsCore.MeatKHorse]))
+                      .Append(", inne (regale/reszta) ").Append(F0(a[o + KsCore.MeatKOther])).Append("; razem ").Append(F0(a[o + KsCore.MeatKAll]))
+                      .Append("; rece swine_farm ").Append(F0(a[o + KsCore.MeatKSwineH]));
+                sb.Append("; podaz ").Append(F0(r.S[g])).Append(", popyt ").Append(F0(r.D[g]));
+                if (r.Eaten != null && r.Eaten.Length == 2 * KsTab.NG) sb.Append(", zjedzone w okregach ").Append(F0(r.Eaten[g]));
+                sb.Append(", cena cienia ").Append(r.P[g].ToString("0.000", Inv));
+            }
+            sb.Append(" | potkniecia linii ").Append(_meatPlanSt).Append(" | gra bez zmian.");
+            return sb.ToString();
+        }
+
         private static void PlanLines(int day, KsResult r, KsInput inp)
         {
             if (r.Error != null)
@@ -551,6 +578,7 @@ namespace Armoury
                 c.Append('.');
                 Log.Info(c.ToString());
             }
+            try { string ml = MeatPlanLine(r); if (ml != null) Log.Info(ml); } catch { _meatPlanSt++; }   // 479-h: sam pomiar
             var w = new StringBuilder(1500);
             w.Append(PK).Append("zajecia (plan doba ").Append(_wDay).Append(", tys. rak):");
             var order = new List<int>(); for (int c = 0; c < KsTab.NC; c++) if (r.CraftLabour[c] >= 500) order.Add(c);
