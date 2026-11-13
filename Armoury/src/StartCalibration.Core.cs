@@ -65,6 +65,9 @@ namespace Armoury
         // m107-gospodarka K4 (klucz Ks Plan Market Balance): ostatnia rownowaga kroku 8 ocenia towary zjadane glownie w okregach (zjedzone >= 1/4 popytu - ziarno) NA TARG
         // ((podaz - zjedzone) / (popyt - zjedzone), prog 3%) - zbieznosc, najlepszy stan i wyjscie "stoi"; krok ceny bez zmian. false - jak dotad
         public bool MarketBalance;
+        // 479-k (klucz Ks Plan Eq Steady Best): punkt kontrolny rownowagi - "na granicy ceny" = towar przyciety do PLo/PHi w tej rundzie (przed normalizacja), a stan
+        // najlepszy wraca tylko, gdy jest lepszy od ostatniego o ponad 10%. false - jak dotad (bit w bit)
+        public bool SteadyBest;
         // m107-gospodarka K5 (klucz Ks Fach Market Room): zjedzone w okregach [rynek * NG + towar] poprzedniego Planu (KsResult.Eaten) - miejsce fachu na targu przed krokiem 8
         public double[] PrevEaten;
     }
@@ -161,6 +164,10 @@ namespace Armoury
         // 479-j (sam pomiar): rownowaga miesa ostatniej rownowagi Planu (kazda rownowaga nadpisuje - zostaje ostatnia) - punkty kontrolne [k * KsCore.MeqW + j]
         // (najwyzej KsCore.MeqMax, probkowane rowno), koniec [KsCore.MeqE*]; null - brak; MeatEqSt - potkniecia pomiaru (wszystkie rownowagi Planu)
         public double[] MeatEqCk, MeatEqEnd; public int MeatEqN, MeatEqSt;
+        // 479-k (klucz Ks Plan Eq Steady Best): SbOn - klucz; SbKeep / SbRest - rownowagi Planu bez zbieznosci, ktore oddaly stan ostatni mimo lepszego najlepszego
+        // (histereza 10%) / wrocily do najlepszego; SbClp / SbFlip - ostatni punkt kontrolny ostatniej rownowagi: towarow czynnych przycietych do granicy / ocenionych
+        // inaczej niz stary test granicy (cena po normalizacji); SbSt - potkniecia
+        public bool SbOn; public int SbKeep, SbRest, SbClp, SbFlip, SbSt;
     }
 
     /// <summary>KS-R3 krok 5: przewoz Planu na korytarzu krain (szt. gry na dobe).</summary>
@@ -954,6 +961,9 @@ namespace Armoury
             // 479-j (sam pomiar): punkty kontrolne miesa tej rownowagi (tylko odczyt p, S, xs; przebieg bez zmian)
             var mq = new List<double>(); int mqTot = 0, mqBestIt = -1; double[] mqLast = null;
             x.R.MeatEqCk = null; x.R.MeatEqEnd = null; x.R.MeatEqN = 0;
+            // 479-k (klucz Ks Plan Eq Steady Best): towar przyciety do granicy ceny w tej rundzie (przed normalizacja rynku); null - klucz wylaczony, test jak dotad
+            bool[] clp = x.In.SteadyBest ? new bool[n] : null; int sbClp = 0, sbFlip = 0;
+            x.R.SbOn = clp != null;
             int it = 0;
             for (it = 0; it < rounds; it++)
             {
@@ -971,6 +981,7 @@ namespace Armoury
                     int g = i % KsTab.NG;
                     double r = KsTab.RegGoodMask[g] ? 1.0 : (x.Dm[i] + 1.0) / (S[i] + 1.0);
                     double v = p[i] * Math.Pow(r, eta == null ? Eta : EtaOf(eta, esg, i, r));
+                    if (clp != null) clp[i] = v < PLo || v > PHi;          // 479-k
                     p[i] = v < PLo ? PLo : (v > PHi ? PHi : v);
                 }
                 for (int m = 0; m < NM; m++)
@@ -992,12 +1003,16 @@ namespace Armoury
                     // n22f-plany (recenzja): punkt kontrolny, wyjscie "zbiezna" i "stoi" - stara miara |S/D - 1| (przebieg rownowagi bez zmian); pasmo zapasu polek
                     // (klucz Ks Plan Converge Shelf Level) tylko w ocenie stanu oddanego ponizej
                     bool bad = false; double mt = 0;
+                    if (clp != null) { sbClp = 0; sbFlip = 0; }
                     for (int i = 0; i < n; i++)
                     {
                         if (!act[i]) continue;
                         double dev = Math.Abs(S[i] / Math.Max(1.0, x.Dm[i]) - 1.0), tol = Tol;
                         if (mkt) MktDev(x.Dm[i], S[i], x.EqEat[i], ref dev, ref tol);   // m107 K4
                         bool atb = p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999;
+                        // 479-k: stary test patrzy na cene po normalizacji - grupa towarow przyklejonych do PLo/PHi wchodzila do mt i wypadala z niego razem ze srednia
+                        // cena rynku (+-0.1%), skok mt ok. 5 przyslanial wszystko; przyciecie w tej rundzie jest stabilne
+                        if (clp != null) { if (clp[i]) sbClp++; if (clp[i] != atb) sbFlip++; atb = clp[i]; }
                         if (dev > tol && !atb) bad = true;
                         if (!atb) mt += dev;
                     }
@@ -1027,9 +1042,21 @@ namespace Armoury
             // koniec bez zbieznosci (stoi, limit rund albo przerwane): najlepszy stan z punktow kontrolnych, gdy ostatni jest gorszy
             x.R.EqN++; if (conv) x.R.EqConv++;                        // feed-swiat: rownowagi Planu (linia rynkow Planu)
             EtaStats(x, eta, act);
-            bool mqRest = !conv && bp != null && bestMt < lastMt;      // 479-j: ten sam warunek co ponizej (sam odczyt)
+            // 479-k (klucz Ks Plan Eq Steady Best): histereza powrotu - mt plaskie (szum 1-3%) oddaje stan OSTATNI (ceny wolnych towarow, np. miesa, tam dokad doszly);
+            // najlepszy wraca tylko, gdy ostatni jest gorszy o ponad 10%. Klucz wylaczony: lastMt * 1.0 - warunek jak dotad (bit w bit)
+            bool restB = !conv && bp != null && bestMt < lastMt * (clp != null ? 0.9 : 1.0);
+            try
+            {
+                if (clp != null)
+                {
+                    x.R.SbClp = sbClp; x.R.SbFlip = sbFlip;
+                    if (restB) x.R.SbRest++; else if (!conv && bp != null && bestMt < lastMt) x.R.SbKeep++;
+                }
+            }
+            catch { x.R.SbSt++; }
+            bool mqRest = restB;                                       // 479-j: ten sam warunek co ponizej (sam odczyt)
             try { mqLast = MeqState(x, p, xs); } catch { x.R.MeatEqSt++; }   // 479-j: ostatnia iteracja przed ewentualnym powrotem do najlepszego stanu
-            if (!conv && bp != null && bestMt < lastMt)
+            if (restB)
             {
                 Array.Copy(bp, p, n); Array.Copy(bxs, xs, x.NP); Array.Copy(bS, S, n); Array.Copy(brr, rr, x.NB);
                 if (x.FeedOn) FeedRestore(x);                          // r4-polnoc (recenzja): liczby progu z punktu kontrolnego (linia wyzywienia krain, A7)

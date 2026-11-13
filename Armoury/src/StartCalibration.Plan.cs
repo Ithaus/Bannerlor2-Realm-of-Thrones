@@ -105,6 +105,7 @@ namespace Armoury
             double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va; _alphaDsN = 0;   // KS r4: licznik wsi z alfa z praw DS (VilAlphaFor)
             inp.FachOn = s != null && s.KsVillageTradeKeep;           // m106-wozy P1: fach wsi w rownowadze Planu i w RegaleStep (StartCalibration.Fach.cs)
             inp.MarketBalance = s != null && s.KsPlanMarketBalance;   // m107 K4: ostatnia rownowaga kroku 8 - zbieznosc NA TARG (StartCalibration.Core.cs Equilibrium)
+            inp.SteadyBest = s != null && s.KsPlanEqSteadyBest;       // 479-k: stabilny test granicy i histereza stanu oddanego (StartCalibration.Core.cs Equilibrium)
             inp.FachMarketRoom = s != null && s.KsFachMarketRoom;     // m107 K5: miejsce fachu na targu bez zjedzonego we wszystkich okregach (StartCalibration.Fach.cs)
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");
@@ -519,7 +520,13 @@ namespace Armoury
                       .Append(' ').Append(MeqN(ck[a + 5], "0.000")).Append(" sw").Append(MeqN(ck[a + 6], "0")).Append(MeqB(ck[a + 7]));
                 }
             }
-            sb.Append(" | potkniecia Planu ").Append(r.MeatEqSt).Append(", linii ").Append(_meatEqSt).Append(" | gra bez zmian.");
+            // 479-k: co zrobila poprawka (klucz Ks Plan Eq Steady Best)
+            sb.Append(" | 479-k stabilny najlepszy: ").Append(r.SbOn ? "tak" : "nie");
+            if (r.SbOn)
+                sb.Append(", rownowag Planu bez zbieznosci: oddany ostatni mimo lepszego najlepszego (najlepszy lepszy o mniej niz 10%) ").Append(r.SbKeep)
+                  .Append(", powrot do najlepszego ").Append(r.SbRest).Append(" (z ").Append(r.EqN).Append(" rownowag); ostatni punkt kontrolny: towarow przycietych do granicy ceny ")
+                  .Append(r.SbClp).Append(", ocenionych inaczej niz stary test (cena po normalizacji) ").Append(r.SbFlip).Append("; potkniecia ").Append(r.SbSt);
+            sb.Append(" | potkniecia Planu ").Append(r.MeatEqSt).Append(", linii ").Append(_meatEqSt).Append(" | pomiar 479-j bez zmian gry.");
             return sb.ToString();
         }
 

@@ -11052,6 +11052,10 @@ namespace Armoury
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsSwitchFoodShelves { get; set; } = true;
 
+        [SettingPropertyBool("Ks Plan Eq Steady Best", HintText = "with Start Calibration: each balance of the weekly plan judges which of its states is best by goods that are really held at a price bound, not by a test that flips with the market's average price, and returns its last state unless the best one is clearly better (by more than a tenth) - so slow goods like meat keep the price they reached instead of being sent back to an early round every week. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
+        public bool KsPlanEqSteadyBest { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Ks Switch Food Shelf Band", 1.00f, 10.00f, "0.0", HintText = "with Ks Switch Food Shelves: how far the stalls may move a food price in the switch rule (3 = up to three times up or down)", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public float KsSwitchFoodShelfBand { get; set; } = 3.0f;
@@ -15915,6 +15919,7 @@ namespace Armoury
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.KsFoodHandsWithA7 = KsFoodHandsWithA7;
             s.KsSwitchFoodShelves = KsSwitchFoodShelves;
+            s.KsPlanEqSteadyBest = KsPlanEqSteadyBest;
             s.KsSwitchFoodShelfBand = KsSwitchFoodShelfBand;
             s.BloomeryColliers = BloomeryColliers;
             s.BanditLimitPerHideout = BanditLimitPerHideout;
