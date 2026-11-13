@@ -228,6 +228,7 @@ namespace Armoury
             Reset169();                                     // paczka 169: pierscien reszty 28 dob, zloto swiata na poczatku bloku
             try { F4Reset(); } catch { }                    // f4-pomiary: okno wyniku handlowego karawan od zera (MoneyLedger.F4.cs)
             VilReset();                                     // f14-wsie: wsie-kiesy.csv - okno od nowa (MoneyLedger.Villages.cs)
+            C490Reset();                                    // 490: przelew startowy - baza od nowa (MoneyLedger.Start490.cs)
         }
 
         private static void ClearDay()
@@ -1205,6 +1206,7 @@ namespace Armoury
                 int poor = 0; foreach (var g in golds) if (g < 1000) poor++;
                 spread = " | rozklad [P]: osad " + golds.Count + ", min " + golds[0] + ", mediana " + golds[golds.Count / 2] + ", max " + golds[golds.Count - 1] + ", ponizej 1000 zlota " + poor;
             }
+            try { C490Class(c, delta); } catch { _c490St++; }   // 490: sam pomiar - pozycje tej linii narastajaco od wczytania (MoneyLedger.Start490.cs)
             _classRest[c] = delta - known;                  // paczka 169: reszta tej klasy do linii "Przeplywy osad (przyczyny)"
             return "Przeplywy osad (" + CName[c] + "): dzien " + day + " | stan " + now + ", zmiana " + S(delta) + " [P], w tym: "
                    + string.Join("; ", parts.ToArray()) + spread + ".";
@@ -1290,6 +1292,7 @@ namespace Armoury
                     try { Log.Info(PumpsLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.PumpsLine", e); }   // N1(a) (noc 16.10): "Pompy - sztuczne przelewy (nekon)" - te same liczniki co "Obieg" (tylko log)
                     try { F4CaravanDay(day, hold, _lastHold); } catch (Exception e) { Log.Error("MoneyLedger.F4CaravanDay", e); }   // f4-pomiary (klucz Measure Caravan Trade): wynik handlowy karawan co 7 dob (tylko log, przed ClearDay)
                 }
+                try { Start490(day, end, hold); } catch { _c490St++; }   // 490: sam pomiar - przelew startowy (baza przy pierwszej dobie, linia w dobach sesji 1..40)
                 VilDaily(day);                                  // f14-wsie: wsie-kiesy.csv co 7 dob (tylko odczyt, po liniach ksiegi) - wlasny try
                 _lastSnap = end; _lastHold = hold; _first = false;
             }

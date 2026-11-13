@@ -79,21 +79,25 @@ namespace Armoury
         {
             if (r == null) return;
             r.NtMk = null;
+            r.P490 = null;   // 490
             var kg = _itemKg;
             if (inp == null || r.Error != null || _itemIx == null || _items == null || kg == null) return;
             var mk = new double[ItemCount]; var tf = new double[ItemCount]; var own = new double[ItemCount]; double kcal = 0, need = 0; int nd = 0;
             var live = BuildLive(r, inp, false);
+            var p490 = new double[2 * 2 * G490 * 3];   // 490: sam pomiar (Plan wedlug rynku i grupy towaru)
             foreach (var ld in live)
             {
                 if (cancelled != null && cancelled()) return;
                 var res = ComputeDistrict(ld, false, null, kg);
                 if (res == null) continue;
                 nd++;
+                try { P490Add(ld, res, p490, kg); } catch { r.P490St++; }   // 490: sam pomiar
                 for (int i = 0; i < ItemCount; i++) { if (ld.TF) tf[i] += res.Market[i]; else { mk[i] += res.Market[i]; own[i] += res.Own[i]; } }
                 kcal += res.OwnKcal; need += res.KcalNeed;
             }
             if (cancelled != null && cancelled()) return;
             r.NtTf = tf; r.NtOwn = own; r.NtKcal = kcal; r.NtNeed = need; r.NtNd = nd;
+            r.P490 = p490;   // 490
             r.NtMk = mk;                                          // ostatnie - znacznik gotowych sum
         }
 
