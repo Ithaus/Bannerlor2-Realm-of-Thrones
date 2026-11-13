@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P10-p (13.11) - rozmowy karczmy: temat Innych tylko, gdy umarli sa przy Murze albo na poludnie od niego (poprawka po recenzji B5)
+
+**Problem:** recenzja B5 (kod): `WorldTalk` ustawial temat "others", gdy klan Innych mial jakakolwiek partie wojenna albo osade. W ROT umarli stoja za Murem od poczatku kampanii (CrashScribe "UMARLI: ... trupow w polu"), wiec 40% kwestii biezacych o Innych moglo isc od pierwszego dnia we wszystkich regionach, takze w Dorne i Essos.
+
+**Przyczyna:** brak warunku miejsca w `WorldTalk.Ensure`.
+
+**Zmiana:** temat "others" tylko, gdy partia wojenna Innych (czynna) albo ich osada stoi przy Murze lub na poludnie (`Measure169c.PlaceAt >= 1` - ta sama definicja miejsca co `OthersRise` i pomiar W8). Linia migawki: `Inni TAK/nie (partii N, przy Murze i na poludnie M)`.
+
+**Ryzyko / co sprawdzic:** klucz `TavernTalkLines` NIE - migawka nie jest liczona. Koszt: raz na dobe, przy pierwszej kwestii - `PlaceAt` dla kazdej partii Innych (kilkadziesiat); czas w linii migawki. Sprawdzic w logu: na poczatku kampanii `Inni nie (partii N>0, ... 0)`, po przejsciu Muru - TAK.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P8-p2 (13.11) - barman wnetrza zajazdu: ceny noclegu z tablic menu, "your bed" przy wspolnym lozku (poprawka po recenzji B4)
 
 **Problem:** recenzja B4 (kod): odpowiedz barmana na "Have you beds for the night?" (`RoadsideInnInterior.BedsCond`) miala ceny przepisane na sztywno ("1 and 1", "2 and 2", "8", "4 and 3", "20"). Przy kluczu `InnCommonRoomSharedBed` `RoomOf(0)` daje 1, a tekst mowil "your own room 1", podczas gdy menu pisze "your bed" (`TownInns.RoomWord`).

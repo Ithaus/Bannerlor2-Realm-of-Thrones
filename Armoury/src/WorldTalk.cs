@@ -33,6 +33,7 @@ namespace Armoury
         private static string _lord, _house;
         private static int _deaths;
         private static bool _others;
+        private static int _othersAll, _othersSouth;   // 474-P10-p: partie wojenne Innych razem / przy Murze i na poludnie (Measure169c.PlaceAt >= 1)
         private static readonly List<Wed> _weds = new List<Wed>();
         private static object _wedsFor;
         private static int _st;
@@ -71,7 +72,7 @@ namespace Armoury
             _day = today; _for = Campaign.Current;
             if (!ReferenceEquals(_wedsFor, Campaign.Current)) { _weds.Clear(); _wedsFor = Campaign.Current; }
             long t0 = Stopwatch.GetTimestamp();
-            _sieges.Clear(); _hungry.Clear(); _lord = _house = null; _deaths = 0; _others = false;
+            _sieges.Clear(); _hungry.Clear(); _lord = _house = null; _deaths = 0; _others = false; _othersAll = _othersSouth = 0;
             try
             {
                 foreach (var s in Settlement.All)
@@ -107,11 +108,24 @@ namespace Armoury
             catch (Exception e) { Stumble("Deaths", e); }
             try
             {
+                // 474-P10-p (recenzja B5): Inni stoja za Murem od poczatku kampanii ROT - temat "others" tylko, gdy ich partia wojenna albo osada jest przy Murze
+                // albo na poludnie od niego (ta sama definicja miejsca co OthersRise / pomiar W8: Measure169c.PlaceAt 0 za Murem, 1 przy Murze, 2 Westeros, 3 Essos)
                 foreach (var c in Clan.All)
                 {
                     if (c == null || c.IsEliminated || !IsOthers(c)) continue;
-                    if ((c.WarPartyComponents != null && c.WarPartyComponents.Count > 0) || (c.Settlements != null && c.Settlements.Count > 0)) { _others = true; break; }
+                    if (c.WarPartyComponents != null)
+                        foreach (var w in c.WarPartyComponents)
+                        {
+                            var mp = w != null ? w.MobileParty : null;
+                            if (mp == null || !mp.IsActive) continue;
+                            _othersAll++;
+                            if (Measure169c.PlaceAt(mp.GetPosition2D) >= 1) _othersSouth++;
+                        }
+                    if (c.Settlements != null)
+                        foreach (var s in c.Settlements)
+                            if (s != null && Measure169c.PlaceAt(s.GetPosition2D) >= 1) _othersSouth++;
                 }
+                _others = _othersSouth > 0;
             }
             catch (Exception e) { Stumble("Others", e); }
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
@@ -120,7 +134,7 @@ namespace Armoury
             try
             {
                 Log.Info(P + "migawka swiata dzien " + today + " - oblezenia " + _sieges.Count + ", glod " + _hungry.Count + " (miasta/zamki bez zapasu), zgony lordow z " + DeathDays + " dni " + _deaths
-                         + (_lord != null ? " (ostatni " + _lord + ")" : "") + ", sluby z " + WeddingDays + " dni " + weds + ", Inni " + (_others ? "TAK" : "nie")
+                         + (_lord != null ? " (ostatni " + _lord + ")" : "") + ", sluby z " + WeddingDays + " dni " + weds + ", Inni " + (_others ? "TAK" : "nie") + " (partii " + _othersAll + ", przy Murze i na poludnie " + _othersSouth + ")"
                          + ", czas " + ms.ToString("0.0", CultureInfo.InvariantCulture) + " ms | potkniecia " + _st + ".");
             }
             catch { }
