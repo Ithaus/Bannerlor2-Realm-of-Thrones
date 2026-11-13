@@ -518,8 +518,9 @@ namespace Armoury
                 if (_wasOff)
                 {
                     _wasOff = false; _next = 0; _built = false; _visKnown = false;
-                    bool sameRule = _job == null || (_job.KeyAll == MapSideRoads.KeyAll && _job.KeyInns == MapSideRoads.KeyInns);   // 487: takze klucz zajazdow   // f19: klucz przelaczony przy wylaczonych drogach - plan od nowa (KeyChanged ponizej)
-                    Log.Info(MapSideRoads.P + "wlaczone w MCM - drogi wracaja (" + (sameRule ? "ten sam plan" : "regula 'kazda wioska' zmieniona - plan od nowa") + ").");
+                    // f19/487: klucz MapSideRoadsAllVillages albo MapSideRoadsToInns przelaczony przy wylaczonych drogach - plan od nowa (KeyChanged ponizej)
+                    string ruleNote = _job == null ? "ten sam plan" : RuleChangeText(_job);
+                    Log.Info(MapSideRoads.P + "wlaczone w MCM - drogi wracaja (" + ruleNote + ").");
                 }
                 if (_job == null)
                 {
@@ -745,10 +746,20 @@ namespace Armoury
             Log.Info(MapSideRoads.P + (keyAll != j.KeyAll ? "regula 'kazda wioska' (klucz MapSideRoadsAllVillages) zmieniona na " + (keyAll ? "TAK" : "NIE")
                                                           : "drogi do zajazdow (klucz MapSideRoadsToInns) zmienione na " + (keyInns ? "TAK" : "NIE")) + " - zdjete decale " + n0
                      + (j.Res == null ? " (plan byl NIEUDANY)" : "") + ", plan od nowa.");
-            SpeedClear("regula 'kazda wioska' zmieniona - plan od nowa");   // n20-drogi
+            SpeedClear(RuleChangeText(j));   // n20-drogi
             _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f; _failedPlan = false;
             ResetChunks();
             return true;
+        }
+
+        /// <summary>487-p: opis zmiany klucza planu wzgledem planu j (ktory klucz: MapSideRoadsAllVillages / MapSideRoadsToInns); "ten sam plan" gdy bez zmian.</summary>
+        private static string RuleChangeText(MapSideRoads.Job j)
+        {
+            bool all = j.KeyAll != MapSideRoads.KeyAll, inns = j.KeyInns != MapSideRoads.KeyInns;
+            if (!all && !inns) return "ten sam plan";
+            string t = all ? "regula 'kazda wioska' (klucz MapSideRoadsAllVillages)" : "";
+            if (inns) t += (all ? " i " : "") + "drogi do zajazdow (klucz MapSideRoadsToInns)";
+            return t + " zmienione - plan od nowa";
         }
 
         /// <summary>Uklad wiosek inny niz w planie (crc ksiegi) - decale zdjete, plan od nowa (raz na zmiane).</summary>
