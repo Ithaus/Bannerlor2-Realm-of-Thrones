@@ -49,7 +49,7 @@ namespace Armoury
         {
             _stumbles = _stumblesDay = 0; _err.Clear();
             _peaceCalls = _peaceQuiet = 0;
-            _lordsY = null; _deathBy.Clear(); _deadIds.Clear(); _agedIds.Clear(); _createdIds.Clear();
+            _lordsY = null; _deathBy.Clear(); _deadIds.Clear(); _agedIds.Clear(); _createdIds.Clear(); _createdKinds.Clear(); _createdStack = null;
             _births = _stillborn = _birthsLord = _deadAll = _deadLord = _deadLordChild = 0;
             Array.Clear(_flow, 0, _flow.Length); Array.Clear(_mir, 0, _mir.Length); _mirLost = 0;
             _bkTotY = null; _w5Y = null;
@@ -353,7 +353,37 @@ namespace Armoury
 
         internal static void OnComesOfAge(Hero h) { try { if (h != null && h.StringId != null) _agedIds.Add(h.StringId); } catch (Exception e) { Stumble("OnComesOfAge", e); } }
 
-        internal static void OnHeroCreated(Hero h, bool born) { try { if (h != null && !born && h.StringId != null) _createdIds.Add(h.StringId); } catch (Exception e) { Stumble("OnHeroCreated", e); } }
+        internal static void OnHeroCreated(Hero h, bool born)
+        {
+            try
+            {
+                if (h == null || born || h.StringId == null) return;
+                _createdIds.Add(h.StringId);
+                // R5 (noc 13.11, analiza 120a pkt 6): skad 22-23 nowych lordow co 7 dob - rodzaj rodu i zawod (doba), stos pierwszego wywolania w sesji
+                var c = h.Clan;
+                string kind = c == null ? "bez rodu" : c.IsBanditFaction ? "bandyci" : c.IsClanTypeMercenary ? "najemnicy" : c.IsMinorFaction ? "rod pomniejszy" : c.Kingdom != null ? "rod krolestwa" : "rod bez krolestwa";
+                string key = kind + "/" + h.Occupation + (h.IsLord ? "/lord" : "");
+                int n; _createdKinds.TryGetValue(key, out n); _createdKinds[key] = n + 1;
+                if (h.IsLord && _createdStack == null && _lordsY != null)   // po pierwszej linii doby (nie tworzenie swiata przy starcie)
+                {
+                    var st = Environment.StackTrace;
+                    var lines = st.Split(new[] { (char)10 });
+                    var sb = new System.Text.StringBuilder();
+                    for (int i = 0, k = 0; i < lines.Length && k < 8; i++)
+                    {
+                        var l = lines[i].Trim();
+                        if (l.Length == 0 || l.Contains("System.Environment") || l.Contains("A16Signals")) continue;
+                        if (sb.Length > 0) sb.Append(" <- ");
+                        sb.Append(l.Length > 110 ? l.Substring(0, 110) : l); k++;
+                    }
+                    _createdStack = h.StringId + " (" + key + "): " + sb;
+                }
+            }
+            catch (Exception e) { Stumble("OnHeroCreated", e); }
+        }
+
+        private static readonly Dictionary<string, int> _createdKinds = new Dictionary<string, int>();
+        private static string _createdStack;   // R5: raz na sesje
 
         private static bool AdultAiLord(Hero h, Clan pc)
         {
@@ -406,11 +436,13 @@ namespace Armoury
             bool first = true;
             foreach (var kv in _deathBy.OrderByDescending(x => x.Value)) { if (!first) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); first = false; }
             sb.Append("), dzieci lordow ").Append(_deadLordChild).Append(", wszystkich bohaterow ").Append(_deadAll)
+              .Append(" | stworzeni wedlug rodu/zawodu (R5): ").Append(_createdKinds.Count == 0 ? "-" : string.Join(", ", _createdKinds.OrderByDescending(x => x.Value).Select(x => x.Key + " " + x.Value).ToArray()))
+              .Append(_createdStack != null ? " | pierwszy stworzony lord w sesji - stos: " + _createdStack : "")
               .Append(" | porody: dzieci ").Append(_births).Append(" (matka z rodu lordow ").Append(_birthsLord).Append("), martwe ").Append(_stillborn)
               .Append(" | zywi bohaterowie ").Append(alive).Append(", lordowie ").Append(lordsAll).Append(" (dzieci ").Append(lordChildren).Append(")");
             Log.Info(sb.ToString());
             _lordsY = now;
-            _deathBy.Clear(); _deadIds.Clear(); _agedIds.Clear(); _createdIds.Clear();
+            _deathBy.Clear(); _deadIds.Clear(); _agedIds.Clear(); _createdIds.Clear(); _createdKinds.Clear();
             _births = _stillborn = _birthsLord = _deadAll = _deadLord = _deadLordChild = 0;
         }
 

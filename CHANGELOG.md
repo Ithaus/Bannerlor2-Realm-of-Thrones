@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## R5-a (13.11) - pomiar: skad nowi lordowie (rod, zawod, stos pierwszego wywolania)
+
+**Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 6): "stworzeni doroslymi" 22-23 co 7 dob przy porodach 0 i jednym zgonie; lordow 1980 -> 2276 (w roku 364 dob ok. +1100). A16 widzial tylko OnHeroCreated bez zrodla.
+
+**Przyczyna:** nieustalona - brak pomiaru.
+
+**Zmiana (sam pomiar):** A16Signals.OnHeroCreated liczy stworzonych bohaterow (nie urodzonych) wedlug rodzaju rodu (bandyci / najemnicy / rod pomniejszy / rod krolestwa / bez krolestwa), Occupation i lord; raz na sesje (po pierwszej linii doby, nie przy tworzeniu swiata) zapisuje stos wywolania pierwszego stworzonego lorda (8 ramek). Linia A16 lordow: "stworzeni wedlug rodu/zawodu (R5): ...", "pierwszy stworzony lord w sesji - stos: ...". Zachowanie gry bez zmian.
+
+**Ryzyko / co sprawdzic:** jeden Environment.StackTrace na sesje; nastepny test 120 dob - wskaze modul / metode tworzaca lordow; potem decyzja (osobny krok).
+
+**Status:** DO SPRAWDZENIA
+
 ## R6 (13.11) - wojna korona-Polnoc bez frontu w tescie 120a: zgodne z rozciagnieta osia fabuly (bez zmiany kodu)
 
 **Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 2): RiverlandsDeclareWarEvent WYSTARTOWALO (dzien 109), "skutkow 0"; Dorzecze w pokoju przez caly test (KRONIKA bez Riverlands), 274 "B bitwy 0 oblezenia 0", Krol Polnocy (272) "czeka - wojna z korona: Polnoc TAK, Dorzecze NIE".
