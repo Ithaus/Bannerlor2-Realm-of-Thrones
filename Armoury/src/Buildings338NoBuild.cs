@@ -108,18 +108,20 @@ namespace Armoury
         }
 
         /// <summary>476-a: AI nie stawia tej budowli w tej osadzie - zbrojownia / sad BK (473-b6, klucz On) albo zaklad bez zasobu okolicy (Buildings338Works, klucz Works).</summary>
-        private static bool Skip(Town t, BuildingType bt)
+        private static bool Skip(Town t, BuildingType bt) { return Skip(t, bt, false); }
+
+        private static bool Skip(Town t, BuildingType bt, bool queued)
         {
             if (IsBlocked(bt) && AiTown(t))
             {
-                if (bt.StringId == CourtId) { var w = Buildings338Civic.AiWantsWorship(t); if (w.HasValue) return !w.Value; }   // 476-c: slot sadu BK = miejsce kultu
+                if (bt.StringId == CourtId) { var w = Buildings338Civic.AiWantsWorship(t, queued); if (w.HasValue) return !w.Value; }   // 476-c: slot sadu BK = miejsce kultu
                 return true;
             }
             return Buildings338Works.AiBlocks(t, bt);
         }
 
         /// <summary>476-p2 (recenzja A2): CitySack.Prioritize nie stawia na czele zgliszcz budowli, ktora AI tej osady i tak wyjmie z kolejki.</summary>
-        internal static bool AiSkips(Town t, BuildingType bt) { try { return t != null && bt != null && Skip(t, bt); } catch { return false; } }
+        internal static bool AiSkips(Town t, BuildingType bt) { try { return t != null && bt != null && Skip(t, bt, true); } catch { return false; } }   // R4: ta sama miara co DropQueued (histereza)
 
         /// <summary>(2) Z ArmouryBehavior przed BuildFunding.Daily: zbrojownia i sad BK (i 476-a: zaklad bez zasobu) wychodza z kolejki osad AI (postep i poziom zostaja na budowli).</summary>
         internal static void DropQueued()
@@ -135,12 +137,12 @@ namespace Armoury
                     var q = t.BuildingsInProgress;
                     if (q == null || q.Count == 0) continue;
                     bool any = false;
-                    foreach (var b in q) if (b != null && Skip(t, b.BuildingType)) { any = true; break; }
+                    foreach (var b in q) if (b != null && Skip(t, b.BuildingType, true)) { any = true; break; }
                     if (!any) continue;
                     var keep = new List<Building>();
                     foreach (var b in q)
                     {
-                        if (b == null || !Skip(t, b.BuildingType)) { keep.Add(b); continue; }
+                        if (b == null || !Skip(t, b.BuildingType, true)) { keep.Add(b); continue; }
                         _dropped++;
                         if (Buildings338Works.AiBlocks(t, b.BuildingType)) Buildings338Works.NoteAiBlocked();   // 476-p2: licznik decyzji, nie wywolan
                     }

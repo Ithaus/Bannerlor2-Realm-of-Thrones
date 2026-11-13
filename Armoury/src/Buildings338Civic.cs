@@ -188,13 +188,16 @@ namespace Armoury
         }
 
         /// <summary>AI: miejsce kultu (slot BK Court House) tylko gdy wiara pana nie panuje w osadzie albo lojalnosc &lt; 60. null - regula nie dotyczy (klucz NIE).</summary>
-        internal static bool? AiWantsWorship(Town t)
+        internal static bool? AiWantsWorship(Town t) { return AiWantsWorship(t, false); }
+
+        /// <summary>R4 (noc 13.11, analiza 120a pkt 10): histereza - nowy wybor przy lojalnosci &lt; 60, budowla juz w kolejce zostaje do lojalnosci &gt; 70 (dotad wchodzila i wypadala co dobe).</summary>
+        internal static bool? AiWantsWorship(Town t, bool queued)
         {
             if (!On || t == null) return null;
             try
             {
                 var r = Religion(Lord(t.Settlement));
-                bool want = (r != null && !ReferenceEquals(r, Dominant(t.Settlement))) || t.Loyalty < 60f;
+                bool want = (r != null && !ReferenceEquals(r, Dominant(t.Settlement))) || t.Loyalty < (queued ? 70f : 60f);
                 if (want) _aiAllowed++; else _aiBlocked++;
                 return want;
             }

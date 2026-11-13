@@ -37,7 +37,7 @@ namespace Armoury
 
         internal static void SessionStart()
         {
-            _res.Clear(); _aiBlocked = _townMinesSkipped = _castleOreFiltered = _stumbles = 0;
+            _res.Clear(); _aiBlocked = _townMinesSkipped = _castleOreFiltered = _stumbles = _oreUnknown = 0;
             if (!_minesHooked)
             {
                 var bkb = AccessTools.TypeByName("BannerKings.Behaviours.BKBuildingsBehavior");
@@ -113,7 +113,7 @@ namespace Armoury
             if (t == null) return false;
             var r = Get(t);
             if (r.Ore >= 0) return r.Ore > 0;
-            bool ok = false;
+            bool ok = false, unknown = false;
             try
             {
                 if (Deposit(r))
@@ -124,13 +124,16 @@ namespace Armoury
                     {
                         int rich;
                         var mins = Buildings338.Minerals(pop, out rich);
-                        if (mins.Count == 0) ok = false;
+                        // R4 (noc 13.11, analiza 120a pkt 9): pusty sklad BK = dane BK jeszcze niegotowe (start nowej kampanii: "ma z czego kopac: miasta 0, zamki 0",
+                        // 39 zakladow zdjetych z kolejek AI w 1. dobie) - traktuj jak samo zloze (HasDeposit) i NIE zapamietuj wyniku na dobe
+                        if (mins.Count == 0) { ok = true; unknown = true; }
                         else foreach (var kv in mins) if (kv.Key != null && kv.Key.StringId != null && r.Items.Contains(kv.Key.StringId)) { ok = true; break; }
                     }
                 }
             }
             catch (Exception e) { Stumble("OreUsable", e); ok = Deposit(r); }
-            r.Ore = ok ? 1 : 0;
+            if (!unknown) r.Ore = ok ? 1 : 0;
+            if (unknown) _oreUnknown++;
             return ok;
         }
 
@@ -184,12 +187,17 @@ namespace Armoury
         /// <summary>Stadnina bez pastwiska okolicy nie hoduje (476).</summary>
         internal static bool StudsNoPasture(Town t) { return On && !HasPasture(t); }
 
+        private static int _oreUnknown;   // R4: odczyty OreUsable przy pustym skladzie BK (dane niegotowe) - zloze uznane, wynik nie zapamietany
+
         internal static void Daily(int day)
         {
             if (!On) return;
+            int tu = 0, cu = 0;   // R4: "ma z czego kopac" takze w linii dobowej (dotad tylko przy starcie sesji)
+            try { foreach (var t in Town.AllTowns) if (Deposit(Get(t)) && OreUsable(t)) tu++; foreach (var t in Town.AllCastles) if (Deposit(Get(t)) && OreUsable(t)) cu++; }
+            catch (Exception e) { Stumble("Daily(kopalnie)", e); }
             Log.Info("Budynki (338) zaklady (476): dzien " + day + " | AI pominelo zaklad bez zasobu " + _aiBlocked + ", miasta z kopalnia bez zloza (bez wydobycia) " + _townMinesSkipped
-                     + ", losowan rudy zamkow spoza zloza okolicy (pominiete) " + _castleOreFiltered + " | urzad podatkowy wsi (476-d): klucz " + Buildings338.YN(Buildings338VillageTax.On) + ", wsi z dluzszym darowaniem zaleglosci dzis " + Buildings338VillageTax.TakeHits() + " | bledy " + _stumbles);
-            _aiBlocked = _townMinesSkipped = _castleOreFiltered = 0;
+                     + ", losowan rudy zamkow spoza zloza okolicy (pominiete) " + _castleOreFiltered + ", kopalnia ma z czego kopac (R4): miasta " + tu + ", zamki " + cu + ", odczytow przy niegotowym skladzie BK " + _oreUnknown + " | urzad podatkowy wsi (476-d): klucz " + Buildings338.YN(Buildings338VillageTax.On) + ", wsi z dluzszym darowaniem zaleglosci dzis " + Buildings338VillageTax.TakeHits() + " | bledy " + _stumbles);
+            _aiBlocked = _townMinesSkipped = _castleOreFiltered = _oreUnknown = 0;
         }
     }
 }

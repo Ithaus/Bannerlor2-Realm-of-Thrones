@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## R4 (13.11) - kopalnie na starcie nowej kampanii, histereza miejsca kultu, powod budow, ktore stoja
+
+**Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 9 i 10): (a) start nowej kampanii "kopalnia ma z czego kopac: miasta 0, zamki 0" (po wczytaniu zapisu 19 / 23), w 1. dobie "AI pominelo zaklad bez zasobu 27", "wyjete z kolejek AI 39" - trwale; (b) miejsce kultu (476-c) wchodzi do kolejki AI i co dobe z niej wypada (prog lojalnosci 60 bez histerezy); (c) budowy 'STOI' ponad 100 dob bez powodu - BuildFunding 'budget < 1 -> continue' bez licznika.
+
+**Przyczyna:** (a) Buildings338Works.OreUsable: pusty sklad mineralow BK (dane BK niegotowe w pierwszej dobie) dawal 'brak' i byl zapamietany na dobe; (b) Buildings338Civic.AiWantsWorship ten sam prog dla wyboru i dla zdjecia z kolejki; (c) brak licznika.
+
+**Zmiana:** (a) pusty sklad BK = dane niegotowe: zloze okolicy wystarcza, wynik NIE zapamietany; linia dobowa "zaklady (476)" ma "kopalnia ma z czego kopac (R4): miasta X, zamki Y, odczytow przy niegotowym skladzie BK Z"; (b) nowy wybor przy lojalnosci < 60, budowla juz w kolejce (DropQueued, CitySack.Prioritize przez AiSkips) zostaje do > 70; (c) BuildFunding zapisuje powod doby bez budzetu (przydzial rodu 0 / podzial na budowy rodu < 1 / mury: limit doby / kolejka rodu R3-11a / pan bez zlota) - linia "Budowa: ... STOI N dni - powod", licznik "bez budzetu doby (R4)" w linii "Budowy oplacone" (przed koncem linii czytanym przez bramke N5-5). Bez nowych kluczy (naprawy i pomiar).
+
+**Ryzyko / co sprawdzic:** (a) w nowej kampanii kopalnie miast/zamkow ze zlozem nie wypadaja z kolejek w 1. dobie; (b) liczniki AI miejsca kultu bez skokow; (c) tylko log.
+
+**Status:** DO SPRAWDZENIA
+
 ## R3 (13.11) - oblezenia: odstapienie i zatrzymany zegar 471 tylko przy bliskiej odsieczy (klucz Siege Near Relief Only)
 
 **Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 4): Starfall oblegany 4 razy, Sandstone 2 razy - za kazdym razem odstapienie przy q_obl 1.28-1.31 przed odsiecza "przyjazd 11.06" doby, ktora nigdy nie walczyla (bitwy pod murami 0); Cape Wrath "zegar 31, dob z odsiecza 54" (odsiecz zebrala 55% wymaganej), Demongate "dob z odsiecza 46"; kapitulacje 471b 0 w calym tescie.

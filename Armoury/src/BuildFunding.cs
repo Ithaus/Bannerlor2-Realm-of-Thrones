@@ -235,13 +235,15 @@ namespace Armoury
         public static void EmptyMaterials(ref List<(ItemObject, int)> __result) { if (On) __result = new List<(ItemObject, int)>(); }
 
         // ------------------------------------------------------------ codzienne rozliczenie
+        internal static readonly System.Collections.Generic.Dictionary<string, string> NoBudgetWhy = new System.Collections.Generic.Dictionary<string, string>();   // R4: osada -> powod ostatniej doby bez budzetu
+        private static int _dNoBudget;   // R4: budowy bez budzetu tej doby
         private static int _paidTowns, _stalledNoMat, _warSkipped; private static long _spent, _toPurses, _toMarkets; private static double _points;
 
         internal static void Daily()
         {
             if (!On || Campaign.Current == null) return;
             _funded.Clear(); EngDayStart(); WallDayStart();   // R3-10b: liczniki doby; 472: liczniki murow
-            _paidTowns = _stalledNoMat = _warSkipped = 0; _spent = _toPurses = _toMarkets = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
+            _paidTowns = _stalledNoMat = _warSkipped = _dNoBudget = 0; _spent = _toPurses = _toMarkets = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
             try
             {
                 var s = Settings.Current;
@@ -311,12 +313,21 @@ namespace Armoury
                     if (mcut < 1f) ppp *= mcut;
                     // materialy z targu (miasto - swoj, zamek - najblizsze miasto)
                     var market = st.IsTown ? st : NearestTown(st);
+                    float b0 = budget;   // R4: przyczyna doby bez budzetu (BuildDiary 'STOI')
                     budget = OneBudget(st, b, clan, all, budget, ppp, market);   // R3-11a: rod AI z kilkoma budowami - reszta przydzialu na te budowe albo 0 (czeka w kolejce); reszta - budget bez zmian
                     float preWall = budget;
                     if (WallOn) budget = WallBudget(st, b, budget, ppp, market);   // 472: mury - budzet najwyzej na punkty do limitu doby (najkrotszy czas poziomu); reszta w kiesie / R3-11a dalej
                     bool wallCut = WallOn && budget < preWall;   // 472-p (recenzja U3): budzet murow obciety limitem - jedna sztuka materialu i place najwyzej w budzecie (klucz wylaczony - false)
+                    float b1 = budget;
                     budget = Math.Min(budget, Math.Max(0, lord.Gold));
-                    if (budget < 1f) continue;
+                    if (budget < 1f)
+                    {
+                        // R4 (noc 13.11, analiza 120a pkt 10): powod doby bez budzetu - dotad 'continue' bez licznika (budowy 'STOI' ponad 100 dob bez powodu)
+                        string why = !(all >= 1f) ? "przydzial rodu 0 (dochod / budzet rodu)" : !(b0 >= 1f) ? "przydzial podzielony na budowy rodu < 1" : !(b1 >= 1f) ? (wallCut ? "mury: limit doby" : "kolejka rodu (R3-11a)") : "pan bez zlota";
+                        NoBudgetWhy[st.StringId] = why; _dNoBudget++;
+                        continue;
+                    }
+                    NoBudgetWhy.Remove(st.StringId);
                     float matBudget = budget * MBMath.ClampFloat(s.BuildMaterialShare, 0f, 1f);
                     // KS-R3 G7: material budow ksiegowany na osade targu (ramka FBuild z osada - rynek osady w linii "KS: rynki"; dotad ramka bez osady - "bez rynku")
                     int matSpent;
@@ -361,7 +372,7 @@ namespace Armoury
             Log.Info("Budowy oplacone: dzien " + (int)CampaignTime.Now.ToDays + " - osad " + _paidTowns + ", wydano " + _spent + " (place i wozy do kas osad " + _toPurses
                      + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
-                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + "." + OneTail() + WarFront.LineTail());   // R3-11a przed N5-E: bramka N5-5 czyta potkniecia N5-E z konca linii
+                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + ", bez budzetu doby (R4, powod w linii Budowa: STOI) " + _dNoBudget + "." + OneTail() + WarFront.LineTail());   // R3-11a przed N5-E: bramka N5-5 czyta potkniecia N5-E z konca linii
             // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild
             try { FolkWorks(); } catch (Exception e) { Log.Error("BuildFunding.FolkWorks", e); }
             EngLine();   // R3-10b: linia "Inzynieria przy budowach" (na koncu doby budow - z dala od linii "Budowy oplacone", ktora zmienia R3-11a)

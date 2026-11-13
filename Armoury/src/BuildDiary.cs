@@ -17,7 +17,7 @@ namespace Armoury
         private static readonly Dictionary<string, int> _stuckDays = new Dictionary<string, int>();
         private static readonly Dictionary<string, string> _sig = new Dictionary<string, string>();
 
-        internal static void Reset() { _last.Clear(); _stuckDays.Clear(); _sig.Clear(); }
+        internal static void Reset() { _last.Clear(); _stuckDays.Clear(); _sig.Clear(); BuildFunding.NoBudgetWhy.Clear(); }   // R4: powody czyszczone miedzy kampaniami
 
         internal static void Daily()
         {
@@ -50,7 +50,7 @@ namespace Armoury
                     else if (had && Math.Abs(prog - prev) < 0.01f)
                     {
                         int sd; _stuckDays.TryGetValue(key, out sd); _stuckDays[key] = sd + 1; stuck++;
-                        state = "STOI " + (sd + 1) + " dni";
+                        string why; state = "STOI " + (sd + 1) + " dni" + (BuildFunding.NoBudgetWhy.TryGetValue(key, out why) ? " - " + why : "");   // R4: powod
                     }
                     else { _stuckDays.Remove(key); going++; state = "idzie +" + (had ? (prog - prev).ToString("0.#") : "?"); }
                     if (BuildFunding.OneWaitedLastDay(st))   // R3-11a: przydzial pana poszedl wczoraj na inna budowe rodu (z tych punktow jest dzisiejszy postep)
