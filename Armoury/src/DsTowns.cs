@@ -117,6 +117,8 @@ namespace Armoury
         private static int _cfN, _cfNS; private static double _cfAmt, _cfAmtS, _ccArrFree, _ccArrFreeS;
         // f7-kasy (Ks Farm Catch Up): gersuma z zapasu kas - doba (od linii do linii) i sesja
         private static int _cuRev, _cuDec, _cuNone, _cuNoGrow, _cuNoFarm, _cuPaidN, _cuShortN, _cuHouse, _cuArr, _cuRemit, _cuLow, _cuStum, _cuStumSess, _cuNS;
+        // 483 (Ks Farm Catch Up When Flat): gersuma postanowiona przy kasie bez przyrostu (liczba, zl) - doba (od linii do linii)
+        private static int _cuFlat; private static double _cuFlatAmt;
         private static double _cuDecAmt, _cuBills;
         private static long _cuPaidL, _cuPaidC, _cuTook, _cuShort, _cuNoLord, _cuPaidLS, _cuPaidCS;
         private static long _cuTicks;
@@ -128,6 +130,7 @@ namespace Armoury
         private static void ClearCounters()
         {
             _cuRev = _cuDec = _cuNone = _cuNoGrow = _cuNoFarm = _cuPaidN = _cuShortN = _cuHouse = _cuArr = _cuRemit = _cuLow = _cuStum = 0;
+            _cuFlat = 0; _cuFlatAmt = 0;                                   // 483
             _cuDecAmt = _cuBills = 0; _cuPaidL = _cuPaidC = _cuTook = _cuShort = _cuNoLord = 0; _cuTicks = 0;
             _tlFloorUp = _tlFloorN = _tlSgOut = _tlSgIn = 0; _tlSgN = 0;   // scalenie f7/f8: okno linii kasy kupcow
             _klFloorUp = _klFloorN = _klSgOut = _klSgIn = 0; _klSgN = 0;   // recenzja calosci 18.10: to samo dla korona2 (pozyczki koron od miast i zaliczki DS)
@@ -785,7 +788,23 @@ namespace Armoury
                     double F = f.FL + f.FC;
                     if (cu) _cuRev++;
                     if (capNet && !(F > 0)) { FromZero(f, st, t, g, smin, s, days, grow, cu, mx); continue; }   // m103 P3 (f): firma od zera
-                    if (!(grow > 0) || !(F > 0)) { if (cu) { if (!(F > 0)) _cuNoFarm++; else _cuNoGrow++; } continue; }
+                    if (!(F > 0)) { if (cu) _cuNoFarm++; continue; }
+                    if (!(grow > 0))
+                    {
+                        // 483 (Ks Farm Catch Up When Flat): kasa bez przyrostu (firma dogonila doplyw) - zapas nagromadzony przed dogonieniem zdejmuje gersuma, tak jak
+                        // przy podwyzce 0 (komentarz nizej); bez podwyzki firmy, ta sama droga zlota (CatchUpDecide -> CatchUpPay: kasa -> pan / skarbiec korony). Klucz NIE - jak dotad
+                        if (cu)
+                        {
+                            _cuNoGrow++;
+                            if (s.KsFarmCatchUpWhenFlat)
+                            {
+                                int d0 = _cuDec; double a0 = _cuDecAmt;
+                                CatchUpDecide(f, st, t, g, smin, s, days);      // wlasny try/catch (licznik potkniec), bez globalnego wylacznika
+                                if (_cuDec > d0) { _cuFlat++; _cuFlatAmt += _cuDecAmt - a0; }
+                            }
+                        }
+                        continue;
+                    }
                     double add;
                     if (capNet)
                     {
@@ -1222,7 +1241,7 @@ namespace Armoury
                   .Append(" | klucz Ks Farm Catch Up TAK (udzial ").Append(CatchUpShare(s).ToString("0.00", Inv)).Append(", prog 1.5 x zapas kupcow + ").Append(CatchUpKeepDays(s))
                   .Append(" dob firmy z kasy; co ").Append(days).Append(" dob, z przegladem wedlug nadwyzki, rozlozona na ").Append(days).Append(" dob)")
                   .Append(" | przeglady dzis ").Append(_cuRev).Append(": gersuma postanowiona ").Append(_cuDec).Append(" (").Append(N0(_cuDecAmt)).Append(" zl; rachunki zywnosci odjete ")
-                  .Append(N0(_cuBills)).Append("), zapas okna do progu ").Append(_cuNone).Append(", kasa bez przyrostu ").Append(_cuNoGrow).Append(", bez firmy ").Append(_cuNoFarm)
+                  .Append(N0(_cuBills)).Append("), zapas okna do progu ").Append(_cuNone).Append(", kasa bez przyrostu ").Append(_cuNoGrow).Append(" (483 Ks Farm Catch Up When Flat ").Append(s.KsFarmCatchUpWhenFlat ? "TAK" : "NIE").Append(": gersuma postanowiona ").Append(_cuFlat).Append(", ").Append(N0(_cuFlatAmt)).Append(" zl)").Append(", bez firmy ").Append(_cuNoFarm)
                   .Append(" | bez przegladu (miasto-doby): kasa do 1.5 x zapas ").Append(_cuLow).Append(", oblezenie / zdobycie ").Append(_cuRemit).Append(", zaleglosci firmy ").Append(_cuArr)
                   .Append(", domy najpierw (R/P ponizej pasma) ").Append(_cuHouse)
                   .Append(" | zaplacone dzis: zdjete z kas ").Append(_cuTook).Append(" = panom ").Append(_cuPaidL).Append(" + koronie ").Append(_cuPaidC)
