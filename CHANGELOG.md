@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 474-p (13.11) - recenzje A i B galezi 474: punkty odrzucone i znane wady (bez zmian w kodzie)
+
+**Problem:** dwie recenzje kodu (A - stabilnosc, B - ekonomia i logika) paczek 474-P1..P11. Poprawione osobnymi wpisami: A1 (474-P8b-p), A2 (474-P8-p/P7-p), A3 (474-P8-p3), A4/B8 (474-P6-p), A7 (474-P8-p4), B1/B2 (474-P5b-p), B3 (474-P9-p), B4 (474-P8-p2), B5 (474-P10-p). Ponizej to, czego swiadomie NIE zmieniono.
+
+**Przyczyna / uzasadnienie:**
+- A5 (lektor czyta plotki z nowych kufli P3/P8 i moze nagrywac brakujace przez ElevenLabs): to ta sama droga co kufel w menu karczmy od m103; limit dzienny `LektorGossipDailyChars` (1000 znakow) i zapas `LektorGossipReserveChars` sa wspolne dla wszystkich kufli - nowe miejsca nie podnosza wydatku ponad dzisiejszy pulap. `Armoury.json` Jeffa nie ma kluczy Lektor (dzialaja domyslne: `LektorGossipLive` TAK). Wylaczenie nagran na zywo to decyzja Jeffa (MCM "Narrator Gossip Live" NIE = tylko nagrania z dysku), nie zmiana kodu. Ramy barmana i kwestie 474-P10 lektor pomija (`Rumours.cs`).
+- A6 (kasztelan: `Ceiling(got)` moglby dac czlowieka z ulamka): `Rooms` liczy wolne miejsce `LevyRoomHere` = podloga (hearth - 50) / przelicznik, a `FromVillage` daje `t = min(can, ask)` - przy ask <= podlogi(can) `got` jest calkowite (albo 0, gdy `Move` sie nie uda). Ulamek nie wystepuje; zasada ta sama co `LevyDo`.
+- A8 (P1: `IsKeyDown` co klatke, `LabelTick` przy wyjatku co klatke z Altem): ograniczone 3 potknieciami (napisy gasna do nastepnego wczytania mapy) - bez zmian.
+- A9 (P9: posadzony bywalec moze wstac, `_tableOf` dalej trzyma go przy stole): nieszkodliwe, do obejrzenia w tescie.
+- B6 (P5: licznik `_lvHouseToday` tylko w pamieci): po zapisie i wczytaniu tej samej doby limit "1 na 5" ludzi rodu liczy sie od zera; ogolna liczba ludzi dalej ograniczona zapisywanym `Today` - z niczego nic nie przybywa, zmienia sie tylko proporcja rod / chlopi. Znana wada.
+- B7 (P10: sluby `WorldTalk._weds` tylko w pamieci): po wczytaniu temat "wedding" znika do nastepnego slubu (najwyzej 20 dni). Znana wada.
+- A4 (czesc): tekst menu wioski pobocznej po werbunku z okna gry zostaje nieaktualny do ponownego wejscia - odswiezenie wymagaloby `SwitchToMenu` z ramki VM; warunki opcji licza od nowa przy kliknieciu.
+
+**Zmiana:** brak zmian w kodzie (tylko ten wpis).
+
+**Ryzyko / co sprawdzic:** decyzje dla Jeffa: (1) nagrania lektora na zywo przy nowych kuflach - zostawic czy wylaczyc w MCM; (2) dzwiek karczmy na mapie jest tylko przy zajazdach przy szlaku - czy miasta z karczma tez maja byc slyszalne z mapy; (3) siedziby rodow bez wsi (linia tabeli rodow w logu) - jesli sa, czy kasztelan ma tam brac ludzi z miasta.
+
+**Status:** DO SPRAWDZENIA (decyzje Jeffa; kod bez zmian).
+
 ## 474-P8-p4 (13.11) - wnetrze zajazdu: gwar i muzyka w sali, nie w poczatku ukladu sceny (poprawka po recenzji A7)
 
 **Problem:** recenzja A7 (kod): gwar (`tavern` area) i `tavern_track_01` powstawaly bez `SetPosition`, czyli w (0,0,0) sceny. W scenach, gdzie sala lezy daleko od tego punktu, dzwiek moze byc nieslyszalny albo dochodzic ze zlej strony.
