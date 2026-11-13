@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-p6 (13.11) - drobne po recenzji 476: nazwy BK wracaja przy kluczu NIE, cache odbicia wiary, front i budowle cywilne, martwy id, komentarz WarFront
+
+**Problem:** recenzja 476 A: (A3) zmiana nazw Theater -> "Temple" i Court House -> "Place of Worship" zostawala po wylaczeniu klucza (wbrew "NIE = jak przed"), flagi linii doby nie zerowane miedzy sesjami; (A8) Religion() przy kazdym liczeniu lojalnosci robil AccessTools.Property(BannerKingsConfig, "Instance"); (A6) przy froncie waga glodu x6 trafiala tez na budowle cywilne, za ktore BuildFunding przy froncie nie placi - wstrzymana cywilna blokowala kolejke; (A5) martwy id "building_settlement_granary" (w 1.4.8 spichlerz jest tylko zamkowy); (A7) dwa summary nad FrontPeek, Calm bez opisu.
+
+**Przyczyna:** jw.
+
+**Zmiana:** Buildings338Civic: oryginalne Name/Explanation zapamietane przed zmiana, przywracane przy kluczu NIE (SessionStart i Daily), flagi _loyWired/_relWired zerowane w SessionStart; BannerKingsConfig.Instance raz na sesje (_cfgInst). Buildings338Need: przy froncie waga glodu tylko dla budowli wojskowych; usuniety martwy id. WarFront: opis wrocil nad Calm.
+
+**Ryzyko / co sprawdzic:** po wylaczeniu "Buildings338 Temples And Worship" nazwy BK nastepnej doby. Wybor AI przy froncie rzadziej cywilny.
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-p5 (13.11) - urzad podatkowy wsi nie podnosi dziennej raty zaleglosci ponad dawny sufit
 
 **Problem:** recenzja 476 B6 (niska, kalibracja): 476-d wydluzal darowanie (sufit zaleglosci fd x czynsz, przy L3 ok. 910 rat) i skracal splate (pd = 11), wiec maksymalna rata wynosila ok. 83 x czynsz dnia zamiast 13 x (364/28) - sumy ponad koszyk wsi (zbytki P5, roboty gminy, zakupy KS) schodzily do pana ok. 6 razy szybciej, wbrew opisowi "mniej przepada po drodze".

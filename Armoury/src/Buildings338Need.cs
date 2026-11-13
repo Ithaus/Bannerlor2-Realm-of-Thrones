@@ -22,7 +22,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.Buildings338 && s.Buildings338AiByNeed; } }
         private static int _picks, _hunger, _wage, _front, _ore, _stumbles;
 
-        private static readonly HashSet<string> Food = new HashSet<string>(StringComparer.Ordinal) { "building_castle_granary", "building_settlement_granary", "building_settlement_warehouse", "building_castle_farmlands", "building_settlement_waterworks" };
+        private static readonly HashSet<string> Food = new HashSet<string>(StringComparer.Ordinal) { "building_castle_granary", "building_settlement_warehouse", "building_castle_farmlands", "building_settlement_waterworks" };
         private static readonly HashSet<string> Wage = new HashSet<string>(StringComparer.Ordinal) { "building_castle_barracks", "building_settlement_barracks", "building_castle_castallans_office" };
         private static readonly HashSet<string> War = new HashSet<string>(StringComparer.Ordinal) { "building_castle_fortifications", "building_settlement_fortifications", "building_castle_siege_workshop", "building_settlement_siege_workshop", "building_castle_guard_house", "building_settlement_guard_house" };
         private static readonly HashSet<string> Roads = new HashSet<string>(StringComparer.Ordinal) { "building_castle_roads_and_paths", "building_settlement_roads_and_paths" };
@@ -48,7 +48,7 @@ namespace Armoury
                     if (skip != null && skip(town, b.BuildingType)) continue;
                     string id = b.BuildingType.StringId ?? "";
                     float x = 1f;
-                    if (hunger && Food.Contains(id)) x *= 6f;
+                    if (hunger && Food.Contains(id) && (!front || b.BuildingType.IsMilitaryProject)) x *= 6f;   // 476-p6 (recenzja A6): przy froncie BuildFunding nie placi za cywilne - glod nie wpycha ich do kolejki
                     if (wage && Wage.Contains(id)) x *= 6f;
                     if (front && War.Contains(id)) x *= 6f;
                     if (ore && (id == Buildings338Works.TownMinesId || id == Buildings338Ports.CastleMinesId)) x *= 6f;

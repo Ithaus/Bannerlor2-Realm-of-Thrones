@@ -32,6 +32,8 @@ namespace Armoury
         private static readonly HashSet<MethodInfo> _patched = new HashSet<MethodInfo>();
         private static RuntimeMethodHandle _loyActive, _relActive;
         private static bool _loyWired, _relWired, _renamed;
+        private static PropertyInfo _cfgInst;   // 476-p6 (recenzja A8): BannerKingsConfig.Instance raz na sesje, nie przy kazdym liczeniu lojalnosci
+        private static readonly Dictionary<BuildingType, KeyValuePair<TextObject, TextObject>> _orig = new Dictionary<BuildingType, KeyValuePair<TextObject, TextObject>>();   // 476-p6 (A3): nazwy przed zmiana
         private static PropertyInfo _cfgRelMgr; private static MethodInfo _getHeroRel; private static PropertyInfo _popRelData, _rdDominant;
         private static TextObject _txtWorship, _txtWorshipW;
         private static int _cLoy, _cRel, _stumbles, _aiAllowed, _aiBlocked;
@@ -45,11 +47,13 @@ namespace Armoury
         internal static void SessionStart()
         {
             _cLoy = _cRel = _stumbles = _aiAllowed = _aiBlocked = 0;
+            _loyWired = _relWired = false;   // 476-p6 (A3): flagi linii doby od zera w kazdej sesji (_renamed - przy przywracaniu nazw)
             string loy = "BRAK", rel = "BRAK", ren = "nie";
             try
             {
                 var tCfg = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
                 _cfgRelMgr = tCfg != null ? AccessTools.Property(tCfg, "ReligionsManager") : null;
+                _cfgInst = tCfg != null ? AccessTools.Property(tCfg, "Instance") : null;
                 var tRm = _cfgRelMgr != null ? _cfgRelMgr.PropertyType : null;
                 _getHeroRel = tRm != null ? AccessTools.Method(tRm, "GetHeroReligion", new[] { typeof(Hero) }) : null;
                 var tPm = AccessTools.TypeByName("BannerKings.Managers.PopulationManager");
@@ -77,7 +81,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Patch", e); }
-            try { if (On) { Rename(); ren = _renamed ? "tak" : "nie (brak typu)"; } } catch (Exception e) { Stumble("Rename", e); }
+            try { if (On) { Rename(); ren = _renamed ? "tak" : "nie (brak typu)"; } else RestoreNames(); } catch (Exception e) { Stumble("Rename", e); }
             Buildings338.Hook("swiatynia i miejsce kultu (476-c): lojalnosc " + loy + ", waga wiary " + rel + ", nazwy " + ren);
         }
 
@@ -93,21 +97,42 @@ namespace Armoury
             var pName = AccessTools.Property(typeof(BuildingType), "Name");
             var pExp = AccessTools.Property(typeof(BuildingType), "Explanation");
             var th = FindType(TheaterId);
-            if (th != null && pName != null) { pName.SetValue(th, new TextObject("Temple"), null); _renamed = true; }
+            if (th != null && pName != null) { Keep(th); pName.SetValue(th, new TextObject("Temple"), null); _renamed = true; }
             var w = FindType(WorshipId);
             if (w != null && pName != null)
             {
+                Keep(w);
                 pName.SetValue(w, new TextObject("Place of Worship"), null);
                 if (pExp != null) pExp.SetValue(w, new TextObject("A sept, a godswood, a hall of the Drowned God or a temple of R'hllor - after the faith of the lord. The lord's faith gains weight among the townsfolk (+10 per level), and while it is the faith of the town the people are more loyal (+0.25 a day per level)."), null);
                 _renamed = true;
             }
         }
 
+        private static void Keep(BuildingType bt)
+        {
+            if (bt == null || _orig.ContainsKey(bt)) return;
+            _orig[bt] = new KeyValuePair<TextObject, TextObject>(bt.Name, bt.Explanation);
+        }
+
+        /// <summary>476-p6 (recenzja A3): klucz NIE - nazwy i opisy BK wracaja (zmiana nazw to stan obiektu typu w procesie, nie zapis).</summary>
+        private static void RestoreNames()
+        {
+            if (!_renamed && _orig.Count == 0) return;
+            var pName = AccessTools.Property(typeof(BuildingType), "Name");
+            var pExp = AccessTools.Property(typeof(BuildingType), "Explanation");
+            foreach (var kv in _orig)
+            {
+                if (pName != null && kv.Value.Key != null) pName.SetValue(kv.Key, kv.Value.Key, null);
+                if (pExp != null && kv.Value.Value != null) pExp.SetValue(kv.Key, kv.Value.Value, null);
+            }
+            _orig.Clear();
+            _renamed = false;
+        }
+
         private static object Religion(Hero h)
         {
             if (h == null || _cfgRelMgr == null || _getHeroRel == null) return null;
-            var cfgT = _cfgRelMgr.DeclaringType;
-            var inst = AccessTools.Property(cfgT, "Instance");
+            var inst = _cfgInst;
             var cfg = inst != null ? inst.GetValue(null, null) : null;
             var rm = cfg != null ? _cfgRelMgr.GetValue(cfg, null) : null;
             return rm != null ? _getHeroRel.Invoke(rm, new object[] { h }) : null;
@@ -178,7 +203,7 @@ namespace Armoury
 
         internal static void Daily(int day)
         {
-            if (!On) return;
+            if (!On) { try { RestoreNames(); } catch (Exception e) { Stumble("RestoreNames", e); } return; }
             int courts = 0, worship = 0;
             foreach (var t in Town.AllTowns) { if (Buildings338.Level(t, CourtGameId) > 0) courts++; if (Buildings338.Level(t, WorshipId) > 0) worship++; }
             Log.Info("Budynki (338) swiatynia i miejsce kultu (476-c): dzien " + day + " | latki: lojalnosc " + (_loyWired ? "tak" : "NIE") + ", waga wiary " + (_relWired ? "tak" : "NIE") + ", nazwy " + (_renamed ? "tak" : "NIE")
