@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 469-r-p (13.11) - poprawki po recenzji 469-r: krok podejscia z niedoboru d - G kazdego lucznika (70% naprawde w zasiegu), osobny budzet zapytan wstrzymanych, swieza proba
+
+**Problem:** recenzja 469-r (kod, bez gry). U1 (WYSOKA): cel podejscia `want = de - gp` liczony od SRODKA szyku do skraju wroga; przy jednakowych lukach (czeste w ROT) percentyl = G, szyk staje srodkiem w G - tylna polowa ma d > G (ok. 50% w zasiegu), a koniec `EnReached` (do max(10 m, glebokosc) przed celem) jeszcze zmniejsza; potem "juz blisko" (`want` ~ 0) - szyk zostaje z polowa wstrzymanych (469-q mial zapas 0.9 x sr. G). U2: `Near` przy wyczerpanym budzecie `NearPer` 16 zwraca "brak wroga" - wstrzymany z wrogiem w 6 m (nie swoim celem) zostaje wstrzymany o przeglad dluzej; po 469-r wstrzymanych wiecej (szyk gracza, piechota); logi 12.11 (469-p): "ponad budzet (zapytania 1346-5105)". U3: `n` (wszyscy wstrzymani) wobec `na` (tylko swieze wpisy 1.5 s) - pelny obieg przegladu (MaxPer 96 na klatke) przy ~1500 ludziach i 10 kl./s trwa ~1.6 s. U4: opis klucza gracza nie mowi, ze wstrzymani trzymaja bron biala. U5: licznik "ma byc 0" (gracz / piechota / AI) liczyl tez pominietych z innych powodow (machina, poscig, chorazy, panika). U6: szyk gracza / piechoty co sekunde dostawal nowy `FS` i tracil go od razu.
+
+**Przyczyna:** `FireRange469.Form` (cel od srodka, bez glebokosci i bez celu kazdego czlowieka), `Near` (wspolny budzet), `Forms` (rozne proby n / na, `FS` dla kazdego szyku), `Cat` (bez pominiec z `Look`).
+
+**Zmiana (`FireRange469.cs`; opis klucza gracza w `Settings.cs` / `McmSettings.cs`):**
+- U1: `GE.S` = niedobor d - G kazdego lucznika w regule (d od jego pozycji do jego celu silnika, bez celu - do skraju najblizszego szyku wroga). `Forms`: 70. percentyl niedoboru szyku (`sl[floor(0.7*(na-1))]`), krok `want = niedobor70 + AdvReach (10 m)` (zapas na tolerancje konca `EnReached`); bez danych `de - gp + glebokosc/2 + AdvReach`. Log: "krok = 70. percentyl niedoboru d - G + 10 m, sr. niedobor X m" i "w zasiegu na koniec podejscia sr. Y% lucznikow szyku (cel ok. 70%)" - mierzone (udzial z S <= 0 w chwili konca).
+- U2: sciezka wstrzymanego ma osobny budzet `NearHeldPer` 32 zapytan na klatke (nie dzieli `NearPer` 16 z nowymi wstrzymaniami); przekroczenia osobno: "zapytania wstrzymanych N". Przy przekroczeniu nadal zostaje wstrzymany (bezpiecznie - przy HoldYourFire ma bron biala i walczy wrecz).
+- U3: `GFresh` 1.5 -> 3 s; "dosc wstrzymanych" liczone w tej samej swiezej probie (`FHeld`: wstrzymani ze swiezym wpisem `GOf`).
+- U4: opis "Player Archers Hold Fire Out Of Range" (po angielsku): podczas wstrzymania gra daje im bron biala, po zwolnieniu najpierw biora luk - pierwsza salwa chwile pozniej. Zachowanie bez zmian.
+- U5: `Cat` zwraca -1 (do "reszty") dla machiny, poscigu 204/283/148/447, chorazego, paniki / odwrotu - jak pominiecia w `Look`; linia: "reszta (poza szykiem / pominieci: machina, poscig, chorazy, panika)".
+- U6: `Movable(f)` - szyk, ktorego `Form` nigdy nie przesuwa (gracza, piechoty, jazdy), nie dostaje wpisu `FS`.
+- Odrzucone: U7 (`_player` czytany na starcie bitwy) - tak samo jak pozostale klucze 469, zmiana od nastepnej bitwy; bez zmiany.
+
+**Ryzyko / co sprawdzic:** regresje - `Form` dalej to samo (oslona piechoty 5 m, jazda wroga w 80 m, 441/443, limit 60 s, zapadka 344, `EnReached` bez zmian); zmienia sie tylko dlugosc kroku (+ zapas 10 m: szyk moze stanac do 10 m blizej niz potrzeba - oslona piechoty i tak ogranicza front). Niedobor liczony do celu silnika: gdy silnik wybral dalszy cel niz najblizszy wrog, krok wiekszy (percentyl to lagodzi). Po dojsciu przy ok. 70% w zasiegu wstrzymanych ~30% = prog `AdvShare` - nastepny krok tylko po 15 s zastoju i tylko gdy niedobor70 + 10 >= 8 m (zbiega). Wydajnosc: druga lista na szyk i sortowanie raz na sekunde; do 32 zapytan wstrzymanych na klatke wiecej (kosztu w linii "koszt ... ms"). Kolizje: 310 bez zmian (`Holds`), szykow 446/457/459 nie przesuwamy. Skan IL 30 trafien (bez nowych odczytow pol statycznych MovementOrder). W logu po tescie: "w zasiegu na koniec podejscia sr. ~70%+", "zapytania wstrzymanych" malo, strzaly poza G gracz / piechota / AI ~0.
+
+**Status:** DO SPRAWDZENIA (zbudowane, niewgrane).
+
 ## 469-r (13.11) - lucznicy szyku gracza i strzelcy w szyku piechoty tez trzymaja ogien poza swoim G; podejscie szyku AI do 70% lucznikow w zasiegu
 
 **Problem:** Jeff 13.11: "jak nie ma zasiegu to nie strzelaja" oraz "czesc lucznikow ma luki z zasiegiem na 100 metrow a czesc na 200 - wszyscy stoja czy ci co maja zasieg strzelaja?". Test at-472b: prawie wszystkie strzaly poza G oddali lucznicy druzyny GRACZA (Ravens Teeth longbow, sr. 345-410 m przy G 200 m) - regula pomijala "szyk gracza" (469-p U2, w linii pominiete 'szyk gracza' 20-65 tys. przegladow) i "szyk piechoty" (5-25 tys.). Podejscie 469-q stawialo szyk na 0.9 x sr. G WSTRZYMANYCH - ignorowalo lucznikow juz w zasiegu i rozrzut G w szyku.
