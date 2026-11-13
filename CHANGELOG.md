@@ -10,7 +10,7 @@
 
 **Ryzyko / co sprawdzic:** regresja: nowe tylko liczniki i tekst; A7hNote nie zmienia best/zwrotu (wolane przed `best = ob` z wartoscia sprzed zamiany); MeatSplit nie pisze do Ctx ani S (wynik w nowym polu KsResult), koszt jeden przebieg par (ok. 120 tys.) na Plan w watku roboczym; MeatOwnLine czyta _live/ld.Res raz na 7 dob. Zapis bez zmian. W tescie: linia "KS: mieso Planu (479-h)" przy kazdym Planie ("inne" ok. 0 - inaczej podzial nie zgadza sie z S), linia "Jedzenie KS (479-h)" co krok f20, koniec linii A7 z "479-h"; potkniecia 0. Porownac: Plan "uboczne zywca" vs gra "zywiec na targ (= mieso)".
 
-**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+**Status:** SPRAWDZONE (at-220h, Armoury-2026-11-13_13-41-38.log: 220/220 dob, 0 BLAD, potkniecia pomiaru 0), NIE WGRANE (sam pomiar). Wynik (kg miesa/d, zywiec x 0.5, doby 108754-108866, stale w czasie, nie zima): Plan W razem 960-1017 tys. (uboczne z pszenicy 480 tys. = 47%), zjedzone w okregach 680-717 tys., na targ ok. 290-300 tys.; gra W produkcja 870-891 tys., wlasny stol 652-683 tys., na targ 187-225 tys. Essos: Plan 885-900 tys. (uboczne 532 tys. = 59%), zjedzone 540 tys., targ ok. 350 tys.; gra 760-770 tys., stol 522-550 tys., targ 212-248 tys. Wniosek: wies je tyle, ile Plan zaklada, ale gra produkuje 12-15% mniej zywca niz Plan, a CALY ten brak schodzi z targu (wies je pierwsza) - targ miesa 25-35% ponizej Planu = brak na polkach. Cena cienia miesa E 0.07-0.16 (prawie podloga), W 0.24-0.64. Cele z polek zawrocone przez 479-g: silk_plant/wheat_farm->olive_trees, wheat_farm->garden, cattle_farm:maslo/fisherman->swine_farm (850 tys. rak).
 
 ## 479-g (13.11) - KS: pelny hamulec 479-e nie zabiera bloku przejscia, ktore robil bez 479-e
 
