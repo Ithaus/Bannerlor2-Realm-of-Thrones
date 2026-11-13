@@ -3144,6 +3144,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool BuildOneWorkPerHouse { get; set; } = true;
 
+        [SettingPropertyBool("Town Treasury Funds Own Build When Lord Has No Build Share", HintText = "when a lord's house gets no building allowance today (a house in debt, or one with no income), the town's own treasury pays for the works of that town: only towns, not castles, not your own fiefs, not under siege; the treasury spends only what lies above the merchants' reserve, the next payment of the town's lease and arrears, and the town council's debt - each day at most one thirtieth of that surplus and no more than the house's usual allowance would be without the debt penalty. Materials come from the town's own market and the wages go to the townsfolk; the lord's purse and debt stay untouched. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool BuildTownChestWhenLordBarred { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Build Material Share", 0.00f, 1.00f, "0.00", HintText = "of that money, this share buys materials (limestone, timber, clay, tools, marble) at the market; the rest pays masons, labourers and carters", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public float BuildMaterialShare { get; set; } = 0.25f;
@@ -13941,6 +13945,7 @@ namespace Armoury
             s.PaidConstructionPlayer = PaidConstructionPlayer;
             s.BuildIncomeShare = BuildIncomeShare;
             s.BuildOneWorkPerHouse = BuildOneWorkPerHouse;
+            s.BuildTownChestWhenLordBarred = BuildTownChestWhenLordBarred;
             s.BuildMaterialShare = BuildMaterialShare;
             s.BuildPencePerPointMilitary = BuildPencePerPointMilitary;
             s.BuildPencePerPointCivil = BuildPencePerPointCivil;

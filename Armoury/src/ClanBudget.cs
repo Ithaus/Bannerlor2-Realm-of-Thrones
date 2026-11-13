@@ -1921,6 +1921,24 @@ namespace Armoury
             var b = Of(c); share = b != null ? (float)Math.Max(0, b.Build) : 0f; return b != null;
         }
 
+        /// <summary>482 (BuildFunding.TownChest.cs): przydzial budow rodu BEZ kary dluznika i bez dopelnienia z nadwyzki pokoju - BuildIncomeShare x D x f biedy (ten sam
+        /// wzor co b.Build w budzecie doby przed "168 Dluznik"). Gorna granica dziennego budzetu kasy miasta za pana bez przydzialu. Najemnik / rod bez budzetu - false. Tylko odczyt.</summary>
+        internal static bool BuildShareBase(Clan c, out float share)
+        {
+            share = 0f;
+            try
+            {
+                var s = Settings.Current;
+                var b = Of(c);
+                if (b == null || s == null || c.IsUnderMercenaryService) return false;
+                double v = Math.Max(0f, s.BuildIncomeShare) * Math.Max(0, b.D) * Math.Max(0, b.F);
+                if (double.IsNaN(v) || double.IsInfinity(v)) return false;
+                share = (float)Math.Min(v, float.MaxValue / 2);
+                return true;
+            }
+            catch { share = 0f; return false; }
+        }
+
         /// <summary>N5-E (BuildFunding przez WarFront.CivilAllowed - budowle cywilne w wojnie): rod ma luz w pulapie zoldu - zold partii, zalog i karawan z ostatniego
         /// budzetu ponizej 95% pulapu (ta sama miara co SlackGold [1]). Budzet 166 wylaczony albo Straz bez zoldu - true (bez pulapu zoldu nie ma czego chronic);
         /// budzet jeszcze nie policzony w tej sesji (pierwsza doba po wczytaniu), pulap 0 albo najemnik - false. Tylko odczyt.</summary>

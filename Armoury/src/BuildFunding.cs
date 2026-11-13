@@ -32,7 +32,7 @@ namespace Armoury
         private static int[] MatOrder { get { return GoodsPaths.PlanksOn ? OrderPlanksFirst : OrderNatural; } }
         internal static bool On { get { var s = Settings.Current; return s != null && s.PaidConstruction; } }
 
-        internal static void Reset() { _funded.Clear(); _near.Clear(); FolkReset(); WoodReset(); OneReset(); }   // P2 recenzja: takze stan robot ludu sesji (BuildFunding.Folk.cs); K1: liczniki drewna
+        internal static void Reset() { _funded.Clear(); _near.Clear(); FolkReset(); WoodReset(); OneReset(); ChestReset(); }   // P2 recenzja: takze stan robot ludu sesji (BuildFunding.Folk.cs); K1: liczniki drewna
 
         // ------------------------------------------------------------ Towary 2 / K1 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A7-10, klucz BuildWoodAboveCraftStock)
         // Budowy braly 65% drewna swiata (1 350 ladunkow/d, linia "Drewno") i kupowaly je do 0 sztuk na polce w ticku dobowym, przed rzemioslem miasta - warsztaty
@@ -242,7 +242,7 @@ namespace Armoury
         internal static void Daily()
         {
             if (!On || Campaign.Current == null) return;
-            _funded.Clear(); EngDayStart(); WallDayStart();   // R3-10b: liczniki doby; 472: liczniki murow
+            _funded.Clear(); EngDayStart(); WallDayStart(); ChestDayStart();   // R3-10b: liczniki doby; 472: liczniki murow; 482: liczniki kasy miasta
             NoBudgetWhy.Clear();   // 477-e: powody od nowa co dobe (dotad zostawaly z dawnych dob)
             _paidTowns = _stalledNoMat = _warSkipped = _dNoBudget = 0; _spent = _toPurses = _toMarkets = _toProducers = 0; TownFolk.LordOrdPaid = TownFolk.LordOrdPcs = TownFolk.LordOrdN = TownFolk.LordOrdNoProd = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
             try
@@ -315,6 +315,10 @@ namespace Armoury
                     if (mcut < 1f) ppp *= mcut;
                     // materialy z targu (miasto - swoj, zamek - najblizsze miasto)
                     var market = st.IsTown ? st : NearestTown(st);
+                    // 482 (BuildFunding.TownChest.cs, klucz BuildTownChestWhenLordBarred): rod bez przydzialu budow - budowe miasta placi kasa miasta z nadwyzki (bez podzialu
+                    // count i kolejki R3-11a); false - stara droga co do monety (powod R4 "przydzial rodu 0" z dopiskiem, czemu kasa nie zaplacila). Klucz wylaczony - nic
+                    string chestWhy = null;
+                    if (!(all >= 1f) && ChestOn && ChestPay(st, b, clan, ppp, mcut, market, s, out chestWhy)) continue;
                     float b0 = budget;   // R4: przyczyna doby bez budzetu (BuildDiary 'STOI')
                     budget = OneBudget(st, b, clan, all, budget, ppp, market);   // R3-11a: rod AI z kilkoma budowami - reszta przydzialu na te budowe albo 0 (czeka w kolejce); reszta - budget bez zmian
                     float preWall = budget;
@@ -325,7 +329,7 @@ namespace Armoury
                     if (budget < 1f)
                     {
                         // R4 (noc 13.11, analiza 120a pkt 10): powod doby bez budzetu - dotad 'continue' bez licznika (budowy 'STOI' ponad 100 dob bez powodu)
-                        string why = !(all >= 1f) ? "przydzial rodu 0 (dochod / budzet rodu)" : !(b0 >= 1f) ? "przydzial podzielony na budowy rodu < 1" : !(b1 >= 1f) ? (wallCut ? "mury: limit doby" : "kolejka rodu (R3-11a)") : "pan bez zlota";
+                        string why = !(all >= 1f) ? "przydzial rodu 0 (dochod / budzet rodu)" + (chestWhy ?? "") : !(b0 >= 1f) ? "przydzial podzielony na budowy rodu < 1" : !(b1 >= 1f) ? (wallCut ? "mury: limit doby" : "kolejka rodu (R3-11a)") : "pan bez zlota";
                         NoBudgetWhy[st.StringId] = why; _dNoBudget++;
                         continue;
                     }
@@ -382,7 +386,7 @@ namespace Armoury
             Log.Info("Budowy oplacone: dzien " + (int)CampaignTime.Now.ToDays + " - osad " + _paidTowns + ", wydano " + _spent + " (place i wozy do kas osad " + _toPurses
                      + ", materialy z targow " + _toMarkets + ", u wytworcow 363 (478-S2) " + _toProducers + " zl / " + TownFolk.LordOrdPcs + " szt. w " + TownFolk.LordOrdN + " budowach, bez wytworcy w zasiegu " + TownFolk.LordOrdNoProd + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
-                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + ", bez budzetu doby (R4, powod w linii Budowa: STOI) " + _dNoBudget + "." + OneTail() + WarFront.LineTail());   // R3-11a przed N5-E: bramka N5-5 czyta potkniecia N5-E z konca linii
+                     + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + ", bez budzetu doby (R4, powod w linii Budowa: STOI) " + _dNoBudget + "." + ChestTail() + OneTail() + WarFront.LineTail());   // R3-11a przed N5-E: bramka N5-5 czyta potkniecia N5-E z konca linii
             // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild
             try { FolkWorks(); } catch (Exception e) { Log.Error("BuildFunding.FolkWorks", e); }
             EngLine();   // R3-10b: linia "Inzynieria przy budowach" (na koncu doby budow - z dala od linii "Budowy oplacone", ktora zmienia R3-11a)

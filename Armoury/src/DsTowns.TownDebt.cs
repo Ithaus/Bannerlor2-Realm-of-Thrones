@@ -66,6 +66,20 @@ namespace Armoury
             catch (Exception e) { Stumble("TdKeep", e); return 0; }
         }
 
+        /// <summary>482 (BuildFunding.TownChest.cs): sama najblizsza rata firmy z kasy i to, co kasa juz winna - TdKeep bez podlogi firm (FloorOf). Wolajacy dodaje to do
+        /// swojego progu (zapas kupcow). Firmy nieczynne / osada bez firmy - 0. Tylko odczyt, nie rzuca.</summary>
+        internal static double TdOwe(Settlement st)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (st == null || st.Town == null || s == null || !FarmsLive) return 0;
+                double v = TdKeep(st) - FloorOf(s, TownPurse.Reserve(st.Town));
+                return double.IsNaN(v) || double.IsInfinity(v) || v < 0 ? 0 : v;
+            }
+            catch (Exception e) { Stumble("TdOwe", e); return 0; }
+        }
+
         internal static long TdPayArrears(Settlement st, long budget, out long toLord, out long toCrown)
         {
             toLord = toCrown = 0;
