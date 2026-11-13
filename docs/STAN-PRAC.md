@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 13.11 19:05 - WGRANIE 225 (XP gracza x0.75 480/480-a, sztandary: Banner Fix + Raise your Banner, Heraldry Studio + Mend 481)
+
+- Armoury.dll md5 0bdaa5d0161c4ec1f92b4122533ba74b (galaz noc/480-xp-gracza, 214c66de = 44976761 + 480 + 480-a; ekonomia jak WGRANIE 224). Klucz MCM "Player Skill XP Multiplier" (grupa Experience) 0.75 - tylko bohater gracza, Kowalstwo tylko raz (SmithXp 0.70), poziom postaci bez ciecia.
+- CrashScribe.dll md5 62174c0a2dfb6baa8834edfc98415a26 (galaz noc/481-mend-hs, dca4a3a9): Mend "HS herby ROT" - Heraldry Studio nie przycina herbow klanow (ROT 211 z 244 ponad 33 warstwy) i nie przekolorowuje barw ROT (37, 40, 117, 124-145).
+- Nowe moduly (LauncherData przed RealisticCaptivity, kopia LauncherData.xml.bak-2026-11-13-przed-sztandary / -przed-hs): BannerFix (Banner Fix 4.0.0 Performance), RaiseYourBanner (v17.0.8), Bannerlord.HeraldryStudio.CompleteCollection (v1.9.0). Zrodla w C:/Users/GAME/mody-staging-2026-11-13.
+- Ustawienia RYB (Configs/ModSettings/Global/RaiseYourBanner/RaiseYourBanner_MCM.json): RYBMode false (bez klonow - klony dawaly sprzet z niczego przez DTE), Archer/HorseArcher 0 (luk i strzaly by przepadly), DropPercentage 0, sztandary w oblezeniach WYL. (nie sprawdzone z SiegeWaves), Infantry 17, Cavalry 13, male proporce 7/7/5/5/7. Bandyci bez sztandarow (warunek moda: zolnierz + wodz bohater). Znana mala strata: chorazy piechoty oddaje oszczepy, ktore nie wracaja do zbrojowni (DTE) - do ewentualnego Mendu.
+- Testy: at-480b (15 dob, 3 bitwy z bandytami OK, bitwy z lordem pominiete - brak wojny z graczem; XP 446.8 -> 335.1), at-480a (10 dob, 2 bitwy, misje sprawdzone, 23 bledy cudze, 0 BLAD; Mend HS 4/4, 15/15). Widocznosci sztandarow RYB log nie pokazuje - do potwierdzenia przez Jeffa w duzej bitwie.
+- Kopie: .bak-2026-11-13-przed-wgranie225 w bin, C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-13-wgranie225 i -przed).
+
 ## STAN 13.11 11:55 - WGRANIE 224 (479-a/b/c: f20 razem z A7; test at-220c OK)
 
 - W grze Armoury.dll md5 90558038cf7751a6b498b491a8c69127 (galaz noc/367c-jeniec-po-odejsciu, commit 44976761 = 479-a+b+c). Kopia przed: `Armoury.dll.bak-2026-11-13-przed-wgranie224` (aea8ef71 = WGRANIE 223), kopie w C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-13-wgranie224 i -przed). Reszta DLL bez zmian.
