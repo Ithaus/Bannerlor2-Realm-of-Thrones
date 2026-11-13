@@ -237,14 +237,14 @@ namespace Armoury
         // ------------------------------------------------------------ codzienne rozliczenie
         internal static readonly System.Collections.Generic.Dictionary<string, string> NoBudgetWhy = new System.Collections.Generic.Dictionary<string, string>();   // R4: osada -> powod ostatniej doby bez budzetu
         private static int _dNoBudget;   // R4: budowy bez budzetu tej doby
-        private static int _paidTowns, _stalledNoMat, _warSkipped; private static long _spent, _toPurses, _toMarkets; private static double _points;
+        private static int _paidTowns, _stalledNoMat, _warSkipped; private static long _spent, _toPurses, _toMarkets, _toProducers; private static double _points;
 
         internal static void Daily()
         {
             if (!On || Campaign.Current == null) return;
             _funded.Clear(); EngDayStart(); WallDayStart();   // R3-10b: liczniki doby; 472: liczniki murow
             NoBudgetWhy.Clear();   // 477-e: powody od nowa co dobe (dotad zostawaly z dawnych dob)
-            _paidTowns = _stalledNoMat = _warSkipped = _dNoBudget = 0; _spent = _toPurses = _toMarkets = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
+            _paidTowns = _stalledNoMat = _warSkipped = _dNoBudget = 0; _spent = _toPurses = _toMarkets = _toProducers = 0; TownFolk.LordOrdPaid = TownFolk.LordOrdPcs = TownFolk.LordOrdN = TownFolk.LordOrdNoProd = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
             try
             {
                 var s = Settings.Current;
@@ -341,13 +341,21 @@ namespace Armoury
                         if (matBudget > 0f && matSpent <= 0) matSpent = BuyOneCheapest(market, wallCut ? Math.Max(0, Math.Min(lord.Gold, (int)budget)) : Math.Max(0, lord.Gold));
                     }
                     finally { GoodsLedger.End(gfm); }
-                    if (matBudget > 0f && matSpent <= 0) { if (wallCut) { _wCutIdle++; NoBudgetWhy[st.StringId] = "mury: limit doby (reszta ponizej ceny sztuki)"; } else { _stalledNoMat++; NoBudgetWhy[st.StringId] = "brak materialu na targu (albo ponad sufit ceny)"; } continue; }   // nie ma z czego budowac   // 472-p: mury przy limicie (reszta limitu ponizej ceny sztuki) - osobny licznik linii murow
-                    float labour = Math.Min(budget - matBudget, matSpent * Math.Max(0f, (1f - s.BuildMaterialShare) / Math.Max(0.01f, s.BuildMaterialShare)));
+                    // 478-S2 (analiza at-120c pkt 2): reszta materialu u wytworcow 363 (jak roboty wsi; pan placi wytworcom wprost, zloto juz zeszlo z kiesy pana)
+                    long prodPaid = 0;
+                    if (matBudget - matSpent >= 1f && lord.Gold - matSpent >= 1)
+                    {
+                        try { prodPaid = TownFolk.LordProducerBuy(lord, st, Math.Min(matBudget - matSpent, lord.Gold - matSpent)); }
+                        catch (Exception e) { Log.Error("BuildFunding.LordProducerBuy", e); prodPaid = 0; }
+                    }
+                    int matAll = matSpent + (int)Math.Min(int.MaxValue / 2, prodPaid);
+                    if (matBudget > 0f && matAll <= 0) { if (wallCut) { _wCutIdle++; NoBudgetWhy[st.StringId] = "mury: limit doby (reszta ponizej ceny sztuki)"; } else { _stalledNoMat++; NoBudgetWhy[st.StringId] = "brak materialu na targu (albo ponad sufit ceny)"; } continue; }   // nie ma z czego budowac   // 472-p: mury przy limicie (reszta limitu ponizej ceny sztuki) - osobny licznik linii murow
+                    float labour = Math.Min(budget - matBudget, matAll * Math.Max(0f, (1f - s.BuildMaterialShare) / Math.Max(0.01f, s.BuildMaterialShare)));
                     int labourI = MBRandom.RoundRandomized(labour);
                     // poprawka po audycie TOWARY 3: material drozszy niz budzet (BuyOneCheapest do calej kiesy) + robocizna z budzetu moglo dac
                     // wiecej niz lord ma - ChangeHeroGold obcina kiese do 0, a kasy dostawaly pelne kwoty (zloto z niczego); robota najwyzej z reszty kiesy
                     labourI = Math.Min(labourI, Math.Max(0, lord.Gold - matSpent));
-                    if (wallCut) labourI = Math.Min(labourI, Math.Max(0, (int)budget - matSpent));   // 472-p (U3): mury przy limicie - material i place razem najwyzej budzet do limitu
+                    if (wallCut) labourI = Math.Min(labourI, Math.Max(0, (int)budget - matAll));   // 472-p (U3): mury przy limicie - material i place razem najwyzej budzet do limitu
                     lord.ChangeHeroGold(-(matSpent + labourI));
                     CirculationWindows.NoteHeroGold(lord, -(matSpent + labourI));   // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
                     if (market != null && market.Town != null)
@@ -360,19 +368,19 @@ namespace Armoury
                     st.Town.ChangeGold(labourI - folk);          // place murarzy, robotnikow, woznic - do kasy osady (E5/B1: do kiesy ludu)
                     ClanIncomeBook.NoteOwnPaid(st, clan, labourI - folk);   // 110-p (K8): "wlasne" D stalego - place budowy w kasie wlasnego zamku albo miasta wracaja zaworem (E5/B1: place w kiesie ludu nie wracaja)
                     try { TownFolk.Note(st, labourI, TownFolk.KBuildLabour); } catch { }   // E5/0 (195): place budowy (tylko licznik)
-                    float pts = PointsFor(matSpent, labourI, ppp, market);
-                    if (mcut < 1f) Buildings338Mason.NoteCut(st.Town, mcut, matSpent + labourI, pts, false);   // 473-a: linia murarza (tylko licznik)
+                    float pts = PointsFor(matAll, labourI, ppp, market);
+                    if (mcut < 1f) Buildings338Mason.NoteCut(st.Town, mcut, matAll + labourI, pts, false);   // 473-a: linia murarza (tylko licznik)
                     _wageIdxSum += WageIdx(market); _wageIdxN++;
                     _funded[st.Town] = pts;
-                    if (WallOn) WallPaid(st, b, matSpent, labourI, pts);   // 472: liczniki murow i kontrola limitu
+                    if (WallOn) WallPaid(st, b, matAll, labourI, pts);   // 472: liczniki murow i kontrola limitu
                     EngPaid(st.Town, pts);   // R3-10b: XP Inzynierii zarzadcy na miejscu i liczniki
-                    _paidTowns++; _spent += matSpent + labourI; _toMarkets += matSpent; _toPurses += labourI; _points += pts;
-                    OnePaid(st, clan, matSpent + labourI, pts);   // R3-11a: reszta przydzialu rodu na nastepna budowe kolejki (rod spoza regul - nic)
+                    _paidTowns++; _spent += matAll + labourI; _toMarkets += matSpent; _toProducers += prodPaid; _toPurses += labourI; _points += pts;
+                    OnePaid(st, clan, matAll + labourI, pts);   // R3-11a: reszta przydzialu rodu na nastepna budowe kolejki (rod spoza regul - nic)
                 }
             }
             catch (Exception e) { Log.Error("BuildFunding", e); }
             Log.Info("Budowy oplacone: dzien " + (int)CampaignTime.Now.ToDays + " - osad " + _paidTowns + ", wydano " + _spent + " (place i wozy do kas osad " + _toPurses
-                     + ", materialy z targow " + _toMarkets + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
+                     + ", materialy z targow " + _toMarkets + ", u wytworcow 363 (478-S2) " + _toProducers + " zl / " + TownFolk.LordOrdPcs + " szt. w " + TownFolk.LordOrdN + " budowach, bez wytworcy w zasiegu " + TownFolk.LordOrdNoProd + "), punktow budowy " + (int)_points + " (place wedle miast targowych: sredni poziom plac "
                      + (_wageIdxN > 0 ? (_wageIdxSum / _wageIdxN).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-") + ")"
                      + "; wstrzymane: brak materialow " + _stalledNoMat + ", wojna (budowle cywilne) " + _warSkipped + ", bez budzetu doby (R4, powod w linii Budowa: STOI) " + _dNoBudget + "." + OneTail() + WarFront.LineTail());   // R3-11a przed N5-E: bramka N5-5 czyta potkniecia N5-E z konca linii
             // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild

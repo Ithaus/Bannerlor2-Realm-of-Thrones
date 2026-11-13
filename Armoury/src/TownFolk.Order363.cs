@@ -226,6 +226,98 @@ namespace Armoury
             finally { P2Close(); }
         }
 
+        // ================================================================ 478-S2: pan dokupuje material budow u wytworcow 363 (jak roboty wsi)
+        private static int _orOpenedEarlyDay = int.MinValue;   // 478-S2: doba, w ktorej sztuki wytworcow otwarto przed budowami pana (wyjatek w DaWorksRun nie zostawia stanu na jutro)
+        internal static long LordOrdPaid, LordOrdPcs, LordOrdN, LordOrdNoProd;
+
+        /// <summary>478-S2: ArmouryBehavior przed BuildFunding.Daily - sztuki doby wytworcow otwarte PRZED budowami pana (kolejnosc pan -> lud -> wies);
+        /// DaWorksRun ich drugi raz nie otwiera. Klucz NIE - nic (otwarcie jak dotad w DaWorksRun).</summary>
+        internal static void OrderDayOpenEarly()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.BuildMaterialsFromProducers || !StartCalibration.OrderOn || !StartCalibration.KeyOn) return;
+            OrDayOpen();
+            _orOpenedEarlyDay = (int)CampaignTime.Now.ToDays;
+        }
+
+        /// <summary>
+        /// 478-S2 (analiza at-120c pkt 2): budowa pana w osadzie `st` - reszta budzetu materialu `matLeft` (po polce targu) u wytworcow 363 w zasiegu, ta sama
+        /// droga ceny, frachtu i sufitu co roboty wsi (OrPrice, OrCapD, OrderOffer, OrderTake); zloto: pan -> kiesa wytworcy (zmierzone). Polozenie zamawiajacego
+        /// - pierwsza wies osady (OrNearOf wedlug wsi). Zwraca zloto, ktore zeszlo z kiesy pana. Nie rzuca.
+        /// </summary>
+        internal static long LordProducerBuy(Hero lord, Settlement st, double matLeft)
+        {
+            long paid = 0;
+            if (lord == null || st == null || !(matLeft >= 1)) return 0;
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.BuildMaterialsFromProducers || !StartCalibration.OrderOn || !StartCalibration.KeyOn || _orOpenedEarlyDay != (int)CampaignTime.Now.ToDays) return 0;
+                Village anchor = null;
+                if (st.BoundVillages != null) foreach (var v in st.BoundVillages) { if (v != null && v.Settlement != null) { anchor = v; break; } }
+                if (anchor == null) return 0;
+                var near = OrNearOf(anchor, s.VillageOrderRange);
+                double fpd = Math.Max(0.0, Math.Min(1.0, (double)s.VillageOrderFreightPerDay));
+                var lf = lord.MapFaction;
+                bool any = false;
+                if (near != null)
+                    foreach (var e in near)
+                    {
+                        if (matLeft < 1 || lord.Gold < 1) break;
+                        try
+                        {
+                            var p = e.V;
+                            if (p == null || p.Settlement == null || p.VillageState != Village.VillageStates.Normal) continue;
+                            if (p.Bound != null && p.Bound.IsUnderSiege) continue;
+                            var fb = p.Settlement.MapFaction;
+                            if (lf != null && fb != null && !ReferenceEquals(lf, fb) && FactionManager.IsAtWarAgainstFaction(lf, fb)) continue;
+                            ItemObject it; double left; bool atCap; int slot;
+                            if (!StartCalibration.OrderOffer(p, out it, out left, out atCap, out slot)) continue;
+                            any = true;
+                            int price = OrPrice(p, it, s);
+                            double frk = fpd * Math.Max(1, e.Days);
+                            if (double.IsNaN(frk) || double.IsInfinity(frk) || frk < 0) frk = 0;
+                            int priceD = price;
+                            if (frk > 0)
+                            {
+                                double pd = Math.Round(price * (1.0 + frk), MidpointRounding.AwayFromZero);
+                                priceD = pd >= int.MaxValue ? int.MaxValue : Math.Max(price, (int)pd);
+                                int capD = OrCapD(it, s);
+                                if (capD > 0 && priceD > capD) { _orCapSkip++; continue; }
+                            }
+                            int n = (int)Math.Min(Math.Floor(left / (1.0 + frk)), Math.Min(Math.Floor(matLeft / priceD), Math.Floor((double)lord.Gold / priceD)));
+                            if (n <= 0) continue;
+                            long want = (long)n * priceD;
+                            int had = lord.Gold;
+                            lord.ChangeHeroGold(-(int)want);
+                            long got = Math.Max(0, (long)had - lord.Gold);
+                            int k = (int)Math.Min(n, got / priceD);
+                            long pay = (long)k * priceD, back = got - pay;
+                            if (back > 0) lord.ChangeHeroGold((int)back);
+                            if (k <= 0) continue;
+                            int ph = p.Gold;
+                            try { p.ChangeGold((int)pay); }
+                            catch (Exception ex) { lord.ChangeHeroGold((int)pay); OrStumble("LordProducerBuy(wytworca)", ex); continue; }
+                            CirculationWindows.NoteHeroGold(lord, -pay);   // glowa poza swiatem - zloto weszlo do swiata (jak budowy pana)
+                            StartCalibration.OrderTake(p, k * (1.0 + frk));
+                            if (slot >= 0 && slot < _orSold.Length) { _orSold[slot] += k; _orFrU[slot] += k * frk; }
+                            if (frk > 0) { _orFrGold += (long)k * Math.Max(0, priceD - price); _orFrDays += (long)k * Math.Max(0, e.Days); _orFrPcs += k; }
+                            GoodsLedger.NoteMadeToOrder(it, k);
+                            OreLedger.NoteVillageOrder(it, k);
+                            paid += pay; matLeft -= pay; LordOrdPcs += k;
+                        }
+                        catch (Exception ex) { OrStumble("LordProducerBuy(wytworca)", ex); }
+                    }
+                if (paid > 0) LordOrdN++;
+                else if (!any) LordOrdNoProd++;
+            }
+            catch (Exception e) { OrStumble("LordProducerBuy", e); }
+            finally { _orTicks += Stopwatch.GetTimestamp() - t0; }
+            LordOrdPaid += paid;
+            return paid;
+        }
+
         /// <summary>DaWorksRun: poczatek doby zamowien (sztuki doby wytworcow).</summary>
         private static void OrDayOpen()
         {

@@ -301,7 +301,7 @@ namespace Armoury
         /// </summary>
         internal static void DaWorksRun()
         {
-            OrDayOpen();                                                     // 363: sztuki doby wytworcow (zamowienia wsi) - przed zleceniami
+            if (_orOpenedEarlyDay != (int)CampaignTime.Now.ToDays) OrDayOpen();                                // 363: sztuki doby wytworcow (zamowienia wsi) - przed zleceniami; 478-S2: juz otwarte przed budowami pana
             P2Begin();                                                       // 322b: pomiar pieniadza w podkrokach (tylko log, klucz bisekcji f19-e1)
             try { DaWorksRunCore(); }
             finally { P2End(); }

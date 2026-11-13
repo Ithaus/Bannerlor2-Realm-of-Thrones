@@ -3136,6 +3136,7 @@ namespace Armoury
             try { MoneyLedger.Probe169("WarFront.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             var gfBuild = GoodsLedger.Begin(GoodsLedger.FBuild);     // paczka 146: ksiega towarow - material zdjety przez budowy (tylko licznik)
             try { Buildings338NoBuild.DropQueued(); } catch (Exception e) { Log.Error("Buildings338NoBuild.DropQueued", e); }   // 473-b6: zbrojownia i sad BK z kolejek AI przed oplata budow
+            try { TownFolk.OrderDayOpenEarly(); } catch (Exception e) { Log.Error("TownFolk.OrderDayOpenEarly", e); }   // 478-S2: sztuki doby wytworcow 363 przed budowami pana (pan -> lud -> wies)
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
             finally { GoodsLedger.End(gfBuild); } DayProfile.Lap("BuildFunding.Daily");
             try { MoneyLedger.Probe169("BuildFunding.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)

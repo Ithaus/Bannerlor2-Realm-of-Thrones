@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 478-S2 (13.11) - budowy panow dokupuja brakujacy material u wytworcow 363 (kamien, glina, deski - jak roboty wsi)
+
+**Problem:** at-120c "Budowy oplacone" brak materialow 77 (jak w 120b); wapien: produkcja 564/d, roboty wsi biora 531, budowy 39; marmur 3143/d, wsie 3109, budowy 22; na polkach miast 41 szt. wapienia i 34 marmuru; 96 z 219 budow stoi, 56 z braku materialu.
+
+**Przyczyna:** ProducerBuy (zamowienia 363) mial jedyne wywolanie w robotach wsi (TownFolk.DsAkum.cs:449); panowie kupuja tylko z polki (BuildFunding.BuyMaterials); niesprzedana produkcja wytworcow przepada w OrderDayClose. Do tego budowy panow (BuildFunding.Daily) biegly PRZED otwarciem sztuk doby wytworcow (DaWorksRun).
+
+**Zmiana:** TownFolk.OrderDayOpenEarly() przed BuildFunding.Daily (sztuki doby wytworcow otwarte przed budowami; DaWorksRun drugi raz nie otwiera - znacznik doby, wyjatek nie zostawia stanu); nowe TownFolk.LordProducerBuy(lord, osada, reszta budzetu materialu): ta sama droga co wsie - OrNearOf (wedlug pierwszej wsi osady), cena OrPrice, fracht, sufit OrCapD (2.0 bez zmian), wytworca w stanie Normal, osada nie oblezona, frakcje nie w wojnie; zloto pan -> kiesa wytworcy (zmierzone, CirculationWindows.NoteHeroGold), OrderTake, ksiega towarow NoteMadeToOrder/OreLedger. BuildFunding: material = polka + wytworcy (punkty, place, mury), do kasy targu tylko czesc z polki. Linia "Budowy oplacone": "u wytworcow 363 (478-S2) X zl / N szt. w M budowach, bez wytworcy w zasiegu K". Klucz Build Materials From Producers (TAK; NIE = jak przed, poza tekstem linii). Kolejnosc kupujacych: pan -> wies (decyzja domyslna (noc 13.11): lud P2 (FolkWorks) bez zmian - dalej tylko polka; osobny krok, jesli test pokaze potrzebe).
+
+**Ryzyko / co sprawdzic:** panowie zabieraja wytworcom czesc sztuk, ktore dotad szly do robot wsi - mniej materialu dla robot wsi (kiesy wsi znow moga puchnac); wiecej rak z pola przy wiekszym popycie (pulap 363 bez zmian). W tescie: "brak materialow" < 77, "u wytworcow 363" > 0, kontrola zlota swiata 0, linia "Zamowienia wsi (363)" bez zmian w kontrolach. Klucz NIE: zachowanie jak przed.
+
+**Status:** DO SPRAWDZENIA
+
 ## 478-S1 (13.11) - ludnosc BK: lustro klas z BetterEconomy zaokragla zamiast obcinac (wsie nie traca juz ok. 20% ludzi na rok)
 
 **Problem:** at-120c (i 120b): A16 "Ludnosc BK" wsie 1 071 659 -> 992 263 (-7.41% w 120 dob), z tego "reszta" -77 050 (97% spadku), przeplywy tylko -2 346; ostatnia doba "wsie 571 ... zmiana -418 = przeplywy +258 + reszta -676"; 402 z 571 wsi traci 1-3 osoby dziennie, wsie < 1 tys. -41.8%. Nasza ksiega ludzi stoi (-0.02%).

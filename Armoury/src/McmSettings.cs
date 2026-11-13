@@ -3168,6 +3168,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public float BuildMaterialPriceCap { get; set; } = 2.0f;
 
+        [SettingPropertyBool("Build Materials From Producers", HintText = "with Paid Construction: when the market of the building's town has too little building material below the price ceiling, the lord buys the rest straight from the villages that make it to order (quarries, clay pits, sawyers - the same way village works do), paying them plus the carters' freight; the village makes those pieces instead of letting them lie unsold. Lords buy first, then the town folk, then the villages. Off = lords buy only from the market shelf, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool BuildMaterialsFromProducers { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Folk Works Level Days", 0.00f, 365.00f, "0", HintText = "with Folk Builds Town: the townsfolk's own works never raise a stage of a building faster than in this many days (each day they put in at most the cost of the stage divided by this; 60 = at most about six stages a year in any town or castle, so a sacked town rebuilds slowly; 0 = no limit); the lord's works are not limited by this", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public float FolkWorksLevelDays { get; set; } = 60f;
@@ -13915,6 +13919,7 @@ namespace Armoury
             s.FolkWorksShare = FolkWorksShare;
             s.FolkWorksHands = FolkWorksHands;
             s.BuildMaterialPriceCap = BuildMaterialPriceCap;
+            s.BuildMaterialsFromProducers = BuildMaterialsFromProducers;
             s.FolkWorksLevelDays = FolkWorksLevelDays;
             s.BuildWagesByTown = BuildWagesByTown;
             s.EngineeringOnPaidWork = EngineeringOnPaidWork;
