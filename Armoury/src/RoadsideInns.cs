@@ -170,6 +170,15 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ wczytanie (raz na sesje)
+        /// <summary>474-P8 (test wnetrza): k-ty najblizszy zajazd od punktu (0 - najblizszy), bez limitu odleglosci; petla po liscie tylko w tescie autotestu.</summary>
+        internal static Inn NearestAny(Vec2 p, int k)
+        {
+            if (_inns.Count == 0) return null;
+            var l = new List<Inn>(_inns);
+            l.Sort((a, b) => DistTo(a, p).CompareTo(DistTo(b, p)));
+            return l[Math.Min(Math.Max(0, k), l.Count - 1)];
+        }
+
         internal static void EnsureLoaded()
         {
             if (_loaded) return;
@@ -634,6 +643,7 @@ namespace Armoury
                          + " | wejscia " + _dEnter + " (po kliku " + _dClick + ", z pytania " + _dAskYes + "), pytania " + _dAsk + ", odmowy " + _dAskNo + ", kliki na zajazd " + _dClickSet
                          + " | " + TownInns.RoadDayText()
                          + " | widok: " + InnViewStats.DayText()
+                         + (RoadsideInnInterior.On ? " | " + RoadsideInnInterior.DayText() : "")
                          + " | tick dojazdu: " + _dTickN + " sprawdzen, srednio " + tickMs.ToString("0.0000", Inv) + " ms"
                          + " | potkniecia dzis " + _dStumbles + " (od wczytania " + _stumbles + ").");
             }

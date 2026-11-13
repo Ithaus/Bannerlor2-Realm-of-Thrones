@@ -6080,6 +6080,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool RoadsideInnTavernSound { get; set; } = true;
 
+        [SettingPropertyBool("Roadside Inn Interior", HintText = "'Enter the Inn' in a roadside inn's menu: step inside in 3D - the tavern room of the nearest town of the same people, with the keeper at his counter, a serving girl, players in the corner and travellers about. Ask the keeper 'Pour me an ale. What's the news?' (the same tankard, price and gossip as the menu option) or about beds (you take them in the menu when you step out). The hubbub and the music of a tavern play inside. Campaign time stands still; hold Tab to step out. Off = no option, the inn menu as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInnInterior { get; set; } = true;
+
         [SettingPropertyBool("Inn Gossip Pages", HintText = "the gossip window never overflows its frame: when there is more talk than fits, it is split into pages - 'Hear more' shows the next one, 'Enough talk' ends it. Off = all the gossip in one window, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
@@ -14523,6 +14527,7 @@ namespace Armoury
             s.InnGossipLeaderNames = InnGossipLeaderNames;
             s.RoadsideInnHideParty = RoadsideInnHideParty;
             s.RoadsideInnTavernSound = RoadsideInnTavernSound;
+            s.RoadsideInnInterior = RoadsideInnInterior;
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;
             s.InnKeeperAleLine = InnKeeperAleLine;

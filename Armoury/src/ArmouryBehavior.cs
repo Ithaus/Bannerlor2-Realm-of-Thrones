@@ -2525,6 +2525,7 @@ namespace Armoury
             RawPrice.MemoryLive = true;   // 299b: od teraz wygladzanie podazy rynku w tempie PriceSupplyMemoryDaily (ticki startowe nowej kampanii byly przed - tempo gry)
             try { HideoutBossTalk.AddDialogs(starter); } catch (Exception e) { Log.Error("HideoutBossTalk.AddDialogs", e); }   // 293: rozmowa z hersztem kryjowki zawsze pyta o pojedynek (warunek w kluczu HideoutBossTalkFix)
             try { TavernKeeperAle.AddDialogs(starter); } catch (Exception e) { Log.Error("TavernKeeperAle.AddDialogs", e); }   // 474-P3: "Pour me an ale. What's the news?" u karczmarza miasta (klucz InnKeeperAleLine)
+            try { RoadsideInnInterior.AddDialogs(starter); } catch (Exception e) { Log.Error("RoadsideInnInterior.AddDialogs", e); }   // 474-P8: rozmowy wnetrza zajazdu (barman, kelnerka, grajkowie; start tylko dla agentow tej misji)
             try { TavernMusic.EnsurePatch(); } catch (Exception e) { Log.Error("TavernMusic.EnsurePatch", e); }   // 474-P4: muzyka karczmy miasta wedlug regionu (postfiks w kampanii, raz na proces; klucz TavernMusicByRegion)
             try { SideVillageVisit.ScreenEnsurePatch(); } catch (Exception e) { Log.Error("SideVillageVisit.ScreenEnsurePatch", e); }   // 474-P6: okno werbunku gry dla wioski pobocznej (3 latki RecruitmentVM w kampanii, raz na proces; klucz SideVillageRecruitScreen)
             try { CaptiveTerms.AddDialogs(starter); } catch (Exception e) { Log.Error("CaptiveTerms.AddDialogs", e); }   // 366: "Let us speak of the terms of your release." przy jencu-krolu albo nastepcy (klucz CaptiveTerms)
@@ -2589,6 +2590,7 @@ namespace Armoury
             try { DistrictWorks.SessionStart(); } catch (Exception e) { Log.Error("DistrictWorks.SessionStart", e); }   // inwest: prace okregu z zapisu i dodatek czesci przed pierwszym rachunkiem KS doby
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { RoadsideInns.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInns.SessionStart", e); }
+            try { RoadsideInnInterior.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInnInterior.SessionStart", e); }   // 474-P8: linia startu wnetrza (klucz, plik kwestii)
             try { SideVillageVisit.SessionStart(); } catch (Exception e) { Log.Error("SideVillageVisit.SessionStart", e); }   // m97-wioski: linia "Wioski poboczne (WP): start sesji"   // sw-zajazdy: linia "Zajazdy (ZJ): start sesji" - plik, zajazdy wedlug ludzi, najblizszy sasiad
             try { HarvestFairs.SessionStart(); } catch (Exception e) { Log.Error("HarvestFairs.SessionStart", e); }   // R3-05a: latka popytu (raz na proces), kalendarz krain, linia "Jarmarki po zniwach (R3-05a): start sesji"
             try { RiverBarges.SessionStart(); } catch (Exception e) { Log.Error("RiverBarges.SessionStart", e); }   // R3-05b: plik arm_rivers.tsv, latka oceny miast BK (raz na proces), linia "Barki rzeczne (R3-05b): start sesji"
@@ -2745,6 +2747,7 @@ namespace Armoury
             try { NightHooks.InCampaign(); } catch (Exception e) { Log.Error("NightHooks.InCampaign", e); }       // noc 25.10 P0 (K3): latki kampanii choragwi P3 (BannerKit) - raz na proces
             try { TownInns.AddMenus(starter); } catch (Exception e) { Log.Error("TownInns.AddMenus", e); }   // KA (16.10): "Take lodgings at an inn" w menu miasta (sen - arm_sleep_wait z NightRest)
             try { RoadsideInns.AddMenus(starter); } catch (Exception e) { Log.Error("RoadsideInns.AddMenus", e); }   // sw-zajazdy: menu zajazdu przy szlaku (nocleg, plotki, dalej w droge)
+            try { RoadsideInnInterior.AddMenus(starter); } catch (Exception e) { Log.Error("RoadsideInnInterior.AddMenus", e); }   // 474-P8: "Enter the Inn" na poczatku menu zajazdu (indeks 0 PO opcjach zajazdu)
             try { if (!LoreSeedFix.On) RangedLore.ReportLedger(false); } catch (Exception e) { Log.Error("RangedLore.ReportLedger", e); }   // m96-wzory: przy kluczu - po zmianach statystyk (LoreSeedFix)
             try { ArmyClothing.StartLine(); } catch (Exception e) { Log.Error("ArmyClothing.StartLine", e); }   // 150: stawki odziezy wojska i zaleznosci
             try { HorseState.OnSessionLaunched(); } catch (Exception e) { Log.Error("HorseState.OnSessionLaunched", e); }   // E6/K0 (209): licznik koni gry wedlug klucza (pelne przeliczenie przy zmianie), stan koni partii od nowa - PO porzadkach taborow wyzej

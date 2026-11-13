@@ -289,6 +289,27 @@ namespace Armoury
             DrinkConsequence(st.GetPosition2D, st.StringId, st.Name.ToString(), true, st, null);
         }
 
+        /// <summary>474-P8: kufel u barmana we wnetrzu zajazdu ("Pour me an ale. What's the news?") - ten sam stan co opcja menu zajazdu (RoadGossipCondition):
+        /// przy InnGossipNeedsDrink DrinkState z cena miasta zajazdu (RoadTown), zakazem wojny / rabunku (RoadDrinkBarred) i ksiega uslyszanych zajazdu (uid);
+        /// bez kufla (klucz NIE) - plotki darmowe jak w menu.</summary>
+        internal static bool RoadAleState(RoadsideInns.Inn inn, out string tip)
+        {
+            if (inn == null) { tip = "Nobody pours ale here now."; return false; }
+            if (!InnDrink.On) { tip = "Drovers, pilgrims and pedlars by the hearth trade the news of the road - the nearer and fresher, the truer."; return true; }
+            var at = new Vec2(inn.X, inn.Y);
+            var town = RoadTown(inn, at);
+            return DrinkState(at, inn.Uid, town, TownInns.RoadDrinkBarred(inn), TankardPrice(town), out tip);
+        }
+
+        /// <summary>474-P8: kufel u barmana po rozmowie - dokladnie skutek opcji menu zajazdu (RoadGossipConsequence).</summary>
+        internal static void RoadAle(RoadsideInns.Inn inn)
+        {
+            if (inn == null) return;
+            if (InnDrink.On) { DrinkConsequence(new Vec2(inn.X, inn.Y), inn.Uid, inn.Name, false, null, inn); return; }
+            _dHeardRoad++;
+            Show(new Vec2(inn.X, inn.Y), inn.Uid, inn.Name, false);
+        }
+
         /// <summary>Stan kufla (dawniej cialo DrinkCondition, 474-P3 wydzielone bez zmiany tekstow i kolejnosci): false + powod (zajazd zakazany, nic nowego, karczmarz
         /// nie naleje, brak pieniedzy) albo true + opis kufla.</summary>
         private static bool DrinkState(Vec2 at, string key, Settlement priceTown, string barred, int price, out string tip)

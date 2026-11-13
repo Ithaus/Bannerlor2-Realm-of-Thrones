@@ -1,0 +1,35 @@
+# 474-P8/P9/P10: kwestie karczmy (same teksty, bez nagran). rodzaj<TAB>region<TAB>temat<TAB>tekst. Wlasne zdania, bez cytatow z ksiazek i serialu.
+# rodzaj: greet (barman), wench (kelnerka), music (grajkowie), sit (bywalec zaprasza), table (scenka: kwestie rozdzielone " || ")
+# region: any north iron west reach river vale storm crown dorne essos | temat: general war peace winter
+greet	any	general	Welcome to {INN}. Ale, bread, a bench by the fire - what'll it be?
+greet	any	general	Shut the door behind you, the draught eats my fire. Now, what can I pour you?
+greet	any	general	Coin first, talk after. That's the rule in {INN}. What are you drinking?
+greet	any	war	Mind your sword in here. We've had soldiers through all week and I'm short two stools already.
+greet	any	winter	Come in out of the cold. There's mulled ale on the hearth, if you've the coin.
+greet	north	general	Stamp the snow off your boots. Ale's brown, the stew's hot, and nobody asks your business.
+greet	north	general	Sit where you like, only not by the old man at the fire. That's been his seat since before the last winter.
+greet	north	winter	Winter's teeth are out tonight. A cup of something hot, friend?
+greet	iron	general	Salt on your cloak and coin in your fist, I hope. What will it be?
+greet	west	general	Good day to you. The wine comes up from the Reach, the ale is our own. Which will you have?
+greet	reach	general	Welcome, welcome. Summerwine or ale - we have the one in plenty and the other in better plenty.
+greet	river	general	Another traveller on the road. Sit, eat, keep your head down - these days that's the best advice in the riverlands.
+greet	river	war	If you've come to burn us out, you're late, someone did it last spring. If you've come to drink, sit down.
+greet	vale	general	You've come down from the high road? Then you've earned a cup. What'll it be?
+greet	storm	general	Hang your cloak by the fire, the storms will have soaked you through. Ale or something stronger?
+greet	crown	general	Fresh from the city or bound for it? Either way, you'll want a drink.
+greet	dorne	general	Out of the sun, friend. Our wine is red and strong, and the shade is free.
+greet	essos	general	Come, come, sit. Wine from three cities and tales from nine. What will you have?
+wench	any	general	Ale's at the counter, love. Ask the keeper - he counts every drop.
+wench	any	general	Mind the floor, it's wet. Someone's always spilling something in here.
+wench	any	general	If you want a bed, it's the keeper you want. If you want gossip, it's the drovers by the fire.
+wench	any	war	Three lots of soldiers this month, and not one of them paid for their own cup.
+wench	north	general	Keep your hands to yourself and your boots near the fire, and we'll get on fine.
+wench	river	general	Don't sit by the window. Things come through windows these days.
+wench	dorne	general	You look thirsty. Everyone who comes in off that road looks thirsty.
+wench	essos	general	The keeper says I'm to smile at every traveller. There. Now go and pay him.
+music	any	general	We play for the room. A coin in the cup keeps the strings in tune.
+music	any	general	A request? We know a dozen songs, and half of them are even decent.
+music	any	general	Hush now, we're between songs. The next one is sad, so drink first.
+music	north	general	We've a song about a winter that lasted a lifetime. It goes on a bit, like the winter.
+music	river	general	We don't sing the war songs here. Folk have heard enough of the real thing.
+music	reach	general	A love song, a drinking song or a song about a knight? We do all three at once, if you pay double.
