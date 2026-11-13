@@ -10516,6 +10516,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageHouseLevy { get; set; } = true;
 
+        [SettingPropertyBool("Castellan Levy From Pool", HintText = "the castellan of a great house's seat (Raventree Hall, Winterfell, Riverrun and the others) no longer conjures household troops out of nothing: the men you recruit from him are sons of the seat's own villages, as many as those villages can spare above their last homesteads, and they are gone from those fields for good. You pay the same price as before, but the money goes to their families (the purse of each village, for its own men) instead of vanishing. The Red Keep's Kingsguard stay as they were. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool CastellanLevyFromPool { get; set; } = true;
+
         [SettingPropertyBool("Land Sales", HintText = "houses in need may sell you land of their own will: ask a clan leader 'I hear your house needs coin. Would you sell me land?' (or use the offer option in a side village or main village menu). The price is the holding's real worth - what it truly earns its lord a year, net of its costs, times 14 to 20 years of it by how well the seller thinks of you (Land Years Of Purchase for a close friend, Land Years Worst when he only just will sell) - never a token price; a house deep in debt may take somewhat less. The coin goes to the seller's head and his creditors take their due from it first. Off = no land is for sale", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
         public bool LandSales { get; set; } = true;
@@ -15620,6 +15624,7 @@ namespace Armoury
             s.SideRecruitGeneralLevyPrice = SideRecruitGeneralLevyPrice;
             s.SideRecruitResettleDays = SideRecruitResettleDays;
             s.SideVillageHouseLevy = SideVillageHouseLevy;
+            s.CastellanLevyFromPool = CastellanLevyFromPool;
             s.LandSales = LandSales;
             s.LandSalesSideVillages = LandSalesSideVillages;
             s.LandSalesLordships = LandSalesLordships;

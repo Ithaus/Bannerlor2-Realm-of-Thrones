@@ -1827,6 +1827,7 @@ namespace Armoury
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeRansom.Tick(); });
             // n20-napisy: linia kontrolna napisow przyciskow menu - dopisana PRZED SiegeRansom.AddMenus, wiec gra wola ja PO nim (sluchacze od ostatnio dopisanego)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, ShortLabels.Audit);
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, CastellanLevy.Hook);   // 474-P5b: kasztelan ROT - ludzie rodu z DOM wsi siedziby, zloto do kies wsi (klucz CastellanLevyFromPool)
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
             // 375: zbrojownia wojska (DTE) i kit dla zalogi w menu oblezonej twierdzy (gracz w srodku) - przed "Leave"; tylko ekran, bez przelaczania menu
