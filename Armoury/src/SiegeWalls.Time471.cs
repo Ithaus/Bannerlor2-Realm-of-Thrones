@@ -87,6 +87,39 @@ namespace Armoury
         }
 
         /// <summary>Czynniki i termin R dla jednego oblezenia; txt - czynniki do linii.</summary>
+        private const int MaxPausedDays = 30;   // R3: najwiecej dob zatrzymanego zegara w jednym oblezeniu
+        private static int _d471PauseCut;     // R3: dob, w ktorych odsiecz w drodze NIE zatrzymala zegara (daleko / slaba / limit 30)
+
+        /// <summary>R3: sila odsieczy (jak ReliefStrength), ale tylko druzyn, ktore w linii prostej przy swojej predkosci dotra w `days` dob. bes - sila obozu.</summary>
+        private static double ReliefNear(Settlement st, float days, out double bes)
+        {
+            bes = 0.0;
+            var ev = st.SiegeEvent;
+            var camp = ev != null ? ev.BesiegerCamp : null;
+            if (camp != null)
+                foreach (var pb in camp.GetInvolvedPartiesForEventType(TaleWorlds.CampaignSystem.MapEvents.MapEvent.BattleTypes.Siege)) if (pb != null) bes += pb.EstimatedStrength;
+            double rel = 0.0;
+            var f = st.MapFaction;
+            var w = f != null ? f.WarPartyComponents : null;
+            if (w == null) return 0.0;
+            var sp = st.GetPosition2D;
+            for (int i = 0; i < w.Count; i++)
+            {
+                var mp = w[i] != null ? w[i].MobileParty : null;
+                if (mp == null || !mp.IsActive || mp.CurrentSettlement == st) continue;
+                if (mp.DefaultBehavior != AiBehavior.DefendSettlement || mp.TargetSettlement != st) continue;
+                var lead = mp.Army != null ? mp.Army.LeaderParty : mp;
+                if (mp.Army != null && lead != mp) continue;
+                if (mp.Army == null && mp.AttachedTo != null) continue;
+                float spd = 0f; try { spd = lead.Speed; } catch { }
+                if (!(spd > 0.01f)) continue;
+                float d = lead.GetPosition2D.Distance(sp);
+                if (d / spd / CampaignTime.HoursInDay > days) continue;
+                rel += mp.Army != null ? mp.Army.EstimatedStrength : mp.Party.EstimatedStrength;
+            }
+            return rel;
+        }
+
         private static double R471(Settlement st, SiegeEvent ev, int cat, int lvl, out double q, out double sq, out bool paused, out string txt, out double ratioOut)
         {
             var t = st.Town;
@@ -256,6 +289,13 @@ namespace Armoury
                         going++; perCat[r.Cat]++;
                         double q, sq, ratio; bool pz; string txt;
                         double R = R471(st, ev, r.Cat, r.Lvl, out q, out sq, out pz, out txt, out ratio);
+                        // R3 (noc 13.11, analiza 120a pkt 4b): zegar stoi tylko przy odsieczy co najmniej rownej sile obozu i bliskiej (do 3 dob w linii prostej),
+                        // najwyzej 30 dob przerwy w jednym oblezeniu (Cape Wrath: zegar 31 przy 54 dobach 'z odsiecza' zebranej w 55%)
+                        if (pz && LocalFront334e.NearReliefOnly)
+                        {
+                            double besN, relN = ReliefNear(st, LocalFront334e.AbandonArrivalDays, out besN);
+                            if (!(relN > 0 && besN > 0 && relN >= besN) || r.PausedDays >= MaxPausedDays) { pz = false; _d471PauseCut++; }
+                        }
                         if (!fresh && !pz) r.Clock += 1.0;                           // 471-p U8: odsiecz sprawdzona dzis, przed doliczeniem doby
                         r.R = R; r.Paused = pz; r.Ratio = ratio;
                         if (pz) { r.PausedDays++; paused++; }
@@ -307,13 +347,13 @@ namespace Armoury
                 }
                 if (log)
                     Log.Info("Czas oblezen (471 doba): dzien " + today + " | klucz 471b " + (act ? "TAK" : "NIE") + " | trwajace w regule " + going + " (maly zamek " + perCat[0] + ", duzy zamek " + perCat[1] + ", miasto " + perCat[2] + ", wielka twierdza " + perCat[3]
-                        + "), poza regula " + outside + " | po terminie R " + over + ", ponad limitem " + overLim + ", zegar stoi (odsiecz) " + paused
+                        + "), poza regula " + outside + " | po terminie R " + over + ", ponad limitem " + overLim + ", zegar stoi (odsiecz) " + paused + ", odsiecz daleka/slaba/limit 30 dob (R3) " + _d471PauseCut
                         + " | dzis: start " + _d471Start + ", koniec " + _d471End + ", poza regula " + _d471Out
                         + " | 471b: kapitulacje " + _d471Yield + " (z glodu " + _d471Starve + "), odejscia po limicie " + _d471Lift + ", wstrzymane " + _d471Refused + ", oblezen trzymanych bramka (raz na dobe) " + _d471Gate
                         + " | wiek/R: " + (sbList.Length == 0 ? "-" : sbList.ToString()) + ".");
             }
             catch (Exception e) { Stumble("Time471Daily", e); }
-            finally { _d471Start = _d471End = _d471Out = _d471Yield = _d471Lift = _d471Gate = _d471Refused = _d471Starve = 0; }
+            finally { _d471Start = _d471End = _d471Out = _d471Yield = _d471Lift = _d471Gate = _d471Refused = _d471Starve = _d471PauseCut = 0; }
         }
 
         // ------------------------------------------------------------ 471b-4: drogi konca

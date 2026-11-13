@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## R3 (13.11) - oblezenia: odstapienie i zatrzymany zegar 471 tylko przy bliskiej odsieczy (klucz Siege Near Relief Only)
+
+**Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 4): Starfall oblegany 4 razy, Sandstone 2 razy - za kazdym razem odstapienie przy q_obl 1.28-1.31 przed odsiecza "przyjazd 11.06" doby, ktora nigdy nie walczyla (bitwy pod murami 0); Cape Wrath "zegar 31, dob z odsiecza 54" (odsiecz zebrala 55% wymaganej), Demongate "dob z odsiecza 46"; kapitulacje 471b 0 w calym tescie.
+
+**Przyczyna:** LocalFront334e.JudgeRule: ODSTAP, gdy przewaga odsieczy przyjedzie przed koncem oblezenia (tLeft) - przy dlugich terminach 471 (40-150 dob) kazda odsiecz w drodze "zdazy". SiegeWalls.Time471: zegar stal przy odsieczy >= 0.5 x oboz, bez wzgledu na odleglosc i bez limitu.
+
+**Zmiana:** nowy klucz Siege Near Relief Only (TAK; NIE = jak przed): (a) JudgeRule - odsiecz przyjezdzajaca pozniej niz AbandonArrivalDays = 3 doby daje KONTYNUUJ (albo GLOD), nie ODSTAP; (b) Time471 - zegar stoi tylko, gdy odsiecz w promieniu 3 dob (linia prosta / predkosc wodza) ma sile >= sila obozu, i najwyzej 30 dob w jednym oblezeniu (MaxPausedDays); licznik "odsiecz daleka/slaba/limit 30 dob (R3)" w linii "Czas oblezen (471 doba)". (c) wspolna miara q przy starcie (334e ZFor vs OB5 ReliefStrength) - decyzja domyslna (noc 13.11): NIE ruszana teraz; po (a) start przy innej mierze nie prowadzi do odwrotu przed daleka odsiecza. Test T3 (334e) - przypadki ODSTAP maja przyjazd <= 2 doby, bez zmian.
+
+**Ryzyko / co sprawdzic:** wiecej oblezen dotrwa do terminu R / kapitulacji 471b (pierwsze kapitulacje > 0), wiecej szturmow i zdobyczy; 274 (pasmo B/A) i 334 teatr - sprawdzic w nastepnym 120 dob; powtorki tych samych celow (Starfall) maja zniknac. Odsiecz blizej niz 3 doby nadal przerywa (zgodnie z gra).
+
+**Status:** DO SPRAWDZENIA
+
 ## R2 (13.11) - weto teatru 334: log tylko opcji, ktore gra realnie rozwazala (ocena > 0)
 
 **Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 5): 66 723 ze 162 121 linii logu (41%) to "weto teatru", z tego 65 933 dla opcji z "ocena gry 0.00".

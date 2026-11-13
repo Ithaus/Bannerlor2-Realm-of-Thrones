@@ -13100,6 +13100,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public float SiegeTimeLimitFactor { get; set; } = 1.5f;
 
+        [SettingPropertyBool("Siege Near Relief Only", HintText = "With Siege Time By Factors: a besieging AI army gives up a siege for a relief army only when that relief would actually arrive within about 3 days, and the siege clock stops only while a relief at least as strong as the camp is within about 3 days, for at most 30 days in one siege. Off = any relief on its way made the army leave and stopped the clock, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeNearReliefOnly { get; set; } = true;
+
         [SettingPropertyBool("Siege Time Rules For Your Fortresses", HintText = "The fortresses of your own house besieged by the lords of the world (while you are not inside or in the camp) follow the same siege rules as everyone else's: with Siege Time By Factors - no assault before the lower bound of the term, they yield with honours when the term runs out with no relief in sight or after a week of hunger (the garrison marches out to your nearest fortress that is not besieged, or to your own party; failing both, to the lords of your realm); with Siege Camp Forages The Villages - the besiegers forage your villages. You get a message when that happens. Off = your own fortresses keep only the old rules (assault, the old hunger, no foraging)", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeTimeRulesPlayerHoldings { get; set; } = true;
@@ -16378,6 +16382,7 @@ namespace Armoury
             s.SiegeCampForage = SiegeCampForage;
             s.SiegeTimeByFactors = SiegeTimeByFactors;
             s.SiegeTimeLimitFactor = SiegeTimeLimitFactor;
+            s.SiegeNearReliefOnly = SiegeNearReliefOnly;
             s.SiegeTimeRulesPlayerHoldings = SiegeTimeRulesPlayerHoldings;
         }
 

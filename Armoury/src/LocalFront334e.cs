@@ -28,6 +28,8 @@ namespace Armoury
         internal const float SiegeDays = 8.02f;      // AiMilitaryBehavior.AverageSiegeDurationAsDays
         internal const float HorizonDays = 12.03f;   // 8.02 + 4.01 (prog obrony gry GetDistanceScoreForDefending) - dalej nie zdazy nigdy
         internal const double OpenQ = 0.8, SiegeBanQ = 1.0, AbandonQ = 1.25;
+        internal const float AbandonArrivalDays = 3f;   // R3: odsiecz dalej niz tyle dob nie wywoluje odstapienia (klucz Siege Near Relief Only)
+        internal static bool NearReliefOnly { get { var s = Settings.Current; return s != null && s.SiegeNearReliefOnly; } }
         internal const double DefNeed = 1.2, DefDrop = 1.0;
         internal const float FoodMinDays = 3f;       // SCA: jedzenie < 3 doby x0.25
         internal const float HoldFloor = 0.5f;       // jak F2 / m116 (prog zmiany celu gry)
@@ -994,6 +996,8 @@ namespace Armoury
             double qr = Ratio(relief + GarCap(garrison, camp), camp);
             if (qr <= AbandonQ) return 2;
             if (arrival > tLeft) return food >= FoodMinDays ? 3 : 5;
+            // R3 (noc 13.11, analiza 120a pkt 4): odstapienie tylko przed odsiecza, ktora przyjedzie w ok. 3 doby (Starfall 4x odstapil przed odsiecza 'przyjazd 11.06', ktora nigdy nie walczyla)
+            if (NearReliefOnly && arrival > AbandonArrivalDays) return food >= FoodMinDays ? 3 : 5;
             return 4;
         }
 
