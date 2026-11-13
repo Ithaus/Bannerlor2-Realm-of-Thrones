@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P8-p5 (13.11) - wnetrze zajazdu: wywrotka przy koncu misji (NRE AnimationPoint.SetAgentItemVisibility) i zawieszenie testu
+
+**Problem:** autotest at-474b (13.11): 02:49:43 test otworzyl wnetrze The Blind Anvil (vlandia_tavern_interior_a, bywalcy przy stolach 5) tuz po "Leave" z bitwy 2/7; misja nie zamknela sie po 8 s ("po bitwie mapa nie wrocila do spokoju w 300 s ... MissionState"); 03:04 EndGame -> crash-original-2026-11-13_03-04-36.log: NullReferenceException w SandBox.Objects.AnimationPoints.AnimationPoint.SetAgentItemVisibility <- SetAgentItemsVisibility <- AnimationPoint.OnUseStopped <- Agent.StopUsingGameObjectAux <- UsableMachine.OnMissionEnded <- Mission.set_MissionEnded <- Mission.EndMission <- MBGameManager.EndGame (gra zawieszona, zabita recznie).
+
+**Przyczyna:** AnimationPoint.SetAgentItemVisibility (dekompilacja SandBox AnimationPoint.cs:960-965) wola UserAgent.GetComponent<CampaignAgentComponent>().AgentNavigator.SetPrefabVisibility. Bywalcy i grajkowie wnetrza sa stawiani przez Mission.SpawnAgent bez CampaignAgentComponent / AgentNavigator, a krzesla (ChairUsePoint) maja przedmioty w dloni (_itemsForBones tylko rosnie). Gra chroni dodanie przedmiotow warunkiem CanAgentUseItem (navigator != null, :875-882), ale ukrywanie w OnUseStopped (:753) / rozmowie / ticku - nie. Pierwsze EndMission (koniec testu po 8 s) rzucilo NRE polkniete przez try w InnInteriorLogic.OnMissionTick - misja w polowie konca, nie zamknela sie; drugie (EndGame) - CTD. Wyjscie gracza Tab i koniec gry we wnetrzu szlyby ta sama droga.
+
+**Zmiana:** nowy AnimationPointGuard474: prefiks prywatnej AnimationPoint.SetAgentItemVisibility (DeclaredMethod, wpiety przy starcie gry obok 468) - agent bez CampaignAgentComponent / AgentNavigator / AgentVisuals: ukrycie przedmiotu pominiete (u takiego agenta przedmiotow nigdy nie pokazano - ten sam warunek co CanAgentUseItem gry). Agenci gry (z nawigatorem) - co do bitu jak w grze. Test autotestu wnetrza otwiera je dopiero po 10 s nieprzerwanie spokojnej mapy (nie tuz po "Leave" z bitwy). Linia startu: "Wnetrze zajazdu (474-P8-p5): oslona ... wpieta"; linia wyjscia z wnetrza: "oslona punktow animacji (474-P8-p5) wpieta, pominietych ukryc przedmiotow N".
+
+**Ryzyko / co sprawdzic:** w autotescie z armoury-zajazd-wnetrze.flag: "wyjscie z <zajazd> po 8 s" dla obu wejsc, pominietych ukryc > 0 (dowod, ze oslona zadzialala), brak crash-original z AnimationPoint, mapa wraca do spokoju. Latka dotyczy wszystkich misji SandBox, ale tylko agentow bez nawigatora (u nich gra rzucala NRE).
+
+**Status:** DO SPRAWDZENIA
+
 ## R5-b/c, R1 (13.11) - garbarnie, handel karawan z kasa miasta, brak materialow budow: ustalenia bez zmiany kodu (decyzje domyslne noc 13.11)
 
 **Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md): pkt 8 garbarnie 0 cykli przy skorach 240 -> 4869; pkt 3 kasy miast drenowane przez karawany, reszta "Przeplywy osad" -20 mln w 118 dobach; pkt 1 brak materialow budowlanych (zlecone 503 726/d, material z polek 0, kiesy wsi 1.4 -> 10.7 mln).

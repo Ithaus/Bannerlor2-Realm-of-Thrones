@@ -91,6 +91,7 @@ namespace Armoury
         private static int _tState, _tLeft = 2, _tWait;
         private static bool _tSeenTown;
         private static long _tNextMs;
+        private static long _tCalmSince;   // 474-P8-p5: mapa spokojna nieprzerwanie od (ms) - test otwiera wnetrze dopiero po 10 s spokoju (at-474b: otwarcie tuz po "Leave" z bitwy)
 
         internal static void Stumble(string where, Exception e)
         {
@@ -424,8 +425,13 @@ namespace Armoury
             }
             if (Busy) return;
             string why = TestGate();
+            long nowCalm = (long)(System.Diagnostics.Stopwatch.GetTimestamp() * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+            if (why != null) _tCalmSince = 0;
+            else if (_tCalmSince == 0) { _tCalmSince = nowCalm; return; }
+            else if (nowCalm - _tCalmSince < 10000) return;
             if (why == null)
             {
+                _tCalmSince = 0;
                 var mp = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty;
                 RoadsideInns.Inn inn = null;
                 try { RoadsideInns.EnsureLoaded(); inn = RoadsideInns.NearestAny(mp.GetPosition2D, _tLeft == 2 ? 0 : 1); } catch (Exception e) { Stumble("TestPick", e); }
@@ -563,7 +569,7 @@ namespace Armoury
             try
             {
                 Log.Info(RoadsideInnInterior.P + "wyjscie z " + InnName + " (" + (Inn != null ? Inn.Uid : "-") + ") po " + _t.ToString("0", CultureInfo.InvariantCulture)
-                         + " s | " + (Tables != null ? Tables.ExitText() + " | " : "") + (TavernLines.On ? "gwar (474-P10): urywkow " + _murmurs + " | " : "") + "potkniecia razem " + RoadsideInnInterior.Stumbles + ".");
+                         + " s | " + (Tables != null ? Tables.ExitText() + " | " : "") + (TavernLines.On ? "gwar (474-P10): urywkow " + _murmurs + " | " : "") + "oslona punktow animacji (474-P8-p5) " + AnimationPointGuard474.Info + ", pominietych ukryc przedmiotow " + AnimationPointGuard474.Skips + " | potkniecia razem " + RoadsideInnInterior.Stumbles + ".");
             }
             catch { }
             _testClock = null;

@@ -98,6 +98,8 @@ namespace Armoury
                 try { SiegeStones383.Install(_harmony); } catch (Exception e) { Log.Error("SiegeStones383.Install", e); }
                 // 468: obroncy AI spychaja drabiny takze dluga bronia drzewcowa - postfiks StandingPointWithWeaponRequirement.IsDisabledForAgent; klucz czytany na zywo (NIE = wyjscie od razu); wlasny try
                 try { SiegeLadderPush468.Install(_harmony); } catch (Exception e) { Log.Error("SiegeLadderPush468.Install", e); }
+                // 474-P8-p5: oslona AnimationPoint.SetAgentItemVisibility dla agentow bez AgentNavigator (bywalcy wnetrza zajazdu) - NRE przy koncu misji; wlasny try
+                try { AnimationPointGuard474.Install(_harmony); } catch (Exception e) { Log.Error("AnimationPointGuard474.Install", e); }
                 ThrownWobblePatch.ApplyAll(_harmony);
                 FairXpPatch.ApplyAll(_harmony);
                 try { RaceLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RaceLaw.ApplyAll", e); }   // Jeff 10.10: sluby i ciaze tylko w obrebie rasy (olbrzymy z olbrzymami) - model slubu, MarriageAction, ciaza, porod
