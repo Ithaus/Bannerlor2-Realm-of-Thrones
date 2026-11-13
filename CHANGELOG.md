@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-p7 (13.11) - panszczyzna: linia doby wolala GetPopulationFoodProduction na czynnym modelu jedzenia innego typu (TargetException)
+
+**Problem:** autotest at-476b (13.11 01:48, session-2026-11-13_01-35-58.log): "ERROR IN A MOD [Armoury] Armoury.Buildings338Corvee.Delta | TargetException: Object does not match target type" ze sciezki Buildings338Corvee.Daily -> Delta (bledy CrashScribe 25 zamiast 23).
+
+**Przyczyna:** Daily podawal do Delta Campaign.Current.Models.SettlementFoodModel, a GetPopulationFoodProduction jest metoda BKFoodModel; czynny model jedzenia nie jest instancja BKFoodModel (inny mod / opakowanie), wiec MethodInfo.Invoke rzucal. Sama regula (postfiks BKFoodModel.CalculateTownFoodChangeInternal, __instance = BKFoodModel) dzialala - psula sie tylko linia pomiaru.
+
+**Zmiana:** postfiks zapamietuje instancje BKFoodModel (_bkModel, zerowane w SessionStart); Daily wola Delta na niej (albo na czynnym modelu, gdy jest BKFoodModel); bez instancji - linia "brak instancji BKFoodModel ... pomiar od nastepnej doby".
+
+**Ryzyko / co sprawdzic:** w nastepnym autotescie brak bledu Corvee.Delta, bledy CrashScribe 23; linia "panszczyzna Farmlands (476-e)" z suma zmiany jedzenia i liczba zamkow z bilansem < 0.
+
+**Status:** DO SPRAWDZENIA
+
 ## 471b-p6 (13.11) - straty obozu: RB przy glodzie i dla obozow bez stawki 471b, komunikat gracza raz na 7 dob, linie przy wylaczonej zarazie (recenzje A3/B4, A7, A8/B8)
 
 **Problem:**

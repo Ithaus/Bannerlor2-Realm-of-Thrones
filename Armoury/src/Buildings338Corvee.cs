@@ -31,6 +31,7 @@ namespace Armoury
         private static TextObject _txt, _txtLoy;
         private static int _stumbles;
         [ThreadStatic] private static bool _inside;
+        private static object _bkModel;   // 476-p7: instancja BKFoodModel z postfiksu - linia doby wola GetPopulationFoodProduction na niej, nie na czynnym modelu (moze byc inny typ: TargetException)
 
         private static void Stumble(string where, Exception e)
         {
@@ -41,6 +42,7 @@ namespace Armoury
         internal static void SessionStart()
         {
             _stumbles = 0;
+            _bkModel = null;
             try
             {
                 var t = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKFoodModel");
@@ -97,6 +99,7 @@ namespace Armoury
         public static void FoodPostfix(object __instance, Town __0, ref ExplainedNumber __result)
         {
             if (_inside) return;
+            if (_bkModel == null && __instance != null && _gpfp != null && _gpfp.DeclaringType.IsInstanceOfType(__instance)) _bkModel = __instance;
             try
             {
                 if (!On || __0 == null || !__0.IsCastle) return;
@@ -132,6 +135,8 @@ namespace Armoury
                 int l1 = 0, l2 = 0, l3 = 0, neg = 0, n = 0;
                 double sum = 0;
                 var fm = Campaign.Current.Models.SettlementFoodModel;
+                object bk = _bkModel != null ? _bkModel : (_gpfp != null && _gpfp.DeclaringType.IsInstanceOfType(fm) ? (object)fm : null);
+                if (bk == null) { Log.Info("Budynki (338) panszczyzna Farmlands (476-e): dzien " + day + " | brak instancji BKFoodModel (postfiks jeszcze nie biegl) - pomiar od nastepnej doby"); return; }
                 foreach (var t in Town.AllCastles)
                 {
                     try
@@ -141,7 +146,7 @@ namespace Armoury
                         n++; if (l == 1) l1++; else if (l == 2) l2++; else l3++;
                         _inside = true;
                         int lv; float d;
-                        try { d = Delta(fm, t, out lv); } finally { _inside = false; }
+                        try { d = Delta(bk, t, out lv); } finally { _inside = false; }
                         sum += d;
                         if (fm.CalculateTownFoodStocksChange(t, true, false).ResultNumber < 0f) neg++;
                     }
