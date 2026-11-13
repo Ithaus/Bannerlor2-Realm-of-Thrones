@@ -249,12 +249,13 @@ namespace Armoury
             if (q.Count > 0)
             {
                 Ruin hr; var head = q.Peek();
-                if (head != null && _ruins.TryGetValue(head, out hr) && hr.R > 0 && (civilOk || head.BuildingType.IsMilitaryProject)) return;   // czolo juz ze zgliszcz (przy froncie - wojskowe)
+                if (head != null && _ruins.TryGetValue(head, out hr) && hr.R > 0 && (civilOk || head.BuildingType.IsMilitaryProject) && !Buildings338NoBuild.AiSkips(t, head.BuildingType)) return;   // czolo juz ze zgliszcz (przy froncie - wojskowe)
             }
             Ruin best = null; float bestRest = float.MaxValue; bool civilWaits = false;
             foreach (var r in rs)
             {
                 if (r.R <= 0 || r.B.CurrentLevel >= 3) continue;
+                if (Buildings338NoBuild.AiSkips(t, r.B.BuildingType)) continue;   // 476-p2 (recenzja A2): wyjmowana z kolejki AI - nie blokuje pozostalych zgliszcz
                 if (!civilOk && !r.B.BuildingType.IsMilitaryProject) { civilWaits = true; continue; }
                 float rest = r.B.GetConstructionCost() - r.B.BuildingProgress;
                 if (rest < bestRest) { bestRest = rest; best = r; }

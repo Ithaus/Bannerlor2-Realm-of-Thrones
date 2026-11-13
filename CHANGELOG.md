@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-p2 (13.11) - zgliszcza budowli wyjmowanej z kolejki AI nie blokuja odbudowy; licznik "AI pominelo zaklad" liczy decyzje
+
+**Problem:** recenzja 476 A2 (srednia): CitySack.Prioritize stawial na czele kolejki zgliszcze z najmniejsza reszta kosztu bez sprawdzenia, czy AI tej osady tej budowli nie wyjmie (473-b6 / 476-a kopalnia lub stadnina bez zasobu, 476-c miejsce kultu, gdy AI go nie chce); DropQueued tej samej doby je wyrzucal, a nazajutrz Prioritize wybieral to samo - pozostale zgliszcza osady (np. koszary) nigdy nie szly. Recenzja B7 (niska): `_aiBlocked++` w AiBlocks liczyl kazde wywolanie (Skip w kazdej petli), a nie decyzje.
+
+**Przyczyna:** brak wspolnej bramki Skip w Prioritize; licznik w funkcji-predykacie.
+
+**Zmiana:** Buildings338NoBuild.AiSkips(t, bt) (= Skip); Prioritize pomija takie zgliszcza i nie uznaje ich za "czolo juz ze zgliszcz". Licznik `_aiBlocked` tylko w DropQueued (wyjeta budowla zakladu) i NextPostfix (wylosowany zaklad bez zasobu) przez NoteAiBlocked.
+
+**Ryzyko / co sprawdzic:** linia LB budowle (odbudowa zgliszcz postepuje), linia zakladow "AI pominelo zaklad bez zasobu N" mala. Klucze NIE - bez zmian (Skip false).
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-p1 (13.11) - panszczyzna Farmlands nie odejmuje jedzenia w oblezeniu; uczciwy opis bilansu
 
 **Problem:** recenzje 476 (A1 srednia, B1 wysoka): w oblezeniu BKFoodModel.GetPopulationFoodProduction zwraca 0 (bk_all.cs:39383), a DefaultSettlementFoodModel nie dodaje FoodProduction budowli (AddEffectOfBuildings tylko poza oblezeniem). Delta 476-e zwracala wtedy -GameFood = -6/-12/-18 na dobe jedzenia, ktorego zamek nie dostal - oblezony zamek z Farmlands glodowal szybciej, obrona 471b krotsza.

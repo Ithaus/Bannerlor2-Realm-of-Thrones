@@ -125,8 +125,7 @@ namespace Armoury
                 bool b = false;
                 if (id == TownMinesId || id == Buildings338Ports.CastleMinesId) b = !HasDeposit(t);
                 else if (id == StudsId) b = !HasPasture(t);
-                if (b) _aiBlocked++;
-                return b;
+                return b;   // 476-p2 (recenzja B7): licznik tylko w miejscu faktycznego odrzucenia (NoteAiBlocked)
             }
             catch (Exception e) { Stumble("AiBlocks", e); return false; }
         }
@@ -146,6 +145,7 @@ namespace Armoury
         }
 
         internal static void NoteCastleOreFiltered() { _castleOreFiltered++; }
+        internal static void NoteAiBlocked() { _aiBlocked++; }
 
         /// <summary>Stadnina: szansa przychowku na dobe (476: 2% x poziom; NIE - 2% jak dotad).</summary>
         internal static float StudsChance(int lvl) { return On ? 0.02f * Math.Max(1, lvl) : 0.02f; }

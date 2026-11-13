@@ -94,6 +94,7 @@ namespace Armoury
                 }
                 if (__result == null) return;
                 if (!Skip(town, __result.BuildingType)) return;
+                if (Buildings338Works.AiBlocks(town, __result.BuildingType)) Buildings338Works.NoteAiBlocked();   // 476-p2
                 var pick = new List<Building>();
                 foreach (var b in town.Buildings)
                     if (b != null && b.BuildingType != null && !b.BuildingType.IsDailyProject && b.CurrentLevel < 3 && !Skip(town, b.BuildingType)
@@ -117,6 +118,9 @@ namespace Armoury
             return Buildings338Works.AiBlocks(t, bt);
         }
 
+        /// <summary>476-p2 (recenzja A2): CitySack.Prioritize nie stawia na czele zgliszcz budowli, ktora AI tej osady i tak wyjmie z kolejki.</summary>
+        internal static bool AiSkips(Town t, BuildingType bt) { try { return t != null && bt != null && Skip(t, bt); } catch { return false; } }
+
         /// <summary>(2) Z ArmouryBehavior przed BuildFunding.Daily: zbrojownia i sad BK (i 476-a: zaklad bez zasobu) wychodza z kolejki osad AI (postep i poziom zostaja na budowli).</summary>
         internal static void DropQueued()
         {
@@ -134,7 +138,12 @@ namespace Armoury
                     foreach (var b in q) if (b != null && Skip(t, b.BuildingType)) { any = true; break; }
                     if (!any) continue;
                     var keep = new List<Building>();
-                    foreach (var b in q) if (b == null || !Skip(t, b.BuildingType)) keep.Add(b); else _dropped++;
+                    foreach (var b in q)
+                    {
+                        if (b == null || !Skip(t, b.BuildingType)) { keep.Add(b); continue; }
+                        _dropped++;
+                        if (Buildings338Works.AiBlocks(t, b.BuildingType)) Buildings338Works.NoteAiBlocked();   // 476-p2: licznik decyzji, nie wywolan
+                    }
                     q.Clear();
                     foreach (var b in keep) q.Enqueue(b);
                 }
