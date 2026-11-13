@@ -151,6 +151,7 @@ namespace Armoury
             _lvLack = new Dictionary<string, double[]>(StringComparer.Ordinal);
             _lvQ = null; _lvOffer.Clear(); RecruitingAt = null;
             _lvHouseToday.Clear();   // 474-P5
+            _scr = null;             // 474-P6: wiazanie okna gry
             _lvSt = 0;
             _lvGDay = int.MinValue; _lvG.Clear();
             LevyDayZero();
@@ -553,6 +554,7 @@ namespace Armoury
                 string why = LevyGate(st, uid, fief, out hide, out code, out q);
                 if (hide || q == null) return;
                 if (why != null) { Log.Player(why, true); return; }
+                if (ScrTryOpen(st, uid, fief)) return;   // 474-P6: okno werbunku gry (klucz SideVillageRecruitScreen); nie wyszlo - lista wyboru jak dotad
                 int max = Math.Min(Math.Min(q.Ready, RoomNow()), Hero.MainHero.Gold / Math.Max(1, q.Price));
                 max = Math.Min(max, LvOfferMax);
                 if (max < 1) return;
