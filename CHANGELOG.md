@@ -10,7 +10,7 @@
 
 **Ryzyko / co sprawdzic:** regresja: nowy kod tylko czyta p, S, xs, Dm, EqEat, BlockScale, W/WH (zadnych zapisow do stanu rownowagi; MktDev wolany z lokalnymi ref); jedyna zmiana w istniejacym bloku to przypisanie mqBestIt obok bestMt. Koszt: jeden przebieg par (tylko swine_farm licza) na punkt kontrolny i trzy na koniec rownowagi - w watku roboczym, male wobec Shares. Kolizje: brak (nowe pola KsResult, nowa linia). Sprawdzic w logu: linia 479-j co Plan, potkniecia 0; czy cena miesa w punktach skacze miedzy PLo i wyzej razem z rekami swin (hipoteza a), czy oddany stan to NAJLEPSZY z miesem DOL przy ostatniej iteracji wyzej (hipoteza b).
 
-**Status:** DO SPRAWDZENIA (zbudowane, NIE WGRANE - sam pomiar).
+**Status:** SPRAWDZONE (at-120j, Armoury-2026-11-13_17-17-58.log: 120/120 dob, 23 bledy cudze, 0 BLAD), NIE WGRANE (sam pomiar). Wynik: hipoteza (a) odrzucona - cena miesa w ostatniej rownowadze NIE drga, rosnie powoli i monotonicznie (ok. 0.002-0.015 na 50 rund; np. W 108759: 0.140 -> 0.407 w 1100 rundach, rece swin 58 -> 8144). Rownowaga nie zbiega (rund 700-1100 z 3000), a mt calego Planu skacze okresowo 2.4 <-> 9.8 (inny towar w cyklu 2-okresowym), wiec wybor najlepszego stanu oddaje WCZESNA runde (150-250): W 108759 oddane 0.161 / 58 rak swin zamiast ostatnich 0.407 / 8144. Hipoteza (b) w wersji: oddany stan z wczesnej rundy zaniza cene miesa, bo mieso nie zdazylo dojsc, a mt wybiera faze cyklu innego towaru. Dalej: znalezc towar w cyklu (mt 2.4/9.8) i/lub szybszy krok ceny miesa; osobny wpis.
 
 ## 479-i (13.11) - KS: pomiar popytu miesa (Plan wobec T* gry) i poprawiona linia miesa wsi
 
