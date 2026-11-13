@@ -1033,6 +1033,8 @@ namespace Armoury
                         hled[11] += raw * Math.Max(0f, c.HarnessWearFactor) * missileScale;
                 }
 
+                // 484: przy Limit Stuck Missiles decyzja zapada przed wbiciem (StuckMissiles484) - tu nic do odpinania (inaczej tick odpialby WCZESNIEJ wbita strzale)
+                if (StuckMissiles484.Owns) return;
                 if (!c.ArrowUnstickEnabled || affectedAgent == null || !affectedAgent.IsHuman) return;
                 if (!blow.IsMissile) return;
                 if (attackCollisionData.AttackBlockedWithShield) return;      // w tarczy strzaly zostaja

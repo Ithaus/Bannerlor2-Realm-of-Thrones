@@ -1816,6 +1816,22 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public int JavelinStickMinDamage { get; set; } = 80;
 
+        [SettingPropertyBool("Limit Stuck Missiles", HintText = "an arrow, bolt or thrown weapon stays stuck in a body only after a real wound, and only a few per person; the rest fall to the ground at the hit and can be picked up. Shields keep their arrows. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool StuckMissilesLimit { get; set; } = true;
+
+        [SettingPropertyInteger("Max Stuck Missiles On A Person", 0, 10, "0", HintText = "at most this many missiles stay stuck in one person (shields not counted)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public int StuckMissilesMaxHuman { get; set; } = 3;
+
+        [SettingPropertyInteger("Min Damage For A Missile To Stick", 0, 100, "0", HintText = "an arrow or bolt must take at least this many hit points to stay stuck in a man (a killing hit always may; thrown weapons use Javelin Stick Min Damage)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public int StuckMissilesMinDamage { get; set; } = 12;
+
+        [SettingPropertyBool("Only A Killing Missile Sticks In A Horse", HintText = "a missile stays stuck in a horse only when it kills the horse; every other hit falls to the ground. Off = horses as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool StuckMissilesHorseOnlyFatal { get; set; } = true;
+
         [SettingPropertyBool("Walk Key Enabled", HintText = "hold Left Ctrl on foot to walk instead of run - the wind comes back as you stroll", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool WalkKeyEnabled { get; set; } = true;
@@ -13621,6 +13637,10 @@ namespace Armoury
             s.ArrowUnstickEnabled = ArrowUnstickEnabled;
             s.ArrowStickMinDamage = ArrowStickMinDamage;
             s.JavelinStickMinDamage = JavelinStickMinDamage;
+            s.StuckMissilesLimit = StuckMissilesLimit;
+            s.StuckMissilesMaxHuman = StuckMissilesMaxHuman;
+            s.StuckMissilesMinDamage = StuckMissilesMinDamage;
+            s.StuckMissilesHorseOnlyFatal = StuckMissilesHorseOnlyFatal;
             s.WalkKeyEnabled = WalkKeyEnabled;
             s.WalkSpeedShare = WalkSpeedShare;
             s.StaminaSlowsRunning = StaminaSlowsRunning;

@@ -115,6 +115,8 @@ namespace Armoury
                 // MissileHitCallback / ChargeDamageCallback i postfiks CalculateDamage - TU, obok ChargeTemperPatch, zanim JIT skompiluje wolajacych; wlasny try.
                 // Recenzja P6: klucz Friendly Fire wylaczony przy starcie gry (plik MCM) = ApplyAll nic nie wpina (sprawdza sam)
                 try { FriendlyFire.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FriendlyFire.ApplyAll", e); }
+                // 484 (Jeff 13.11 "wygladam jak jez"): schowek MissileHitCallback + decyzja HandleMissileCollisionReaction (Priority.First, przed RBM); wlasny try
+                try { StuckMissiles484.ApplyAll(_harmony); } catch (Exception e) { Log.Error("StuckMissiles484.ApplyAll", e); }
                 TravellerGoods36.ApplyAll(_harmony);   // 3.6: wedrowcy BK bez towaru, rudy i drewna z niczego (postfiks po CastleSteel - Priority.Low)
                 CastleSteel.ApplyAll(_harmony);   // 177-1: wedrowcy BK bez sztab i wegla z niczego (dawny ValyrianSteel.DearRefine zdjety - stal zamkowa to zwykly stopien)
                 TravellerTrade36b.ApplyAll(_harmony);   // 36b: wedrowcy BK z prawdziwym towarem - zywnosc drogi z polki pochodzenia, bez jucznych z niczego, towar w komis miasto -> miasto
@@ -879,6 +881,9 @@ namespace Armoury
                 // noc 25.10 P6: bramka friendly fire (pole, oblezenie, kryjowka, morze - liczona raz w EarlyStart; turniej i arena poza)
                 if (Settings.Current.FriendlyFireEnabled && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new FriendlyFire.Logic());
+                // 484: bramka wbitych pociskow i linia licznikow na koncu misji (klucz Limit Stuck Missiles)
+                if (Settings.Current.StuckMissilesLimit && Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new StuckMissiles484.Logic());
                 // 305c: jezdziec AI zwalnia przed swoim pieszym (klucz CavalrySlowsForOwnFoot) i pomiar szarz w swoich (przy FriendlyFireEnabled) - samo sprawdza bitwe polowa
                 if ((Settings.Current.CavalrySlowsForOwnFoot || Settings.Current.FriendlyFireEnabled) && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new OwnFootAhead.Logic());

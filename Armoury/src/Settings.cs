@@ -678,6 +678,10 @@ namespace Armoury
         public bool ArrowUnstickEnabled = true;            // arrows the armour stopped do not stay stuck in a man (shields keep theirs)
         public int ArrowStickMinDamage = 8;                // an arrow must deal at least this to lodge in flesh
         public int JavelinStickMinDamage = 80;             // a thrown javelin, axe or knife stays in a man only when it kills him or deals at least this much - anything less bounces off
+        public bool StuckMissilesLimit = true;             // an arrow, bolt or thrown weapon stays stuck in a body only after a real wound: in a man only when it deals at least Min Damage For A Missile To Stick (thrown weapons: Javelin Stick Min Damage) or kills him, and never more than Max Stuck Missiles On A Person; a missile that does not stick falls to the ground at the hit and can be picked up. Shields keep their arrows. Off = as before
+        public int StuckMissilesMaxHuman = 3;              // at most this many missiles stay stuck in one person (shields not counted)
+        public int StuckMissilesMinDamage = 12;            // an arrow or bolt must take at least this many hit points to stay stuck in a man (a killing hit always may)
+        public bool StuckMissilesHorseOnlyFatal = true;    // a missile stays stuck in a horse only when it kills the horse; every other hit falls to the ground. Off = horses as before
         public bool WalkKeyEnabled = true;                 // hold Left Ctrl on foot to walk instead of run - the wind comes back as you stroll
         public float WalkSpeedShare = 0.42f;               // walking pace as a share of full speed
         // 313c (01.11, Jeff: "jak biegalem i spadla mi stamina do 0 to nadal biegne zamiast caly czas stopniowo zwalniac, az jak dojdzie do 0 po prostu powinienem
