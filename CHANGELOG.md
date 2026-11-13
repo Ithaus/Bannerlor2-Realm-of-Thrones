@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 479-j (13.11) - KS: pomiar rownowagi miesa w Planie (punkty kontrolne, stan oddany, swinie)
+
+**Problem:** 479-h/479-i: cena cienia miesa konczy Plan przy podlodze PLo 0.05 (Core.cs), choc podaz miesa Planu < popyt (Westeros ma niska cene przy zerowej luce popytu). Nie wiadomo, skad: (a) cena drga, bo rece swine_farm skacza 0 <-> dziesiatki tysiecy przy progu oplacalnosci (logit beta 10 w Shares), a oddany stan to przypadkowa faza; (b) wybor najlepszego stanu w Equilibrium (towary przy granicy ceny 'atb' nie licza sie do mt ani do 'bad') woli stany z miesem na PLo.
+
+**Przyczyna:** brak pomiaru przebiegu rownowagi - linie Planu pokazuja tylko stan oddany.
+
+**Zmiana:** SAM POMIAR - bez zmiany zadnego bitu wyniku Planu (ceny, udzialy, rundy, stan oddany), decyzji gry ani zapisu; kazdy nowy rachunek w try/catch, ktory tylko liczy potkniecia (KsResult.MeatEqSt). StartCalibration.Core.cs Equilibrium: w kazdym punkcie kontrolnym (it % 50 == 49, po policzeniu bad/mt, przed wyjsciem 'zbiezna') MeqCheck zapisuje runde, mt i na rynek W/E: cene miesa i zboza, S i Dm miesa, EqEat miesa (NaN poza krokiem 8), odchylenie miesa (ten sam wzor co punkt kontrolny, z MktDev w rownowadze targu), rece swine_farm (MeqHands - wzor MeatSplit 479-h), granice ceny (DOL/GORA/nieczynny). Przed ewentualnym powrotem do najlepszego stanu MeqState (cena miesa, rece swin ostatniej iteracji); na koncu MeqEnd: zbiezna, rundy/limit, czy oddany NAJLEPSZY stan (ten sam warunek !conv && bp != null && bestMt < lastMt), runda najlepszego stanu, mt najlepszy/ostatni, liczba punktow, cena miesa/rece swin/granica/odchylenie oddane. Najwyzej 20 punktow (probkowane rowno, z pierwszym i ostatnim). Kazda rownowaga nadpisuje rekord (KsResult.MeatEqCk/MeatEqEnd/MeatEqN) - zostaje OSTATNIA rownowaga Planu (ta, ktorej stan idzie do Finish). StartCalibration.Plan.cs PlanLines (watek glowny): po linii 479-i linia "KS: rownowaga miesa (479-j) plan doba N | W: ... | E: ..." (MeatEqLine).
+
+**Ryzyko / co sprawdzic:** regresja: nowy kod tylko czyta p, S, xs, Dm, EqEat, BlockScale, W/WH (zadnych zapisow do stanu rownowagi; MktDev wolany z lokalnymi ref); jedyna zmiana w istniejacym bloku to przypisanie mqBestIt obok bestMt. Koszt: jeden przebieg par (tylko swine_farm licza) na punkt kontrolny i trzy na koniec rownowagi - w watku roboczym, male wobec Shares. Kolizje: brak (nowe pola KsResult, nowa linia). Sprawdzic w logu: linia 479-j co Plan, potkniecia 0; czy cena miesa w punktach skacze miedzy PLo i wyzej razem z rekami swin (hipoteza a), czy oddany stan to NAJLEPSZY z miesem DOL przy ostatniej iteracji wyzej (hipoteza b).
+
+**Status:** DO SPRAWDZENIA (zbudowane, NIE WGRANE - sam pomiar).
+
 ## 479-i (13.11) - KS: pomiar popytu miesa (Plan wobec T* gry) i poprawiona linia miesa wsi
 
 **Problem:** at-220h (Armoury-2026-11-13_13-41-38.log): ksiega gry - mieso produkcja ok. 1500-1860 szt./d, zuzycie tyle samo (mieszczanie ok. 1000, wsie kupujace w miastach ok. 550, partie ok. 80), zapas plaski 5-6 tys. szt.; cel polki f20 T* miesa (7 dob x popyt zaplacony Q+QV+Der+One) = W 6040 + E 9136 szt., czyli ok. 2170 szt./d popytu przy zwyklej cenie wobec ok. 1700 produkcji - polki 0.15-0.28 T*. Plan stawia na targ ok. 1736 szt./d miesa, ale jego popyt D jest scieniowany narzutem drabiny miast (Mu miesa W x1.307, E x1.201; zboze/ser/maslo/ryby x2.2-3). Linia 479-h "mieso wsi" pomijala pola mieszczan (ld.TF) i czytala ld.Res sprzed Buildings338Village.ScaleRates - nieporownywalna z linia Planu.

@@ -158,6 +158,9 @@ namespace Armoury
         public bool MktOn, MktConv; public int MktN, MktRounds; public string MktWorst = "-";
         // 479-h (sam pomiar): mieso Planu wedlug zrodla [m * MeatN + k] kg/d (KsCore.MeatK*), rece swine_farm; null - nie policzone; MeatSt - potkniecia pomiaru
         public double[] MeatSrc; public int MeatSt;
+        // 479-j (sam pomiar): rownowaga miesa ostatniej rownowagi Planu (kazda rownowaga nadpisuje - zostaje ostatnia) - punkty kontrolne [k * KsCore.MeqW + j]
+        // (najwyzej KsCore.MeqMax, probkowane rowno), koniec [KsCore.MeqE*]; null - brak; MeatEqSt - potkniecia pomiaru (wszystkie rownowagi Planu)
+        public double[] MeatEqCk, MeatEqEnd; public int MeatEqN, MeatEqSt;
     }
 
     /// <summary>KS-R3 krok 5: przewoz Planu na korytarzu krain (szt. gry na dobe).</summary>
@@ -948,6 +951,9 @@ namespace Armoury
             // odchylenie |(S - E) / (D - E) - 1|, prog MktTol; ocena "zbiezna", suma mt (najlepszy stan, "stoi"). Krok ceny (D + 1) / (S + 1) i normalizacja bez zmian - punkt staly
             // S = D ten sam; zmienia sie tylko, kiedy rownowaga konczy i ktory stan oddaje. Wylaczony - jak dotad (mkt false)
             bool mkt = x.EqMkt && x.EqEat != null && x.EqEat.Length >= n;
+            // 479-j (sam pomiar): punkty kontrolne miesa tej rownowagi (tylko odczyt p, S, xs; przebieg bez zmian)
+            var mq = new List<double>(); int mqTot = 0, mqBestIt = -1; double[] mqLast = null;
+            x.R.MeatEqCk = null; x.R.MeatEqEnd = null; x.R.MeatEqN = 0;
             int it = 0;
             for (it = 0; it < rounds; it++)
             {
@@ -995,12 +1001,13 @@ namespace Armoury
                         if (dev > tol && !atb) bad = true;
                         if (!atb) mt += dev;
                     }
+                    mqTot++; try { MeqCheck(x, p, S, xs, act, mkt, it, mt, mq); } catch { x.R.MeatEqSt++; }   // 479-j: sam pomiar
                     if (!bad) { conv = true; break; }
                     lastMt = mt;
                     if (mt < bestMt * 0.995) bestImp = it;
                     if (mt < bestMt)
                     {
-                        bestMt = mt;
+                        bestMt = mt; mqBestIt = it + 1;                // 479-j: runda najlepszego stanu (sam pomiar)
                         if (bp == null) { bp = new double[n]; bxs = new double[x.NP]; bS = new double[n]; brr = new double[x.NB]; }
                         Array.Copy(p, bp, n); Array.Copy(xs, bxs, x.NP); Array.Copy(S, bS, n); Array.Copy(rr, brr, x.NB);
                         if (x.FeedOn) FeedSave(x);                     // r4-polnoc (recenzja): liczby progu tego samego stanu co udzialy punktu kontrolnego
@@ -1020,6 +1027,8 @@ namespace Armoury
             // koniec bez zbieznosci (stoi, limit rund albo przerwane): najlepszy stan z punktow kontrolnych, gdy ostatni jest gorszy
             x.R.EqN++; if (conv) x.R.EqConv++;                        // feed-swiat: rownowagi Planu (linia rynkow Planu)
             EtaStats(x, eta, act);
+            bool mqRest = !conv && bp != null && bestMt < lastMt;      // 479-j: ten sam warunek co ponizej (sam odczyt)
+            try { mqLast = MeqState(x, p, xs); } catch { x.R.MeatEqSt++; }   // 479-j: ostatnia iteracja przed ewentualnym powrotem do najlepszego stanu
             if (!conv && bp != null && bestMt < lastMt)
             {
                 Array.Copy(bp, p, n); Array.Copy(bxs, xs, x.NP); Array.Copy(bS, S, n); Array.Copy(brr, rr, x.NB);
@@ -1027,6 +1036,7 @@ namespace Armoury
             }
             x.Rent = rr;
             if (mkt) MktResult(x, p, S, act, conv, done);              // m107 K4: wynik miary targu (linia Planu)
+            try { MeqEnd(x, p, xs, S, act, mkt, conv, done, rounds, mqRest, mqBestIt, mqTot, bestMt, lastMt, mq, mqLast); } catch { x.R.MeatEqSt++; }   // 479-j: sam pomiar
             // stan zbieznosci do wyniku
             x.R.Open.Clear(); x.R.Bounds.Clear(); Array.Clear(x.R.OpenAbsM, 0, x.R.OpenAbsM.Length);
             // n22f-plany (klucz Ks Plan Converge Shelf Level, po recenzji): towar niezbiezny wobec pasma [1, wspolny poziom S/D rynku] - poziom zmierzony (towary, ktore
@@ -1058,6 +1068,81 @@ namespace Armoury
             for (int b = 0; b < x.NB; b++) { if (dem[b] / x.Area[b] > 0.98) bind++; rs += rr[b]; if (rr[b] > rmax) rmax = rr[b]; }
             x.R.LandBind = x.NB > 0 ? (double)bind / x.NB : 0; x.R.RentMean = x.NB > 0 ? rs / x.NB : 0; x.R.RentMax = rmax;
             return p;
+        }
+
+        // 479-j (noc 13.11, sam pomiar): rownowaga miesa - punkty kontrolne i stan oddany ostatniej rownowagi Planu. Tylko odczyt p, S, xs, Dm, EqEat (nic nie pisze
+        // do stanu rownowagi). Rynek: [0 cena miesa, 1 cena zboza, 2 S miesa, 3 Dm miesa, 4 zjedzone w okregach (NaN - brak), 5 odchylenie (jak punkt kontrolny,
+        // z MktDev w rownowadze targu), 6 rece swine_farm (wzor MeatSplit), 7 granica ceny (-1 nieczynny, 0 nie, 1 dol PLo, 2 gora PHi)]
+        internal const int MeqF = 8, MeqW = 2 + NM * MeqF, MeqMax = 20;
+        internal const int MeqEConv = 0, MeqEDone = 1, MeqERounds = 2, MeqERest = 3, MeqEBestIt = 4, MeqETot = 5, MeqEBestMt = 6, MeqELastMt = 7, MeqEMkt = 8, MeqEM = 9, MeqEMW = 6;
+        // koniec: [MeqEM + m * MeqEMW + 0 cena miesa oddana, 1 rece swin oddane, 2 granica oddana, 3 cena miesa ostatniej iteracji, 4 rece swin ostatniej iteracji, 5 odchylenie oddane]
+
+        private static double[] MeqHands(Ctx x, double[] xs)
+        {
+            var h = new double[NM];
+            for (int k = 0; k < x.NP; k++)
+            {
+                if (x.Pc[k] != KsTab.CSwine) continue;
+                int b = x.Pb[k], m = x.Pm[k];
+                if (m < 0 || m >= NM) continue;
+                var d = x.BD[b]; var blk = x.B[b];
+                double rem = x.W[b] - x.WH[b], lg = KsTab.Land2(KsTab.CWheat, blk.O, d.Type), sb = 0;
+                if (lg > 0) sb = Math.Min(rem, KsTab.OwnGrainShare(lg) * GrainOwnNeed(d.Need0) * blk.Share / (KsTab.PGrainSub * lg));
+                h[m] += xs[k] * (rem - sb) * (1.0 - HomeOf(d)) * x.BlockScale[b];
+            }
+            return h;
+        }
+
+        private static void MeqMarket(Ctx x, double[] p, double[] S, bool[] act, bool mkt, double[] hands, int m, double[] o, int at)
+        {
+            int i = m * KsTab.NG + KsTab.GMeat;
+            double dev = Math.Abs(S[i] / Math.Max(1.0, x.Dm[i]) - 1.0), tol = Tol;
+            if (mkt) MktDev(x.Dm[i], S[i], x.EqEat[i], ref dev, ref tol);
+            o[at + 0] = p[i]; o[at + 1] = p[m * KsTab.NG + KsTab.GGrain]; o[at + 2] = S[i]; o[at + 3] = x.Dm[i];
+            o[at + 4] = x.EqEat != null && x.EqEat.Length > i ? x.EqEat[i] : double.NaN;
+            o[at + 5] = dev; o[at + 6] = hands[m];
+            o[at + 7] = !act[i] ? -1 : (p[i] <= PLo * 1.001 ? 1 : (p[i] >= PHi * 0.999 ? 2 : 0));
+        }
+
+        private static void MeqCheck(Ctx x, double[] p, double[] S, double[] xs, bool[] act, bool mkt, int it, double mt, List<double> mq)
+        {
+            var o = new double[MeqW];
+            o[0] = it + 1; o[1] = mt;
+            var h = MeqHands(x, xs);
+            for (int m = 0; m < NM; m++) MeqMarket(x, p, S, act, mkt, h, m, o, 2 + m * MeqF);
+            mq.AddRange(o);
+        }
+
+        private static double[] MeqState(Ctx x, double[] p, double[] xs)
+        {
+            var h = MeqHands(x, xs);
+            var o = new double[2 * NM];
+            for (int m = 0; m < NM; m++) { o[m * 2] = p[m * KsTab.NG + KsTab.GMeat]; o[m * 2 + 1] = h[m]; }
+            return o;
+        }
+
+        private static void MeqEnd(Ctx x, double[] p, double[] xs, double[] S, bool[] act, bool mkt, bool conv, int done, int rounds, bool rest, int bestIt, int tot,
+                                   double bestMt, double lastMt, List<double> mq, double[] last)
+        {
+            int cnt = mq.Count / MeqW, keep = Math.Min(cnt, MeqMax);
+            var ck = new double[keep * MeqW];
+            for (int j = 0; j < keep; j++)
+            {
+                int src = keep < 2 ? cnt - 1 : (int)Math.Round((double)j * (cnt - 1) / (keep - 1));   // rowno, z pierwszym i ostatnim
+                for (int w = 0; w < MeqW; w++) ck[j * MeqW + w] = mq[src * MeqW + w];
+            }
+            var e = new double[MeqEM + NM * MeqEMW];
+            e[MeqEConv] = conv ? 1 : 0; e[MeqEDone] = done; e[MeqERounds] = rounds; e[MeqERest] = rest ? 1 : 0; e[MeqEBestIt] = bestIt; e[MeqETot] = tot;
+            e[MeqEBestMt] = bestMt == double.MaxValue ? double.NaN : bestMt; e[MeqELastMt] = lastMt == double.MaxValue ? double.NaN : lastMt; e[MeqEMkt] = mkt ? 1 : 0;
+            var h = MeqHands(x, xs); var t = new double[MeqF];
+            for (int m = 0; m < NM; m++)
+            {
+                MeqMarket(x, p, S, act, mkt, h, m, t, 0);
+                int o = MeqEM + m * MeqEMW;
+                e[o + 0] = t[0]; e[o + 1] = t[6]; e[o + 2] = t[7];
+                e[o + 3] = last != null ? last[m * 2] : double.NaN; e[o + 4] = last != null ? last[m * 2 + 1] : double.NaN; e[o + 5] = t[5];
+            }
+            x.R.MeatEqCk = ck; x.R.MeatEqN = keep; x.R.MeatEqEnd = e;
         }
 
         private static double[] Ones(int n) { var a = new double[n]; for (int i = 0; i < n; i++) a[i] = 1.0; return a; }

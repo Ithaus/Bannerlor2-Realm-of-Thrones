@@ -481,6 +481,48 @@ namespace Armoury
             return sb.ToString();
         }
 
+        // 479-j (noc 13.11, sam pomiar): linia "KS: rownowaga miesa (479-j)" - ostatnia rownowaga Planu: punkty kontrolne (runda, suma odchylen mt, na rynek cena miesa
+        // i zboza, S i D miesa, zjedzone w okregach, odchylenie, rece swine_farm, granica ceny), koniec (zbiezna, rundy, stan najlepszy czy ostatni, runda najlepszego,
+        // cena miesa i rece swin oddane wobec ostatniej iteracji). Liczby z watku roboczego (KsResult.MeatEq*), tu tylko tekst
+        private static int _meatEqSt;
+        private static string MeqN(double v, string f) { return double.IsNaN(v) || double.IsInfinity(v) ? "-" : v.ToString(f, Inv); }
+        private static string MeqB(double c) { return c < 0 ? " nieczynny" : (c == 1 ? " DOL" : (c == 2 ? " GORA" : "")); }
+        private static string MeatEqLine(KsResult r)
+        {
+            if (r == null || r.Error != null) return null;
+            var sb = new StringBuilder(4000);
+            sb.Append(PK).Append("rownowaga miesa (479-j) plan doba ").Append(_wDay).Append(" (sam pomiar; ostatnia rownowaga Planu)");
+            var e = r.MeatEqEnd; var ck = r.MeatEqCk; int n = r.MeatEqN;
+            if (e == null || e.Length != KsCore.MeqEM + 2 * KsCore.MeqEMW)
+            {
+                sb.Append(" | brak pomiaru (potkniecia Planu ").Append(r.MeatEqSt).Append(", linii ").Append(_meatEqSt).Append(") | gra bez zmian.");
+                return sb.ToString();
+            }
+            if (ck == null || ck.Length < n * KsCore.MeqW) n = 0;
+            sb.Append(": zbiezna ").Append(e[KsCore.MeqEConv] > 0 ? "tak" : "nie").Append(", rund ").Append(MeqN(e[KsCore.MeqEDone], "0")).Append("/").Append(MeqN(e[KsCore.MeqERounds], "0"))
+              .Append(", targ K4 ").Append(e[KsCore.MeqEMkt] > 0 ? "tak" : "nie").Append(", oddany stan ").Append(e[KsCore.MeqERest] > 0 ? "NAJLEPSZY" : "ostatni")
+              .Append(" (najlepszy z rundy ").Append(e[KsCore.MeqEBestIt] > 0 ? MeqN(e[KsCore.MeqEBestIt], "0") : "-").Append(", mt najlepszy ").Append(MeqN(e[KsCore.MeqEBestMt], "0.00"))
+              .Append(", mt ostatni ").Append(MeqN(e[KsCore.MeqELastMt], "0.00")).Append("), punktow kontrolnych ").Append(MeqN(e[KsCore.MeqETot], "0")).Append(" (pokazane ").Append(n).Append(")");
+            sb.Append("; mt (runda:suma odchylen):");
+            for (int j = 0; j < n; j++) sb.Append(j == 0 ? " " : ", ").Append(MeqN(ck[j * KsCore.MeqW], "0")).Append(':').Append(MeqN(ck[j * KsCore.MeqW + 1], "0.00"));
+            for (int m = 0; m < 2; m++)
+            {
+                int o = KsCore.MeqEM + m * KsCore.MeqEMW;
+                sb.Append(" | ").Append(m == 0 ? "W" : "E").Append(": oddane cena miesa ").Append(MeqN(e[o], "0.000")).Append(MeqB(e[o + 2])).Append(", rece swine_farm ").Append(MeqN(e[o + 1], "0"))
+                  .Append(", odchylenie ").Append(MeqN(e[o + 5], "0.000")).Append("; ostatnia iteracja cena ").Append(MeqN(e[o + 3], "0.000")).Append(", rece swin ").Append(MeqN(e[o + 4], "0"))
+                  .Append("; punkty (runda cena miesa/zboza S/D zjedzone odch. rece swin [granica]):");
+                for (int j = 0; j < n; j++)
+                {
+                    int q = j * KsCore.MeqW, a = q + 2 + m * KsCore.MeqF;
+                    sb.Append(j == 0 ? " " : "; ").Append(MeqN(ck[q], "0")).Append(' ').Append(MeqN(ck[a], "0.000")).Append('/').Append(MeqN(ck[a + 1], "0.00"))
+                      .Append(' ').Append(MeqN(ck[a + 2], "0")).Append('/').Append(MeqN(ck[a + 3], "0")).Append(" e").Append(MeqN(ck[a + 4], "0"))
+                      .Append(' ').Append(MeqN(ck[a + 5], "0.000")).Append(" sw").Append(MeqN(ck[a + 6], "0")).Append(MeqB(ck[a + 7]));
+                }
+            }
+            sb.Append(" | potkniecia Planu ").Append(r.MeatEqSt).Append(", linii ").Append(_meatEqSt).Append(" | gra bez zmian.");
+            return sb.ToString();
+        }
+
         // 479-i (noc 13.11, sam pomiar): linia "KS: popyt miesa (479-i)" - na rynek W/E dla miesa, zboza, sera, masla i ryb: popyt Planu D (kg/d i szt./d - kg / (sigma x
         // kg sztuki ZC4), ten sam dzielnik co TownItems w grze), popyt przy cenach startu (bez narzutu miast), narzut Mu, podaz, zjedzone w okregach, podaz i popyt na targ,
         // cena cienia. Tylko odczyt wyniku Planu i jego wejscia - bez ponownej rownowagi.
@@ -660,6 +702,7 @@ namespace Armoury
             }
             try { string ml = MeatPlanLine(r); if (ml != null) Log.Info(ml); } catch { _meatPlanSt++; }   // 479-h: sam pomiar
             try { string dl = DemandPlanLine(r, inp); if (dl != null) Log.Info(dl); } catch { _demPlanSt++; }   // 479-i: sam pomiar
+            try { string ql = MeatEqLine(r); if (ql != null) Log.Info(ql); } catch { _meatEqSt++; }   // 479-j: sam pomiar
             var w = new StringBuilder(1500);
             w.Append(PK).Append("zajecia (plan doba ").Append(_wDay).Append(", tys. rak):");
             var order = new List<int>(); for (int c = 0; c < KsTab.NC; c++) if (r.CraftLabour[c] >= 500) order.Add(c);
