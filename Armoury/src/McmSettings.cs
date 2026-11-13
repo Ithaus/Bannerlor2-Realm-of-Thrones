@@ -10512,6 +10512,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public int SideRecruitResettleDays { get; set; } = 364;
 
+        [SettingPropertyBool("Side Village House Levy", HintText = "with Side Village Recruit: in a side village on the land of a great house - a seat of Realm of Thrones with its own men at arms (Raventree Hall of House Blackwood, Stonehedge of House Bracken, Winterfell of House Stark and the others whose castellan trains household troops) and the villages of that seat - one in five of the men who come in a day are that house's own levies, dearer than plain peasants. It is the land that makes them: a house's men stay its men when someone else takes the land - you too, once you hold it, can raise them. They come from the same pool of young men of that village, and the money goes to their families as for any man of the village. The house must think well of you, as with its castellan: its head's regard of at least 30, unless the land or its seat is yours, you are of that house, or the house is no more. Off = only plain peasants, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageHouseLevy { get; set; } = true;
+
         [SettingPropertyBool("Land Sales", HintText = "houses in need may sell you land of their own will: ask a clan leader 'I hear your house needs coin. Would you sell me land?' (or use the offer option in a side village or main village menu). The price is the holding's real worth - what it truly earns its lord a year, net of its costs, times 14 to 20 years of it by how well the seller thinks of you (Land Years Of Purchase for a close friend, Land Years Worst when he only just will sell) - never a token price; a house deep in debt may take somewhat less. The coin goes to the seller's head and his creditors take their due from it first. Off = no land is for sale", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
         public bool LandSales { get; set; } = true;
@@ -15615,6 +15619,7 @@ namespace Armoury
             s.SideRecruitLevyPrice = SideRecruitLevyPrice;
             s.SideRecruitGeneralLevyPrice = SideRecruitGeneralLevyPrice;
             s.SideRecruitResettleDays = SideRecruitResettleDays;
+            s.SideVillageHouseLevy = SideVillageHouseLevy;
             s.LandSales = LandSales;
             s.LandSalesSideVillages = LandSalesSideVillages;
             s.LandSalesLordships = LandSalesLordships;
