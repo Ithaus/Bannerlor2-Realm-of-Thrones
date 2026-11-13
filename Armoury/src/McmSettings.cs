@@ -8504,6 +8504,10 @@ namespace Armoury
         [SettingPropertyGroup("Side roads to far villages")]
         public bool MapSideRoadsAllVillages { get; set; } = true;
 
+        [SettingPropertyBool("Map Side Roads To Inns", HintText = "with Map Side Roads and Map Side Roads All Villages on, every roadside inn that stands on a track away from the main roads gets a lane of its own to the road network, like a village; the inns stay where they are. Changed on the map, the lanes are drawn anew within a few seconds. Off = no lanes lead to the inns, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Side roads to far villages")]
+        public bool MapSideRoadsToInns { get; set; } = true;
+
         [SettingPropertyBool("Map Side Roads Chunks", HintText = "with Map Side Roads on, only the lanes around the part of the map the camera is looking at are laid on the map: the map is split into squares, the lanes of a square are laid down as it comes into view and taken away when the camera leaves it behind - the same lanes where you look, far less for the game to draw every frame. Off = every lane of the whole map stays laid down all the time and is only hidden when the camera rises high, as before", RequireRestart = false)]
         [SettingPropertyGroup("Side roads to far villages")]
         public bool MapSideRoadsChunks { get; set; } = true;
@@ -15313,6 +15317,7 @@ namespace Armoury
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.MapSideRoads = MapSideRoads;
             s.MapSideRoadsAllVillages = MapSideRoadsAllVillages;
+            s.MapSideRoadsToInns = MapSideRoadsToInns;
             s.MapSideRoadsChunks = MapSideRoadsChunks;
             s.MapSideRoadsChunkRadiusCap = MapSideRoadsChunkRadiusCap;
             s.MapVillageFields = MapVillageFields;
