@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-f (13.11) - wybor budowy AI wedlug potrzeb osady (glod, zold, front, zloze) zamiast losu
+
+**Problem:** audyt budynkow 12.11: AI wybiera budowe losowo (DefaultBuildingScoreCalculationModel.GetNextBuilding:16-18) - 48.7% punktow zamkow (ok. 430 tys. zl w 59 dobach) na budowle slabe/martwe, koszary i spichlerze czekaja. Sesja zaproponowala wybor wg potrzeb, Jeff: "na pozostale sie zgadzam".
+
+**Przyczyna:** losowy model gry; BK go nie podmienia.
+
+**Zmiana:** nowy Buildings338Need.cs + postfiks GetNextBuilding 473-b6 (osada nie gracza): kandydaci jak u gry (bez projektow dziennych, poziom < 3, nie w kolejce, bez Skip 473-b6/476-a/476-c), waga 1; x6 gdy odpowiada potrzebie: glod (bilans < 0 albo maly bilans przy malym zapasie) - spichlerz/magazyn/pola/wodociagi; zaloga >= 150 - koszary/biuro kasztelana; front (nowe WarFront.FrontPeek - odczyt Calm) - mury/warsztat oblezniczy/straznica; zloze - kopalnia; x3 stadnina przy pastwisku i drogi. Linia doby "wybor budowy AI wg potrzeb (476-f)". Klucz Buildings338 AI Builds By Need (TAK; NIE = losowo jak gra).
+
+**Ryzyko / co sprawdzic:** ocena tylko przy wyborze (kolejka pusta, 10%/d) - koszt pomijalny; FrontPeek dziala tylko przy CivilWorksAwayFromFront (inaczej front = false). Mury czesciej przy froncie - kolejka murow 472/475 dluzsza (blokuje inne budowy). Obserwowac licznik "na potrzebe".
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-e (13.11) - Farmlands zamku = pola dworskie (panszczyzna): udzial 20/25/30% plonu ludnosci bez premii z niczego, lojalnosc -0.1/poziom
 
 **Problem:** projekt budynkow 13.11 (czesc B, liczby): premia BK Farmlands +50%/poziom produkcji ludnosci to odpowiednik ok. 1500/3000/4500 nieistniejacych parobkow na typowy zamek, plus +6/12/18 gry - jedzenie z niczego (wiekszosc przepada nad sufitem zapasu: 110 ze 130 zamkow na suficie). Jeff: "wyjasnij na liczbach", po wyjasnieniu propozycji: "na pozostale sie zgadzam".

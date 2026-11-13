@@ -186,6 +186,12 @@ namespace Armoury
         }
 
         /// <summary>Warownia poza frontem: bez zagrozenia od CivilWorksCalmDays dob (pamiec sesji; brak wpisu - spokoj).</summary>
+        /// <summary>476-f (wybor budowy AI wg potrzeb): warownia przy froncie (Calm false) - tylko odczyt, bez licznikow; klucz wylaczony albo wyjatek - false.</summary>
+        internal static bool FrontPeek(Settlement st)
+        {
+            try { return On && st != null && !Calm(st, (int)CampaignTime.Now.ToDays); } catch { return false; }
+        }
+
         private static bool Calm(Settlement st, int day)
         {
             int d;

@@ -330,6 +330,7 @@ namespace Armoury
             try { Buildings338Crafts.Daily(day); } catch (Exception e) { Stumble(GCore, "Crafts.Daily", e); }   // 476-b
             try { Buildings338Civic.Daily(day); } catch (Exception e) { Stumble(GCore, "Civic.Daily", e); }   // 476-c
             try { Buildings338Corvee.Daily(day); } catch (Exception e) { Stumble(GStock, "Corvee.Daily", e); }   // 476-e
+            try { Buildings338Need.Daily(day); } catch (Exception e) { Stumble(GCore, "Need.Daily", e); }   // 476-f
         }
 
         internal static string Tail(int g) { return " | bledy " + Errors(g); }

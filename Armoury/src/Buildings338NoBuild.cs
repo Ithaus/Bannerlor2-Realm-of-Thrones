@@ -86,8 +86,13 @@ namespace Armoury
         {
             try
             {
-                if (__result == null) return;
                 var town = __args != null && __args.Length > 0 ? __args[0] as Town : null;
+                if (Buildings338Need.On && town != null && town.Settlement != null && town.Settlement.OwnerClan != Clan.PlayerClan)   // 476-f: wybor wg potrzeb zamiast losu
+                {
+                    var need = Buildings338Need.Pick(town, Skip);
+                    if (need != null || __result == null) { __result = need; return; }
+                }
+                if (__result == null) return;
                 if (!Skip(town, __result.BuildingType)) return;
                 var pick = new List<Building>();
                 foreach (var b in town.Buildings)

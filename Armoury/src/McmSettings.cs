@@ -12952,6 +12952,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338FarmlandsCorvee { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338 AI Builds By Need", HintText = "With Buildings338: lords run by the game no longer pick their next building at random - each building still has a chance, but one that answers the settlement need weighs six times more: a granary, warehouse, fields or waterworks when food runs short, barracks or the castellan office for a large garrison, walls, siege workshop or guard house near the front, a mine where the land has ore; studs by pastures and roads weigh three times more. Off = random, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338AiByNeed { get; set; } = true;
+
         [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338CastleMines { get; set; } = true;
@@ -16245,6 +16249,7 @@ namespace Armoury
             s.Buildings338Worship = Buildings338Worship;
             s.Buildings338VillageTaxOffice = Buildings338VillageTaxOffice;
             s.Buildings338FarmlandsCorvee = Buildings338FarmlandsCorvee;
+            s.Buildings338AiByNeed = Buildings338AiByNeed;
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
             s.GoldDailySummary = GoldDailySummary;
