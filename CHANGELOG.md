@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 477-d (13.11) - Przeplywy osad (przyczyny): pozycja "inne" rozbita wedlug pliku wolajacego
+
+**Problem:** analiza at-120b (P4): kasy miast 6.05 mln wobec celu 7.63 mln (56 z 97 ponizej celu), w linii "Przeplywy osad (przyczyny)": "inne +19183" i "reszta po nowym pomiarze +31203; srednia 28 dob +75302 - prog 10000: PONAD" - zrodlo niewyjasnione.
+
+**Przyczyna:** MoneyLedger.Note169 z N169Other zbiera ok. 30 roznych drog (BkDipGold, CampSutlers, CaravanBulk/CaravanTrade284 zwroty, CaravanCapital, NotableGold, LevyGold, OutlawLaw, SpoilsSeal, TownLoan, GearFund, MenPurse, RotLeaks37, HideoutPurge, GarrisonRecruitFee, DistrictWorks, Bloomery...) w jedna liczbe.
+
+**Zmiana (tylko log):** Note169 dostaje parametr [CallerFilePath] (stala z kompilacji, wywolania bez zmian); dla N169Other licznik [przychod, rozchod] wedlug pliku i klasy osad; linia "Przeplywy osad (przyczyny)" dopisuje "inne wedlug pliku (477-d): Plik +/-N, ..." (8 najwiekszych netto), zerowane z doba (ClearDay169).
+Decyzja domyslna (noc 13.11): handlu karawan z kasa miasta przez rynek gry (SellItemsAction / kupno partii) nie licze w tej linii - wymaga latki na sciezce handlu (osobny krok); reszta [R] dalej go zawiera.
+
+**Ryzyko / co sprawdzic:** brak zmian zachowania (sam licznik). W tescie: ktore pliki skladaja "inne" (np. CaravanCapital, NotableGold - kasa miasta -> karawany).
+
+**Status:** DO SPRAWDZENIA
+
 ## 477-c (13.11) - oblezenie AI: karencja 2 dob - odstapienie wymaga przewagi wedlug miary startu (ZFor)
 
 **Problem:** analiza at-120b (P3): Saath - start oblezenia przy q 0.64 (wrog w polu 952, linia 28340), po 4.5 doby odstapienie przy "odsiecz 1796+zaloga 397 (q_obl 1.44)" (31329), a linia KO tej samej chwili "odsiecz w drodze 0 / wymagana 3054" (31331) - trzy rozne liczby jednej odsieczy; Qamayl: start q 0.77, chwile pozniej odsiecz 2022 wobec obozu 866.

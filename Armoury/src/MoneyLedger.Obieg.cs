@@ -33,6 +33,7 @@ namespace Armoury
         private static readonly string[] N169Name = { "naprawy", "skup nadwyzek zbrojowni", "komplety gracza", "sakiewki rozbitych partii", "inne", "sakwy taborow wsi (112)",
                                                       "myto do kas osad (E3-G3)", "zakupy wsi wozem (E3-W1)", "daniny wsi przy wozie (DS)", "zakupy dworu BK z polki (f19-e1)" };
         private static readonly long[,] _n169In = new long[Classes, N169], _n169Out = new long[Classes, N169];
+        private static readonly Dictionary<string, long[]>[] _otherBy = { new Dictionary<string, long[]>(StringComparer.Ordinal), new Dictionary<string, long[]>(StringComparer.Ordinal), new Dictionary<string, long[]>(StringComparer.Ordinal) };   // 477-d: [przychod, rozchod] "inne" wedlug pliku
         private static long _purseGoneWin, _purseGoneTown;  // sakiewki rozbitych partii: do zwyciezcow (i ich lordow) / do kas miast
         private static readonly long[] _classRest = new long[Classes];   // reszta starej linii kas (ClassLine) - do linii przyczyn
 
@@ -77,7 +78,7 @@ namespace Armoury
         {
             try
             {
-                Array.Clear(_n169In, 0, _n169In.Length); Array.Clear(_n169Out, 0, _n169Out.Length);
+                Array.Clear(_n169In, 0, _n169In.Length); Array.Clear(_n169Out, 0, _n169Out.Length); foreach (var od in _otherBy) od.Clear();
                 _purseGoneWin = _purseGoneTown = 0;
                 Array.Clear(_classRest, 0, Classes);
                 _debtNew = _debtPaid = _walletInClan = 0; _debtNewN = _debtPaidN = 0; _clanAborted = 0;
@@ -347,7 +348,7 @@ namespace Armoury
         // ------------------------------------------------------------ nasze przeplywy kas bez licznika (D13) - tylko liczniki
         /// <summary>Nasz modul zmienil kase osady poza tickiem dobowym, bez licznika starej ksiegi (kwota ze znakiem jak ChangeGold).
         /// Wlasna tablica - stara linia "Przeplywy osad (kasy miast)" bez zmian; pokazuje to linia "Przeplywy osad (przyczyny)".</summary>
-        internal static void Note169(int kind, Settlement st, int amount, int src = TownFolk.BOurs)
+        internal static void Note169(int kind, Settlement st, int amount, int src = TownFolk.BOurs, [System.Runtime.CompilerServices.CallerFilePath] string file = "")
         {
             try
             {
@@ -357,6 +358,13 @@ namespace Armoury
                 int c = ClassOf(st);
                 if (c < 0) return;
                 if (amount > 0) _n169In[c, kind] += amount; else _n169Out[c, kind] -= amount;
+                // 477-d (analiza 120b P4): "inne" rozbite wedlug pliku wolajacego (CallerFilePath - stala z kompilacji, bez kosztu stosu); tylko licznik linii
+                if (kind == N169Other)
+                {
+                    string who = "?"; try { who = System.IO.Path.GetFileNameWithoutExtension(file ?? ""); } catch { }
+                    var d = _otherBy[c]; long[] v; if (!d.TryGetValue(who, out v)) { v = new long[2]; d[who] = v; }
+                    if (amount > 0) v[0] += amount; else v[1] -= amount;
+                }
             }
             catch (Exception e) { Stumble169("Note169", e); }
         }
@@ -656,6 +664,15 @@ namespace Armoury
                 }
                 fresh += armSum;
                 if (arm.Count > 0) parts.Add("Armoury bez licznika: " + string.Join(", ", arm.ToArray()));
+                // 477-d: "inne" wedlug pliku (netto, najwieksze 8 co do wartosci bezwzglednej)
+                if (c < _otherBy.Length && _otherBy[c].Count > 0)
+                {
+                    var ol = new List<KeyValuePair<string, long>>();
+                    foreach (var kv in _otherBy[c]) ol.Add(new KeyValuePair<string, long>(kv.Key, kv.Value[0] - kv.Value[1]));
+                    ol.Sort((x, y) => Math.Abs(y.Value).CompareTo(Math.Abs(x.Value)));
+                    var os = new List<string>(); for (int i = 0; i < ol.Count && i < 8; i++) os.Add(ol[i].Key + " " + S(ol[i].Value));
+                    parts.Add("inne wedlug pliku (477-d): " + string.Join(", ", os.ToArray()) + (ol.Count > 8 ? " (+" + (ol.Count - 8) + ")" : ""));
+                }
                 long tm1 = tm0 - fresh;
                 sb.Append(" | ").Append(ClsHead[c]).Append(": reszta przed nowym pomiarem ").Append(S(tm0)).Append(", nowe pozycje ").Append(S(fresh)).Append(": ")
                   .Append(parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "brak").Append(zeros > 0 && c != CTown ? " (pozostale 0)" : "")
