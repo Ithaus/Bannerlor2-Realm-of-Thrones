@@ -199,7 +199,7 @@ namespace Armoury
                      + " | oceny: zero " + _dZero + ", w gore " + _dUp + ", w dol " + _dDown + ", cofniecia SCA " + _dScaUndo + ", obrona nizej " + _dDefLow + ", obrona twierdzy " + _dDefFort
                      + ", dom zagrozony " + _dHomeCap + ", BK weto " + _dBkVeto + " (zapas " + _dBkVetoFallback + ")"
                      + " | oblezenia: sad " + _dJudge + " (KONTYNUUJ " + _dStates[1] + ", SRODEK " + _dStates[2] + ", NIE-ZDAZY " + _dStates[3] + ", ODSTAP " + _dStates[4] + ", GLOD " + _dStates[5] + ")"
-                     + ", trzymane " + _dKeep + ", bez wskrzeszania " + _dKeepVeto + ", kandydaci odwrotu " + _dRetreatCand + ", odstapienia " + _dRetreat
+                     + ", trzymane " + _dKeep + ", bez wskrzeszania " + _dKeepVeto + ", karencja odstapienia 477-c " + _dGrace + ", kandydaci odwrotu " + _dRetreatCand + ", odstapienia " + _dRetreat
                      + (_dRetreatNotes.Count > 0 ? " [" + string.Join("; ", _dRetreatNotes.ToArray()) + "]" : "") + ", zostaly w obozie " + _dStay
                      + ", BK stick przepuscil " + _dStickYield + ", m116 przepuscil " + _dFreshYield
                      + " | rabunki przerwane " + _dBreak + " | armie rabunek opcji " + _dArmyRaidOffers + " (weta " + _dArmyRaidVeto + ") | Zelazni oblezenia opcji " + _dIronOffers + " (weta " + _dIronVeto + ")" + IronXLine()

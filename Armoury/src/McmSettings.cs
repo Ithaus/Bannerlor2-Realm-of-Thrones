@@ -13112,6 +13112,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeNearReliefOnly { get; set; } = true;
 
+        [SettingPropertyBool("Siege Abandon Grace", HintText = "with Siege Near Relief Only: for the first 2 days of a siege the besieging AI army leaves for a relief only if the enemy is stronger by the same measure the army used when it chose to start the siege (enemies in the field within reach) - the start and the first judgement no longer disagree and the army does not walk away a few hours after arriving. Off = the judgement of a running siege applies from the first hour, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeAbandonGrace { get; set; } = true;
+
         [SettingPropertyBool("Siege Time Rules For Your Fortresses", HintText = "The fortresses of your own house besieged by the lords of the world (while you are not inside or in the camp) follow the same siege rules as everyone else's: with Siege Time By Factors - no assault before the lower bound of the term, they yield with honours when the term runs out with no relief in sight or after a week of hunger (the garrison marches out to your nearest fortress that is not besieged, or to your own party; failing both, to the lords of your realm); with Siege Camp Forages The Villages - the besiegers forage your villages. You get a message when that happens. Off = your own fortresses keep only the old rules (assault, the old hunger, no foraging)", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeTimeRulesPlayerHoldings { get; set; } = true;
@@ -16393,6 +16397,7 @@ namespace Armoury
             s.SiegeTimeByFactors = SiegeTimeByFactors;
             s.SiegeTimeLimitFactor = SiegeTimeLimitFactor;
             s.SiegeNearReliefOnly = SiegeNearReliefOnly;
+            s.SiegeAbandonGrace = SiegeAbandonGrace;
             s.SiegeTimeRulesPlayerHoldings = SiegeTimeRulesPlayerHoldings;
         }
 

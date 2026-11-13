@@ -29,6 +29,8 @@ namespace Armoury
         internal const float HorizonDays = 12.03f;   // 8.02 + 4.01 (prog obrony gry GetDistanceScoreForDefending) - dalej nie zdazy nigdy
         internal const double OpenQ = 0.8, SiegeBanQ = 1.0, AbandonQ = 1.25;
         internal const float AbandonArrivalDays = 3f;   // R3: odsiecz dalej niz tyle dob nie wywoluje odstapienia (klucz Siege Near Relief Only)
+        internal static bool AbandonGraceOn { get { var s = Settings.Current; return s != null && s.SiegeNearReliefOnly && s.SiegeAbandonGrace; } }
+        internal const double AbandonGraceDays = 2.0;
         internal static bool NearReliefOnly { get { var s = Settings.Current; return s != null && s.SiegeNearReliefOnly; } }
         internal const double DefNeed = 1.2, DefDrop = 1.0;
         internal const float FoodMinDays = 3f;       // SCA: jedzenie < 3 doby x0.25

@@ -71,7 +71,7 @@ namespace Armoury
         private static readonly Dictionary<SK, KRel> _krel = new Dictionary<SK, KRel>();
         private static int _dKRelHold, _dKRelFree;
         private static readonly Dictionary<MapEvent, int[]> _raidBad = new Dictionary<MapEvent, int[]>();        // [godzina, kolejne zle]
-        private static int _dJudge, _dKeep, _dMid, _dRetreat, _dRetreatCand, _dStay, _dKeepVeto, _dBreak, _dStickYield, _dFreshYield, _dIronOffers, _dIronVeto, _dSiegeLines;
+        private static int _dJudge, _dKeep, _dMid, _dRetreat, _dRetreatCand, _dStay, _dKeepVeto, _dGrace, _dBreak, _dStickYield, _dFreshYield, _dIronOffers, _dIronVeto, _dSiegeLines;
         private static readonly int[] _dStates = new int[6];
         private static readonly List<string> _dRetreatNotes = new List<string>();
         private static int _sRetreat;
@@ -79,7 +79,7 @@ namespace Armoury
         private static void ResetSiege() { _camps.Clear(); _retreat.Clear(); _block.Clear(); _kblock.Clear(); _krel.Clear(); _raidBad.Clear(); _ironNav.Clear(); _musterDay.Clear(); _musterTry.Clear(); _musterFail.Clear(); _sRetreat = 0; ZeroSiegeDay(); }
         private static void ZeroSiegeDay()
         {
-            _dJudge = _dKeep = _dMid = _dRetreat = _dRetreatCand = _dStay = _dKeepVeto = _dBreak = _dStickYield = _dFreshYield = _dIronOffers = _dIronVeto = _dSiegeLines = _dKBlock = 0;
+            _dJudge = _dKeep = _dMid = _dRetreat = _dRetreatCand = _dStay = _dKeepVeto = _dGrace = _dBreak = _dStickYield = _dFreshYield = _dIronOffers = _dIronVeto = _dSiegeLines = _dKBlock = 0;
             _dKRelHold = _dKRelFree = 0; _dIronMuster = _dIronKeepSea = _dIronPrio = _dIronMusterLines = _dIronMusterFail = _dIronMusterBan = 0; Array.Clear(_dIronWhy, 0, _dIronWhy.Length);
             Array.Clear(_dStates, 0, _dStates.Length); _dRetreatNotes.Clear();
             Array.Clear(_dIronX, 0, _dIronX.Length); _dIronMinQ = -1; _dIronMinT = "-"; _dIronMinStr = 0;
@@ -504,6 +504,20 @@ namespace Armoury
                 campS = camp0 + allyIn;
                 arrival = Arrival(rel, GarCap(gar, campS), campS);
                 state = JudgeRule(campS, relief, gar, arrival, tLeft, food, out q);
+                // 477-c (klucz Siege Abandon Grace; analiza 120b P3, Saath: start q 0.64 wg ZFor, po 4.5 doby odstapienie przy q_obl 1.44 z innej miary): przez pierwsze
+                // 2 doby oblezenia odstapienie (4) wymaga przewagi wedlug tej samej miary co start (ZFor - wrogowie w polu w zasiegu, jak IsGood przy starcie)
+                string grace = null;
+                if (state == 4 && AbandonGraceOn)
+                {
+                    double age = 99; try { age = ev.SiegeStartTime.ElapsedDaysUntilNow; } catch { }
+                    if (age < AbandonGraceDays)
+                    {
+                        float gf; double ga;
+                        double zs = ZFor(st, k, party, SiegeDays, out gf, out ga);
+                        double qs = Ratio(zs, camp0 + ga);
+                        if (qs <= AbandonQ) { state = 3; _dGrace++; grace = " | karencja 477-c: wiek " + F2((float)age) + " doby, q miary startu " + F2(qs) + " <= " + F2(AbandonQ) + " - zostaje"; }
+                    }
+                }
                 qr = Ratio(relief + GarCap(gar, campS), campS);
                 int h = NowH;
                 // 334f (L14): histereza z ocen dowodcy (mysl obozu co ok. 3 h), nie z dwoch kolejnych godzin zegara - ta nie spelniala sie nigdy
@@ -518,7 +532,7 @@ namespace Armoury
                     r.SaidDay = Today; _dSiegeLines++;
                     Log.Info(Tag + "oblezenie | dzien " + Today + " | " + st.StringId + " (" + Nm(st) + ") | " + Nm(party) + " (" + Id(k) + ") | oboz " + F0(campS) + (allyIn > 0 ? " (w drodze " + F0(allyIn) + ")" : "")
                              + " | odsiecz " + F0(relief) + " (idzie " + nGo + ", pamiec " + nMem + ", zwiad " + nScout + ", zaloga " + F0(gar) + ") | q_obl " + F2(q) + " | q_odw " + F2(qr) + " | przyjazd " + (arrival == float.MaxValue ? "-" : F2(arrival))
-                             + " | pozostalo " + F2(tLeft) + " | jedzenie " + (food >= 999f ? "-" : F2(food)) + " | stan " + StateName[state] + (state == 4 ? " (" + bad + "/2 mysli)" : "") + ".");
+                             + " | pozostalo " + F2(tLeft) + " | jedzenie " + (food >= 999f ? "-" : F2(food)) + " | stan " + StateName[state] + (state == 4 ? " (" + bad + "/2 mysli)" : "") + (grace ?? "") + ".");
                 }
             }
             var scores = pt.AIBehaviorScores;

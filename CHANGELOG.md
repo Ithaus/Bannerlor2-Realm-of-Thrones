@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 477-c (13.11) - oblezenie AI: karencja 2 dob - odstapienie wymaga przewagi wedlug miary startu (ZFor)
+
+**Problem:** analiza at-120b (P3): Saath - start oblezenia przy q 0.64 (wrog w polu 952, linia 28340), po 4.5 doby odstapienie przy "odsiecz 1796+zaloga 397 (q_obl 1.44)" (31329), a linia KO tej samej chwili "odsiecz w drodze 0 / wymagana 3054" (31331) - trzy rozne liczby jednej odsieczy; Qamayl: start q 0.77, chwile pozniej odsiecz 2022 wobec obozu 866.
+
+**Przyczyna:** start oblezenia (LocalFront334e.Siege.cs ~1060, IsGood) liczy q = ZFor(cel, horyzont dojazdu) / sila armii; sad oblezenia w toku (JudgeCore -> JudgeRule) liczy odsiecz z listy "idzie / pamiec / zwiad" (rel, HorizonDays, LocalFront334e.Siege.cs ~470-505), a linia 471 KO - z OB5 ReliefStrength. Pierwszy sad po starcie moze wiec od razu dac ODSTAP (4).
+
+**Zmiana:** klucz Siege Abandon Grace (TAK, dziala z Siege Near Relief Only): przez pierwsze 2 doby oblezenia (ev.SiegeStartTime) stan ODSTAP z JudgeRule zamienia sie na KONTYNUUJ (3), jesli q miary startu (ZFor(st, k, party, SiegeDays) / (oboz + sojusznicy w drodze)) <= AbandonQ 1.25. Linia oblezenia 334e: dopisek "karencja 477-c: wiek X doby, q miary startu Y <= 1.25 - zostaje"; linia doby 334e: licznik "karencja odstapienia 477-c".
+Decyzja domyslna (noc 13.11): trzech miar odsieczy nie ujednolicam (ZFor - wybor celu, rel - sad 334e, ReliefStrength - zegar 471/OB5 maja rozne zadania); karencja usuwa sprzecznosc w pierwszych dobach.
+
+**Ryzyko / co sprawdzic:** armia AI zostaje pod murami przy nadciagajacej odsieczy w pierwszych 2 dobach - moze wyjsc bitwa przy obozie (zgodne z 471b). Klucz NIE = co do bitu jak przed (stan bez zmian, grace null). Test: mniej odstapien w dobach 0-2 oblezenia, licznik karencji > 0.
+
+**Status:** DO SPRAWDZENIA
+
 ## 477-a/b (13.11) - ZW (zajecia wiosek bez KS): regale z typem wsi przy N >= 1.5 jako kandydaci; pierwsza zmiana regionu w sezonie mimo udzialu
 
 **Problem:** analiza at-120b (docs/ANALIZA-120B-2026-11-13.md, P1): nowa kampania ma KS w stanie Plan (nieuzbrojona), wszystkie 569 okregow ida droga ZW ("bez KS 569, pod KS 0"). ZW w 120 dobach zaczelo 8 zmian (same farmy), choc marble N 2.00 (23 z 48 miast), clay 1.50; "wstrzymane udzialem regionu ... (rece czesci > caly udzial regionu) 410".
