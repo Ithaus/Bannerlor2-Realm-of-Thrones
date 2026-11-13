@@ -1021,10 +1021,27 @@ namespace Armoury
         private static double CatchUpShare(Settings s) { double v = s.KsFarmCatchUpShare; return double.IsNaN(v) ? 0.5 : Math.Max(0.05, Math.Min(1.0, v)); }
         private static int CatchUpKeepDays(Settings s) { return Math.Max(0, Math.Min(182, s.KsFarmCatchUpKeepDays)); }
 
-        /// <summary>Prog gersumy: 1.5 x zapas kupcow + Ks Farm Catch Up Keep Days x firma z kasy (pan + korona) na dobe - tego kupcy nie oddaja nigdy.</summary>
+        /// <summary>489 (Jeff 13.11 "obnizyc do x 1"): mnoznik zapasu kupcow w progu gersumy (Ks Town Surplus Reserve Mult, 0.5-3.0; NaN - 1.0). 1.5 = jak dotad
+        /// (OverReserve). Tylko gersuma (CatchUpDecide, CatchUpPay, linia f7) - brama przegladu wedlug nadwyzki, zamki, M6/M9, roboty (HireKeep) i pozyczki z kasy
+        /// (CofferLoanFloor) zostaja przy 1.5.</summary>
+        internal static double CatchUpMult(Settings s)
+        {
+            if (s == null) return OverReserve;
+            double v = s.KsTownSurplusReserveMult;
+            return double.IsNaN(v) || double.IsInfinity(v) ? 1.0 : Math.Max(0.5, Math.Min(3.0, v));
+        }
+
+        /// <summary>Prog gersumy: Ks Town Surplus Reserve Mult (489; dotad 1.5) x zapas kupcow + Ks Farm Catch Up Keep Days x firma z kasy (pan + korona) na dobe - tego
+        /// kupcy nie oddaja nigdy.</summary>
         private static double CatchUpKeep(Farm f, int reserve, Settings s)
         {
-            return OverReserve * Math.Max(0, reserve) + CatchUpKeepDays(s) * Math.Max(0, f.FL + f.FC) / YearDays;
+            return CatchUpKeep(f, reserve, s, CatchUpMult(s));
+        }
+
+        /// <summary>Jak wyzej z podanym mnoznikiem zapasu - 489: roboty z rak okregu (HireKeep) i pozyczki z kasy (CofferLoanFloor) dalej z OverReserve (1.5), jak dotad.</summary>
+        private static double CatchUpKeep(Farm f, int reserve, Settings s, double mult)
+        {
+            return mult * Math.Max(0, reserve) + CatchUpKeepDays(s) * Math.Max(0, f.FL + f.FC) / YearDays;
         }
 
         /// <summary>p6-a7 (TownHire): czego kasa miasta nie oddaje na roboty z rak okregu - 1.5 x zapas kupcow, z firma DS ten sam prog co gersuma (CatchUpKeep) plus reszta
@@ -1038,7 +1055,7 @@ namespace Armoury
                 int reserve = TownPurse.Reserve(t);
                 double keep = OverReserve * Math.Max(0, reserve);
                 var f = FarmOf(st, false);
-                if (f != null && s != null) keep = Math.Max(keep, CatchUpKeep(f, reserve, s)) + Math.Max(0, f.CLeft) + Math.Max(0, f.AL) + Math.Max(0, f.AC) + Math.Max(0, f.AidArr);
+                if (f != null && s != null) keep = Math.Max(keep, CatchUpKeep(f, reserve, s, OverReserve)) + Math.Max(0, f.CLeft) + Math.Max(0, f.AL) + Math.Max(0, f.AC) + Math.Max(0, f.AidArr);
                 return keep;
             }
             catch (Exception e) { Stumble("HireKeep", e); return double.NaN; }
@@ -1070,7 +1087,7 @@ namespace Armoury
                 if (t == null || t.Settlement == null || t.Settlement.StringId == null || !CatchUpOn(s) || !StartCalibration.KsTownApplied(t)) return loanFloor;
                 Farm f;
                 if (!_farm.TryGetValue(t.Settlement.StringId, out f) || f == null || f.Fixed < 0) return loanFloor;
-                double fl = Math.Max(loanFloor, CatchUpKeep(f, TownPurse.Reserve(t), s)) + Math.Max(0, f.CLeft);
+                double fl = Math.Max(loanFloor, CatchUpKeep(f, TownPurse.Reserve(t), s, OverReserve)) + Math.Max(0, f.CLeft);   // 489: pozyczki przy progu 1.5 jak dotad
                 if (fl > loanFloor) up = fl - loanFloor;
                 return fl;
             }
@@ -1238,7 +1255,7 @@ namespace Armoury
                 int days = Math.Max(7, Math.Min(91, s.KsFarmSurplusReviewDays));
                 var sb = new StringBuilder(1000);
                 sb.Append("Gersuma kas miast (f7-kasy): dzien ").Append(day)
-                  .Append(" | klucz Ks Farm Catch Up TAK (udzial ").Append(CatchUpShare(s).ToString("0.00", Inv)).Append(", prog 1.5 x zapas kupcow + ").Append(CatchUpKeepDays(s))
+                  .Append(" | klucz Ks Farm Catch Up TAK (udzial ").Append(CatchUpShare(s).ToString("0.00", Inv)).Append(", prog ").Append(CatchUpMult(s).ToString("0.00", Inv)).Append(" x zapas kupcow (489 Ks Town Surplus Reserve Mult) + ").Append(CatchUpKeepDays(s))
                   .Append(" dob firmy z kasy; co ").Append(days).Append(" dob, z przegladem wedlug nadwyzki, rozlozona na ").Append(days).Append(" dob)")
                   .Append(" | przeglady dzis ").Append(_cuRev).Append(": gersuma postanowiona ").Append(_cuDec).Append(" (").Append(N0(_cuDecAmt)).Append(" zl; rachunki zywnosci odjete ")
                   .Append(N0(_cuBills)).Append("), zapas okna do progu ").Append(_cuNone).Append(", kasa bez przyrostu ").Append(_cuNoGrow).Append(" (483 Ks Farm Catch Up When Flat ").Append(s.KsFarmCatchUpWhenFlat ? "TAK" : "NIE").Append(": gersuma postanowiona ").Append(_cuFlat).Append(", ").Append(N0(_cuFlatAmt)).Append(" zl)").Append(", bez firmy ").Append(_cuNoFarm)

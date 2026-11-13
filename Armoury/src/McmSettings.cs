@@ -10016,6 +10016,10 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public int KsFarmCatchUpKeepDays { get; set; } = 28;
 
+        [SettingPropertyFloatingInteger("Town Savings Kept From Lord (x merchant reserve)", 0.50f, 3.00f, "0.00", HintText = "with Ks Farm Catch Up: how many times the merchants' working coin a town always keeps from its lord and the crown when it pays the catch-up (plus Ks Farm Catch Up Keep Days of the farm); the lower, the more of the idle coin goes to the lord and the crown. 1.5 = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public float KsTownSurplusReserveMult { get; set; } = 1.0f;
+
         [SettingPropertyBool("Ks Farm Catch Up When Flat", HintText = "with Ks Farm Catch Up: a town whose purse stopped growing at the review (its farm has caught up with the merchants' takings) also pays the catch-up out of the coin that lay idle the whole review period above the merchants' keep, so coin gathered before the farm caught up does not lie in the purse for good. The farm itself is not raised. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool KsFarmCatchUpWhenFlat { get; set; } = true;
@@ -15687,6 +15691,7 @@ namespace Armoury
             s.KsFarmCatchUp = KsFarmCatchUp;
             s.KsFarmCatchUpShare = KsFarmCatchUpShare;
             s.KsFarmCatchUpKeepDays = KsFarmCatchUpKeepDays;
+            s.KsTownSurplusReserveMult = KsTownSurplusReserveMult;
             s.KsFarmCatchUpWhenFlat = KsFarmCatchUpWhenFlat;
             s.KsFarmCatchUpOneOff = KsFarmCatchUpOneOff;
             s.KsFarmSurplusCapNet = KsFarmSurplusCapNet;
