@@ -78,6 +78,7 @@ namespace Armoury
             catch (Exception e) { parts.Add("RBL: blad"); Stumble("ApplyAll(RBL)", e); }
             try { parts.Add(LayerOnce.ApplyAll(h)); } catch (Exception e) { parts.Add("warstwa BK: blad"); Stumble("ApplyAll(warstwa BK)", e); }
             try { parts.Add(BkFlow.ApplyAll(h)); } catch (Exception e) { parts.Add("pomiar BK: blad"); Stumble("ApplyAll(pomiar BK)", e); }
+            try { parts.Add(BkMirrorRound478.ApplyAll(h)); } catch (Exception e) { parts.Add("zaokraglenie lustra BK (478-S1): blad"); Stumble("ApplyAll(478-S1)", e); }
             _wire = string.Join("; ", parts.ToArray());
             Log.Info("A16 sygnaly: " + _wire + ".");
         }
@@ -619,6 +620,7 @@ namespace Armoury
             sb.Append(" | powrot do ludnosci BK osady pochodzenia (BkReturnsToOriginVillage) ").Append(ReturnsToOrigin ? "TAK" : "NIE")
               .Append(" | lustro A16 - BK nie dostal nigdzie (ksiega liczy ich jako powrot) ").Append(_mirLost)
               .Append(" | reszta = zmiany poza UpdatePopType (wzrost i spadek klas z BetterEconomy - SyncClassesFromBetterEconomy, przyciecie do 0) | potkniecia A16 dzis ").Append(_stumblesDay).Append(" (razem ").Append(_stumbles).Append(')');
+            sb.Append(BkMirrorRound478.DayText());
             Log.Info(sb.ToString());
             _bkTotY = ok ? tot : null;
             Array.Clear(_flow, 0, _flow.Length); Array.Clear(_mir, 0, _mir.Length); _mirLost = 0;

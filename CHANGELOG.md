@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 478-S1 (13.11) - ludnosc BK: lustro klas z BetterEconomy zaokragla zamiast obcinac (wsie nie traca juz ok. 20% ludzi na rok)
+
+**Problem:** at-120c (i 120b): A16 "Ludnosc BK" wsie 1 071 659 -> 992 263 (-7.41% w 120 dob), z tego "reszta" -77 050 (97% spadku), przeplywy tylko -2 346; ostatnia doba "wsie 571 ... zmiana -418 = przeplywy +258 + reszta -676"; 402 z 571 wsi traci 1-3 osoby dziennie, wsie < 1 tys. -41.8%. Nasza ksiega ludzi stoi (-0.02%).
+
+**Przyczyna:** BK PopulationData.MirrorClassCount (dekompilacja scratchpad/an120c/popdata.cs:414-428): int num = (int)BetterEconomyBridge.GetClassCount(...) - obciecie ulamka, codziennie dla kazdej klasy, po tym jak BE przeskaluje klasy do wartosci ulamkowych; suma BK wraca do BE - petla traci do 1 osoby na klase na dobe.
+
+**Zmiana:** nowy BkMirrorRound478.cs - prefiks (DeclaredMethod PopulationData.MirrorClassCount, Priority.First, wpiety w menu glownym obok pomiaru A16) liczy to samo z Math.Round (AwayFromZero) zamiast obciecia; klasa bez wpisu w liscie - oryginal. Klucz Bk Mirror Round (TAK; NIE = oryginal co do bitu). Linia A16 Ludnosc BK: dopisek "zaokraglenie lustra BK (478-S1): wywolan, w gore +X (ile obciecie by zabralo)".
+
+**Ryzyko / co sprawdzic:** zgodnosc - UpdatePopType (BK + BridgeUpdateClassCount), BkSeal34, LosersFlee.BkAddPlaces nie wolaja MirrorClassCount i dalej ida przez UpdatePopType; zmienia sie tylko wynik lustra. W tescie: "reszta" wsi w A16 bliska 0 (zamiast ok. -650/d), "w gore" ok. kilkaset na dobe. Ludnosc BK stanie sie prawie stala - wzrost BE dalej moze przepadac na kopii (regula "przyrost uzupelnia pobor" - osobno). Watek: liczniki Interlocked.
+
+**Status:** DO SPRAWDZENIA
+
 ## 477-e (13.11) - budowy STOI: powod takze przy oblezeniu, wojnie, braku materialu i limicie murow; powody od nowa co dobe
 
 **Problem:** analiza at-120b (P6): budowy.log doba 108768 - 114 linii "STOI", powod tylko w 4 (R4 pisal powod tylko w galezi "doba bez budzetu").

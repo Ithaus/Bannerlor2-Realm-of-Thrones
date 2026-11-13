@@ -3640,6 +3640,7 @@ namespace Armoury
         // ktorej ksiega ludzi oddaje go do DOM (PeopleBook.HomeKnown) - dotad ludnosc BK dostawala go w najblizszej bitwie osadzie swojej frakcji i kultury (takze
         // zamku i miescie; LosersFlee.FindHome) albo we wsi rodu (ClanBudget.VillageFor). Ta sama liczba ludzi, to samo miejsce w obu ksiegach. Off = 79a8d89
         public bool BkReturnsToOriginVillage = true;       // A soldier of known origin who comes home - fled from a lost battle, freed, or dismissed for want of pay - goes back to the same village (or town) in Banner Kings' population that he returns to in the mod's own count of people; off = as before: in Banner Kings he joined the nearest settlement of his realm and culture to the battle, a castle or town among them, or a village of his lord's house
+        public bool BkMirrorRound = true;                  // 478-S1: Banner Kings copies each class of a settlement from Better Economy every day and cuts the fraction off (rounds down), so every village slowly loses people (about a fifth a year); on = the copy rounds to the nearest whole person instead; off = as before
         // A16: linie "Dobrobyt (skladniki A16)", "Bohaterowie (A16)", "Ludnosc BK (A16)" raz na dobe (tylko log; latki pomiaru na BK wpinane zawsze, licza przy kluczu)
         public bool A16SignalsLog = true;                  // Writes daily lines that measure what drives town and castle prosperity, the births, deaths and coming of age of lords, and every change of Banner Kings' population by kind of settlement (diagnostics only)
 

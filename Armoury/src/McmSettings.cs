@@ -8608,6 +8608,10 @@ namespace Armoury
         [SettingPropertyGroup("Signals from the long runs (A16)")]
         public bool BkReturnsToOriginVillage { get; set; } = true;
 
+        [SettingPropertyBool("Bk Mirror Round", HintText = "Banner Kings copies each class of a settlement from Better Economy every day and cuts the fraction off (rounds down), so every village slowly loses people - about a fifth a year. On = the copy rounds to the nearest whole person instead, with no drift either way. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Signals from the long runs (A16)")]
+        public bool BkMirrorRound { get; set; } = true;
+
         [SettingPropertyBool("A16 Signals Log", HintText = "Writes daily lines that measure what drives town and castle prosperity, the births, deaths and coming of age of lords, and every change of Banner Kings' population by kind of settlement (diagnostics only)", RequireRestart = false)]
         [SettingPropertyGroup("Signals from the long runs (A16)")]
         public bool A16SignalsLog { get; set; } = true;
@@ -15271,6 +15275,7 @@ namespace Armoury
             s.RblPeaceNeedsQuiet = RblPeaceNeedsQuiet;
             s.BkProsperityLayerOnce = BkProsperityLayerOnce;
             s.BkReturnsToOriginVillage = BkReturnsToOriginVillage;
+            s.BkMirrorRound = BkMirrorRound;
             s.A16SignalsLog = A16SignalsLog;
             s.ValveRaiseWhileShort = ValveRaiseWhileShort;
             s.ValveShortCeiling = ValveShortCeiling;
