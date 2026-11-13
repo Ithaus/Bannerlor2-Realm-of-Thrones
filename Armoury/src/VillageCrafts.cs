@@ -378,7 +378,7 @@ namespace Armoury
             return res;
         }
 
-        private static void ZeroDay() { _dLists = _dAdded = _dSteps = _dStarted = _dDone = _dStall = _dBusy = _dBudget = _dLocked = _dPress = _dCancel = _dRedone = 0; _dPaid = 0; _dHeldZero = 0; }
+        private static void ZeroDay() { _dLists = _dAdded = _dSteps = _dStarted = _dDone = _dStall = _dBusy = _dBudget = _dLocked = _dPress = _dCancel = _dRedone = 0; _dPaid = 0; _dHeldZero = 0; _dRegCand = _dRegStart = _dFirst = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -2207,7 +2207,22 @@ namespace Armoury
             double[] nf = tab6 ? CraftShortage.Row(mt) : null;
             foreach (var s in di.Sides)
             {
-                if (s.Target >= 0 || s.Cand == null || s.Cand.Count < 2 || s.Row == null) continue;
+                if (s.Target >= 0 || s.Cand == null || s.Row == null) continue;
+                // 477-a (klucz Side Village Deposit Crafts On Shortage): poza KS regale z typem wsi gry (glina, zelazo, srebro, sol, drewno) dochodza do kandydatow,
+                // gdy ziemia pasuje (>= 0.5, jak blok KS) i towar zajecia ma N >= 1.5 w miescie targowym; marmur i wapno bez typu wsi - tylko przez KS
+                var cands = s.Cand;
+                if (RegaleOn && tab6 && mt != null && mt.Settlement != null)
+                {
+                    foreach (int rc in KsTab.Regale)
+                    {
+                        if (cands.Contains(rc) || !Valid(rc, meta) || StartCalibration.Suit(s.Row, rc, dtype) < 0.5) continue;
+                        double rn = CraftShortageN(SupplySignal.Table, mt.Settlement, rc);
+                        if (!(rn >= 1.5)) continue;
+                        if (ReferenceEquals(cands, s.Cand)) cands = new List<int>(s.Cand);
+                        cands.Add(rc); _dRegCand++;
+                    }
+                }
+                if (cands.Count < 2) continue;
                 if (DistrictWorks.Locks(di.V, s.Uid)) { s.Held = 0; _dLocked++; continue; }
                 var cm = meta[s.Craft];
                 if (cm == null) continue;
@@ -2216,7 +2231,7 @@ namespace Armoury
                 if (nf == null)
                 {
                     cur = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype) : StartCalibration.Suit(s.Row, s.Craft, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, cm)));
-                    foreach (int c in s.Cand)
+                    foreach (int c in cands)
                     {
                         if (c == s.Craft || meta[c] == null) continue;
                         double v = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype) : StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
@@ -2229,7 +2244,7 @@ namespace Armoury
                     double r0 = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype) : StartCalibration.Suit(s.Row, s.Craft, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, cm)));
                     cur = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype, nf[s.Craft]) : r0 * nf[s.Craft];
                     double rb = double.NegativeInfinity; bool any = false;
-                    foreach (int c in s.Cand)
+                    foreach (int c in cands)
                     {
                         if (c == s.Craft || meta[c] == null) continue;
                         double v0 = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype) : StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
@@ -2267,11 +2282,16 @@ namespace Armoury
                 float share = s0 != null ? Math.Max(0f, Math.Min(1f, s0.SideVillageCraftRegionShare)) : 0.05f;
                 // 435-L2: stojace przebudowy tego sezonu oddaja regionowi rece, ktore jeszcze nie przeszly (relRefund null przy kluczu 0 - rachunek jak dotad)
                 double refund = 0; if (relRefund != null && relRefund.TryGetValue(di.Region ?? "-", out refund) && refund > 0 && !CraftUnblock.RefundFree(CraftUnblock.SysZw, di.Region, today / Season)) refund = 0;   // 435-L2-p: zwrot raz na sezon
-                if (Math.Max(0.0, moved - refund) + hands > share * rh) { _dBudget++; if (!(moved > 0) && hands > share * rh) CraftUnblock.NoteShareSmall(CraftUnblock.SysZw); continue; }
+                // 477-b (klucz Side Village Region First Mover): pierwsza zmiana regionu w sezonie (moved 0) przechodzi, choc rece wioski > caly udzial regionu - inaczej
+                // duza wioska nie zmienilaby zajecia nigdy (at-120b: 'rece czesci > caly udzial regionu' 410)
+                bool first = FirstOn && !(moved > 0);
+                if (!first && Math.Max(0.0, moved - refund) + hands > share * rh) { _dBudget++; if (!(moved > 0) && hands > share * rh) CraftUnblock.NoteShareSmall(CraftUnblock.SysZw); continue; }
                 if (refund > 0 && moved + hands > share * rh) CraftUnblock.NoteStartRefund(CraftUnblock.SysZw, hands, di.Region, today / Season);
                 if (stalled) CraftUnblock.NoteStartPast(CraftUnblock.SysZw);
                 int T = meta[bc].Tree ? Math.Max(7, s0 != null ? s0.SideVillageCraftTreeDays : 364) : Math.Max(7, s0 != null ? s0.SideVillageCraftChangeDays : 60);
                 double sigma = Math.Max(1, DailyLife.KsSigma);
+                if (first && hands > share * rh) _dFirst++;
+                if (KsTab.IsRegale[bc] && !s.Cand.Contains(bc)) _dRegStart++;
                 s.Target = bc; s.TStart = today; s.TEnd = today + T; s.F = 0f; s.Paid = 0f;
                 s.Cost = (float)(CostDays * KsTab.KCost[bc] * hands / sigma);
                 // 435-L4 (klucz Village Gear On Switch): zmiana przez sprzet - OD RAZU (pola, lasy): bez raty w zlocie, sprzet nowego zajecia z robot gminy; ZA SPRZETEM
@@ -2290,6 +2310,10 @@ namespace Armoury
                 Notify(di, s, bc, mt);
             }
         }
+
+        private static bool RegaleOn { get { var s = Settings.Current; return s != null && s.SideVillageRegaleOnShortage; } }
+        private static bool FirstOn { get { var s = Settings.Current; return s != null && s.SideVillageRegionFirstMover; } }
+        private static int _dRegCand, _dRegStart, _dFirst;   // 477-a/b: liczniki od ostatniej linii ZW
 
         /// <summary>435-L6-p: pierwszy krok ZW z czynnikiem niedoboru sterujacym - nacisk wszystkich wiosek pobocznych od zera (raz; znacznik w zapisie arm_lpn).</summary>
         private static void HeldZeroL6()
@@ -2556,7 +2580,7 @@ namespace Armoury
             if (f) sb.Append(" -");
             sb.Append(" | inne niz typ okregu ").Append(other).Append(", w przebudowie ").Append(inTrans).Append(", uprawy na sniegu (inne niz typ okregu) ").Append(snow)
               .Append(" | zmiany: nacisk ").Append(_dPress).Append(", zaczete ").Append(_dStarted).Append(", skonczone ").Append(_dDone).Append(", wstrzymane (inna wioska okregu) ").Append(_dBusy)
-              .Append(", (udzial regionu) ").Append(_dBudget).Append(", zamrozone pracami ").Append(_dLocked).Append(", doby bez pelnej zaplaty ").Append(_dStall).Append(", porzucone ").Append(_dCancel)
+              .Append(", (udzial regionu) ").Append(_dBudget).Append(" | 477: kandydaci regale przy N >= 1.5 ").Append(_dRegCand).Append(", zaczete na regale ").Append(_dRegStart).Append(", pierwsza zmiana regionu ponad udzial ").Append(_dFirst).Append(", zamrozone pracami ").Append(_dLocked).Append(", doby bez pelnej zaplaty ").Append(_dStall).Append(", porzucone ").Append(_dCancel)
               .Append(EcoAudit427.RbText(EcoAudit427.SysZw, _dStall))   // 427 A1: powod postoju i wiek przebudow (klucz wylaczony - pusto); zeruje swoje liczniki
               .Append(_dHeldZero > 0 ? ", Held wyzerowane (pierwszy krok sygnalu KS) " + _dHeldZero : "")   // recenzja calosci fali 5
               .Append(", zaplacone ").Append(_dPaid).Append(" zl").Append(_notes.Count > 0 ? " (" + string.Join("; ", _notes.ToArray()) + ")" : "")

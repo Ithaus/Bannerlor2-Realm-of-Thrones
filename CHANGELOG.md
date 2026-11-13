@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 477-a/b (13.11) - ZW (zajecia wiosek bez KS): regale z typem wsi przy N >= 1.5 jako kandydaci; pierwsza zmiana regionu w sezonie mimo udzialu
+
+**Problem:** analiza at-120b (docs/ANALIZA-120B-2026-11-13.md, P1): nowa kampania ma KS w stanie Plan (nieuzbrojona), wszystkie 569 okregow ida droga ZW ("bez KS 569, pod KS 0"). ZW w 120 dobach zaczelo 8 zmian (same farmy), choc marble N 2.00 (23 z 48 miast), clay 1.50; "wstrzymane udzialem regionu ... (rece czesci > caly udzial regionu) 410".
+
+**Przyczyna:** (a) kandydaci ZW z StartCalibration.CandidatesOf -> KsCore.Candidates pomijaja regale (StartCalibration.Core.cs:453 `!KsTab.IsRegale[i]`), wiec ZW nigdy nie wybiera kopalni gliny, zelaza itd.; regale chodza tylko w KS (RegaleCycle). (b) VillageCrafts.Rule: `moved + hands > share * rh` blokuje wioske, ktorej same rece sa wieksze niz udzial regionu na sezon (5%) - taka wioska nie zmieni zajecia nigdy.
+
+**Zmiana:** (a) klucz Side Village Deposit Crafts On Shortage (TAK): w Rule dla okregow bez KS dochodza kandydaci regale z typem wsi gry (Valid: clay_mine, iron_mine, silver_mine, salt_mine, lumberjack...), gdy ziemia pasuje (Suit >= 0.5, jak warunek regale bloku KS StartCalibration.Core.cs:1280) i N towaru zajecia >= 1.5 w miescie targowym (CraftShortageN); dalej zwykly rachunek ZW (czynnik niedoboru, prog x1.25, nacisk 60 dob, koszt, bezpiecznik zboza, udzial regionu). (b) klucz Side Village Region First Mover (TAK): pierwsza zmiana regionu w sezonie (moved 0) przechodzi mimo udzialu. Liczniki w linii ZW: "477: kandydaci regale przy N >= 1.5, zaczete na regale, pierwsza zmiana regionu ponad udzial".
+Decyzja domyslna (noc 13.11): marmur (quarry) i wapno (lime_pit) nie maja typu wsi gry - poza KS nie da sie ich wytwarzac (meta.Goods puste, Valid false); wariant "x1.1 rak regale" z analizy dotyczy blokow KS - nieprzydatny bez KS. Prawdziwa naprawa marmuru i wapna = uzbrojona KS (Jeff: MCM "Arm This Save" + "Confirm" w zapisie).
+
+**Ryzyko / co sprawdzic:** rece wiosek ida z biezacego zajecia (zwykle zboze - bezpiecznik zboza L2 dziala); kopalnie gliny zaczna przybywac po 60 dobach nacisku + przebudowie. Klucze NIE = co do bitu jak przed (cands = s.Cand, first false). Linia ZW: kandydaci regale > 0, zaczete na regale > 0 w tescie 120 dob.
+
+**Status:** DO SPRAWDZENIA
+
 ## 469-t (13.11) - lucznicy: pomiar strzalu do celu, w ktory strzala poleciala (469 przed 310), nowy cel 310 nie dalej niz G, histereza zwolnienia
 
 **Problem:** autotest at-474c (Armoury-2026-11-13_03-18-26.log, "Ogien w zasiegu (469)"): po 469-s nadal strzaly poza G - bitwa 5 szyk AI 25, bitwa 6 szyk piechoty 139 (wstrzyman 1810 / ludzi 2), bitwa 7 szyk gracza 108; "mimo wstrzymania" 140 / 109 przy "wstrzymanych od razu po strzale" 15 / 17.

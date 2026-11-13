@@ -10276,6 +10276,14 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageCrafts { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Deposit Crafts On Shortage", HintText = "with Side Village Crafts and a shortage table: a side village outside Start Calibration may also turn to a deposit craft (clay pit, iron, silver, salt mine, timber) its land suits (suitability at least 0.5), when the good of that craft is short in its market town (shortage N at least 1.5). The switch costs and waits like any other craft change, and the hands come from the village's current work. Marble and limestone have no village type outside Start Calibration, so only an armed Start Calibration moves villages to them. Off = deposit crafts are never a choice outside Start Calibration, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageRegaleOnShortage { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Region First Mover", HintText = "with Side Village Crafts: when no village of a region has changed craft yet this season, one village may change even if its hands alone are more than the region's seasonal share - otherwise a big village could never change at all. Off = the share blocks such a village, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageRegionFirstMover { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Side Village Craft Switch", 1.00f, 3.00f, "0.00", HintText = "with Side Village Crafts: a side village turns to another craft only when that craft would earn at least this many times its present one at its market town (land suitability x prices)", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float SideVillageCraftSwitch { get; set; } = 1.25f;
@@ -15677,6 +15685,8 @@ namespace Armoury
             s.KsCostFast2 = KsCostFast2;
             s.SideVillageCrafts = SideVillageCrafts;
             s.SideVillageCraftSwitch = SideVillageCraftSwitch;
+            s.SideVillageRegaleOnShortage = SideVillageRegaleOnShortage;
+            s.SideVillageRegionFirstMover = SideVillageRegionFirstMover;
             s.SideVillageCraftHoldDays = SideVillageCraftHoldDays;
             s.RebuildStallReleaseDays = RebuildStallReleaseDays;
             s.GrainHandsWinterLock = GrainHandsWinterLock;
