@@ -119,7 +119,7 @@ namespace Armoury
 
         internal string ExitText()
         {
-            return "stoly (474-P9): rozmowy " + _talks + ", scenki " + _scenes + ", kolejki " + _rounds + " (" + _roundGold + " d)";
+            return "stoly (474-P9): rozmowy " + _talks + ", scenki " + _scenes + (TavernLines.On ? " (biezace 474-P10: " + _dTopicalScenes + ")" : "") + ", kolejki " + _rounds + " (" + _roundGold + " d)";
         }
 
         internal int TableOf(Agent a) { int t; return a != null && _tableOf.TryGetValue(a, out t) ? t : -1; }
@@ -200,6 +200,8 @@ namespace Armoury
             _scenesLeft--;
             _idx = 0;
             _lines = new List<string>();
+            _sex = new List<char>();
+            if (TavernLines.On) { NextSceneTalk(); return; }   // 474-P10
             var all = TavernLines.All("table", _l.Region);
             var fresh = new List<string>();
             foreach (var s in all) if (!_usedScenes.Contains(s)) fresh.Add(s);
@@ -211,11 +213,77 @@ namespace Armoury
             _scenes++;
         }
 
+        // ------------------------------------------------------------ 474-P10: scenki z pliku rozmow (klucz Tavern Talk Lines)
+        private List<char> _sex = new List<char>();
+        private int _dTopicalScenes;
+
+        /// <summary>474-P10: scenka 60/40 (ogolne / biezace z migawki swiata), tylko takie, ktore stol moze powiedziec (kwestia "F:" wymaga kobiety przy stole, "M:" -
+        /// mezczyzny); bez powtorek w tej wizycie. Kwestie bez przedrostka mowi kolejny przy stole.</summary>
+        private void NextSceneTalk()
+        {
+            bool f = false, m = false;
+            if (_talkTable >= 0) foreach (var a in _tables[_talkTable]) { if (a == null) continue; if (a.IsFemale) f = true; else m = true; }
+            List<string> gen, cur;
+            TavernLines.Scenes(_l.Region, out gen, out cur);
+            var g2 = Fit(gen, f, m); var c2 = Fit(cur, f, m);
+            bool topical = c2.Count > 0 && (g2.Count == 0 || MBRandom.RandomFloat < 0.4f);
+            var all = topical ? c2 : g2;
+            var fresh = new List<string>();
+            foreach (var s in all) if (!_usedScenes.Contains(s)) fresh.Add(s);
+            if (fresh.Count == 0 && all.Count > 0) { _usedScenes.Clear(); fresh = all; }
+            string pick = fresh.Count > 0 ? fresh[MBRandom.RandomInt(fresh.Count)]
+                        : "Roads are worse every year. || Roads? It's the tolls I mind. Every bridge has a lord's man on it now. || Drink up. Talking won't mend either.";
+            if (topical && fresh.Count > 0) { _dTopicalScenes++; TavernLines.NoteTopical(); }
+            _usedScenes.Add(pick);
+            foreach (var x in pick.Split(new[] { "||" }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var y = x.Trim();
+                char sx = ' ';
+                if (y.Length > 2 && (y[0] == 'F' || y[0] == 'M') && y[1] == ':') { sx = y[0]; y = y.Substring(2).Trim(); }
+                if (y.Length == 0) continue;
+                _lines.Add(y.Replace("{INN}", _l.InnName));
+                _sex.Add(sx);
+            }
+            _scenes++;
+        }
+
+        private static List<string> Fit(List<string> l, bool f, bool m)
+        {
+            var res = new List<string>();
+            foreach (var s in l)
+            {
+                if (!f && s.IndexOf("F:", StringComparison.Ordinal) >= 0 && NeedsSex(s, 'F')) continue;
+                if (!m && s.IndexOf("M:", StringComparison.Ordinal) >= 0 && NeedsSex(s, 'M')) continue;
+                res.Add(s);
+            }
+            return res;
+        }
+
+        private static bool NeedsSex(string scene, char c)
+        {
+            foreach (var x in scene.Split(new[] { "||" }, StringSplitOptions.RemoveEmptyEntries)) { var y = x.TrimStart(); if (y.Length > 1 && y[0] == c && y[1] == ':') return true; }
+            return false;
+        }
+
+        /// <summary>474-P10: mowiacy kwestii idx - wedlug przedrostka plci (kolejny pasujacy od miejsca w kolejce), inaczej kolejny przy stole jak dotad.</summary>
+        private Agent SpeakerFor(List<Agent> people)
+        {
+            if (people.Count == 0) return null;
+            char sx = _idx < _sex.Count ? _sex[_idx] : ' ';
+            if (sx == ' ') return people[_idx % people.Count];
+            for (int k = 0; k < people.Count; k++)
+            {
+                var a = people[(_idx + k) % people.Count];
+                if (a != null && a.IsFemale == (sx == 'F')) return a;
+            }
+            return people[_idx % people.Count];
+        }
+
         private bool SetLine()
         {
             if (_idx < 0 || _idx >= _lines.Count || _talkTable < 0) return false;
             var people = _tables[_talkTable];
-            _speaker = people.Count > 0 ? people[_idx % people.Count] : null;
+            _speaker = TavernLines.On ? SpeakerFor(people) : (people.Count > 0 ? people[_idx % people.Count] : null);
             MBTextManager.SetTextVariable("ARM474_TB_LINE", _lines[_idx]);
             return true;
         }

@@ -2000,6 +2000,7 @@ namespace Armoury
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)
             Measure169c.RegisterEvents(this);   // 169c: niewola lordow, dezercja, sluby AI, Bliznaki - same liczniki (tylko log)
             AiDowry.RegisterEvents(this);       // R3-01c: posag przy slubach AI z AI (BeforeHeroesMarried)
+            CampaignEvents.BeforeHeroesMarried.AddNonSerializedListener(this, WorldTalk.OnMarried);   // 474-P10: sluby do rozmow karczmy (tylko imiona i doba; klucz Tavern Talk Lines)
             ArmyCohesionYear.RegisterEvents(this);   // AC (Jeff 14.10): armie zalozone / rozwiazane - wiek armii i przyczyny do linii doby
             ArmedStrength.RegisterEvents(this);   // p9 (Jeff 25.10): gotowosc zbrojowni partii - doba partii, godzina (brudne, publikacja; ArmsFirst), koniec bitwy, nowa / zniszczona partia
             LordEscort.RegisterEvents(this);   // 223 (Jeff 26.10): eskorta lordow - godzina (dolaczenie do armii, eskorta z zalogi po wejsciu), wejscie do osady, pojmanie, zniszczona partia

@@ -306,7 +306,11 @@ namespace Armoury
 
         private static bool PourCond()
         {
-            MBTextManager.SetTextVariable("ARM474_INN_POUR", "There you are. Drink up, and I'll tell you what the road has been saying.");
+            const string def = "There you are. Drink up, and I'll tell you what the road has been saying.";
+            string t = def;
+            try { var l = InnInteriorLogic.Current; if (TavernLines.On && l != null) t = TavernLines.Pick("pour", l.Region, def).Replace("{INN}", l.InnName); }   // 474-P10
+            catch (Exception e) { Stumble("PourCond", e); t = def; }
+            MBTextManager.SetTextVariable("ARM474_INN_POUR", t);
             return true;
         }
 
@@ -455,6 +459,9 @@ namespace Armoury
         private readonly Dictionary<Agent, int> _roles = new Dictionary<Agent, int>();
         private readonly Random _rng = new Random();
         private float _t;
+        // 474-P10: gwar sali - urywek rozmowy co 11-20 s (pierwszy po 6-10 s), nie w trakcie rozmowy; klucz Tavern Talk Lines NIE - nic
+        private float _nextMurmur = 6f;
+        private int _murmurs;
         private string _spawnAt = "-";
         private SoundEvent _crowd, _music;
         private System.Diagnostics.Stopwatch _testClock;
@@ -480,6 +487,7 @@ namespace Armoury
                 if (Inn != null) InnName = Inn.Name;
                 Cult = Inn != null && Inn.Village != null ? Inn.Village.Culture : null;
                 Region = TavernLines.RegionOf(Cult != null ? Cult.StringId : null);
+                if (TavernLines.On && Inn != null) TavernLines.SetPlace(new Vec2(Inn.X, Inn.Y), Inn.Village != null ? Inn.Village.MapFaction : null);   // 474-P10: migawka swiata dla zajazdu
             }
             catch (Exception e) { RoadsideInnInterior.Stumble("Setup", e); }
             try { Build(); }
@@ -489,11 +497,28 @@ namespace Armoury
         public override void OnMissionTick(float dt)
         {
             _t += dt;
+            if (_t >= _nextMurmur) Murmur();
             if (_testClock != null && _testClock.ElapsedMilliseconds >= 8000)
             {
                 _testClock = null;
                 try { Mission.EndMission(); } catch (Exception e) { RoadsideInnInterior.Stumble("TestEnd", e); }
             }
+        }
+
+        private void Murmur()
+        {
+            _nextMurmur = _t + 11f + (float)_rng.NextDouble() * 9f;
+            if (!TavernLines.On) { _nextMurmur = float.MaxValue; return; }
+            try
+            {
+                var cm = Campaign.Current != null ? Campaign.Current.ConversationManager : null;
+                if (cm != null && (cm.IsConversationInProgress || cm.IsConversationFlowActive)) return;
+                string t = TavernLines.Murmur(Region);
+                if (t == null) return;
+                _murmurs++;
+                InformationManager.DisplayMessage(new InformationMessage(t.Replace("{INN}", InnName), new Color(0.78f, 0.74f, 0.66f)));
+            }
+            catch (Exception e) { RoadsideInnInterior.Stumble("Murmur", e); }
         }
 
         public override InquiryData OnEndMissionRequest(out bool canPlayerLeave)
@@ -509,7 +534,7 @@ namespace Armoury
             try
             {
                 Log.Info(RoadsideInnInterior.P + "wyjscie z " + InnName + " (" + (Inn != null ? Inn.Uid : "-") + ") po " + _t.ToString("0", CultureInfo.InvariantCulture)
-                         + " s | " + (Tables != null ? Tables.ExitText() + " | " : "") + "potkniecia razem " + RoadsideInnInterior.Stumbles + ".");
+                         + " s | " + (Tables != null ? Tables.ExitText() + " | " : "") + (TavernLines.On ? "gwar (474-P10): urywkow " + _murmurs + " | " : "") + "potkniecia razem " + RoadsideInnInterior.Stumbles + ".");
             }
             catch { }
             _testClock = null;

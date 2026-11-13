@@ -42,7 +42,7 @@ namespace Armoury
             {
                 if (starter == null) return;
                 starter.AddPlayerLine("arm474_tk_ale", "tavernkeeper_talk", "arm474_tk_ale_pour", "{=!}Pour me an ale. What's the news?", Cond, Asked, 105, Click);
-                starter.AddDialogLine("arm474_tk_ale_pour", "arm474_tk_ale_pour", "close_window", "{=!}There you are. Drink up, and I'll tell you what the talk has been.", null, Pour, 105);
+                starter.AddDialogLine("arm474_tk_ale_pour", "arm474_tk_ale_pour", "close_window", "{=!}{ARM474_TK_POUR}", PourCond, Pour, 105);
                 Log.Info(P + "linia \"Pour me an ale. What's the news?\" dodana do rozmowy z karczmarzem miasta (tavernkeeper_talk) - klucz Innkeeper Ale Line " + (On ? "TAK" : "NIE (albo brak plotek / kufla / karczm miast)") + ".");
             }
             catch (Exception e) { Stumble("AddDialogs", e); }
@@ -80,6 +80,26 @@ namespace Armoury
         }
 
         private static void Asked() { _dAsked++; }
+
+        /// <summary>474-P10: odpowiedz karczmarza z pliku rozmow (rodzaj "pour", region kultury miasta); klucz Tavern Talk Lines NIE - zdanie jak dotad.</summary>
+        private static bool PourCond()
+        {
+            string t = Def;
+            try
+            {
+                var st = CurTown();
+                if (TavernLines.On && st != null)
+                {
+                    TavernLines.SetPlace(st.GetPosition2D, st.MapFaction);
+                    t = TavernLines.Pick("pour", TavernLines.RegionOf(st.Culture != null ? st.Culture.StringId : null), Def).Replace("{INN}", st.Name.ToString());
+                }
+            }
+            catch (Exception e) { Stumble("PourCond", e); t = Def; }
+            MBTextManager.SetTextVariable("ARM474_TK_POUR", t);
+            return true;
+        }
+
+        private const string Def = "There you are. Drink up, and I'll tell you what the talk has been.";
 
         private static void Pour()
         {

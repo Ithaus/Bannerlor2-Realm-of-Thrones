@@ -6088,6 +6088,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool RoadsideInnMapSound { get; set; } = true;
 
+        [SettingPropertyBool("Tavern Talk Lines", HintText = "the talk in town taverns and roadside inns grows to thousands of lines of their own, by region - the North, the Iron Islands, the West, the Reach, the riverlands, the Vale, the stormlands, the crownlands, Dorne and Essos. The keeper wraps his news in words of his own when you buy a tankard, the tables tell longer stories with women among the talkers, inside a roadside inn you overhear snatches of talk from the room, and the talk follows the world - wars, sieges, hunger nearby, winter, a lord's death, a wedding, the dead in the far north. Words only, no voices. Off = the few lines as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool TavernTalkLines { get; set; } = true;
+
         [SettingPropertyBool("Inn Table Talk", HintText = "inside a roadside inn (Roadside Inn Interior), travellers sit at the tables in twos, threes and fours. Talk to one and you sit down with the whole table: they talk among themselves of the road, the weather, the war and the lords, each in turn. 'Tell me more' starts a new story (one more for free), 'Let me buy this table a round' pays a tankard a head to the keeper and the village whose lands the inn stands on and opens another, or leave them to it. Words only, no voices yet. Off = the travellers stand about as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool InnTableTalk { get; set; } = true;
@@ -14537,6 +14541,7 @@ namespace Armoury
             s.RoadsideInnTavernSound = RoadsideInnTavernSound;
             s.RoadsideInnInterior = RoadsideInnInterior;
             s.RoadsideInnMapSound = RoadsideInnMapSound;
+            s.TavernTalkLines = TavernTalkLines;
             s.InnTableTalk = InnTableTalk;
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;

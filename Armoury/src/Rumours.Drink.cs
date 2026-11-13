@@ -431,7 +431,21 @@ namespace Armoury
             InnDrink.DItems += n; InnDrink.DTourn += tn; InnDrink.DMatch += mn; InnDrink.DTournFalse += tn - tTrue; InnDrink.DMatchFalse += mn - mTrue;
             try { if (n > 0) me.AddSkillXp(DefaultSkills.Charm, CharmXpPerItem * n); } catch (Exception e) { Stumble("CharmXp", e); }
             if (town) _dHeardTown++; else _dHeardRoad++;
+            // 474-P10 (klucz TavernTalkLines): rama barmana wokol plotek - zdanie otwarcia po zaplacie, zamkniecie na koniec (region kultury miasta / wsi okregu zajazdu;
+            // migawka swiata dla miejsca kufla). Lektor tych zdan nie czyta (noRead). Klucz NIE - open i close null, naglowek co do bitu jak dotad.
+            string fOpen = null, fClose = null;
+            try
+            {
+                var fc = town ? (st != null ? st.Culture : null) : (inn != null && inn.Village != null ? inn.Village.Culture : null);
+                var ff = town ? (st != null ? st.MapFaction : null) : (inn != null && inn.Village != null ? inn.Village.MapFaction : null);
+                TavernLines.Frame(TavernLines.RegionOf(fc != null ? fc.StringId : null), at, ff, out fOpen, out fClose);
+                if (fOpen != null) fOpen = "\"" + fOpen.Replace("{INN}", place) + "\"";
+                if (fClose != null) fClose = "\"" + fClose.Replace("{INN}", place) + "\"";
+            }
+            catch (Exception e) { Stumble("Frame", e); fOpen = fClose = null; }
+            string fIns = fOpen != null ? (town ? "" : "The keeper leans over the bench. ") + fOpen + " " : null;
             string head = (town ? "You buy a tankard of ale (" + paid + " d), and the innkeeper leans on his counter. " : "You buy a tankard of ale (" + paid + " d) and sit by the hearth. ")
+                          + (fIns ?? "")
                           + (n == 1 ? "Over it you hear one piece of news" : "Over it you hear " + n + " pieces of news")
                           + (left > 0 ? " - another round would loosen more tongues (" + left + " more):" : ":");
             Log.Info(InnDrink.P + "kufel w " + place + " (" + (town ? "karczma miasta" : "zajazd") + ", " + key + ") dzien " + Today + " - cena " + price
@@ -442,8 +456,9 @@ namespace Armoury
                      + " [bandy " + cats[0] + ", kryjowki " + cats[1] + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5]
                      + ", turnieje " + cats[CatTourn] + ", swaty " + cats[CatMatch] + "]"
                      + " | turnieje " + tn + " (prawdziwe " + tTrue + "), swaty " + mn + " (prawdziwe " + mTrue + ")" + (refs.Length > 0 ? ": " + refs : "")
-                     + " | XP Uroku +" + (CharmXpPerItem * n) + " | " + state + ".");
-            Show(at, key, place, town, take, head);
+                     + " | XP Uroku +" + (CharmXpPerItem * n) + " | " + state
+                     + (fIns != null || fClose != null ? " | rama barmana (474-P10): otwarcie " + (fIns != null ? "tak" : "nie") + ", zamkniecie " + (fClose != null ? "tak" : "nie") : "") + ".");
+            Show(at, key, place, town, take, head, fClose, fOpen != null || fClose != null ? new[] { fIns, fClose } : null);
         }
     }
 }
