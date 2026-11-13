@@ -91,6 +91,7 @@ namespace CrashScribe
                 Net.WrapHotspots(_harmony);
                 Quiet.Install(_harmony);
                 Mends.Install(_harmony);
+                HsBanners.Install(_harmony);      // 481: Heraldry Studio - bez przycinania herbow ROT do 33 warstw i bez przemalowania kolorow ROT (przed kazda sesja kampanii)
                 BkTitles.Install(_harmony);       // P1 audytu 14.10 (AM-26/AM-27): sciezka tytulow BK ROT przy kazdym odczycie, plik ROT 8.1.8
                 AuditP3.Install(_harmony);        // P3 audytu 14.10 (AM-29 wzorce kultur, AM-01 dobrobyt BKROT, AM-28 wiara Lorath) - kazda naprawa pod wlasnym kluczem
                 NameplateGhosts.Install(_harmony);   // 10.10: ikony-duchy partii nad osadami
