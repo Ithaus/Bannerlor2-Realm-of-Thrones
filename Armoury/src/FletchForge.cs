@@ -218,8 +218,20 @@ namespace Armoury
                     foreach (var p in r.Parts)
                         for (int g = 1; g <= 6; g++)
                             if (p.Item != null && p.Item == Recipes.MaterialItem((CraftingMaterials)g)) { rm += p.Count; break; }
+                // 488 (audyt 13.11: linia porownywala tylko metal i drewno - 40 kg skory tarczy t6 przeszlo niezauwazone): takze skora i len kwitu wobec przepisu
+                int rl = 0, rn = 0;
+                if (r.Parts != null)
+                    foreach (var p in r.Parts)
+                    {
+                        if (p.Item == null) continue;
+                        if (p.Item == Recipes.SoftLeather) rl += p.Count;
+                        else if (p.Item == Recipes.SoftLinen) rn += p.Count;
+                    }
+                int bl = bill.Length > 9 ? Math.Max(0, bill[9]) : 0, bn = bill.Length > 10 ? Math.Max(0, bill[10]) : 0;
                 return shield.StringId + " metal " + metal + " (receptura " + rm + "), drewno " + bill[(int)CraftingMaterials.Wood]
-                       + (metal == rm ? " = z receptury" : " = kwit BK") + ", wykutych tak tarcz od startu " + _shieldBills
+                       + ", skora " + bl + " (receptura " + rl + "), len " + bn + " (receptura " + rn + ")"
+                       + (r.Kg != null ? ", przepis z masy (sztuki do otwarcia)" : "")
+                       + (metal == rm && bl == rl && bn == rn ? " = z receptury" : " = kwit BK") + ", wykutych tak tarcz od startu " + _shieldBills
                        + ", aksamit tarcz t5+ (sprawdzany i zdejmowany osobno) zdjety od startu " + _velvetTaken + ", latki tarczy " + _shieldHooks;
             }
             catch (Exception e) { return "wyjatek " + e.GetType().Name; }
@@ -351,7 +363,9 @@ namespace Armoury
             try
             {
                 if (!Recipes.MassOn) return;
-                if (item == null || !item.HasArmorComponent || !Recipes.MassCovers(item)) return;
+                // 488 (ShieldRecipeByMass): tarcza z masy tez - gdy CRAFT BK liczy ja przepisem (BkShieldBillByRecipe); drewno w kg zdejmuje BkShieldSpendPostfix,
+                // MassCommitBk pomija drewno (Grade < 0) - bez podwojnego zapisu
+                if (item == null || !(item.HasArmorComponent || ShieldRecipeOn(item)) || !Recipes.MassCovers(item)) return;
                 // kwit, ktory BK wlasnie zdjal (ta sama metoda, otwarte ladunki jeszcze nie ruszone), musi byc kwitem przepisu z masy - inaczej (latki kwitu
                 // wylaczone) zapis kg dalby otwartym ladunkom metal, ktorego nikt nie zdjal z sakw
                 var cfg = Traverse.CreateWithType("BannerKings.BannerKingsConfig").Property("Instance").GetValue();
