@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-e (13.11) - Farmlands zamku = pola dworskie (panszczyzna): udzial 20/25/30% plonu ludnosci bez premii z niczego, lojalnosc -0.1/poziom
+
+**Problem:** projekt budynkow 13.11 (czesc B, liczby): premia BK Farmlands +50%/poziom produkcji ludnosci to odpowiednik ok. 1500/3000/4500 nieistniejacych parobkow na typowy zamek, plus +6/12/18 gry - jedzenie z niczego (wiekszosc przepada nad sufitem zapasu: 110 ze 130 zamkow na suficie). Jeff: "wyjasnij na liczbach", po wyjasnieniu propozycji: "na pozostale sie zgadzam".
+
+**Przyczyna:** BKFoodModel.GetPopulationFoodProduction:39425 (czynnik +0.5 x L Farmlands) i FoodProduction budynku gry; zamek bierze 15% produkcji (CalculateTownFoodChangeInternal).
+
+**Zmiana:** nowy Buildings338Corvee.cs: postfiks na BKFoodModel.CalculateTownFoodChangeInternal (DeclaredMethod; tylko zamki z Farmlands > 0) - pozycja "Lord's fields (corvee)" = udzial (0.20/0.25/0.30) x produkcja ludnosci BEZ premii budynku - 0.15 x produkcja z premia - FoodProduction budynku gry; postfiks CalculateLoyaltyChange czynnego modelu (PatchTarget.OfActive) - "Corvee on the lord's fields" -0.1 x poziom. Miasta (Warehouse) bez zmian. Linia doby "Budynki (338) panszczyzna Farmlands (476-e)": zamki wg poziomu, suma zmiany jedzenia, zamki z bilansem < 0. Klucz Buildings338 Farmlands Corvee (TAK; NIE = co do bitu jak przed).
+
+**Ryzyko / co sprawdzic:** projekt: typowy zamek L2 bilans +45 -> ok. +9, swiat ok. -4650 jedzenia/d w zamkach (glownie nadmiar ponad sufit), ok. 59 zamkow ponizej 0 ale z zapasem na lata - OBSERWOWAC w tescie 120 dob (linia: zamki z bilansem < 0, sufity, glod garnizonow 471b!). Kolizja z 471b (oblezenia: jedzenie zalogi czynnikiem R) - nizszy bilans = krotsza obrona. Jesli zamkow z bilansem < 0 > 30% - obnizyc udzialy albo wylaczyc klucz. Decyzja domyslna (noc 13.11): wdrozone z kluczem TAK.
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-d (13.11) - urzad podatkowy wsi: lepszy pobor istniejacego czynszu (pozniejsze darowanie i szybsza splata zaleglosci), bez nowego zlota
 
 **Problem:** Jeff 13.11: "Tax office w wiosce - czemu wylaczyc?"; sesja zaproponowala "lepszy pobor czynszu, nowe zloto nie powstaje", Jeff: "na pozostale sie zgadzam". Dzis budynek martwy - BK dosypuje zloto z niczego (BKTaxModel.AddVillagePopulationTaxes), co blokuje KingdomTreasury.TaxOfficePrefix (PolicyIncomeConserved TAK u Jeffa), a AI dalej go stawia.

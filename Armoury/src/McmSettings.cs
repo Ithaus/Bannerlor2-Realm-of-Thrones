@@ -12948,6 +12948,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338VillageTaxOffice { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338 Farmlands Corvee", HintText = "With Buildings338: castle Farmlands become the lord's demesne fields worked by the peasants' corvee - they make no food out of nothing any more: the castle takes 20 / 25 / 30% (level 1 / 2 / 3) of what its people grow instead of 15% plus the Banner Kings bonus of +50% per level and the game's +6 / 12 / 18, and the heavier labour costs 0.1 loyalty a day per level. Town warehouses are not touched. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338FarmlandsCorvee { get; set; } = true;
+
         [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338CastleMines { get; set; } = true;
@@ -16240,6 +16244,7 @@ namespace Armoury
             s.Buildings338CastleCraftsmen = Buildings338CastleCraftsmen;
             s.Buildings338Worship = Buildings338Worship;
             s.Buildings338VillageTaxOffice = Buildings338VillageTaxOffice;
+            s.Buildings338FarmlandsCorvee = Buildings338FarmlandsCorvee;
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
             s.GoldDailySummary = GoldDailySummary;
