@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 479-b (13.11) - KS: f20-d4 przy czynnej A7 nie sadzi nowych gajow (nowe drzewa tylko platna A7)
+
+**Problem:** recenzja 479-a (2 niezalezne przeglady + weryfikacja): przy KsFoodHandsWithA7 TAK f20-d4 z kluczem Ks Food Hands Grow Groves TAK dodaje rece winnicom, gajom oliwnym, sadom cytrusowym i daktylowym od razu i za darmo, a A7 za te sama zmiane bierze koszt i 364 doby - darmowa droga obok platnej (nic z niczego), dwie reguly o odwrotnej ekonomii dla jednego zjawiska.
+
+**Przyczyna:** StartCalibration.Jedzenie.cs F20Week: `groves = F20Groves` niezaleznie od A7 (przed 479-a f20 nigdy nie dzialal razem z A7).
+
+**Zmiana:** decyzja domyslna (noc 13.11): przy czynnej A7 groves = false - f20-d4 przesuwa rece tylko miedzy zajeciami bloku bez wzrostu drzew (drzewa moga tylko oddawac rece, jak przy Grow Groves NIE); nowe gaje sadzi wylacznie A7 (z kosztem). A7 wylaczona - bez zmian. Linia "Jedzenie KS (f20-d4)": "drzewa biora rece NIE - A7 czynna, nowe gaje tylko platna A7 (479-b)" i licznik "wzrost gajow pominiety przez A7 (479-b): bloki N, regale daktyli M".
+
+**Ryzyko / co sprawdzic:** owoce/oliwki/daktyle beda schodzic wolniej niz zakladal 479-a (rece rosna tylko przez A7 albo zajecia nie-drzewne); kontrola - ceny "KS: ceny miast dzien" dla oliwek/owocow i licznik 479-b > 0. Kolizje: zmienna groves czytaja tylko F20Block i F20Regale (ten sam krok); klucz KsFoodHandsWithA7 NIE wylacza calosc jak przed 479-a.
+
+**Status:** DO SPRAWDZENIA
+
 ## 479-a (13.11) - KS: rece jedzenia ida za polkami rynku takze przy czynnej regule A7 (f20-d4 razem z A7)
 
 **Problem:** at-220a (220 dob od prologu, KS uzbrojona): kontrola wczesna D+7 - w pasmie 3 z 24 cen (orange x3.7, date x3.8, salt x2.8, olives 1.89 przy starcie 0.70; plik armoury-ks-przerwij.flag). Po 166 dobach (l.174169 "KS: ceny miast dzien 108864") dalej: owoce 2.11, oliwki 1.57, ser 1.71, mieso 2.47, Essos zboze 2.35; polki (l.176855) oliwki q50 0.12 d przy T* 12.7, winogrona 0.26/7.0, mieso 0.17/7.0, ser 0.29/10.4, Essos zboze 0.24/3.6. Rece stoja: "zmiany zajec: zaczete 0 (od D razem 217)", "przegladow ponad progiem 0" (l.176858).

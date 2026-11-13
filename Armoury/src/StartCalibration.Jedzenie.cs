@@ -175,7 +175,11 @@ namespace Armoury
             }
             // recenzja: decyzja z DZISIEJSZEGO zapasu (jak zelazo f5-ruda: "ktorego brakuje na rynku"), bez rzutu naprzod; zima - rece bez zmian (decyzje tylko do wgladu)
             bool winter = false; try { winter = WinterBite.WinterNow(); } catch { winter = false; }
-            bool groves = F20Groves;
+            // 479-b (noc 13.11, decyzja domyslna - recenzja 479-a): przy czynnej A7 nowe gaje (winnica, oliwki, cytrusy, daktyle) sadzi tylko platna A7 (koszt, 364 doby);
+            // f20-d4 przesuwa wtedy rece tylko miedzy zajeciami bez wzrostu drzew (zamknieta ekonomia - bez darmowych drzew). A7 wylaczona - bez zmian (klucz Grow Groves)
+            bool grovesKey = F20Groves;
+            bool grovesA7 = grovesKey && A7RuleOn;
+            bool groves = grovesKey && !A7RuleOn;
             var dec = new int[2 * NG]; var sig = new int[2 * NG];
             for (int m = 0; m < 2; m++)
                 foreach (int g in KsCore.Food)
@@ -260,7 +264,7 @@ namespace Armoury
               .Append(" po D+").Append(CtlEnd).Append(" (rece zajec jedzenia i soli za dzisiejszymi polkami calego rynku: BRAK - polki + w drodze < ")
               .Append(F20Lo.ToString("0.0", inv)).Append(" T*, NADMIAR - polki i polki + w drodze > ").Append(F20Hi.ToString("0.0", inv))
               .Append(" T*; zajecie x(1 + ").Append(F20Rate.ToString("0.00", inv)).Append(" x wynik), najwyzej ").Append((100 * F20MaxRel).ToString("0", inv))
-              .Append("% rak zajecia na krok, tylko miedzy zajeciami ziemi bloku; drzewa biora rece ").Append(groves ? "TAK" : "NIE").Append(" (Ks Food Hands Grow Groves))")
+              .Append("% rak zajecia na krok, tylko miedzy zajeciami ziemi bloku; drzewa biora rece ").Append(groves ? "TAK" : grovesA7 ? "NIE - A7 czynna, nowe gaje tylko platna A7 (479-b)" : "NIE").Append(" (Ks Food Hands Grow Groves))")
               .Append(" | zima: ").Append(winter ? "TAK - rece bez zmian (decyzje tylko do wgladu)" : "nie")
               .Append(" | regula A7 ").Append(A7RuleOn ? "TAK - razem z nia (r4-jedzenie, Ks Food Hands With A7), bloki w przebudowie A7 pominiete" : "NIE");
             for (int m = 0; m < 2; m++)
@@ -286,7 +290,8 @@ namespace Armoury
             sb.Append(" | bloki ").Append(nBlk).Append(": zmienione ").Append(nChg).Append(", rowny wynik ").Append(nFlat).Append(", jedno zajecie albo bez rak do przesuniecia ").Append(nSingle)
               .Append(", ziemia skrocila ").Append(nLandCut).Append(", ziemia zatrzymala ").Append(nLandStop).Append(", przebudowa A7 ").Append(nBusy).Append(", prace okregu ").Append(nLock)
               .Append(", bez rachunku rak ").Append(nNoHands).Append(", zima bez ruchu ").Append(nWinter).Append("; okregi w progu najpierw wyzywic siebie ").Append(nGuard).Append(", krainy wrocone ").Append(nBack)
-              .Append("; drzewa bez wzrostu (Grow Groves NIE) ").Append(nTree);
+              .Append("; drzewa bez wzrostu (Grow Groves NIE albo A7 czynna) ").Append(nTree)
+              .Append("; wzrost gajow pominiety przez A7 (479-b): bloki ").Append(grovesA7 ? nTree : 0).Append(", regale daktyli ").Append(grovesA7 ? nRegTree : 0);
             // grupy zajec: w brak (wynik >= 0.5) i w nadmiarze (<= -0.5) - rece pola przed -> po (bez zmiany regale)
             for (int m = 0; m < 2; m++)
             {
