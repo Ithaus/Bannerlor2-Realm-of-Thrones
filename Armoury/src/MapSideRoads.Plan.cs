@@ -307,6 +307,9 @@ namespace Armoury
             // traktu"; 0 = nieznany (obrys 1 jedn.); nazwa do logu (wioski bez trasy po ladzie wymienione z nazwy)
             public float Hl, Hw, FrontDeg;
             public string Name;
+            // 487: zajazd przy drodze (MapSideRoads.Start, klucz MapSideRoadsToInns) - 0 wioska / wies gry, 1 zajazd przy dukcie (kind track), 2 inny zajazd
+            // dalej niz InnFar od farby; w planie f19 jak wioska ukladu (Game = false), osobne liczniki (Result.Inn*)
+            public byte Inn;
         }
 
         internal struct Obstacle { public float X, Y; }
@@ -349,6 +352,9 @@ namespace Armoury
             public int HubJoined, HubTouch, HubLocal, HubLonely;
             public readonly List<string> NoRouteNames = new List<string>();
             public readonly List<string> LonelyNames = new List<string>();   // wsie gry bez zadnej drogi (faza C) - z nazwy
+            // 487: zajazdy jako wezly planu f19 (wyjete z licznikow wiosek ukladu po planie - SplitInns)
+            public int InnNodes, InnTrack, InnMerged, InnRouted, InnAtNet, InnOnPaint, InnNoRoute, InnCap;
+            public readonly List<string> InnNoRouteNames = new List<string>();
             public byte[] States;                // stan kazdej wioski (SideRoadPlan.St*; podglad poza gra), null przy planie f11
             public int LatNx, LatNy;
             public long Relax;
@@ -400,6 +406,14 @@ namespace Armoury
                   .Append(", ponad limit ").Append(CapStamps).Append(")")
                   .Append(" | krata ").Append(LatNx).Append(" x ").Append(LatNy).Append(", relaksacji ").Append(Relax).Append(", krata ").Append(LatMs.ToString("0", Inv)).Append(" ms, ksztalt ")
                   .Append(ShapeMs.ToString("0", Inv)).Append(" ms, czas ").Append(Ms.ToString("0", Inv)).Append(" ms");
+                if (InnNodes > 0)
+                {
+                    sb.Append(" | zajazdy (487) ").Append(InnNodes).Append(" (przy dukcie ").Append(InnTrack).Append("): drogi do zajazdow ").Append(InnMerged + InnRouted)
+                      .Append(" (laczka ").Append(InnMerged).Append(", trasa ").Append(InnRouted).Append("), styk z siecia ").Append(InnAtNet).Append(", na farbie traktu ").Append(InnOnPaint)
+                      .Append(", bez drogi ").Append(InnNoRoute + InnCap).Append(" (bez trasy ").Append(InnNoRoute).Append(", ponad limit ").Append(InnCap).Append(")");
+                    if (InnNoRouteNames.Count > 0)
+                        sb.Append(" [").Append(string.Join(", ", InnNoRouteNames.GetRange(0, Math.Min(20, InnNoRouteNames.Count)).ToArray())).Append(InnNoRouteNames.Count > 20 ? ", ..." : "").Append("]");
+                }
                 if (EndOdd > 0 || PathBroken > 0) sb.Append(" | potkniecia planu: koniec trasy bez celu ").Append(EndOdd).Append(", zerwana trasa ").Append(PathBroken);
                 return sb.ToString();
             }

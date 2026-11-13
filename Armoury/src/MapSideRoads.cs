@@ -86,6 +86,12 @@ namespace Armoury
         /// <summary>f19-drogi: klucz MapSideRoadsAllVillages (kazda wioska ukladu ma droge; NIE = plan f11). Bez ustawien - TAK (domyslna klucza).</summary>
         internal static bool KeyAll { get { var s = Settings.Current; return s == null || s.MapSideRoadsAllVillages; } }
 
+        /// <summary>487: klucz MapSideRoadsToInns (zajazdy przy duktach i dalekie od farby - wezly planu f19). Bez ustawien - TAK (domyslna klucza).</summary>
+        internal static bool KeyInns { get { var s = Settings.Current; return s == null || s.MapSideRoadsToInns; } }
+
+        /// <summary>487: zajazd (nie przy dukcie) dalej od krawedzi farby traktu niz tyle jedn. - tez wezel planu (blizej - stoi przy trakcie).</summary>
+        internal const float InnFar = 3f;
+
         /// <summary>Drogi boczne czynne: klucz MCM albo plik-przelacznik autotestu (tylko w kampanii).</summary>
         internal static bool On { get { return Key || AutotestFlag; } }
 
@@ -137,7 +143,7 @@ namespace Armoury
             string note = ApplyFlag(p, look);
             p.Clamp();
             Log.Info(P + "wlaczone (" + (key ? "klucz MapSideRoads = TAK" : "klucz NIE") + (flag ? ", plik-przelacznik autotestu " + FlagName + " jest" + (note.Length > 0 ? " (" + note + ")" : " (bez zmian parametrow)") : "")
-                     + ") - plan: " + p.Text() + "; wyglad: " + look.Text() + "; komorki f22 (klucz MapSideRoadsChunks): "
+                     + ") - plan: " + p.Text() + "; drogi do zajazdow (klucz MapSideRoadsToInns, 487): " + (KeyInns ? "TAK" : "NIE") + "; wyglad: " + look.Text() + "; komorki f22 (klucz MapSideRoadsChunks): "
                      + (KeyChunks ? "TAK - w scenie tylko komorki " + ChunkCell.ToString("0", Inv) + " jedn. wokol widoku kamery, najdalej " + ChunkCap.ToString("0", Inv) + " jedn. od kamery (nie blizej niz rog ekranu przy zwyklym pochyleniu)"
                                   : "NIE - wszystkie decale w scenie, chowane z wioskami")
                      + ". Drogi postawi widok mapy (raz) - bez zmian tras i zapisu gry; premia predkosci drog bocznych (klucz MapSideRoadSpeedBonus " + (Settings.Current != null && Settings.Current.MapSideRoadSpeedBonus ? "TAK" : "NIE") + ") po planie (linia Drogi (DR): drogi boczne w premii).");
@@ -203,6 +209,8 @@ namespace Armoury
             public bool HasLayout;
             public uint LayoutCrc;
             public bool KeyAll;                 // f19: klucz MapSideRoadsAllVillages przy starcie planu (zmiana na mapie - plan od nowa)
+            public bool KeyInns;                // 487: klucz MapSideRoadsToInns przy starcie planu (zmiana na mapie - plan od nowa)
+            public string InnNote = "";         // 487: zajazdy w planie (watek z puli - po odsiewie wedlug farby)
             public SideRoadPlan.Params Params;
             public Look Look;
             public ChunkGrid Grid;              // f22: podzial stempli na komorki (watek z puli, po planie); null - plan nieudany albo podzial nieudany
@@ -213,7 +221,7 @@ namespace Armoury
         /// wlaczonych wioskach na mapie (MapVillagesEnabled - bez obrazkow droga prowadzilaby donikad).</summary>
         internal static Job Start()
         {
-            var job = new Job { Params = new SideRoadPlan.Params(), Look = new Look(), KeyAll = KeyAll, ChunkCap = ChunkCap };
+            var job = new Job { Params = new SideRoadPlan.Params(), Look = new Look(), KeyAll = KeyAll, KeyInns = KeyInns, ChunkCap = ChunkCap };
             job.Params.AllVillages = job.KeyAll ? 1 : 0;   // f19: regula z klucza; plik-przelacznik autotestu (ApplyFlag, AllVillages=0/1) moze nadpisac
             var sw = System.Diagnostics.Stopwatch.StartNew();
             string fl = ApplyFlag(job.Params, job.Look);
@@ -265,18 +273,41 @@ namespace Armoury
                 }
                 catch { bad++; }
             }
+            // 487: zajazdy przy drogach (wczytane wczesniej - RoadsideInns.SessionStart; EnsureLoaded nic nie robi drugi raz) - kopia polozen na watek z puli,
+            // odsiew "dalej niz InnFar od farby" w Work (trakty czytane tam); tylko regula f19 (plan f11 bez zmian)
+            var inns = new List<SideRoadPlan.Node>();
+            string innNote;
+            if (!job.KeyInns) innNote = "zajazdy: klucz MapSideRoadsToInns = NIE";
+            else if (job.Params.AllVillages != 1) innNote = "zajazdy: tylko z regula f19 (MapSideRoadsAllVillages) - bez drog";
+            else if (!RoadsideInns.On) innNote = "zajazdy wylaczone (RoadsideInns) - bez drog";
+            else
+            {
+                int innBad = 0;
+                try
+                {
+                    RoadsideInns.EnsureLoaded();
+                    foreach (var inn in RoadsideInns.All)
+                    {
+                        if (inn == null || float.IsNaN(inn.Bx) || float.IsNaN(inn.By)) { innBad++; continue; }
+                        inns.Add(new SideRoadPlan.Node { X = inn.Bx, Y = inn.By, Id = inn.Uid ?? "", Game = false, Inn = (byte)(inn.Kind == "track" ? 1 : 2),
+                                                         Name = SideRoadPlan.InnTag + (inn.Name ?? "") });
+                    }
+                }
+                catch (Exception e) { innBad++; job.Error = (job.Error.Length > 0 ? job.Error + "; " : "") + "zajazdy 487: " + e.GetType().Name; }
+                innNote = "zajazdy wczytane " + inns.Count + (innBad > 0 ? " (zle " + innBad + ")" : "");
+            }
             job.Input = layoutNote + ", wsie gry " + gameN + ", miasta " + townN + " i zamki " + castleN + " (przeszkody)" + (bad > 0 ? ", zle wiersze " + bad : "")
-                        + (fl.Length > 0 ? "; plik-przelacznik: " + fl : "");
+                        + "; " + innNote + (fl.Length > 0 ? "; plik-przelacznik: " + fl : "");
             job.MainMs = sw.Elapsed.TotalMilliseconds;
             string gridPath = MapVillageData.DataPathFor(GridFile), mainPath = MapVillageData.DataPathFor(MainFile), terrain = TerrainPath();
             try
             {
-                ThreadPool.QueueUserWorkItem(_ => Work(job, nodes, obst, gridPath, mainPath, terrain));
+                ThreadPool.QueueUserWorkItem(_ => Work(job, nodes, inns, obst, gridPath, mainPath, terrain));
             }
             catch (Exception e)
             {
                 job.Error = "kolejka watkow: " + e.GetType().Name + " - plan na watku glownym";
-                Work(job, nodes, obst, gridPath, mainPath, terrain);
+                Work(job, nodes, inns, obst, gridPath, mainPath, terrain);
             }
             return job;
         }
@@ -290,7 +321,7 @@ namespace Armoury
             return v;
         }
 
-        private static void Work(Job job, List<SideRoadPlan.Node> nodes, List<SideRoadPlan.Obstacle> obst, string gridPath, string mainPath, string terrain)
+        private static void Work(Job job, List<SideRoadPlan.Node> nodes, List<SideRoadPlan.Node> inns, List<SideRoadPlan.Obstacle> obst, string gridPath, string mainPath, string terrain)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
@@ -314,6 +345,7 @@ namespace Armoury
                 guard = tsize > 0 ? "terrain.bin zgodny (" + tsize + " B)" : "terrain.bin nie znaleziony - bez straznika mapy";
                 job.Note = "siatka v" + g.Version + " " + g.Nx + " x " + g.Ny + " po " + g.Cell.ToString("0.#", Inv) + " jedn. (lad " + g.Land + ", zle wiersze " + g.BadRows + "), trakty: lamanych "
                            + m.Lines + ", odcinkow " + m.Segments + " (zle wiersze " + m.BadRows + "); " + guard;
+                AddInns(job, m, nodes, inns);
                 job.Res = SideRoadPlan.Build(g, m, nodes, obst, job.Params);
                 // f22: podzial na komorki i oczekiwane decale w scenie (czysta geometria, tu - nie na watku glownym); nieudany = komorek nie ma, widok idzie stara droga
                 if (job.Res != null)
@@ -324,6 +356,28 @@ namespace Armoury
             }
             catch (Exception e) { job.Error = (job.Error.Length > 0 ? job.Error + "; " : "") + e.GetType().Name + ": " + e.Message; job.Res = null; }
             finally { job.WorkMs = sw.Elapsed.TotalMilliseconds; job.Done = true; }
+        }
+
+        /// <summary>487: zajazdy do wezlow planu (watek z puli, po wczytaniu traktow): przy dukcie (kind track) zawsze, inny - gdy krawedz farby traktu dalej
+        /// niz InnFar (albo zadnego traktu w 12 jedn.); blizej - stoi przy trakcie, bez drogi. Dopisane NA KONCU listy (indeksy wiosek i wsi gry bez zmian).</summary>
+        private static void AddInns(Job job, SideRoadPlan.MainRoads m, List<SideRoadPlan.Node> nodes, List<SideRoadPlan.Node> inns)
+        {
+            if (inns == null || inns.Count == 0) return;
+            int track = 0, far = 0, near = 0;
+            foreach (var nd in inns)
+            {
+                if (nd.Inn != 1)
+                {
+                    float centr, half, px, py; int seg;
+                    bool any = m.NearestSeg(nd.X, nd.Y, 12f, out centr, out half, out px, out py, out seg);
+                    if (any && centr - half <= InnFar) { near++; continue; }
+                    far++;
+                }
+                else track++;
+                nodes.Add(nd);
+            }
+            job.InnNote = "zajazdy w planie " + (track + far) + " (przy dukcie " + track + ", inne dalej niz " + InnFar.ToString("0.#", Inv) + " od farby " + far
+                          + "), przy trakcie bez drogi " + near;
         }
 
         private static string TerrainPath()
@@ -464,7 +518,7 @@ namespace Armoury
                 if (_wasOff)
                 {
                     _wasOff = false; _next = 0; _built = false; _visKnown = false;
-                    bool sameRule = _job == null || _job.KeyAll == MapSideRoads.KeyAll;   // f19: klucz przelaczony przy wylaczonych drogach - plan od nowa (KeyChanged ponizej)
+                    bool sameRule = _job == null || (_job.KeyAll == MapSideRoads.KeyAll && _job.KeyInns == MapSideRoads.KeyInns);   // 487: takze klucz zajazdow   // f19: klucz przelaczony przy wylaczonych drogach - plan od nowa (KeyChanged ponizej)
                     Log.Info(MapSideRoads.P + "wlaczone w MCM - drogi wracaja (" + (sameRule ? "ten sam plan" : "regula 'kazda wioska' zmieniona - plan od nowa") + ").");
                 }
                 if (_job == null)
@@ -526,7 +580,7 @@ namespace Armoury
                          + " - drog nie bedzie do nastepnego wczytania (gra bez zmian).");
                 return;
             }
-            Log.Info(MapSideRoads.P + "plan - " + j.Res.Text() + " | " + j.Note + " | wejscie: " + j.Input + " | parametry: " + j.Params.Text()
+            Log.Info(MapSideRoads.P + "plan - " + j.Res.Text() + " | " + j.Note + (j.InnNote.Length > 0 ? " | " + j.InnNote : "") + " | wejscie: " + j.Input + " | parametry: " + j.Params.Text()
                      + " | czas: wejscie (watek glowny) " + j.MainMs.ToString("0.0", Inv) + " ms, plan (watek z puli) " + j.WorkMs.ToString("0", Inv) + " ms"
                      + (j.Error.Length > 0 ? " | uwaga: " + j.Error : "") + ".");
             Log.Info(MapSideRoads.P + "miejsca z najgestsza siecia (cele zdjec, kwadrat 24 jedn.): " + SideRoadPlan.DenseSpots(j.Res, 6) + ".");
@@ -684,11 +738,12 @@ namespace Armoury
         {
             var j = _job;
             if (j == null) return false;
-            bool keyAll = MapSideRoads.KeyAll;
-            if (keyAll == j.KeyAll) return false;
+            bool keyAll = MapSideRoads.KeyAll, keyInns = MapSideRoads.KeyInns;
+            if (keyAll == j.KeyAll && keyInns == j.KeyInns) return false;   // 487: klucz MapSideRoadsToInns tak samo - plan od nowa
             int n0 = RemoveAll();
             _replans++;
-            Log.Info(MapSideRoads.P + "regula 'kazda wioska' (klucz MapSideRoadsAllVillages) zmieniona na " + (keyAll ? "TAK" : "NIE") + " - zdjete decale " + n0
+            Log.Info(MapSideRoads.P + (keyAll != j.KeyAll ? "regula 'kazda wioska' (klucz MapSideRoadsAllVillages) zmieniona na " + (keyAll ? "TAK" : "NIE")
+                                                          : "drogi do zajazdow (klucz MapSideRoadsToInns) zmienione na " + (keyInns ? "TAK" : "NIE")) + " - zdjete decale " + n0
                      + (j.Res == null ? " (plan byl NIEUDANY)" : "") + ", plan od nowa.");
             SpeedClear("regula 'kazda wioska' zmieniona - plan od nowa");   // n20-drogi
             _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f; _failedPlan = false;

@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 487 (13.11) - zajazdy przy duktach dostaja drogi boczne
+
+**Problem:** Jeff 13.11: zajazdy "2 dostaja drogi". 57 ze 135 zajazdow (kind "track" w Armoury/ModuleData/arm_roadside_inns.tsv, tools/zajazdy/zajazdy_gen.py) stoi 15-270 jedn. od farby traktu - budynek w polu bez zadnej drogi. Log Armoury-2026-11-13_21-55-34.log: zajazdy wczytane 21:58:11 ("zajazdow 135"), plan drog bocznych 22:12:51 ("-> drog 2446", "stempli 73939", ponad limit 0) - plan nie wiedzial o zajazdach.
+
+**Przyczyna:** MapSideRoads.Start (wejscie planu f19) bral tylko wioski ukladu, wsie gry, miasta i zamki; zajazdy nie byly wezlami planu.
+
+**Zmiana (klucz MapSideRoadsToInns, MCM "Map Side Roads To Inns", domyslnie TAK; NIE = plan co do znaku jak dotad):** MapSideRoads.Start (watek glowny, po RoadsideInns.EnsureLoaded - idempotentne; zajazdy i tak sa wczytane w OnSessionLaunched, plan rusza dopiero z widoku mapy) kopiuje polozenia budynkow zajazdow (bx, by) jako SideRoadPlan.Node z nowym polem Inn (1 = track, 2 = inny); Work (watek z puli, po wczytaniu traktow) dopisuje NA KONIEC listy kazdy zajazd "track" i kazdy inny dalej niz InnFar = 3 jedn. od krawedzi farby (MainRoads.NearestSeg, jak "blisko traktu" planu) - zajazd idzie przez plan f19 jak wioska ukladu (faza 0 laczka / faza B trasa do najblizszej sieci). Zajazd zostaje na miejscu. Po planie SplitInns przenosi stany zajazdow z licznikow wiosek ukladu do nowych (linia planu: "| zajazdy (487) N (przy dukcie N): drogi do zajazdow N (laczka, trasa), styk z siecia, na farbie traktu, bez drogi N (bez trasy, ponad limit) [nazwy]"; obok "zajazdy w planie N (przy dukcie, inne dalej niz 3 od farby), przy trakcie bez drogi N"; wejscie: "zajazdy wczytane N"). Tylko regula f19 (MapSideRoadsAllVillages = TAK) i wlaczone zajazdy (RoadsideInns). Przelaczenie klucza na mapie - plan od nowa (KeyChanged jak MapSideRoadsAllVillages). Linia startu: "drogi do zajazdow (klucz MapSideRoadsToInns, 487): TAK".
+
+**Pomiar poza gra (tools/drogi/boczne-podglad, kopia z zajazdami w scratchpad, te same pliki planu):** bez zajazdow drog 2450, dlugosc 30497, stempli 73956 (odstep x2.72), czas 757 ms; z zajazdami: zajazdow w planie 57 (track 57, innych dalej niz 3 od farby 0, przy trakcie 78) -> drogi do zajazdow 57 (trasa 57), bez drogi 0; drog 2507, dlugosc 31263, stempli 73919 (odstep x2.79, ponad limit 0), czas 600 ms. Drogi zajazdow 12.6-27.3 jedn. (mediana 14.4) - dochodza do najblizszych drog wiosek. Liczniki wiosek ukladu i wsi gry bez zmian.
+
+**Ryzyko / co sprawdzic:** (1) Kolejnosc: plan bierze zajazdy przez RoadsideInns.All na watku glownym (kopia struktur na watek z puli - bez wspoldzielenia). (2) Limity: +57 drog (MaxRoads 4000), stemple w limicie 80000 - siec ciut rzadsza (odstep x2.79 zamiast x2.72, nigdy urwana droga). (3) Wezly zajazdow licza sie w VillageAvoidR (drogi wiosek omijaja srodek zajazdu jak srodek wioski) - inne drogi moga przebiec troche inaczej; premia predkosci drog bocznych (MapSideRoadSpeedBonus) obejmuje tez drogi do zajazdow (ten sam plan). (4) Linia "oczekiwane decale" f22 liczy wezly razem z zajazdami (tylko log). (5) Plan f11 (MapSideRoadsAllVillages = NIE) bez zmian. (6) W grze: linia "Drogi boczne (f11): plan -" z "zajazdy (487) 57 ... bez drogi 0" i zdjecie drogi do zajazdu przy dukcie.
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane - Jeff gra).
+
 ## 485 (13.11) - karczma: jedno krzeslo jedno miejsce (bez siadania na stolach)
 
 **Problem:** Jeff 13.11 (zrzut wnetrza zajazdu): "w karczmie siedza na stolach i w powietrzu". Log Armoury-2026-11-13_21-55-34.log l.2074 (zajazd The Green Stag, scena vlandia_tavern_interior_a): "stoly (474-P9): krzesel 30, miejsc 119, stolow 2, zajete 2, siadanie 6".

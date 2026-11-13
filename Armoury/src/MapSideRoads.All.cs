@@ -440,9 +440,37 @@ namespace Armoury
             }
             for (int r = 0; r < res.Roads.Count; r++) Stamps(res.Roads[r], r, p, res);
             res.States = a.St;
+            SplitInns(res, nodes, a.St);
             res.Ms = sw.Elapsed.TotalMilliseconds;
             return res;
         }
+
+        /// <summary>487: zajazdy szly przez plan jak wioski ukladu - po planie ich stany przeniesione z licznikow wiosek ukladu do licznikow zajazdow
+        /// (linia planu: wioski ukladu bez zmian wzgledem planu bez zajazdow, zajazdy osobno). Nazwy zajazdow bez trasy - z listy wiosek do listy zajazdow.</summary>
+        private static void SplitInns(Result res, List<Node> nodes, byte[] st)
+        {
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                var nd = nodes[i];
+                if (nd.Inn == 0) continue;
+                res.LayoutNodes--; res.InnNodes++;
+                if (nd.Inn == 1) res.InnTrack++;
+                switch (st[i])
+                {
+                    case StMerged: res.Merged--; res.InnMerged++; break;
+                    case StLane: res.Routed--; res.InnRouted++; break;
+                    case StAtNet: res.AtNet--; res.InnAtNet++; break;
+                    case StOnPaint: res.OnPaint--; res.InnOnPaint++; break;
+                    case StNoRoute: res.NoRouteLayout--; res.InnNoRoute++; break;
+                    case StCap: res.CapLayout--; res.InnCap++; break;
+                }
+            }
+            for (int k = res.NoRouteNames.Count - 1; k >= 0; k--)
+                if (res.NoRouteNames[k].StartsWith(InnTag, StringComparison.Ordinal)) { res.InnNoRouteNames.Insert(0, res.NoRouteNames[k].Substring(InnTag.Length)); res.NoRouteNames.RemoveAt(k); }
+        }
+
+        /// <summary>487: przedrostek nazwy wezla-zajazdu (MapSideRoads.Start) - rozpoznanie w liscie wiosek bez trasy.</summary>
+        internal const string InnTag = "zajazd: ";
 
         /// <summary>Faza C. Czesc sieci bez korzenia = wies gry bez wlasnej drogi do traktu / bramy (stan "wezel" albo "bez trasy" po fazie A) razem z drogami
         /// wiosek, ktore do niej dochodza (wprost albo przez inne drogi). Pole odleglosci od nowa - tylko od korzenia (farba, bramy, drogi z korzeniem, wsie gry
