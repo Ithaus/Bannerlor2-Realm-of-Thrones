@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 479-d (13.11) - KS: pomiar - skad zmiana rak pola stad i drzew miedzy krokami f20 (sam pomiar)
+
+**Problem:** at-220b (sesja Armoury-2026-11-13_07-25-29.log): mieso BRAK przez wszystkie 17 krokow f20-d4 (polki 0.21-0.25 T*), ceny miast mieso 2.30, owce 2.78, swinie 2.51. Workflow wkgj7elfi (przeglad + kontra): rece pola sheep_farm Westeros w ostatnim tygodniu -10603, z czego A7 ok. 2.1 tys. ("przejscia sezonu" sheep_farm->wheat_farm 5/2226 -> 8/4337), ubytek ludzi ok. 0.7 tys. - ok. 7.8 tys. bez wyjasnienia (podejrzenie: HomeFrac, praca domowa wsi przy niezaplaconym koszyku miesa). Bez tego nie wiadomo, czy naprawiac A7, f20 czy koszyk wsi.
+
+**Przyczyna:** brak pomiaru - linia f20 pokazuje rece pola przed i po kroku f20, ale nie, co je zmienilo miedzy krokami (A7 Progress, Deliver.cs:104 HomeFrac = wH/W co dobe, RegaleCycle RF, ludzie bloku).
+
+**Zmiana:** decyzja domyslna (noc 13.11): SAM POMIAR, zero zmiany ekonomii. StartCalibration.Jedzenie.cs F20Week: migawka kazdego bloku po kroku f20 (Hands, HomeFrac, suma RF, udzialy sheep_farm/swine_farm/cattle_farm/olive_trees/vineyard, czy w przebudowie A7); w nastepnym kroku zmiana rak pola tych zajec rozbita dokladnie (teleskop) na: A7 (blok w przebudowie teraz albo przy poprzednim kroku), udzial poza A7, ludzie bloku, praca domowa, zloza, bloki nowe/znikniete + kontrola (reszta, ma byc 0) i obok ruch f20 w tym kroku. Linia "Jedzenie KS (f20-d4)": "rece pola miedzy krokami (479-d, sam pomiar; ...)". Pamiec sesji czyszczona w F20Reset (RuleReset - nowa kampania i wczytanie); bez zapisu. Pierwszy krok sesji - tylko migawka.
+
+**Ryzyko / co sprawdzic:** tylko czyta stan blokow (X, Hands, HomeFrac, RF, Target) - nie pisze nic poza wlasna pamiecia; potkniecie pomiaru lapane per blok (licznik "potkniecia pomiaru"), nie rusza reguly. Pamiec: ok. 15 tys. migawek (5 liczb + 5 udzialow) - kilka MB. Kolizje: brak (nowe pola prywatne F20*). Sprawdzic w logu: "kontrola 0" przy kazdym zajeciu; ktora skladowa robi spadek sheep_farm (A7 / dom / ludzie).
+
+**Status:** DO SPRAWDZENIA
+
 ## 479-c (13.11) - KS: nacisk A7 (Held) zeruje sie, gdy f20-d4 zmieni glowne zajecie bloku
 
 **Problem:** recenzja 479-a (potwierdzone, niskie): b.Held to jedna liczba na blok, liczona w petli A7 wobec glownego zajecia (argmax X). Od 479-a f20-d4 przepisuje X blokow bez przebudowy co 7 dob (przed petla A7 tej samej doby) - w bloku prawie remisowym (np. 0.51/0.49) glowne zajecie sie odwraca, a Held przechodzi dalej: A7 moze zaczac zmiane zajecia, ktore bylo pod naciskiem krocej niz 60 dob.

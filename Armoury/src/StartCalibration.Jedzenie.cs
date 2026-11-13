@@ -58,7 +58,30 @@ namespace Armoury
         /// <summary>Recenzja f20-d4: drzewa (Tree() - winnica, gaj oliwny, sad cytrusowy, gaj daktylowy) biora rece od razu (TAK) albo tylko je oddaja (NIE - jak A7: drzewa 364 doby).</summary>
         private static bool F20Groves { get { var s = Settings.Current; return s == null || s.KsFoodHandsGrowGroves; } }
 
-        private static void F20Reset() { _f20Wg = null; _f20Ww = null; _f20Stum = 0; _f20RegSkip = false; }
+        private static void F20Reset() { _f20Wg = null; _f20Ww = null; _f20Stum = 0; _f20RegSkip = false; _f20Snap = null; _f20Gen = 0; _f20MeasC = null; _f20PrevAfter = null; }
+
+        // 479-d (noc 13.11, decyzja domyslna - analiza at-220b, workflow mieso/drzewa): SAM POMIAR, bez zmiany ekonomii. Rece pola zajec stada i drzew miedzy
+        // krokami f20 rozbite na przyczyny: A7 (blok w przebudowie teraz albo przy poprzednim kroku), inna zmiana udzialu X (poza A7), ludzie bloku (Hands),
+        // praca domowa (HomeFrac), rece przy zlozach (RF), bloki nowe/znikniete; obok ruch samego f20 w tym kroku. Rozbicie dokladne (teleskop):
+        // x*Fh(H,hf,rs) - x1*Fh(H1,hf1,rs1) = dX*Fh(H1,hf1,rs1) + x*[Fh(H,hf1,rs1)-Fh(H1,hf1,rs1)] + x*[Fh(H,hf,rs1)-Fh(H,hf1,rs1)] + x*[Fh(H,hf,rs)-Fh(H,hf,rs1)].
+        // Pamiec sesji (migawka bloku po kroku f20), czyszczona w F20Reset (nowa kampania / wczytanie) - bez zapisu.
+        private static readonly string[] F20MeasNames = { "sheep_farm", "swine_farm", "cattle_farm", "olive_trees", "vineyard" };
+        private sealed class F20Snap { public double H, Hf, Rs; public double[] X; public bool Busy; public int Gen, M; }
+        private static Dictionary<LiveBlock, F20Snap> _f20Snap;
+        private static int _f20Gen;
+        private static int[] _f20MeasC;
+        private static double[] _f20PrevAfter;
+
+        private static double F20Fh(double h, double hf, double rs) { return Math.Max(0.0, h) * Math.Max(0.0, 1.0 - hf) * Math.Max(0.0, 1.0 - rs); }
+
+        private static double F20Rs(LiveBlock b) { double r = 0; if (b.RF != null) for (int j = 0; j < b.RF.Length; j++) r += b.RF[j]; return r; }
+
+        private static double[] F20MeasX(LiveBlock b)
+        {
+            int K = _f20MeasC.Length; var x = new double[K];
+            for (int j = 0; j < b.C.Length && j < b.X.Length; j++) { int c = b.C[j]; for (int k = 0; k < K; k++) if (_f20MeasC[k] == c) x[k] += b.X[j]; }
+            return x;
+        }
 
         /// <summary>Recenzja f20-d4: dopisek linii "KS: produkcja" (F4FrozenText) po D+49 z kluczem - zajecia nie sa zamrozone (sprawdz_logi NF4-4 przyjmuje oba napisy).</summary>
         private const string F20FrozenOff = "zajecia: regula A7 wylaczona (Start Calibration Switch Rule), rece jedzenia i soli co 7 dob za polkami rynku (f20-d4, Ks Food Hands Follow Market)";
@@ -210,6 +233,16 @@ namespace Armoury
             int nWinter = 0, nTree = 0, nRegGuard = 0, nRegTree = 0, nHeldReset = 0;               // recenzja: bloki zima bez ruchu, drzewa bez wzrostu (klucz Grow Groves NIE), regale bez wzrostu
             double maxPct = 0; string maxId = "-";
             var cnt = new F20Count();
+            // 479-d: pomiar rak pola (sam pomiar)
+            if (_f20MeasC == null) { _f20MeasC = new int[F20MeasNames.Length]; for (int k = 0; k < _f20MeasC.Length; k++) _f20MeasC[k] = Array.IndexOf(KsTab.Crafts, F20MeasNames[k]); }
+            bool meas = Array.IndexOf(_f20MeasC, -1) < 0;
+            int MK = F20MeasNames.Length;
+            if (_f20Snap == null) _f20Snap = new Dictionary<LiveBlock, F20Snap>();
+            bool measPrev = _f20Gen > 0 && _f20PrevAfter != null;
+            _f20Gen++;
+            var dA7 = new double[2 * MK]; var dXo = new double[2 * MK]; var dH = new double[2 * MK]; var dHome = new double[2 * MK]; var dRf = new double[2 * MK];
+            var dNew = new double[2 * MK]; var dGone = new double[2 * MK]; var dF20 = new double[2 * MK]; var mNow = new double[2 * MK]; var mAfter = new double[2 * MK];
+            int measSt = 0;
             foreach (var ld in _live.Values)
             {
                 if (ld == null || ld.St == null || ld.K == null || ld.B == null) continue;
@@ -230,6 +263,31 @@ namespace Armoury
                         double fh = out0 * Math.Max(0.0, 1.0 - rsum);                               // rece pola (zajecia bloku)
                         distAll += out0;
                         for (int j = 0; j < b.C.Length && j < b.X.Length; j++) hc0[m * NC + b.C[j]] += b.X[j] * fh;
+                        double[] xb = null; F20Snap sp = null;
+                        if (meas)
+                        {
+                            try
+                            {
+                                xb = F20MeasX(b); _f20Snap.TryGetValue(b, out sp);
+                                double fNow = F20Fh(b.Hands, b.HomeFrac, rsum);
+                                for (int k = 0; k < MK; k++) mNow[m * MK + k] += xb[k] * fNow;
+                                if (sp != null && sp.X != null && sp.X.Length == MK)
+                                {
+                                    double f1 = F20Fh(sp.H, sp.Hf, sp.Rs), fa = F20Fh(b.Hands, sp.Hf, sp.Rs), fb = F20Fh(b.Hands, b.HomeFrac, sp.Rs);
+                                    bool a7 = b.Target >= 0 || sp.Busy;
+                                    int mp = sp.M;                                                          // migawka liczona na rynku z poprzedniego kroku (kontrola)
+                                    for (int k = 0; k < MK; k++)
+                                    {
+                                        double dx = (xb[k] - sp.X[k]) * f1;
+                                        if (a7) dA7[m * MK + k] += dx; else dXo[m * MK + k] += dx;
+                                        dH[m * MK + k] += xb[k] * (fa - f1); dHome[m * MK + k] += xb[k] * (fb - fa); dRf[m * MK + k] += xb[k] * (fNow - fb);
+                                        if (mp != m) { dNew[m * MK + k] += sp.X[k] * f1; dGone[mp * MK + k] += sp.X[k] * f1; }   // blok zmienil rynek - przenosiny miedzy rynkami
+                                    }
+                                }
+                                else for (int k = 0; k < MK; k++) dNew[m * MK + k] += xb[k] * fNow;
+                            }
+                            catch { measSt++; xb = null; }
+                        }
                         double moved = 0;
                         if (b.Target >= 0) nBusy++;                                               // przebudowa A7 - RegaleCycle i krok zelaza tez ja pomijaja
                         else if (!(b.Hands > 0) || b.K == null) nNoHands++;
@@ -243,6 +301,17 @@ namespace Armoury
                         }
                         if (cnt.Applied == 0) for (int j = 0; j < b.C.Length && j < b.X.Length; j++) hc1[m * NC + b.C[j]] += b.X[j] * fh;
                         cnt.Applied = 0;
+                        if (meas && xb != null)
+                        {
+                            try
+                            {
+                                var xa = F20MeasX(b); double rsA = F20Rs(b), fA = F20Fh(b.Hands, b.HomeFrac, rsA), fNow = F20Fh(b.Hands, b.HomeFrac, rsum);
+                                for (int k = 0; k < MK; k++) { dF20[m * MK + k] += xa[k] * fA - xb[k] * fNow; mAfter[m * MK + k] += xa[k] * fA; }
+                                if (sp == null) { sp = new F20Snap(); _f20Snap[b] = sp; }
+                                sp.H = b.Hands; sp.Hf = b.HomeFrac; sp.Rs = rsA; sp.X = xa; sp.Busy = b.Target >= 0; sp.Gen = _f20Gen; sp.M = m;
+                            }
+                            catch { measSt++; }
+                        }
                         distMoved += moved;
                     }
                     if (distAll > 0)
@@ -255,6 +324,18 @@ namespace Armoury
                     }
                 }
                 catch (Exception e) { _f20Stum++; Stumble("F20Week(okreg)", e); }
+            }
+            // 479-d: bloki z migawka, ktorych ten krok nie widzial (kraina wrocona, okreg z potknieciem, blok zniknal) - poza rachunkiem od tego kroku
+            if (meas)
+            {
+                List<LiveBlock> gone = null;
+                foreach (var kv in _f20Snap)
+                {
+                    var g0 = kv.Value; if (g0 == null || g0.Gen == _f20Gen) continue;
+                    if (g0.X != null && g0.X.Length == MK) { double f1 = F20Fh(g0.H, g0.Hf, g0.Rs); for (int k = 0; k < MK; k++) dGone[g0.M * MK + k] += g0.X[k] * f1; }
+                    (gone ?? (gone = new List<LiveBlock>())).Add(kv.Key);
+                }
+                if (gone != null) foreach (var gb in gone) _f20Snap.Remove(gb);
             }
             // 4. linia
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
@@ -333,11 +414,35 @@ namespace Armoury
             sb.Append(" | przesunieto rak: Westeros ").Append(mvM[0].ToString("0", inv)).Append(", Essos ").Append(mvM[1].ToString("0", inv)).Append("; najwiecej w okregu ")
               .Append(maxPct.ToString("0.00", inv)).Append("% rak poza domem (").Append(maxId).Append("; limit ").Append((100 * F20MaxRel).ToString("0", inv)).Append("%), okregow ponad limit ").Append(nOver)
               .Append(" z ").Append(nDist);
+            // 479-d: rozbicie zmiany rak pola miedzy krokami
+            if (!meas) sb.Append(" | rece pola miedzy krokami (479-d): brak zajecia w tabeli - bez pomiaru");
+            else if (!measPrev) sb.Append(" | rece pola miedzy krokami (479-d): pierwszy krok sesji - migawka zapisana, rozbicie od nastepnego kroku");
+            else
+            {
+                sb.Append(" | rece pola miedzy krokami (479-d, sam pomiar; po poprzednim kroku f20 -> przed tym krokiem = A7 + udzial poza A7 + ludzie bloku + praca domowa + zloza + nowe - znikniete; obok ruch f20 w tym kroku):");
+                for (int m = 0; m < 2; m++)
+                {
+                    sb.Append(m == 0 ? " Westeros" : "; Essos");
+                    for (int k = 0; k < MK; k++)
+                    {
+                        int i = m * MK + k; double prev = _f20PrevAfter[i];
+                        double ctl = mNow[i] - (prev + dA7[i] + dXo[i] + dH[i] + dHome[i] + dRf[i] + dNew[i] - dGone[i]);
+                        sb.Append(k == 0 ? " " : ", ").Append(F20MeasNames[k]).Append(' ').Append(prev.ToString("0", inv)).Append(" -> ").Append(mNow[i].ToString("0", inv))
+                          .Append(" (A7 ").Append(F20Sg(dA7[i], inv)).Append(", udzial poza A7 ").Append(F20Sg(dXo[i], inv)).Append(", ludzie ").Append(F20Sg(dH[i], inv))
+                          .Append(", dom ").Append(F20Sg(dHome[i], inv)).Append(", zloza ").Append(F20Sg(dRf[i], inv)).Append(", nowe/znikniete ").Append(F20Sg(dNew[i], inv)).Append('/').Append(F20Sg(-dGone[i], inv))
+                          .Append(", kontrola ").Append(ctl.ToString("0", inv)).Append("; f20 ").Append(F20Sg(dF20[i], inv)).Append(')');
+                    }
+                }
+                sb.Append("; potkniecia pomiaru ").Append(measSt);
+            }
+            if (meas) _f20PrevAfter = mAfter;
             sb.Append(" | pieniadze i towar: bez przelewow - zmiana tylko podzialu rak bloku (rece zajec + rece przy zlozach = rece bloku)")
               .Append(" | czas ").Append(ms.ToString("0.0", inv)).Append(" ms | potkniecia ").Append(_f20Stum).Append('.');
             Log.Info(sb.ToString());
             _f20Stum = 0;
         }
+
+        private static string F20Sg(double v, CultureInfo inv) { return (v >= 0 ? "+" : "") + v.ToString("0", inv); }
 
         private sealed class F20Count
         {
