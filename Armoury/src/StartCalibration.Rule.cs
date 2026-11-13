@@ -442,9 +442,9 @@ namespace Armoury
                         // 435-L2: stojace przebudowy tego sezonu oddaja regionowi rece, ktore jeszcze nie przeszly (relRefund null przy kluczu 0 - rachunek jak dotad)
                         double refund = 0; if (relRefund != null && relRefund.TryGetValue(region ?? "-", out refund) && refund > 0 && !CraftUnblock.RefundFree(CraftUnblock.SysKs, region, season)) refund = 0;   // 435-L2-p: zwrot raz na sezon
                         if (Math.Max(0.0, moved - refund) + hands > RegionShare * rh) { _rBudget++; if (!(moved > 0) && hands > RegionShare * rh) CraftUnblock.NoteShareSmall(CraftUnblock.SysKs); continue; }
+                        if (sig && !fachRet && !A7eGate(b, type, cur, best, mt, ld.Market == 0 ? 0 : 1, hands, nfU)) continue;   // 479-e: hamulec przejsc z polek; 479-f: PRZED zwrotem i licznikiem startu po terminie (odrzucony start nie zuzywa zwrotu sezonu)
                         if (refund > 0 && moved + hands > RegionShare * rh) CraftUnblock.NoteStartRefund(CraftUnblock.SysKs, hands, region, season);
                         if (stalled) CraftUnblock.NoteStartPast(CraftUnblock.SysKs);
-                        if (sig && !fachRet && !A7eGate(b, type, cur, best, mt, ld.Market == 0 ? 0 : 1, hands, nfU)) continue;   // 479-e: hamulec wzrostu przejsc z polek
                         int T = Tree(best) ? 364 : 60;
                         b.Cur = (sbyte)cur; b.Target = (sbyte)best; b.TStart = today; b.TEnd = today + T; b.X0 = b.X[ci]; b.H0 = (float)hands;
                         b.Cost = ld.TF ? 0f : (float)(CostDays * KsTab.KCost[best] * hands / sigma); b.Paid = 0f;

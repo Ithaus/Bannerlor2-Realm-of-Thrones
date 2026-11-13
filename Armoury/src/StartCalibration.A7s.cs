@@ -85,6 +85,11 @@ namespace Armoury
         private static int _a7eDev, _a7eSame, _a7eDiff, _a7eNew, _a7eCap, _a7eNoOld, _a7eSea = -1;
         private static double _a7eDiffH, _a7eNewH, _a7eCapH;
         private static double[] _a7eSeaH;
+        // 479-f (recenzja 479-e, noc 13.11): hamulec takze na ODPLYW rak zajecia zrodlowego (10% na sezon - nadmiar jedzenia przy cenie 1/x nie wypycha rak bez hamulca);
+        // liczniki: wstrzymane odplywem, bez zywej tablicy f20 (cap 0), kroki z tablica przeterminowana albo f20 nieczynnym
+        private static double[] _a7eSeaOut;
+        private static int _a7eOutCap, _a7eStale, _a7eNoTab;
+        private static double _a7eOutCapH;
         private static readonly Dictionary<string, int> _a7eTr = new Dictionary<string, int>();
 
         private static bool A7eFood(int g)
@@ -98,19 +103,25 @@ namespace Armoury
         {
             if (!A7eOn) return true;
             double[] o;
-            if (mt == null || !_sigOld.TryGetValue(mt, out o) || o == null) { _a7eNoOld++; return true; }
+            // 479-f: bez wiersza dawnego (po wczytaniu przed pierwsza aktualizacja sygnalu, potkniecie miasta) nie wiadomo, czy przejscie jest dzieki 479-e - bramka ZAMKNIETA
+            // (nacisk Held zostaje, przejscie wraca w nastepnym kroku); dawniej otwarta
+            if (mt == null || !_sigOld.TryGetValue(mt, out o) || o == null || o.Length != KsTab.NG) { _a7eNoOld++; return false; }
             var oV = A7sVRow(o); double rent = A7sRent(b);
             double ic = A7sIncome(b, type, cur, o, oV, rent, nfU != null ? nfU[cur] : 1.0), ib = double.NegativeInfinity; int ob = -1;
             foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, o, oV, rent, nfU != null ? nfU[c] : 1.0); if (v > ib) { ib = v; ob = c; } }
             bool oldPress = ob >= 0 && ib >= SwitchRatio * Math.Max(0.02, ic);
             if (oldPress && ob == best) { _a7eSame++; return true; }
             int NC = KsTab.NC;
-            if (_a7eSea != _regionSeason || _a7eSeaH == null) { _a7eSea = _regionSeason; _a7eSeaH = new double[2 * NC]; }
-            var hc = _f20Hc; double baseH = 0, all = 0;
-            if (hc != null && hc.Length == 2 * NC) { baseH = Math.Max(0.0, hc[m * NC + best]); for (int c = 0; c < NC; c++) all += Math.Max(0.0, hc[m * NC + c]); }
+            if (_a7eSea != _regionSeason || _a7eSeaH == null || _a7eSeaOut == null) { _a7eSea = _regionSeason; _a7eSeaH = new double[2 * NC]; _a7eSeaOut = new double[2 * NC]; }
+            // 479-f: rece zajec tylko z zywej tablicy f20 (f20 czynny, <= 14 dob); bez niej cap 0 - przejscia dzieki 479-e wstrzymane
+            var hc = F20TabLive(Today()) ? _f20Hc : null; double baseH = 0, srcH = 0, all = 0;
+            if (hc != null && hc.Length == 2 * NC) { baseH = Math.Max(0.0, hc[m * NC + best]); srcH = Math.Max(0.0, hc[m * NC + cur]); for (int c = 0; c < NC; c++) all += Math.Max(0.0, hc[m * NC + c]); }
+            else _a7eNoTab++;
             double cap = Math.Max(A7eGrowCap * baseH, A7eGrowFloor * all);
+            double capOut = Math.Max(A7eGrowCap * srcH, A7eGrowFloor * all);
             if (_a7eSeaH[m * NC + best] + hands > cap) { _a7eCap++; _a7eCapH += hands; return false; }
-            _a7eSeaH[m * NC + best] += hands;
+            if (_a7eSeaOut[m * NC + cur] + hands > capOut) { _a7eOutCap++; _a7eOutCapH += hands; return false; }   // 479-f: odplyw zrodla
+            _a7eSeaH[m * NC + best] += hands; _a7eSeaOut[m * NC + cur] += hands;
             if (oldPress) { _a7eDiff++; _a7eDiffH += hands; } else { _a7eNew++; _a7eNewH += hands; }
             string key = KsTab.Crafts[cur] + "->" + KsTab.Crafts[best]; int n; _a7eTr.TryGetValue(key, out n); _a7eTr[key] = n + 1;
             return true;
@@ -122,10 +133,12 @@ namespace Armoury
             var inv = Inv;
             var top = new List<KeyValuePair<string, int>>(_a7eTr); top.Sort((x, y) => y.Value.CompareTo(x.Value));
             var parts = new List<string>(); for (int i = 0; i < top.Count && i < 6; i++) parts.Add(top[i].Key + " " + top[i].Value);
-            return " | jedzenie z polek (479-e, Ks Switch Food Shelves TAK, pasmo x" + A7eBand.ToString("0.0", inv) + ", tablica f20 " + (_f20Cov != null ? "jest" : "BRAK - sygnal jak dotad")
+            return " | jedzenie z polek (479-e, Ks Switch Food Shelves TAK, pasmo x" + A7eBand.ToString("0.0", inv) + ", tablica f20 " + (F20TabLive(Today()) ? "jest (doba " + _f20CovDay + ")" : _f20Cov != null ? "PRZETERMINOWANA albo f20 nieczynny - sygnal jak dotad" : "BRAK - sygnal jak dotad")
                  + "): wpisow towar x miasto z polek od linii " + _a7eDev + "; przejscia zaczete: jak bez 479-e " + _a7eSame + ", inny cel dzieki 479-e " + _a7eDiff + " (rak " + _a7eDiffH.ToString("0", inv)
-                 + "), bez 479-e bez nacisku " + _a7eNew + " (rak " + _a7eNewH.ToString("0", inv) + "), bez wiersza dawnego " + _a7eNoOld
+                 + "), bez 479-e bez nacisku " + _a7eNew + " (rak " + _a7eNewH.ToString("0", inv) + ")"
                  + "; hamulec wzrostu (10% rak zajecia celu na sezon) wstrzymal " + _a7eCap + " (rak " + _a7eCapH.ToString("0", inv) + ")"
+                 + "; 479-f: hamulec odplywu (10% rak zajecia zrodla na sezon) wstrzymal " + _a7eOutCap + " (rak " + _a7eOutCapH.ToString("0", inv) + "), bez wiersza dawnego - bramka zamknieta " + _a7eNoOld
+                 + ", bez zywej tablicy f20 (cap 0) " + _a7eNoTab + ", krokow sygnalu z tablica przeterminowana albo f20 nieczynnym (sygnal jak dotad) " + _a7eStale + ", ZW wsie poboczne na wierszu bez polek"
                  + (parts.Count > 0 ? "; dzieki 479-e (top): " + string.Join(", ", parts.ToArray()) : "");
         }
 
@@ -164,7 +177,7 @@ namespace Armoury
 
         private static void A7sReset()
         {
-            _sigOld.Clear(); _sigOldN.Clear(); _a7eSeaH = null; _a7eSea = -1;   // 479-e
+            _sigOld.Clear(); _sigOldN.Clear(); _a7eSeaH = null; _a7eSeaOut = null; _a7eSea = -1;   // 479-e, 479-f
             _sig.Clear(); _sigN.Clear(); _sigLoad = null; _sigDay = -1; _sigPlanDay = -1; _heldKind = -1; _a7sSea = new A7sSeason();
             _sigMv = null; _sigRent = null; _sigRentFor = null; _sigV.Clear(); _a7sMat = null; _a7sLast.Clear();
             _a7sFlagDay = int.MinValue; _a7sFlagVal = false;
@@ -178,6 +191,7 @@ namespace Armoury
             _a7sVil = _a7sTown = _a7sFolk = _a7sCof = _a7sMatG = _a7sOld = _a7sPcs = _a7sDrop = 0;
             _a7sNotes.Clear();
             _a7eDev = _a7eSame = _a7eDiff = _a7eNew = _a7eCap = _a7eNoOld = 0; _a7eDiffH = _a7eNewH = _a7eCapH = 0; _a7eTr.Clear();   // 479-e
+            _a7eOutCap = _a7eStale = _a7eNoTab = 0; _a7eOutCapH = 0;                                                               // 479-f
         }
 
         // ------------------------------------------------------------ cena sygnalu
@@ -254,18 +268,21 @@ namespace Armoury
             if (P == null) return;
             A7sResolveLoad();
             double band = A7sBand;
-            bool shelf = A7eOn && _f20Cov != null;                                   // 479-e
-            if (!shelf) { _sigOld.Clear(); _sigOldN.Clear(); }
+            // 479-f: tablica polek tylko zywa (f20 czynny, <= 14 dob); wiersz dawny (bez polek) prowadzony przy kluczu 479-e ZAWSZE - takze bez tablicy (wtedy = inst),
+            // zeby hamulec po wczytaniu i po przerwie f20 mial z czym porownac; klucz wylaczony - bez wiersza dawnego (bramka i tak otwarta)
+            bool a7e = A7eOn, shelf = a7e && F20TabLive(today);                       // 479-e
+            if (a7e && !shelf && _f20Cov != null) _a7eStale++;
+            if (!a7e) { _sigOld.Clear(); _sigOldN.Clear(); }
             foreach (var t in Town.AllTowns)
             {
                 if (t == null || t.Settlement == null) continue;
                 try
                 {
                     var inst = A7sInst(t, P, band, shelf);
-                    if (shelf)
+                    if (a7e)
                     {
-                        // 479-e: wiersz dawny (bez polek) ta sama srednia - tylko do licznika i hamulca
-                        var io = A7sInst(t, P, band, false); double[] ao; int no;
+                        // 479-e: wiersz dawny (bez polek) ta sama srednia - licznik, hamulec i ZW (479-f)
+                        var io = shelf ? A7sInst(t, P, band, false) : (double[])inst.Clone(); double[] ao; int no;
                         _sigOldN.TryGetValue(t, out no);
                         if (!_sigOld.TryGetValue(t, out ao) || ao == null || ao.Length != KsTab.NG) { _sigOld[t] = io; no = 0; }
                         else { double wo = 1.0 / Math.Min(A7sAvg, no + 1); for (int g = 0; g < KsTab.NG; g++) ao[g] += (io[g] - ao[g]) * wo; }
@@ -294,6 +311,14 @@ namespace Armoury
                 if (!ld.TryGetValue(t.Settlement.StringId, out kv) || kv.Value == null || kv.Value.Length != KsTab.NG) continue;
                 _sig[t] = (double[])kv.Value.Clone(); _sigN[t] = kv.Key;
             }
+        }
+
+        /// <summary>479-f (recenzja 479-e): ZW wsie poboczne nie maja hamulca 479-e - biora wiersz sygnalu BEZ polek (wiersz dawny), gdy jest; inaczej wiersz A7.</summary>
+        private static double[] A7sRowZW(Town t)
+        {
+            double[] o;
+            if (A7eOn && t != null && _sigOld.TryGetValue(t, out o) && o != null && o.Length == KsTab.NG) return o;
+            return A7sRow(t);
         }
 
         private static double[] A7sRow(Town t)
@@ -602,7 +627,7 @@ namespace Armoury
         {
             try
             {
-                var r = A7sRow(mt);
+                var r = A7sRowZW(mt);
                 if (r == null || row == null || c < 0 || c >= KsTab.NC) return 0.0;
                 A7sEnsureMv();
                 double v = 0; int o = c * KsTab.NG;

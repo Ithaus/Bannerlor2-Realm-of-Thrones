@@ -58,12 +58,17 @@ namespace Armoury
         /// <summary>Recenzja f20-d4: drzewa (Tree() - winnica, gaj oliwny, sad cytrusowy, gaj daktylowy) biora rece od razu (TAK) albo tylko je oddaja (NIE - jak A7: drzewa 364 doby).</summary>
         private static bool F20Groves { get { var s = Settings.Current; return s == null || s.KsFoodHandsGrowGroves; } }
 
-        private static void F20Reset() { _f20Wg = null; _f20Ww = null; _f20Stum = 0; _f20RegSkip = false; _f20Snap = null; _f20Gen = 0; _f20MeasC = null; _f20PrevAfter = null; _f20Cov = null; _f20Hc = null; }
+        private static void F20Reset() { _f20Wg = null; _f20Ww = null; _f20Stum = 0; _f20RegSkip = false; _f20Snap = null; _f20Gen = 0; _f20MeasC = null; _f20PrevAfter = null; _f20Cov = null; _f20Hc = null; _f20CovDay = int.MinValue; }
 
         // 479-e (noc 13.11): pokrycie polek rynku jedzenia z kroku f20 - T* / (polki + w drodze), [m * NG + g]; NaN - bez celu (T* < 1), +inf - pusto.
         // Czyta sygnal A7 (A7sInst) przy kluczu Ks Switch Food Shelves; _f20Hc - rece pola zajec rynku przed krokiem f20 ([m * NC + c], hamulec wzrostu 479-e).
         // Pamiec sesji (bez zapisu): po wczytaniu do pierwszego kroku f20 sygnal A7 jak dotad.
         private static double[] _f20Cov, _f20Hc;
+        // 479-f (recenzja 479-e, noc 13.11): dzien tablicy; tablica zywa tylko przy czynnym f20 (F20Active) i nie starsza niz 14 dob - inaczej sygnal A7 jak przed 479-e,
+        // a hamulec 479-e bez rak zajec (cap 0 - przejscia dzieki 479-e wstrzymane), zeby wylaczenie klucza f20 w MCM w polowie sesji nie zamrazalo sygnalu
+        private static int _f20CovDay = int.MinValue;
+        private const int F20CovMaxAge = 14;
+        private static bool F20TabLive(int today) { return _f20Cov != null && _f20CovDay != int.MinValue && today >= _f20CovDay && today - _f20CovDay <= F20CovMaxAge && F20Active(today, DDay); }
 
         // 479-d (noc 13.11, decyzja domyslna - analiza at-220b, workflow mieso/drzewa): SAM POMIAR, bez zmiany ekonomii. Rece pola zajec stada i drzew miedzy
         // krokami f20 rozbite na przyczyny: A7 (blok w przebudowie teraz albo przy poprzednim kroku), inna zmiana udzialu X (poza A7), ludzie bloku (Hands),
@@ -232,7 +237,7 @@ namespace Armoury
                         double sum = S[i] + R[i];
                         cov[i] = sum > 0 ? t / sum : double.PositiveInfinity;
                     }
-                _f20Cov = cov;
+                _f20Cov = cov; _f20CovDay = today;                                         // 479-f: dzien tablicy
             }
             // 2. wynik zajecia na rynku (-1..1): wartosc towarow jedzenia z celem x sygnal / wartosc towarow jedzenia z celem
             var sc = new double[2 * NC];
