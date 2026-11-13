@@ -76,14 +76,16 @@ namespace Armoury
                         if (mk.Gold < sell * n) n = Math.Min(n, mk.Gold / sell);
                         if (n <= 0) { _noGold++; continue; }
                         var fr = GoodsLedger.Begin(GoodsLedger.FTownCraft, mk.Settlement);
+                        OreLedger.CraftEnter();   // 476-p4 (recenzja B5): wsad zelaza i drewna w pozycji "przetwory miast" ksiegi rudy - ta sama co ujscie ramki FTownCraft (kontrola GoodsLedger:1820)
                         try
                         {
                             shelf.AddToCounts(pr[0], -n);
+                            OreLedger.OnConsumed(pr[0], mk.Settlement, n);
                             t.ChangeGold(-buy * n); mk.ChangeGold(buy * n);       // zamek kupuje surowiec od miasta
                             shelf.AddToCounts(pr[1], n);
                             mk.ChangeGold(-sell * n); t.ChangeGold(sell * n);     // miasto kupuje towar od zamku
                         }
-                        finally { if (fr != null) { try { GoodsLedger.End(fr); } catch { } } }
+                        finally { OreLedger.CraftExit(); if (fr != null) { try { GoodsLedger.End(fr); } catch { } } }
                         int margin = (sell - buy) * n;
                         int wage = (int)(margin * 0.6);
                         int folk = wage > 0 ? Math.Max(0, Math.Min(wage, TownFolk.Earn(t.Settlement, wage, TownFolk.KCraftPaid))) : 0;

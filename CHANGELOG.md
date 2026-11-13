@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-p4 (13.11) - rzemieslnicy zamku w ksiedze rudy: wsad zelaza i drewna w "przetwory miast"
+
+**Problem:** recenzja 476 B5: przerob iron->tools i hardwood->planks (476-b) szedl w ramce FTownCraft (grupa GCraft ksiegi towarow), a kontrola rudy (GoodsLedger.cs:1820-1826) wymaga crafts == o[7] ("przetwory miast" OreLedger), liczone tylko w nawiasie OreLedger.CraftEnter/Exit z OnConsumed. shelf.AddToCounts nie wola OnConsumed - linia zelaza i drewna bylaby "NIEZGODNA" w kazda dobe przerobu.
+
+**Przyczyna:** brak nawiasu ksiegi rudy wokol przerobu zamku.
+
+**Zmiana:** Buildings338Crafts: OreLedger.CraftEnter() przed przerobem, OreLedger.OnConsumed(surowiec, miasto, n) po zdjeciu z polki, CraftExit w finally. Sygnal KS "rzemioslo miasta" (code 5) dla wsadu zostaje - to prawdziwy popyt na tym targu (decyzja domyslna noc 13.11).
+
+**Ryzyko / co sprawdzic:** linie ksiegi rudy i drewna: "przetwory miast X/X" zgodne w dobach przerobu rzemieslnikow zamkow.
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-p3 (13.11) - kopalnia stoi tylko tam, gdzie ma z czego kopac (sklad mineralow BK twierdzy x zloze okolicy); jedna regula dla miasta i zamku
 
 **Problem:** recenzje 476 B3/B4 (srednie), A4 (niska): AiBlocks i wybor AI (476-f, waga x6 "zloze") pozwalaly na kopalnie, gdy wsie okolicy mialy jakikolwiek mineral, a urobek zamku to przeciecie losowego skladu BK MineralData twierdzy (bk_all.cs:75025-75090) ze zlozem wsi - np. wies solna przy zamku ze skladem wapien+zelazo = pusta kopalnia na zawsze. Miasto przepuszczalo cale BK RunMines przy jakimkolwiek zlozu (BK kopie wtedy caly swoj sklad). Gdy BK tyka zamki sam (BkTicksCastles), zamek bez zloza kopal i hodowal bez filtra. Podpowiedz MCM mowila "digs only those minerals" takze dla miast.
