@@ -523,8 +523,9 @@ namespace Armoury
             // 479-k: co zrobila poprawka (klucz Ks Plan Eq Steady Best)
             sb.Append(" | 479-k stabilny najlepszy: ").Append(r.SbOn ? "tak" : "nie");
             if (r.SbOn)
-                sb.Append(", rownowag Planu bez zbieznosci: oddany ostatni mimo lepszego najlepszego (najlepszy lepszy o mniej niz 10%) ").Append(r.SbKeep)
-                  .Append(", powrot do najlepszego ").Append(r.SbRest).Append(" (z ").Append(r.EqN).Append(" rownowag); ostatni punkt kontrolny: towarow przycietych do granicy ceny ")
+                sb.Append(", rownowag Planu bez zbieznosci: oddany ostatni mimo lepszego najlepszego (bliski stan lepszy o mniej niz 10%, zaden towar gorszy o ponad 0.05) ").Append(r.SbKeep)
+                  .Append(", powrot do bliskiego stanu ").Append(r.SbRest).Append(" (w tym przez straz towaru ").Append(r.SbGuard).Append(", do stanu pozniejszego niz minimum mt ").Append(r.SbLate)
+                  .Append(") (z ").Append(r.EqN).Append(" rownowag); ostatni punkt kontrolny: towarow przycietych do granicy ceny ")
                   .Append(r.SbClp).Append(", ocenionych inaczej niz stary test (cena po normalizacji) ").Append(r.SbFlip).Append("; potkniecia ").Append(r.SbSt);
             sb.Append(" | potkniecia Planu ").Append(r.MeatEqSt).Append(", linii ").Append(_meatEqSt).Append(" | pomiar 479-j bez zmian gry.");
             return sb.ToString();

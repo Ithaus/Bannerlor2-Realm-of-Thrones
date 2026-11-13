@@ -168,6 +168,8 @@ namespace Armoury
         // (histereza 10%) / wrocily do najlepszego; SbClp / SbFlip - ostatni punkt kontrolny ostatniej rownowagi: towarow czynnych przycietych do granicy / ocenionych
         // inaczej niz stary test granicy (cena po normalizacji); SbSt - potkniecia
         public bool SbOn; public int SbKeep, SbRest, SbClp, SbFlip, SbSt;
+        // 479-k-p: SbGuard - powroty tylko przez straz towaru (mt ostatniego w 10%); SbLate - powroty do stanu pozniejszego niz globalne minimum mt
+        public int SbGuard, SbLate;
     }
 
     /// <summary>KS-R3 krok 5: przewoz Planu na korytarzu krain (szt. gry na dobe).</summary>
@@ -936,6 +938,9 @@ namespace Armoury
             x.R.MktWorst = wi >= 0 ? x.R.Markets[wi / KsTab.NG] + " " + KsTab.Goods[wi % KsTab.NG] + " " + wq.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : "-";
         }
 
+        // 479-k-p: straz towaru histerezy - najwiekszy dopuszczalny wzrost odchylenia jednego towaru (ostatni wobec stanu bp)
+        private const double SbGuardDev = 0.05;
+
         private static double[] Equilibrium(Ctx x, double[] p0, int rounds, out double[] xs, out double[] S, out int done, Func<bool> cancel)
         {
             int n = NM * KsTab.NG;
@@ -963,6 +968,9 @@ namespace Armoury
             x.R.MeatEqCk = null; x.R.MeatEqEnd = null; x.R.MeatEqN = 0;
             // 479-k (klucz Ks Plan Eq Steady Best): towar przyciety do granicy ceny w tej rundzie (przed normalizacja rynku); null - klucz wylaczony, test jak dotad
             bool[] clp = x.In.SteadyBest ? new bool[n] : null; int sbClp = 0, sbFlip = 0;
+            // 479-k-p (recenzja): przy kluczu bp trzyma NAJPOZNIEJSZY punkt kontrolny z mt <= 1.1 x bestMt (bestMt z tej chwili), nie globalne minimum
+            // (wczesny jednorazowy dolek nie wraca); cdev / bdev - odchylenie towaru w punkcie kontrolnym / w stanie bp (-1: nieczynny albo przyciety)
+            double[] cdev = clp != null ? new double[n] : null, bdev = clp != null ? new double[n] : null; double bpMt = double.MaxValue; int gbIt = -1, bpIt = -1;
             x.R.SbOn = clp != null;
             int it = 0;
             for (it = 0; it < rounds; it++)
@@ -1004,6 +1012,7 @@ namespace Armoury
                     // (klucz Ks Plan Converge Shelf Level) tylko w ocenie stanu oddanego ponizej
                     bool bad = false; double mt = 0;
                     if (clp != null) { sbClp = 0; sbFlip = 0; }
+                    if (cdev != null) for (int i = 0; i < n; i++) cdev[i] = -1.0;
                     for (int i = 0; i < n; i++)
                     {
                         if (!act[i]) continue;
@@ -1012,7 +1021,7 @@ namespace Armoury
                         bool atb = p[i] <= PLo * 1.001 || p[i] >= PHi * 0.999;
                         // 479-k: stary test patrzy na cene po normalizacji - grupa towarow przyklejonych do PLo/PHi wchodzila do mt i wypadala z niego razem ze srednia
                         // cena rynku (+-0.1%), skok mt ok. 5 przyslanial wszystko; przyciecie w tej rundzie jest stabilne
-                        if (clp != null) { if (clp[i]) sbClp++; if (clp[i] != atb) sbFlip++; atb = clp[i]; }
+                        if (clp != null) { if (clp[i]) sbClp++; if (clp[i] != atb) sbFlip++; atb = clp[i]; cdev[i] = atb ? -1.0 : dev; }
                         if (dev > tol && !atb) bad = true;
                         if (!atb) mt += dev;
                     }
@@ -1020,9 +1029,12 @@ namespace Armoury
                     if (!bad) { conv = true; break; }
                     lastMt = mt;
                     if (mt < bestMt * 0.995) bestImp = it;
-                    if (mt < bestMt)
+                    if (mt < bestMt) { bestMt = mt; gbIt = it + 1; }
+                    // klucz NIE: zapis tylko przy nowym minimum (jak dotad, bit w bit); klucz TAK: kazdy punkt kontrolny w 10% od minimum (najpozniejszy bliski stan)
+                    if (clp == null ? gbIt == it + 1 : mt <= bestMt * 1.1)
                     {
-                        bestMt = mt; mqBestIt = it + 1;                // 479-j: runda najlepszego stanu (sam pomiar)
+                        mqBestIt = it + 1;                             // 479-j: runda stanu zapisanego (sam pomiar)
+                        bpMt = mt; bpIt = it + 1; if (bdev != null) Array.Copy(cdev, bdev, n);
                         if (bp == null) { bp = new double[n]; bxs = new double[x.NP]; bS = new double[n]; brr = new double[x.NB]; }
                         Array.Copy(p, bp, n); Array.Copy(xs, bxs, x.NP); Array.Copy(S, bS, n); Array.Copy(rr, brr, x.NB);
                         if (x.FeedOn) FeedSave(x);                     // r4-polnoc (recenzja): liczby progu tego samego stanu co udzialy punktu kontrolnego
@@ -1044,13 +1056,27 @@ namespace Armoury
             EtaStats(x, eta, act);
             // 479-k (klucz Ks Plan Eq Steady Best): histereza powrotu - mt plaskie (szum 1-3%) oddaje stan OSTATNI (ceny wolnych towarow, np. miesa, tam dokad doszly);
             // najlepszy wraca tylko, gdy ostatni jest gorszy o ponad 10%. Klucz wylaczony: lastMt * 1.0 - warunek jak dotad (bit w bit)
-            bool restB = !conv && bp != null && bestMt < lastMt * (clp != null ? 0.9 : 1.0);
+            // 479-k-p (recenzja): porownanie ze stanem bp (najpozniejszy bliski minimum), plus straz towaru - ostatni nie zostaje, gdy jakis towar czynny i nieprzyciety
+            // w obu stanach ma odchylenie wieksze niz w bp o ponad SbGuardDev (jeden towar w fazie skoku przy plaskiej reszcie)
+            bool restB, sbG = false;
+            if (clp == null) restB = !conv && bp != null && bestMt < lastMt;
+            else
+            {
+                bool mtW = bpMt < lastMt * 0.9;
+                if (!conv && bp != null && !mtW)
+                {
+                    try { for (int i = 0; i < n; i++) if (cdev[i] >= 0 && bdev[i] >= 0 && cdev[i] > bdev[i] + SbGuardDev) { sbG = true; break; } }
+                    catch { x.R.SbSt++; }
+                }
+                restB = !conv && bp != null && (mtW || sbG);
+            }
             try
             {
                 if (clp != null)
                 {
                     x.R.SbClp = sbClp; x.R.SbFlip = sbFlip;
-                    if (restB) x.R.SbRest++; else if (!conv && bp != null && bestMt < lastMt) x.R.SbKeep++;
+                    if (restB) { x.R.SbRest++; if (sbG && !(bpMt < lastMt * 0.9)) x.R.SbGuard++; if (bpIt > gbIt) x.R.SbLate++; }
+                    else if (!conv && bp != null && bestMt < lastMt) x.R.SbKeep++;
                 }
             }
             catch { x.R.SbSt++; }
@@ -1063,7 +1089,7 @@ namespace Armoury
             }
             x.Rent = rr;
             if (mkt) MktResult(x, p, S, act, conv, done);              // m107 K4: wynik miary targu (linia Planu)
-            try { MeqEnd(x, p, xs, S, act, mkt, conv, done, rounds, mqRest, mqBestIt, mqTot, bestMt, lastMt, mq, mqLast); } catch { x.R.MeatEqSt++; }   // 479-j: sam pomiar
+            try { MeqEnd(x, p, xs, S, act, mkt, conv, done, rounds, mqRest, mqBestIt, mqTot, bpMt, lastMt, mq, mqLast); } catch { x.R.MeatEqSt++; }   // 479-j: sam pomiar (479-k-p: mt stanu zapisanego; klucz NIE - to samo co bestMt)
             // stan zbieznosci do wyniku
             x.R.Open.Clear(); x.R.Bounds.Clear(); Array.Clear(x.R.OpenAbsM, 0, x.R.OpenAbsM.Length);
             // n22f-plany (klucz Ks Plan Converge Shelf Level, po recenzji): towar niezbiezny wobec pasma [1, wspolny poziom S/D rynku] - poziom zmierzony (towary, ktore
