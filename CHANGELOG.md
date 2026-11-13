@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-p5 (13.11) - urzad podatkowy wsi nie podnosi dziennej raty zaleglosci ponad dawny sufit
+
+**Problem:** recenzja 476 B6 (niska, kalibracja): 476-d wydluzal darowanie (sufit zaleglosci fd x czynsz, przy L3 ok. 910 rat) i skracal splate (pd = 11), wiec maksymalna rata wynosila ok. 83 x czynsz dnia zamiast 13 x (364/28) - sumy ponad koszyk wsi (zbytki P5, roboty gminy, zakupy KS) schodzily do pana ok. 6 razy szybciej, wbrew opisowi "mniej przepada po drodze".
+
+**Przyczyna:** dwa efekty naraz bez sufitu raty.
+
+**Zmiana:** DsVillage: gdy urzad zmienia dni splaty (pd != ArrPayDays), rata zaleglosci najwyzej max(czynsz, ForgiveDays x czynsz / ArrPayDays) - jak bez urzedu. Bez urzedu (pd == ArrPayDays) - co do bitu jak dotad.
+
+**Ryzyko / co sprawdzic:** linia DS "zaleglosci splacone" - wzrost umiarkowany, nie skokowy.
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-p4 (13.11) - rzemieslnicy zamku w ksiedze rudy: wsad zelaza i drewna w "przetwory miast"
 
 **Problem:** recenzja 476 B5: przerob iron->tools i hardwood->planks (476-b) szedl w ramce FTownCraft (grupa GCraft ksiegi towarow), a kontrola rudy (GoodsLedger.cs:1820-1826) wymaga crafts == o[7] ("przetwory miast" OreLedger), liczone tylko w nawiasie OreLedger.CraftEnter/Exit z OnConsumed. shelf.AddToCounts nie wola OnConsumed - linia zelaza i drewna bylaby "NIEZGODNA" w kazda dobe przerobu.

@@ -536,6 +536,10 @@ namespace Armoury
                     if (basket < 0) basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, VillNeeds.ChestBasket(st, nv)) : 0;   // r4-bkwies (M9): przy KS koszyk z Planu
                     int pd = Buildings338VillageTax.PayDays(st, ArrPayDays(s));   // 476-d: urzad podatkowy wsi - szybsza splata zaleglosci (NIE - jak dotad)
                     double inst = pd > 0 ? Math.Max(Math.Max(1.0, d), owed / pd) : owed;
+                    // 476-p5 (recenzja 476 B6): rata zaleglosci najwyzej jak przed urzedem (sufit ForgiveDays x czynsz / ArrPayDays) - urzad wydluza darowanie i
+                    // przyspiesza splate malej zaleglosci, ale nie podnosi dziennego transferu wies -> pan ponad dawny (bez urzedu pd = ArrPayDays, owed <= cap: bez zmian)
+                    int apd = ArrPayDays(s); int ofd = ForgiveDays(s);
+                    if (pd > 0 && apd > 0 && ofd > 0 && pd != apd) inst = Math.Min(inst, Math.Max(Math.Max(1.0, d), ofd * Math.Max(1.0, d) / apd));
                     double keep = s.DsLordReliefBelowChest && chestR > basket ? chestR : basket;   // m105 gosp5: rata zaleglosci z kiesy ponad max(koszyk, skrzynia); klucz NIE - koszyk
                     double room = g - payDay - keep;
                     payArr = (long)Math.Floor(Math.Max(0, Math.Min(Math.Min(owed, inst), room)));
