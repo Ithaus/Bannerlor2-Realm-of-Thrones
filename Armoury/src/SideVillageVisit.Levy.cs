@@ -303,7 +303,7 @@ namespace Armoury
         /// <summary>534: oferta wioski na dobe (tylko pamiec - po wczytaniu losowana od nowa). Own / Key - wlasnosc i klucz przy losowaniu: zmiana = nowe losowanie.</summary>
         private sealed class LvOffer
         {
-            public int Day; public bool Own, Key, BkLow, NoHead; public int Elite;
+            public int Day; public bool Own, Key, BkLow, NoHead, NoBasic; public int Elite;   // NoBasic (recenzja 534): kultura bez BasicTroop - lista krotsza, bez dolosowania przy kazdej wycenie
             public string HouseWhy, HouseName;
             public readonly List<LvSlot> Slots = new List<LvSlot>();
         }
@@ -325,7 +325,7 @@ namespace Armoury
                 _lvOffer[uid] = o;
             }
             need = Math.Max(1, Math.Min(LvSlotMax, need));
-            if (o.Slots.Count >= need) return o;
+            if (o.Slots.Count >= need || o.NoBasic) return o;
             try
             {
                 var cul = st.Culture ?? (st.OwnerClan != null ? st.OwnerClan.Culture : null);
@@ -367,7 +367,7 @@ namespace Armoury
                         if (t == null || t.IsHero || t.Tier > 1 || t.IsMounted) t = basic;
                     }
                     if (t != null && t.IsHero) t = null;
-                    if (t == null) break;   // kultura bez BasicTroop - brak okienek (opcja ukryta jak dotad)
+                    if (t == null) { o.NoBasic = true; break; }   // kultura bez BasicTroop - brak okienek (opcja ukryta jak dotad); recenzja: nie losuje od nowa do konca doby
                     if (why != null && o.HouseWhy == null) o.HouseWhy = why;
                     if (kind == 1 && o.HouseName == null && st.OwnerClan != null) o.HouseName = Txt(st.OwnerClan.Name);
                     o.Slots.Add(new LvSlot { T = t, Kind = kind });

@@ -27,7 +27,8 @@
 - Wczytanie zapisu: okienka losowane od nowa (`Today` z zapisu zostaje, wiec ludzi nie przybywa); oznaczenia `Taken` gina - ale dostepne liczy `Ready`, nie oznaczenia.
 - Czestosc rodu: los modelu ochotnikow (ok. 15% elity) - przy 8 okienkach srednio ok. 1 rekrut rodu, ok. 27% dob bez zadnego (0.85^8); wtedy linia logu mowi "los: elity 0 w 8 losowaniach".
 - Bledy liczone (`LvStumble` "OfferFor", "OfferLog", "GetBasicVolunteer"; `ScrStumble` jak dotad) - nic nie gasnie.
-- CHANGELOG: 49910 -> 49942 linii (wpis dopisany na gorze, reszta bez zmian).
+- Recenzja 534 (noc/534-rec): sprawdzone - kazde okienko osobne GetBasicVolunteer, stabilnosc w dobie (pamiec _lvOffer, czyszczona przy wczytaniu), dostepne = prefiks Ready niewzietych (koszyk z kilku rodzajow: kazdy LevyDo zmniejsza Ready o tyle, ile oznacza Taken, wiec wybrane okienka zostaja w prefiksie), bramka zlota najtanszy rodzaj, sonda ponad dzis po oproznieniu ('koniec dnia' przed 'rodzaj: brak'). Poprawka: kultura bez BasicTroop - `LvOffer.NoBasic`, lista nie jest dolosowywana przy kazdej wycenie (wczesniej kazda wycena wolala model i nabijala liczniki doby). Uwaga: liczniki okienek doby licza tez losowanie od nowa po zmianie wlasnosci / klucza - tylko log.
+- CHANGELOG: 49910 -> 49943 linii (wpis dopisany na gorze, reszta bez zmian).
 - Build Armoury 0 bledow. Gra Jeffa moze byc wlaczona - NIE wgrane, w grze nie sprawdzone.
 
 **Status:** DO SPRAWDZENIA (galaz noc/534-okienka, nie wgrane).
