@@ -1562,6 +1562,8 @@ namespace Armoury
         // --- Iron Bank ---
         public bool HistoricalRecruitCost = true;          // a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level
         public float RecruitCostDays = 10f;                // days of a troop's daily pay paid to take him on (historical prest/advance: a few to a dozen days of wages)
+        // 508 (perki): znizki werbunku z perkow (HeadHunter, ChinkInTheArmor, ShowOfStrength, HardyFrontline, RenownedArcher, Piercer) schodza pod podloge BK (zold x 10). Wylaczone = jak dotad
+        public bool PerkRecruitDiscounts = true;           // the recruitment discounts of perks (Head Hunter, Chink in the Armor, Show of Strength, Hardy Frontline, Renowned Archer, Piercer) lower the prest money as in the base game; Banner Kings' floor of ten days of pay no longer swallows them
         // --- Hiring companions ---
         // TOWARZYSZE (CompanionPay.cs) - DECYZJA CLAUDE (noc 15/16.10), decyzja Jeffa 15.10 TAK: umiejetnosci morskie NavalDLC w regule BK jak sila ciala i role w druzynie
         // (3 / 10 / 10 zamiast 15 - dowodzenie), cena werbunku wedrowca = polowa sprzetu + 20 dni jego zoldu (zaciag najemnika: 10 dni x 2). Wylaczone = BK jak dotad

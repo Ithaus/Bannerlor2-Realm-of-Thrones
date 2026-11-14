@@ -4064,6 +4064,11 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float RecruitCostDays { get; set; } = 10f;
 
+        // 508 (perki)
+        [SettingPropertyBool("Perk Recruit Discounts", HintText = "the recruitment discounts of perks (Head Hunter, Chink in the Armor, Show of Strength, Hardy Frontline, Renowned Archer, Piercer) lower the prest money as in the base game; Banner Kings' floor of ten days of pay no longer swallows them", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool PerkRecruitDiscounts { get; set; } = true;
+
         [SettingPropertyBool("Companion Naval Skills Priced", HintText = "a wanderer's sailing skills count like body skills and party roles in his price and pay (Mariner like Riding, Boatswain and Shipmaster like Scouting or Engineering), not like command as Banner Kings counted them - about two fifths of a Realm of Thrones companion's skill premium came from the sea. The same rule sets the pay of heroes in every party and of your own mercenary contract", RequireRestart = false)]
         [SettingPropertyGroup("Hiring companions")]
         public bool CompanionNavalSkillsPriced { get; set; } = true;
@@ -14271,6 +14276,7 @@ namespace Armoury
             s.AiFoodDearIndex = AiFoodDearIndex;
             s.HistoricalRecruitCost = HistoricalRecruitCost;
             s.RecruitCostDays = RecruitCostDays;
+            s.PerkRecruitDiscounts = PerkRecruitDiscounts;   // 508 (perki)
             s.CompanionNavalSkillsPriced = CompanionNavalSkillsPriced;
             s.CompanionHireByWage = CompanionHireByWage;
             s.CompanionHireDays = CompanionHireDays;
