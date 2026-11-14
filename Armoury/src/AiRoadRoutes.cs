@@ -43,7 +43,7 @@ namespace Armoury
     /// WYBOR: Dijkstra z wielu zrodel po wezlach w promieniu R (1/4 trasy gry, 3..40 jedn.) od startu; koszt = odcinek poza droga x 1 + droga x 1/(1 + premia),
     /// premia = czynna premia traktu (MapRoadSpeedPercent, jak MapRoads.PctOf; recenzja p6-drogi: nie klucz nadkladu); wyjscie w promieniu R od celu.
     /// Najtanszy wariant "start -> wejscie na trakt -> trakt -> zejscie -> cel" przyjety, gdy (po policzeniu trasy przez silnik):
-    ///  - CZAS: koszt przejazdu objazdu <= koszt przejazdu trasy gry (od 520-fix x WorthMargin 0.95 - zapas na blad szacunku), OBA z probek co 1 jedn. ta sama miara co premia (MapRoads.KindAt: trakt 1/(1 + premia),
+    ///  - CZAS: koszt przejazdu objazdu <= koszt przejazdu trasy gry (520-fix: x 0.95; od 527-c: koszt objazdu x F z dojazdow zmierzonych <= koszt trasy gry), OBA z probek co 1 jedn. ta sama miara co premia (MapRoads.KindAt: trakt 1/(1 + premia),
     ///    droga boczna 1/(1 + premia boczna), reszta 1) - trasa gry tez bywa czesciowo na drodze; teren (las, snieg) i bloto poza szacunkiem - czas
     ///    zmierzony osobno (dojazd do celu, nizej);
     ///  - droga (trakt z probek) >= polowa trasy, dlugosc <= trasa gry x (1 + MapRoadAiDetourPercent/100) - nadklad to tylko sufit dlugosci.
@@ -84,6 +84,19 @@ namespace Armoury
     ///    (krotkoterminowe GoToSettlement / GoToPoint, najazd - RaidSettlement) - te same warunki (nie wolniej, droga >= polowa). Oblezenie, szturm, najazd
     ///    w toku (MapEvent / SiegeEvent / BesiegedSettlement), poscig (EngageParty), ucieczka, bitwa - trasa gry. Ostatni odcinek pod mury - trasa gry (zejscie R).
     ///  - Bandy - BEZ ZMIAN (nie sa w Cat; Jeff o nie nie prosil): jezdza trasa gry, premie drogi dostaja tylko, gdy trafia na droge.
+    ///
+    /// 527 (Jeff 14.11 "drogi - tak"; log 237: jazda AI droga 25-28%, objazdy 4.7-9.2% planowanych, "bez drogi w zasiegu" do 956 / dobe, siec 413 skladowych,
+    /// objazd jedzie 121-131% czasu trasy gry przy szacunku ok. 91%):
+    ///  - (a) LACZNIKI (klasa LinkCls, waga 1 - poza droga, nie liczy sie do udzialu drogi): wezel bramy kazdego miasta / zamku polaczony z najblizszym punktem
+    ///    kazdej lamanej do HubR od srodka (plan f19 konczy drogi na pierscieniu twierdzy - drogi jednego miasta byly osobnymi kawalkami); mostki Kruskala
+    ///    z koncow lamanych do innej skladowej do BridgeR (wierzcholek albo rzut na odcinek traktu - nowy wezel na odcinku). Kazdy lacznik sprawdzony siatka
+    ///    gry (prosta albo sciezka silnika do LinkBent x cieciwa + 1). Czesc geometryczna przebudowy na watku z puli (BuildDraft), sciany siatki - watek glowny
+    ///    (Finish) w nastepnym spisie godzinnym. Skladowe przed / po w linii sieci.
+    ///  - (b) Pokrycie osad: wezel ALBO rzut na krawedz (odcinki traktow do 13 jedn.); osobno polaczenia tylko przez lacznik.
+    ///  - (c) Kalibracja: objazd przyjety, gdy koszt objazdu x F <= koszt trasy gry; F z dojazdow zmierzonych (czas / czas szacowany wybranej trasy, objazdy
+    ///    wobec proby), poczatkowo CalPrior 1.10 (log 237) o wadze 30 dojazdow, przyciety 0.95..1.35.
+    ///  - (d) Pomiar odrzucen: "bez drogi w zasiegu" wedlug przyczyny (wyspa, brak wezla przy starcie, siec nie dochodzi pod cel) i krotsze od progu wedlug
+    ///    dlugosci - progi MapRoadAiMinDistance 15 i promien R bez zmian (decyzja po pomiarze).
     /// </summary>
     internal static class AiRoadRoutes
     {
@@ -112,9 +125,19 @@ namespace Armoury
         private const int NCat = 4;               // 520: 0 rody, 1 karawany, 2 wozy wsi, 3 patrole / milicja
         // 520-fix (recenzja): objazd przyjety, gdy szacowany koszt <= 0.95 x koszt trasy gry. Dojazd zmierzony 14.11 (WGRANIE 234, nadklad 15%): objazdy sr. 138.2%,
         // proba (trasa gry) 133.6% - szacunek obiecywal 97.3%, czyli mylil sie o ok. 6 pp na korzysc objazdu. Przy nadkladzie do 30% i progu 15 jedn. bez zapasu
-        // przybyloby objazdow, na ktorych szacunek sie myli (wolniejsze dostawy karawan i wozow wsi).
-        private const float WorthMargin = 0.95f;
+        // przybyloby objazdow, na ktorych szacunek sie myli (wolniejsze dostawy karawan i wozow wsi). 527-c: stala 0.95 zastapiona mnoznikiem kalibracji CalF (nizej).
         private const float CoverTownR = 3.5f;    // 520-fix: pokrycie miast / zamkow od srodka osady (pierscien drog bocznych ObstR 2.2 .. 3.2 + zapas); wsie - 2.5 od bramy
+        // 527 (Jeff 14.11 "drogi - tak": "polaczyc 413 kawalkow drog bocznych w siec i poprawic szacunek objazdu"):
+        private const byte LinkCls = 5;           // klasa krawedzi-lacznika POZA droga (mostek miedzy kawalkami sieci, wezel bramy) - waga 1 jak pole, nie liczy sie do drogi
+        private const float BridgeR = 2.5f;       // mostek: koniec lamanej do najblizszego punktu innej skladowej (wlot laczki pod katem lezy do pol-szer. + 0.75 od osi traktu)
+        private const float HubR = 4f;            // wezel bramy: lamane do 4 jedn. od srodka miasta / zamku (pierscien planu ObstR 2.2 .. 3.2 + wygladzenie)
+        private const float LinkBent = 2f;        // lacznik po siatce gry: sciezka silnika najwyzej 2 x cieciwa + 1 (inaczej wyciety - rzeka, mur, gory)
+        // 527-c: kalibracja szacunku objazdu z dojazdow zmierzonych. Log 237 (Armoury-2026-11-14_19-28-01.log, 16 dob): objazdy sr. 125.5% czasu trasy gry,
+        // proba 121.5%, a szacunek obiecywal objazdom 91.4% kosztu trasy gry -> faktycznie ok. 103% (szacunek za optymistyczny o ok. 10-13%). Mnoznik F
+        // = (czas zmierzony / czas szacowany objazdu) / (czas zmierzony / czas szacowany trasy gry proby), sredni z sesji z wplywem poczatkowym CalPrior
+        // o wadze CalPriorN dojazdow; objazd przyjety, gdy koszt objazdu x F <= koszt trasy gry (zastepuje stale 0.95 z 520-fix).
+        private const float CalPrior = 1.10f, CalMin = 0.95f, CalMax = 1.35f;
+        private const int CalPriorN = 30;
 
         // ------------------------------------------------------------------ graf (niezmienny po budowie)
         private sealed class Graph
@@ -142,6 +165,29 @@ namespace Armoury
             public float GX0, GY0, GInv;
             public int GNx, GNy;
             public int[] GStart, GNode;
+            // 527: laczenie kawalkow sieci (tylko log, NodeRoad - punkty patrolu)
+            public bool[] NodeRoad;    // wezel lezy na drodze (nie wezel bramy) - punkt patrolu tylko na drodze
+            public float MaxEdge;      // najdluzsza krawedz (pokrycie osad rzutem na odcinek)
+            public int CompsOld;       // skladowe bez lacznikow 527 (ta sama miara co przed 527)
+            public int CompsGeo0, CompsGeo1;   // skladowe geometryczne (przed sprawdzeniem siatki gry) przed / po lacznikach
+            public int Hubs, HubLinks, HubLinksCut, Links, LinksTrakt, LinksCut;
+            public double DraftMs;     // czesc geometryczna (watek z puli przy przebudowie)
+        }
+
+        // 527: osada-wezel (miasto / zamek) do lacznikow bramy - zebrane na watku glownym, czytane w budowie geometrycznej
+        private struct Anchor { public float X, Y, Gx, Gy; }
+
+        // 527: wynik czesci geometrycznej budowy (bez silnika gry - moze isc na watku z puli); punkty i krawedzie jak w grafie, sciany siatki liczy Finish
+        private sealed class Draft
+        {
+            public int Nodes, Lines, Points, Joins, SideLines, SideSegJoins, SideLoose, SideJoins, ValBridges;
+            public int Hubs, HubLinks, Links, LinksTrakt, CompsGeo0, CompsGeo1;
+            public float[] X, Y;
+            public bool[] Trakt, Road;
+            public List<int> EA, EB;
+            public List<byte> EC;
+            public double Length, SideLength, Ms;
+            public bool Classes;
         }
 
         private sealed class Scratch
@@ -153,6 +199,7 @@ namespace Armoury
             public float Cr2;
             public float[] HeapK;
             public int Now, HeapCount, Size;
+            public float CostDet, CostGame;   // 527-c: koszt objazdu / trasy gry z ostatniego planu (-1 = nie liczony) - czas szacowany do kalibracji
             public readonly Vec2[] Out = new Vec2[PathCap];
             public readonly NavigationPath Tmp = new NavigationPath();
 
@@ -231,6 +278,11 @@ namespace Armoury
         // pierwsza), godzina planu wzgledem startu sesji, czas szacowany trasy gry (h), cel
         private static readonly byte[] _slotGrp = new byte[1 << SlotBits];
         private static readonly float[] _slotT0 = new float[1 << SlotBits], _slotPred = new float[1 << SlotBits];
+        private static readonly float[] _slotPredC = new float[1 << SlotBits];   // 527-c: czas szacowany wybranej trasy z premia drogi (kalibracja)
+        // 527-c: kalibracja szacunku (sesja, nie doba): dojazdy objazdow / proby - liczba i suma stosunku x 1000
+        private static long _calDetN, _calDetPm, _calCtlN, _calCtlPm;
+        private static long _noRoadIsl, _noRoadStart, _noRoadEnd;   // 527-d: "bez drogi w zasiegu" wedlug przyczyny
+        private static long _shortA, _shortB, _shortC;              // 527-d: krotsze od progu wedlug dlugosci (< 5, 5..10, 10..prog)
         private static readonly float[] _slotTx = new float[1 << SlotBits], _slotTy = new float[1 << SlotBits];
         private static double _hour0;
 
@@ -449,12 +501,12 @@ namespace Armoury
                         for (int k = g.GStart[cc]; k < g.GStart[cc + 1]; k++)
                         {
                             int n = g.GNode[k];
-                            if (!g.Ok[n] || g.Island[n] != island) continue;
+                            if (!g.Ok[n] || g.Island[n] != island || !g.NodeRoad[n]) continue;   // 527: wezel bramy nie jest droga
                             SnapTry(g.X[n], g.Y[n], p, c, me, lim2, ref found, ref bx, ref by, ref bd);
                             for (int a = g.AdjStart[n]; a < g.AdjStart[n + 1]; a++)
                             {
                                 int m = g.Adj[a];
-                                if (g.AdjLen[a] < 0f || !g.AdjDirect[a] || !g.Ok[m] || g.Island[m] != island) continue;   // krawedz bywa liczona dwa razy - bez szkody
+                                if (g.AdjLen[a] < 0f || !g.AdjDirect[a] || !g.Ok[m] || g.Island[m] != island || g.AdjCls[a] == LinkCls) continue;   // krawedz bywa liczona dwa razy - bez szkody; 527: lacznik nie jest droga
                                 float ax = g.X[n], ay = g.Y[n], dx = g.X[m] - ax, dy = g.Y[m] - ay, l2 = dx * dx + dy * dy;
                                 if (l2 < 1e-6f) continue;
                                 float t = ((p.x - ax) * dx + (p.y - ay) * dy) / l2;
@@ -560,7 +612,12 @@ namespace Armoury
             Vec2 pv = S;
             for (int i = 0; i < n0; i++) { L += (pts[i] - pv).Length; pv = pts[i]; }
             Interlocked.Increment(ref _seen);
-            if (!(L >= MinDist(s))) { Interlocked.Increment(ref _short); return false; }
+            if (!(L >= MinDist(s)))
+            {
+                Interlocked.Increment(ref _short);
+                if (L < 5f) Interlocked.Increment(ref _shortA); else if (L < 10f) Interlocked.Increment(ref _shortB); else Interlocked.Increment(ref _shortC);   // 527-d
+                return false;
+            }
 
             // ten sam cel po ODRZUCONYM objezdzie w tej samej godzinie - bez planowania (trasa gry i tak ta sama); po PRZYJETYM - planowanie od nowa: gra
             // nadpisala Path trasa gry, a bez zmiany celu nie przeliczy jej do konca marszu (powrot po ucieczce / przerwie, koniec przejscia). Cel ruchomy (patrol
@@ -586,19 +643,21 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             long st = StRejected;
             int res = RouteOther;
+            float cost = -1f;
             try
             {
                 Interlocked.Increment(ref _planned);
                 if (war) Interlocked.Increment(ref _planWar);
                 res = Route(g, s, mp, target, S, T, L, path, cacheNext, cat);
                 if (res == RouteOk) { st = StAccepted; if (aiOff) Interlocked.Increment(ref _aiOff); if (war) Interlocked.Increment(ref _accWar); }
+                if (!sameKey && (res == RouteOk || res == RouteCtl)) cost = MarchCost(s, S, path, L, res);   // 527-c: koszt wybranej trasy do kalibracji
             }
             finally
             {
                 Volatile.Write(ref _slotCnt[slot], sameHour ? _slotCnt[slot] + 1 : 1);
                 Volatile.Write(ref _slotHour[slot], hour);
                 Volatile.Write(ref _slotKey[slot], key | st);
-                if (!sameKey) OpenMarch(slot, mp, res, L, T);
+                if (!sameKey) OpenMarch(slot, mp, res, L, T, cost);
                 Interlocked.Add(ref _ticks, Stopwatch.GetTimestamp() - t0);
             }
             return true;
@@ -606,7 +665,7 @@ namespace Armoury
 
         // ------------------------------------------------------------------ dojazd zmierzony (tylko log)
         /// <summary>Nowy marsz (nowy cel): grupa pomiaru z wyniku pierwszego planu - objazd albo proba porownawcza (droga w zasiegu, trasa gry).</summary>
-        private static void OpenMarch(int slot, MobileParty mp, int res, float L, Vec2 T)
+        private static void OpenMarch(int slot, MobileParty mp, int res, float L, Vec2 T, float cost)
         {
             byte gp = res == RouteOk ? GrpDet : res == RouteCtl ? GrpCtl : (byte)0;
             if (gp == 0) return;
@@ -614,6 +673,7 @@ namespace Armoury
             if (!(v > 0.1f)) return;
             _slotT0[slot] = NowRel();
             _slotPred[slot] = L / v;
+            _slotPredC[slot] = cost > 0f ? cost / v : 0f;   // 527-c: czas szacowany WYBRANEJ trasy (objazd: koszt objazdu, proba: koszt trasy gry) - premia drogi wliczona
             _slotTx[slot] = T.x; _slotTy[slot] = T.y;
             Volatile.Write(ref _slotGrp[slot], gp);
         }
@@ -625,7 +685,7 @@ namespace Armoury
             if (gp == 0) return;
             Volatile.Write(ref _slotGrp[slot], (byte)0);
             if ((Volatile.Read(ref _slotKey[slot]) >> 32) != idx) return;   // slot innej partii (indeks ponad 1 << 17)
-            if (AtTarget(slot, mp, pos)) Arrive(gp, NowRel() - _slotT0[slot], _slotPred[slot]);
+            if (AtTarget(slot, mp, pos)) Arrive(gp, NowRel() - _slotT0[slot], _slotPred[slot], _slotPredC[slot]);
             else Interlocked.Increment(ref _arrAbort);
         }
 
@@ -639,7 +699,7 @@ namespace Armoury
             return Len(a.x - tx, a.y - ty) <= ArriveR + 1f || Len(b.x - tx, b.y - ty) <= ArriveR + 1f;
         }
 
-        private static void Arrive(byte gp, float hours, float pred)
+        private static void Arrive(byte gp, float hours, float pred, float predC)
         {
             if (!(pred > 0f) || !(hours > 0f) || hours > MaxMarchHours) { Interlocked.Increment(ref _arrOut); return; }
             float r = hours / pred;
@@ -647,6 +707,39 @@ namespace Armoury
             long pm = (long)Math.Round(r * 1000f);
             if (gp == GrpDet) { Interlocked.Increment(ref _arrDetN); Interlocked.Add(ref _arrDetPm, pm); }
             else { Interlocked.Increment(ref _arrCtlN); Interlocked.Add(ref _arrCtlPm, pm); }
+            // 527-c: kalibracja (sesja): czas zmierzony / czas szacowany wybranej trasy z premia drogi - objazdy i proba osobno
+            if (!(predC > 0f)) return;
+            float rc = hours / predC;
+            if (rc > RatioCap * 1.5f) return;
+            long cpm = (long)Math.Round(rc * 1000f);
+            if (gp == GrpDet) { Interlocked.Increment(ref _calDetN); Interlocked.Add(ref _calDetPm, cpm); }
+            else { Interlocked.Increment(ref _calCtlN); Interlocked.Add(ref _calCtlPm, cpm); }
+        }
+
+        /// <summary>527-c: mnoznik kalibracji szacunku objazdu F = (sr. czas zmierzony / szacowany objazdow) / (to samo dla proby), z wplywem poczatkowym
+        /// CalPrior o wadze CalPriorN dojazdow w kazdej grupie (typowy stosunek 1.2 - noce i postoje), przyciety do CalMin..CalMax. Watek roboczy - odczyt liczb.</summary>
+        private static float CalF()
+        {
+            const double Base = 1.2;
+            double dn = Interlocked.Read(ref _calDetN), dp = Interlocked.Read(ref _calDetPm) / 1000.0;
+            double cn = Interlocked.Read(ref _calCtlN), cp = Interlocked.Read(ref _calCtlPm) / 1000.0;
+            double rd = (dp + CalPriorN * Base * CalPrior) / (dn + CalPriorN);
+            double rc = (cp + CalPriorN * Base) / (cn + CalPriorN);
+            double f = rc > 1e-6 ? rd / rc : CalPrior;
+            if (!(f >= CalMin)) f = CalMin; else if (f > CalMax) f = CalMax;
+            return (float)f;
+        }
+
+        /// <summary>527-c: koszt (jednostki "poza droga") trasy wybranej w planie - objazd z planu, proba: trasa gry (z planu albo liczona tu, gdy plan skonczyl
+        /// sie przed probkowaniem: "droga sie nie oplaca" po Dijkstrze, "malo drogi", "za dlugie"). Raz na nowy marsz, tylko objazd / proba.</summary>
+        private static float MarchCost(Settings s, Vec2 S, NavigationPath path, float L, int res)
+        {
+            var scr = _scr;
+            if (scr == null) return -1f;
+            if (res == RouteOk) return scr.CostDet;
+            if (scr.CostGame > 0f) return scr.CostGame;
+            float tr;
+            return RideCost(S, path.PathPoints, path.Size, L, RoadPct(s), SidePct(s), MapRoads.ValPctNow(s), MapRoads.CarPctNow(s), out tr);
         }
 
         /// <summary>Spis godzinny (watek glowny, co godzine): partia przy celu otwartego marszu = dojazd; marsz ponad 10 dob = poza pomiarem.</summary>
@@ -697,12 +790,13 @@ namespace Armoury
         {
             var startFace = mp.CurrentNavigationFace;
             var endFace = target.Face;
-            if (!startFace.IsValid() || !endFace.IsValid() || startFace.FaceIslandIndex != endFace.FaceIslandIndex) { Interlocked.Increment(ref _noRoad); return RouteOther; }
+            if (!startFace.IsValid() || !endFace.IsValid() || startFace.FaceIslandIndex != endFace.FaceIslandIndex) { Interlocked.Increment(ref _noRoad); Interlocked.Increment(ref _noRoadIsl); return RouteOther; }
             int island = startFace.FaceIslandIndex;
             var scr = _scr;
             if (scr == null) { scr = new Scratch(); _scr = scr; }
             scr.Ensure(g);
             scr.Begin();
+            scr.CostDet = -1f; scr.CostGame = -1f;
             float detour = Detour(s);   // sufit dlugosci objazdu
             float pct = RoadPct(s);     // waga drogi w koszcie = czynna premia traktu (recenzja p6-drogi: nie klucz nadkladu)
             float w = 1f / (1f + pct);
@@ -738,7 +832,7 @@ namespace Armoury
                         if (scr.Push(n, cost)) seeds++;
                     }
                 }
-            if (seeds == 0) { Interlocked.Increment(ref _noRoad); return RouteOther; }
+            if (seeds == 0) { Interlocked.Increment(ref _noRoad); Interlocked.Increment(ref _noRoadStart); return RouteOther; }
 
             float best = float.MaxValue;
             int bestN = -1;
@@ -761,6 +855,7 @@ namespace Armoury
                     byte ac = g.AdjCls != null ? g.AdjCls[a] : MapRoadKinds.Trakt;
                     float nk;
                     if (ac == SideCls) nk = pk + el * wsd;   // 520: droga boczna
+                    else if (ac == LinkCls) nk = pk + el;    // 527: lacznik (mostek, wezel bramy) - poza droga
                     else
                     {
                         int ef = MapRoadKinds.Eff(s, ac);
@@ -773,7 +868,7 @@ namespace Armoury
                     scr.Push(m, nk);
                 }
             }
-            if (bestN < 0) { Interlocked.Increment(ref _noRoad); return RouteOther; }
+            if (bestN < 0) { Interlocked.Increment(ref _noRoad); Interlocked.Increment(ref _noRoadEnd); return RouteOther; }
             if (best > L) { Interlocked.Increment(ref _notWorth); return RouteCtl; }
 
             // lancuch wezlow wejscie -> zejscie
@@ -785,10 +880,15 @@ namespace Armoury
             }
             for (int i = 0, j = cn - 1; i < j; i++, j--) { int t = scr.Chain[i]; scr.Chain[i] = scr.Chain[j]; scr.Chain[j] = t; }
             int c0 = scr.Chain[0], cl = scr.Chain[cn - 1];
-            float road = 0f;
-            for (int i = 1; i < cn; i++) road += g.AdjLen[scr.PrevA[scr.Chain[i]]];
+            float road = 0f, chainLen = 0f;
+            for (int i = 1; i < cn; i++)
+            {
+                int ai = scr.PrevA[scr.Chain[i]];
+                chainLen += g.AdjLen[ai];
+                if (g.AdjCls[ai] != LinkCls) road += g.AdjLen[ai];   // 527: lacznik nie jest droga
+            }
             float off1 = Len(g.X[c0] - S.x, g.Y[c0] - S.y), off2 = Len(T.x - g.X[cl], T.y - g.Y[cl]);
-            float est = off1 + road + off2;
+            float est = off1 + chainLen + off2;
             if (road < MinRoadShare * est) { Interlocked.Increment(ref _fewRoad); return RouteCtl; }
             if (est > L * (1f + detour)) { Interlocked.Increment(ref _tooLong); return RouteCtl; }
 
@@ -816,8 +916,11 @@ namespace Armoury
             float spct = SidePct(s), detTrakt, gameTrakt;
             float costDet = RideCost(S, scr.Out, scr.Size, total, pct, spct, vpct, cpct, out detTrakt);
             float costGame = RideCost(S, path.PathPoints, path.Size, L, pct, spct, vpct, cpct, out gameTrakt);
+            scr.CostGame = costGame;
             if (detTrakt < MinRoadShare * total) { Interlocked.Increment(ref _fewRoad); return RouteCtl; }
-            if (!(costDet <= costGame * WorthMargin)) { Interlocked.Increment(ref _notWorth); return RouteCtl; }   // 520-fix: zapas na blad szacunku
+            // 527-c: koszt objazdu x mnoznik kalibracji z dojazdow zmierzonych (zastepuje stale 0.95 z 520-fix)
+            if (!(costDet * CalF() <= costGame)) { Interlocked.Increment(ref _notWorth); return RouteCtl; }
+            scr.CostDet = costDet;
 
             // zapis trasy do NavigationPath partii (PathBegin = 0 ustawil ComputePath)
             var pp = path.PathPoints;
@@ -917,6 +1020,8 @@ namespace Armoury
             _note = "nie zbudowana";
             _tried = false;
             _sideBuilt = null; _sideNote = "same trakty";   // 520
+            _job = null;                                     // 527: przebudowa w toku z poprzedniej kampanii - wynik porzucony
+            _calDetN = _calDetPm = _calCtlN = _calCtlPm = 0; // 527-c: kalibracja szacunku od nowa (wplyw poczatkowy CalPrior)
             _cross = new TaleWorlds.CampaignSystem.Settlements.Settlement[0];
             _crossPos = new Vec2[0];
             Array.Clear(_slotKey, 0, _slotKey.Length);
@@ -931,6 +1036,7 @@ namespace Armoury
         private static void ZeroCounters()
         {
             _seen = _short = _repeat = _planned = _noRoad = _notWorth = _fewRoad = _tooLong = _navFail = _tooMany = _legCalls = _ticks = 0;
+            _noRoadIsl = _noRoadStart = _noRoadEnd = _shortA = _shortB = _shortC = 0;   // 527-d
             for (int i = 0; i < _acc.Length; i++) _acc[i] = 0;
             _overPm = _roadPm = _timePm = 0;
             _crossAvoid = 0;
@@ -977,13 +1083,14 @@ namespace Armoury
             Log.Info(P + "start sesji - klucz MapRoadAiRoutes tak, marsz od " + MinDist(s).ToString("0", Inv) + " jedn., nadklad do " + (Detour(s) * 100f).ToString("0", Inv)
                      + "% (sufit dlugosci), premia traktu w koszcie " + (RoadPct(s) * 100f).ToString("0", Inv) + "% (MapRoadSpeedPercent; droga boczna "
                      + (SidePct(s) * 100f).ToString("0.0", Inv) + "%, Valyria " + (MapRoads.ValPctNow(s) * 100f).ToString("0", Inv) + "%), droga >= " + (MinRoadShare * 100f).ToString("0", Inv)
-                     + "% trasy, objazd szac. <= " + (WorthMargin * 100f).ToString("0", Inv) + "% kosztu trasy gry (zapas 520-fix) | 520: rody, karawany, wozy wsi" + (s.MapRoadAiPatrols ? ", patrole / milicja (MapRoadAiPatrols tak; punkty patrolu na droge - latka " + _patrolNote + ")" : " (MapRoadAiPatrols nie - bez patroli)")
+                     + "% trasy, objazd: koszt szac. x F <= koszt trasy gry (527-c: F z dojazdow zmierzonych w sesji, poczatkowo " + CalPrior.ToString("0.00", Inv) + " o wadze " + CalPriorN + " dojazdow, " + CalMin.ToString("0.00", Inv) + ".." + CalMax.ToString("0.00", Inv) + ") | 520: rody, karawany, wozy wsi" + (s.MapRoadAiPatrols ? ", patrole / milicja (MapRoadAiPatrols tak; punkty patrolu na droge - latka " + _patrolNote + ")" : " (MapRoadAiPatrols nie - bez patroli)")
                      + ", marsz wojenny " + (s.MapRoadAiWarMarch ? "tak" : "nie") + " (MapRoadAiWarMarch), drogi boczne w sieci "
                      + (s.MapRoadAiSideRoads && s.MapSideRoadSpeedBonus ? "tak - dolaczane po planie drog bocznych (osobna linia)" : "NIE (MapRoadAiSideRoads / MapSideRoadSpeedBonus)")
                      + ", bandy bez zmian | " + _note
                      + (g != null ? " | siec: wezlow " + g.Nodes + " (poza siatka gry " + g.BadNodes + "), polaczen " + (g.AdjCount / 2) + ", rozstajow " + g.Joins + ", skladowych " + g.Comps
                                     + ", lamanych " + g.Lines + ", punktow pliku " + g.Points + ", dlugosc " + g.Length.ToString("0.0", Inv) + " jedn.; krawedzie po siatce gry: proste " + g.EdgesDirect
                                     + ", z objazdem " + g.EdgesBent + ", wyciete " + g.EdgesCut : "")
+                     + (g != null ? " | " + LinkNote(g) : "")
                      + (g != null ? " | " + Coverage(g) : "")
                      + " | przeprawy CrossingLaw " + cross + "/" + CrossingIds.Length + " (wrogi lord bez objazdu przez strefe)"
                      + " | latka ComputePath " + _hookNote + " | budowa " + ms.ToString("0.0", Inv) + " ms | " + Status() + ".");
@@ -1017,7 +1124,7 @@ namespace Armoury
                 string path = MapVillageData.DataPathFor(MapRoads.FileName);
                 if (path == null || !File.Exists(path)) { _note = "BRAK pliku ModuleData\\" + MapRoads.FileName; return 0; }
                 string err;
-                var g = Build(path, null, out err);
+                var g = Build(path, null, Forts(), out err);   // 527: wezly bram i mostki takze w sieci samych traktow (watek glowny, ok. 10 ms)
                 if (g == null) { _note = "siec niezbudowana: " + err; if (err != null && err.StartsWith("zaden wezel", StringComparison.Ordinal)) _tried = false; return 0; }
                 _sideBuilt = null; _sideNote = "same trakty";
                 _g = g;
@@ -1029,28 +1136,74 @@ namespace Armoury
             return (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
         }
 
+        // 527: przebudowa z drogami bocznymi - czesc geometryczna na watku z puli (raz na plan), sciany siatki gry w spisie godzinnym (watek glowny)
+        private sealed class Job
+        {
+            public SideRoadPlan.Result Res;
+            public Draft D;
+            public string Err;
+            public volatile bool Done;
+            public long T0;
+        }
+        private static Job _job;
+
         /// <summary>520 (watek glowny, spis godzinny): plan drog bocznych inny niz ten w grafie (nowy plan, zdjety, klucz zmieniony) - graf od nowa (trakty +
-        /// drogi boczne albo same trakty). Nieudana budowa - zostaje graf biezacy (plan zapamietany, bez ponawiania co godzine). Linia logu z pokryciem osad.</summary>
+        /// drogi boczne albo same trakty). Nieudana budowa - zostaje graf biezacy (plan zapamietany, bez ponawiania co godzine). Linia logu z pokryciem osad.
+        /// 527: czesc geometryczna (lamane, rozstaje, wezly bram, mostki, Douglas-Peucker) idzie na watek z puli (ThreadPool, bez obiektow gry - osady zebrane
+        /// tu jako Anchor); gotowa czesc odbiera nastepny spis godzinny i konczy na watku glownym (sciany siatki gry, silnik). Do tego czasu - graf poprzedni.</summary>
         private static void SideCheck(Settings s)
         {
+            var j = _job;
+            if (j != null)
+            {
+                if (!j.Done) return;   // czesc geometryczna w toku - graf poprzedni
+                _job = null;
+                SideFinish(j);
+            }
             object want = s.MapRoadAiSideRoads && s.MapSideRoadSpeedBonus ? MapRoads.SidePlan() : null;
             if (ReferenceEquals(want, _sideBuilt)) return;
             _sideBuilt = want;
             var res = want as SideRoadPlan.Result;
-            long t0 = Stopwatch.GetTimestamp();
-            Graph g = null;
-            string err = null;
+            string path = MapVillageData.DataPathFor(MapRoads.FileName);
+            if (path == null || !File.Exists(path))
+            {
+                _sideNote = "przebudowa nieudana (BRAK pliku ModuleData\\" + MapRoads.FileName + ") - zostaje siec poprzednia";
+                Log.Info(P + "siec tras AI z drogami bocznymi NIE - " + _sideNote + ".");
+                return;
+            }
+            var forts = Forts();
+            bool valOn = MapRoadKinds.ValOn(s);
+            var job = new Job { Res = res, T0 = Stopwatch.GetTimestamp() };
+            _job = job;
             try
             {
-                string path = MapVillageData.DataPathFor(MapRoads.FileName);
-                if (path == null || !File.Exists(path)) err = "BRAK pliku ModuleData\\" + MapRoads.FileName;
-                else g = Build(path, res, out err);
+                ThreadPool.QueueUserWorkItem(_ =>
+                {
+                    try { string e; job.D = BuildDraft(path, res, forts, valOn, out e); job.Err = e; }
+                    catch (Exception e) { job.D = null; job.Err = e.GetType().Name + ": " + (e.Message ?? ""); }
+                    finally { job.Done = true; }
+                });
             }
-            catch (Exception e) { g = null; err = e.GetType().Name + ": " + (e.Message ?? ""); _stumblesAll++; }
-            double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+            catch (Exception e) { job.Err = e.GetType().Name + ": " + (e.Message ?? ""); job.Done = true; }
+        }
+
+        /// <summary>527 (watek glowny): koniec przebudowy - sciany siatki gry dla gotowej czesci geometrycznej, wymiana grafu, linia logu.</summary>
+        private static void SideFinish(Job j)
+        {
+            var res = j.Res;
+            long t1 = Stopwatch.GetTimestamp();
+            Graph g = null;
+            string err = j.Err;
+            if (j.D != null)
+            {
+                try { g = Finish(j.D, out err); }
+                catch (Exception e) { g = null; err = e.GetType().Name + ": " + (e.Message ?? ""); _stumblesAll++; }
+            }
+            double ms = (Stopwatch.GetTimestamp() - t1) * 1000.0 / Stopwatch.Frequency;
+            double wait = (t1 - j.T0) * 1000.0 / Stopwatch.Frequency;
             if (g == null)
             {
-                _sideNote = "przebudowa nieudana (" + err + ") - zostaje siec poprzednia";
+                _sideNote = "przebudowa nieudana (" + (err ?? "?") + ") - zostaje siec poprzednia";
                 Log.Info(P + "siec tras AI z drogami bocznymi NIE - " + _sideNote + " | " + ms.ToString("0.0", Inv) + " ms.");
                 return;
             }
@@ -1063,7 +1216,17 @@ namespace Armoury
                      + g.SideEdges + " (wyciete - bez sciezki po siatce gry " + g.SideEdgesCut + "), rozstajow z droga boczna " + g.SideJoins
                      + " (konce dolaczone rzutem na odcinek traktu " + g.SideSegJoins + ", konce bez rozstaju " + g.SideLoose + ")"
                      + "; krawedzie po siatce gry: proste " + g.EdgesDirect + ", z objazdem " + g.EdgesBent + ", wyciete " + g.EdgesCut
-                     + " | " + cov + " | budowa " + ms.ToString("0.0", Inv) + " ms (watek glowny, raz na plan drog bocznych).");
+                     + " | " + LinkNote(g) + " | " + cov + " | budowa " + ms.ToString("0.0", Inv) + " ms (watek glowny: sciany siatki gry; czesc geometryczna "
+                     + g.DraftMs.ToString("0", Inv) + " ms na watku z puli, gotowa po " + wait.ToString("0", Inv) + " ms; raz na plan drog bocznych).");
+        }
+
+        /// <summary>527 (tylko log): laczniki kawalkow sieci - skladowe przed / po, wezly bram, mostki.</summary>
+        private static string LinkNote(Graph g)
+        {
+            return "527 laczenie kawalkow: skladowe (wezly na drodze, krawedzie ze sciezka) " + g.CompsOld + " -> " + g.Comps + " (geometrycznie, przed siatka gry "
+                   + g.CompsGeo0 + " -> " + g.CompsGeo1 + "); wezly bram miast / zamkow " + g.Hubs + " (lacznikow " + g.HubLinks + ", wyciete przez siatke gry " + g.HubLinksCut
+                   + "), mostki do " + BridgeR.ToString("0.0", Inv) + " jedn. miedzy skladowymi " + g.Links + " (do traktu " + g.LinksTrakt + ", wyciete przez siatke gry " + g.LinksCut
+                   + "); lacznik = poza droga (waga 1), po siatce gry prosto albo do " + LinkBent.ToString("0", Inv) + " x cieciwa + 1";
         }
 
         /// <summary>520 (tylko log): osady z wezlem sieci (miasta, zamki - do CoverTownR 3.5 jedn. od srodka osady, bo drogi do bramy koncza sie na pierscieniu
@@ -1072,7 +1235,7 @@ namespace Armoury
         private static string Coverage(Graph g)
         {
             const float CoverVillR = 2.5f;
-            int[] n = new int[3], inNet = new int[3], linked = new int[3];
+            int[] n = new int[3], inNet = new int[3], linked = new int[3], viaLink = new int[3];
             var lonely = new List<string>();
             int lonelyAll = 0;
             try
@@ -1085,12 +1248,15 @@ namespace Armoury
                     n[t]++;
                     float R = t < 2 ? CoverTownR : CoverVillR;   // 520-fix (recenzja): miasto / zamek od srodka (pierscien drog ObstR), wies od bramy
                     Vec2 p = t < 2 ? st.GetPosition2D : st.GatePosition.ToVec2();   // srodek jak przeszkoda w MapSideRoads.cs
-                    int best = -1; float bd = R * R;
-                    int gx0 = (int)((p.x - R - g.GX0) * g.GInv), gx1 = (int)((p.x + R - g.GX0) * g.GInv);
-                    int gy0 = (int)((p.y - R - g.GY0) * g.GInv), gy1 = (int)((p.y + R - g.GY0) * g.GInv);
+                    // 527-b: wezel ALBO rzut na krawedz ze sciezka (odcinki traktow maja do ok. 13 jedn. - trakt przechodzacy przez miasto miedzy wezlami nie byl
+                    // liczony: log 237 "155 twierdz bez traktu", m.in. King's Landing, Winterfell); okno siatki wezlow powiekszone o pol najdluzszej cieciwy.
+                    // Osobno: przez droge (wezly na drodze, krawedzie drog) i przez lacznik 527 (wezel bramy, mostek)
+                    float W = R + Math.Min(g.MaxEdge * 0.5f, 40f), R2 = R * R;
+                    int gx0 = (int)((p.x - W - g.GX0) * g.GInv), gx1 = (int)((p.x + W - g.GX0) * g.GInv);
+                    int gy0 = (int)((p.y - W - g.GY0) * g.GInv), gy1 = (int)((p.y + W - g.GY0) * g.GInv);
                     if (gx0 < 0) gx0 = 0; if (gy0 < 0) gy0 = 0;
                     if (gx1 >= g.GNx) gx1 = g.GNx - 1; if (gy1 >= g.GNy) gy1 = g.GNy - 1;
-                    bool link = false;
+                    bool near = false, link = false, linkRoad = false;
                     for (int cy = gy0; cy <= gy1; cy++)
                         for (int cx = gx0; cx <= gx1; cx++)
                         {
@@ -1099,27 +1265,147 @@ namespace Armoury
                             {
                                 int q = g.GNode[k];
                                 if (!g.Ok[q]) continue;
+                                bool tr = g.CompTrakt[g.Comp[q]];
                                 float dx = g.X[q] - p.x, dy = g.Y[q] - p.y, d2 = dx * dx + dy * dy;
-                                if (d2 > R * R) continue;
-                                if (g.CompTrakt[g.Comp[q]]) link = true;
-                                if (d2 < bd) { bd = d2; best = q; }
+                                if (d2 <= R2) { near = true; if (tr) { link = true; if (g.NodeRoad[q]) linkRoad = true; } }
+                                for (int a = g.AdjStart[q]; a < g.AdjStart[q + 1]; a++)
+                                {
+                                    int m = g.Adj[a];
+                                    if (g.AdjLen[a] < 0f || !g.Ok[m]) continue;
+                                    float ex = g.X[m] - g.X[q], ey = g.Y[m] - g.Y[q], l2 = ex * ex + ey * ey;
+                                    if (l2 < 1e-9f) continue;
+                                    float u = -(dx * ex + dy * ey) / l2;
+                                    if (u <= 0f || u >= 1f) continue;
+                                    float fx = dx + u * ex, fy = dy + u * ey;
+                                    if (fx * fx + fy * fy > R2) continue;
+                                    near = true;
+                                    if (tr) { link = true; if (g.AdjCls[a] != LinkCls) linkRoad = true; }
+                                }
                             }
                         }
-                    if (best >= 0) inNet[t]++;
-                    if (link) linked[t]++;
+                    if (near) inNet[t]++;
+                    if (link) { linked[t]++; if (!linkRoad) viaLink[t]++; }
                     else if (t < 2) { lonelyAll++; if (lonely.Count < 12) lonely.Add(st.Name != null ? st.Name.ToString() : st.StringId); }
                 }
             }
             catch (Exception e) { _stumblesAll++; return "pokrycie osad: blad (" + e.GetType().Name + ")"; }
-            return "osady w sieci (wezel do " + CoverTownR.ToString("0.0", Inv) + " jedn. od srodka miasta / zamku, " + CoverVillR.ToString("0.0", Inv) + " od bramy wsi) / polaczone z traktem: miasta " + inNet[0] + "/" + linked[0] + " z " + n[0]
+            return "osady w sieci (wezel albo odcinek do " + CoverTownR.ToString("0.0", Inv) + " jedn. od srodka miasta / zamku, " + CoverVillR.ToString("0.0", Inv) + " od bramy wsi; 527-b rzut na odcinek) / polaczone z traktem: miasta " + inNet[0] + "/" + linked[0] + " z " + n[0]
                    + ", zamki " + inNet[1] + "/" + linked[1] + " z " + n[1] + ", wsie " + inNet[2] + "/" + linked[2] + " z " + n[2]
+                   + " (z tego tylko przez lacznik 527 - wezel bramy / mostek: miasta " + viaLink[0] + ", zamki " + viaLink[1] + ", wsie " + viaLink[2] + ")"
                    + "; miasta i zamki bez polaczenia z traktem " + lonelyAll + (lonely.Count > 0 ? " (" + string.Join(", ", lonely.ToArray()) + (lonelyAll > lonely.Count ? ", ..." : "") + ")" : "")
                    + " - sciezki dla nich: osobny krok (plan C2 wpisu 520)";
         }
 
-        private static Graph Build(string file, SideRoadPlan.Result side, out string err)
+        /// <summary>Budowa grafu na watku glownym (start sesji - same trakty): czesc geometryczna + sciany siatki gry.</summary>
+        private static Graph Build(string file, SideRoadPlan.Result side, Anchor[] forts, out string err)
+        {
+            var d = BuildDraft(file, side, forts, MapRoadKinds.ValOn(Settings.Current), out err);
+            if (d == null) return null;
+            return Finish(d, out err);
+        }
+
+        /// <summary>527: miasta i zamki (srodek, brama) do wezlow bramy - watek glowny (obiekty osad gry).</summary>
+        private static Anchor[] Forts()
+        {
+            var l = new List<Anchor>(256);
+            try
+            {
+                foreach (var st in TaleWorlds.CampaignSystem.Settlements.Settlement.All)
+                {
+                    if (st == null || !(st.IsTown || st.IsCastle)) continue;
+                    Vec2 c = st.GetPosition2D, gt = st.GatePosition.ToVec2();
+                    if (!c.IsNonZero() || !gt.IsNonZero()) continue;
+                    l.Add(new Anchor { X = c.x, Y = c.y, Gx = gt.x, Gy = gt.y });
+                }
+            }
+            catch (Exception e) { _stumblesAll++; if (_first == null) _first = e; }
+            return l.ToArray();
+        }
+
+        // 527: punkty pliku / planu do szukania najblizszej lamanej (czesc geometryczna budowy)
+        private sealed class Pts
+        {
+            public List<float> X, Y;
+            public int[] LineOf, LS, PStart, PList;
+            public int MainPts, Pnx, Pny, SegCells;
+            public float MinX, MinY, Pc;
+        }
+
+        // 527: najblizszy punkt lamanej (wierzcholek J albo rzut na odcinek traktu U-W w T) - jeden na lamana
+        private struct Cand { public int Line; public float D2, T; public int J, U, W; }
+
+        private static int FindL(List<int> par, int a)
+        {
+            while (par[a] != a) { par[a] = par[par[a]]; a = par[a]; }
+            return a;
+        }
+
+        private static void UnionL(List<int> par, int a, int b)
+        {
+            int ra = FindL(par, a), rb = FindL(par, b);
+            if (ra != rb) par[ra] = rb;
+        }
+
+        /// <summary>527: najblizszy punkt kazdej lamanej (z co najmniej 2 punktami) do r od (x, y): wierzcholek albo rzut na odcinek TRAKTU (wierzcholki traktow
+        /// bywaja co 13 jedn.; drogi boczne maja os co 0.25). Wynik w o (najblizszy na lamana).</summary>
+        private static void NearLines(Pts P, float x, float y, float r, List<Cand> o)
+        {
+            o.Clear();
+            float r2 = r * r;
+            int cx = (int)((x - P.MinX) / P.Pc), cy = (int)((y - P.MinY) / P.Pc);
+            int rc = (int)Math.Ceiling(r / P.Pc) + 1, sc = rc + P.SegCells;
+            for (int yy = cy - sc; yy <= cy + sc; yy++)
+                for (int xx = cx - sc; xx <= cx + sc; xx++)
+                {
+                    if (xx < 0 || yy < 0 || xx >= P.Pnx || yy >= P.Pny) continue;
+                    bool near = Math.Abs(xx - cx) <= rc && Math.Abs(yy - cy) <= rc;
+                    int c = yy * P.Pnx + xx;
+                    for (int k = P.PStart[c]; k < P.PStart[c + 1]; k++)
+                    {
+                        int j = P.PList[k];
+                        if (!near && j >= P.MainPts) continue;   // daleko - tylko odcinki traktow
+                        int lj = P.LineOf[j];
+                        if (P.LS[lj + 1] - 1 <= P.LS[lj]) continue;   // lamana z jednego punktu
+                        if (near)
+                        {
+                            float dx = P.X[j] - x, dy = P.Y[j] - y, d2 = dx * dx + dy * dy;
+                            if (d2 <= r2) Offer(o, new Cand { Line = lj, D2 = d2, J = j, U = -1, W = -1 });
+                        }
+                        if (j >= P.MainPts) continue;   // rzut na odcinek - tylko trakty
+                        for (int e2 = 0; e2 < 2; e2++)
+                        {
+                            int u = e2 == 0 ? j - 1 : j, w = u + 1;
+                            if (u < P.LS[lj] || w >= P.LS[lj + 1]) continue;
+                            float ax = P.X[u], ay = P.Y[u], dx = P.X[w] - ax, dy = P.Y[w] - ay, l2 = dx * dx + dy * dy;
+                            if (l2 < 1e-9f) continue;
+                            float t = ((x - ax) * dx + (y - ay) * dy) / l2;
+                            if (t <= 0.02f || t >= 0.98f) continue;   // przy koncu odcinka - wierzcholek wystarczy
+                            float ex = x - ax - t * dx, ey = y - ay - t * dy, d2 = ex * ex + ey * ey;
+                            if (d2 <= r2) Offer(o, new Cand { Line = lj, D2 = d2, J = -1, U = u, W = w, T = t });
+                        }
+                    }
+                }
+        }
+
+        private static void Offer(List<Cand> o, Cand c)
+        {
+            for (int i = 0; i < o.Count; i++)
+                if (o[i].Line == c.Line) { if (c.D2 < o[i].D2) o[i] = c; return; }
+            o.Add(c);
+        }
+
+        /// <summary>527: CZESC GEOMETRYCZNA budowy (bez silnika gry i obiektow kampanii - watek z puli przy przebudowie z drogami bocznymi): lamane traktow
+        /// (plik) i drog bocznych (plan), rozstaje 520 bez zmian, potem LACZNIKI 527 (klasa LinkCls, waga 1 - poza droga):
+        ///  - WEZEL BRAMY miasta / zamku (Anchor): punkt pod brama polaczony z najblizszym punktem kazdej lamanej do HubR od srodka osady (konce drog planu na
+        ///    pierscieniu ObstR, trakt przechodzacy przez miasto - rzutem na odcinek); plan f19 konczy droge na pierscieniu twierdzy, wiec drogi tego samego
+        ///    miasta byly osobnymi kawalkami (log 237: 288 drog "do bramy miasta / zamku", 413 skladowych);
+        ///  - MOSTKI (Kruskal): koniec kazdej lamanej do najblizszego punktu lamanej INNEJ skladowej do BridgeR (wierzcholek albo rzut na odcinek traktu),
+        ///    od najkrotszych, tylko gdy laczy rozne skladowe (bez petli i zbednych krawedzi).
+        /// Krawedzie lacznikow sprawdza siatka gry w Finish (prosta albo sciezka do LinkBent x cieciwa + 1; inaczej wycieta - mostek tylko po ladzie).</summary>
+        private static Draft BuildDraft(string file, SideRoadPlan.Result side, Anchor[] forts, bool valOn, out string err)
         {
             err = null;
+            long tStart = Stopwatch.GetTimestamp();
             var ids = new List<int>(11000);
             var xs = new List<float>(11000);
             var ys = new List<float>(11000);
@@ -1202,12 +1488,13 @@ namespace Armoury
             var plist = new int[np];
             for (int i = 0; i < np; i++) { int c = (int)((ys[i] - minY) / pc) * pnx + (int)((xs[i] - minX) / pc); plist[pstart[c] + pfill[c]++] = i; }
             var joinA = new List<int>(); var joinB = new List<int>();
-            int joins0;
+            var joinC = new List<byte>();   // 527: klasa krawedzi rozstaju jawnie (520: trakt / droga boczna, m96: most Valyrii, 527: lacznik)
+            int sideJoins = 0;
             // 520-fix (recenzja): najdluzszy odcinek traktu - promien szukania odcinka dla konca drogi bocznej bez wierzcholka w JoinSideR (wlot planu lezy
             // na osi traktu, czesto w srodku dlugiego odcinka - do ok. 13 jedn. w pliku; 9.4% dlugosci traktow dalej niz 1.2 od wierzcholka)
             float maxSeg = 0f;
             for (int i = 1; i < mainPts; i++)
-                if (ids[i] == ids[i - 1]) { float d = Len(xs[i] - xs[i - 1], ys[i] - ys[i - 1]); if (d > maxSeg) maxSeg = d; }
+                if (ids[i] == ids[i - 1]) { float sg = Len(xs[i] - xs[i - 1], ys[i] - ys[i - 1]); if (sg > maxSeg) maxSeg = sg; }
             int segCells = (int)Math.Ceiling((maxSeg * 0.5f + JoinSideR) / pc);
             int segJoins = 0, loose = 0;
             int lines = 0;
@@ -1240,7 +1527,13 @@ namespace Armoury
                                 if (d2 <= bd) { bd = d2; bestJ = j; }
                             }
                         }
-                    if (bestJ >= 0) { keep[bestJ] = true; joinA.Add(p); joinB.Add(bestJ); }
+                    if (bestJ >= 0)
+                    {
+                        keep[bestJ] = true; joinA.Add(p); joinB.Add(bestJ);
+                        bool sj = p >= mainPts || bestJ >= mainPts;   // 520: rozstaj z droga boczna - klasa drogi bocznej
+                        joinC.Add(sj ? SideCls : MapRoadKinds.Trakt);
+                        if (sj) sideJoins++;
+                    }
                     else if (sideLine)
                     {
                         // 520-fix: rzut konca drogi bocznej na najblizszy ODCINEK traktu do JoinSideR - rozstaj z oboma koncami odcinka (dwie krawedzie klasy
@@ -1273,21 +1566,111 @@ namespace Armoury
                         if (sa >= 0)
                         {
                             keep[sa] = true; keep[sb] = true;
-                            joinA.Add(p); joinB.Add(sa); joinA.Add(p); joinB.Add(sb);
+                            joinA.Add(p); joinB.Add(sa); joinC.Add(SideCls); joinA.Add(p); joinB.Add(sb); joinC.Add(SideCls);
+                            sideJoins += 2;
                             segJoins++;
                         }
                         else loose++;
                     }
                 }
             }
-            joins0 = joinA.Count;   // m96-valyria: dalej mosty Valyrii (klasa Bridge)
-            if (pcls != null && brA != null && MapRoadKinds.ValOn(Settings.Current))
+            int valBridges = 0;
+            if (pcls != null && brA != null && valOn)
                 for (int k = 0; k < brA.Count; k++)
                 {
                     int a = brA[k], b = brB[k];
                     if (a < 0 || b < 0 || a >= np || b >= np) continue;
-                    keep[a] = true; keep[b] = true; joinA.Add(a); joinB.Add(b);
+                    keep[a] = true; keep[b] = true; joinA.Add(a); joinB.Add(b); joinC.Add(MapRoadKinds.Bridge); valBridges++;
                 }
+
+            // ---- 527: laczniki kawalkow sieci (wezly bram, mostki). Punkty dodatkowe (rzut na odcinek traktu, wezel bramy) maja indeks np + e,
+            // w podziale par - nl + e (par rosnie razem z lista punktow dodatkowych)
+            var d = new Draft();
+            int joinsPre = joinA.Count;   // rozstaje jak przed 527 (linia startu "rozstajow")
+            int nl = ls.Count - 1;
+            var par = new List<int>(nl + 1024);
+            for (int l = 0; l < nl; l++) par.Add(l);
+            for (int k = 0; k < joinA.Count; k++) UnionL(par, lineOf[joinA[k]], lineOf[joinB[k]]);
+            d.CompsGeo0 = Roots(par, ls, nl);
+            var exX = new List<float>(); var exY = new List<float>(); var exRoad = new List<bool>(); var exTrakt = new List<bool>();
+            var P = new Pts { X = xs, Y = ys, LineOf = lineOf, LS = ls.ToArray(), PStart = pstart, PList = plist, MainPts = mainPts, Pnx = pnx, Pny = pny,
+                              MinX = minX, MinY = minY, Pc = pc, SegCells = (int)Math.Ceiling(maxSeg * 0.5f / pc) };
+            var cands = new List<Cand>(16);
+            // punkt docelowy kandydata: wierzcholek (keep) albo nowy punkt na odcinku traktu (dwie krawedzie klasy odcinka do jego koncow, ta sama droga)
+            Func<Cand, int> target = c =>
+            {
+                if (c.J >= 0) { keep[c.J] = true; return c.J; }
+                keep[c.U] = true; keep[c.W] = true;
+                int e = exX.Count;
+                exX.Add(xs[c.U] + (xs[c.W] - xs[c.U]) * c.T); exY.Add(ys[c.U] + (ys[c.W] - ys[c.U]) * c.T);
+                exRoad.Add(true); exTrakt.Add(true);
+                par.Add(par.Count); UnionL(par, par.Count - 1, c.Line);
+                joinA.Add(np + e); joinB.Add(c.U); joinC.Add(cls[c.W]);
+                joinA.Add(np + e); joinB.Add(c.W); joinC.Add(cls[c.W]);
+                return np + e;
+            };
+            Func<int, int> unit = q => q < np ? lineOf[q] : nl + (q - np);
+            int hubs = 0, hubLinks = 0, links = 0, linksTrakt = 0;
+            Comparison<Cand> byD = (u, v) => u.D2.CompareTo(v.D2);
+            // (1) wezly bram miast i zamkow: najblizszy punkt kazdej lamanej do HubR od srodka osady (najwyzej 12 lamanych)
+            if (forts != null)
+                foreach (var f in forts)
+                {
+                    NearLines(P, f.X, f.Y, HubR, cands);
+                    if (cands.Count == 0) continue;
+                    cands.Sort(byD);
+                    int h = exX.Count;
+                    exX.Add(f.Gx); exY.Add(f.Gy); exRoad.Add(false); exTrakt.Add(false);
+                    par.Add(par.Count);
+                    hubs++;
+                    for (int i = 0; i < cands.Count && i < 12; i++)
+                    {
+                        int q = target(cands[i]);
+                        joinA.Add(np + h); joinB.Add(q); joinC.Add(LinkCls);
+                        UnionL(par, nl + h, unit(q));
+                        hubLinks++;
+                    }
+                }
+            // (2) mostki (Kruskal): koniec lamanej -> najblizszy punkt lamanej innej skladowej do BridgeR; najwyzej 2 kandydatow na koniec (rozne skladowe)
+            var bq = new List<KeyValuePair<float, int>>(4096);
+            var bp = new List<int>(4096);
+            var bc = new List<Cand>(4096);
+            for (int l = 0; l < nl; l++)
+            {
+                int a = ls[l], b = ls[l + 1] - 1;
+                if (b <= a) continue;
+                for (int e = 0; e < 2; e++)
+                {
+                    int p = e == 0 ? a : b;
+                    NearLines(P, xs[p], ys[p], BridgeR, cands);
+                    if (cands.Count == 0) continue;
+                    cands.Sort(byD);
+                    int rp = FindL(par, l), r1 = -1, got = 0;
+                    for (int i = 0; i < cands.Count && got < 2; i++)
+                    {
+                        int rc = FindL(par, cands[i].Line);
+                        if (rc == rp || rc == r1) continue;
+                        r1 = rc; got++;
+                        bq.Add(new KeyValuePair<float, int>(cands[i].D2, bc.Count));
+                        bp.Add(p); bc.Add(cands[i]);
+                    }
+                }
+            }
+            bq.Sort((u, v) => u.Key.CompareTo(v.Key));
+            foreach (var kv in bq)
+            {
+                int p = bp[kv.Value];
+                var c = bc[kv.Value];
+                if (FindL(par, lineOf[p]) == FindL(par, c.Line)) continue;
+                int q = target(c);
+                keep[p] = true;
+                joinA.Add(p); joinB.Add(q); joinC.Add(LinkCls);
+                UnionL(par, lineOf[p], c.Line);
+                links++;
+                if (ls[c.Line] < mainPts) linksTrakt++;
+            }
+            d.CompsGeo1 = Roots(par, ls, nl);
+
             // Douglas-Peucker miedzy punktami wymuszonymi (konce, rozstaje)
             var stack = new List<int>(64);
             for (int l = 0; l + 1 < ls.Count; l++)
@@ -1323,22 +1706,20 @@ namespace Armoury
                     from = i;
                 }
             }
-            // wezly
+            // wezly: punkty zachowane, potem punkty dodatkowe 527
             var nodeOf = new int[np];
-            int nn = 0;
-            for (int i = 0; i < np; i++) nodeOf[i] = keep[i] ? nn++ : -1;
-            var g = new Graph();
-            g.Nodes = nn; g.Points = np; g.Lines = lines; g.Joins = joinA.Count;
-            g.Classes = pcls != null;   // m96-valyria (recenzja: AdjCls jest zawsze - "klasy" z pliku rodzajow)
-            g.X = new float[nn]; g.Y = new float[nn]; g.Face = new PathFaceRecord[nn]; g.Ok = new bool[nn]; g.Island = new int[nn];
-            g.NodeTrakt = new bool[nn];
-            g.SideLines = sideLines;
-            g.SideSegJoins = segJoins; g.SideLoose = loose;
-            for (int i = 0; i < np; i++) if (nodeOf[i] >= 0) { g.X[nodeOf[i]] = xs[i]; g.Y[nodeOf[i]] = ys[i]; g.NodeTrakt[nodeOf[i]] = i < mainPts; }
-            // krawedzie: kolejne wezly lamanej + rozstaje
-            var ea = new List<int>(nn * 2); var eb = new List<int>(nn * 2);
-            var ec = new List<byte>(nn * 2);   // m96-valyria: klasa krawedzi (MapRoadKinds)
-            double length = 0;
+            int nn0 = 0;
+            for (int i = 0; i < np; i++) nodeOf[i] = keep[i] ? nn0++ : -1;
+            int nex = exX.Count, nn = nn0 + nex;
+            d.Nodes = nn; d.Points = np; d.Lines = lines; d.Joins = joinsPre; d.Classes = pcls != null;
+            d.SideLines = sideLines; d.SideSegJoins = segJoins; d.SideLoose = loose; d.SideJoins = sideJoins; d.ValBridges = valBridges;
+            d.Hubs = hubs; d.HubLinks = hubLinks; d.Links = links; d.LinksTrakt = linksTrakt;
+            d.X = new float[nn]; d.Y = new float[nn]; d.Trakt = new bool[nn]; d.Road = new bool[nn];
+            for (int i = 0; i < np; i++) if (nodeOf[i] >= 0) { int v = nodeOf[i]; d.X[v] = xs[i]; d.Y[v] = ys[i]; d.Trakt[v] = i < mainPts; d.Road[v] = true; }
+            for (int e = 0; e < nex; e++) { int v = nn0 + e; d.X[v] = exX[e]; d.Y[v] = exY[e]; d.Trakt[v] = exTrakt[e]; d.Road[v] = exRoad[e]; }
+            // krawedzie: kolejne wezly lamanej + rozstaje (klasa jawna)
+            d.EA = new List<int>(nn * 2); d.EB = new List<int>(nn * 2); d.EC = new List<byte>(nn * 2);
+            double length = 0, sideLength = 0;
             for (int l = 0; l + 1 < ls.Count; l++)
             {
                 int a = ls[l], b = ls[l + 1] - 1;
@@ -1349,21 +1730,47 @@ namespace Armoury
                     if (nodeOf[i] < 0) continue;
                     if (prev >= 0)
                     {
-                        ea.Add(nodeOf[prev]); eb.Add(nodeOf[i]); ec.Add(cls[i]);
-                        double d = Len(xs[i] - xs[prev], ys[i] - ys[prev]);
-                        if (i < mainPts) length += d; else g.SideLength += d;   // 520: dlugosc traktow jak dotad, drogi boczne osobno
+                        d.EA.Add(nodeOf[prev]); d.EB.Add(nodeOf[i]); d.EC.Add(cls[i]);
+                        double dd = Len(xs[i] - xs[prev], ys[i] - ys[prev]);
+                        if (i < mainPts) length += dd; else sideLength += dd;   // 520: dlugosc traktow jak dotad, drogi boczne osobno
                     }
                     prev = i;
                 }
             }
             for (int k = 0; k < joinA.Count; k++)
             {
-                bool sj = joinA[k] >= mainPts || joinB[k] >= mainPts;   // 520: rozstaj z droga boczna - klasa drogi bocznej
-                if (k < joins0 && sj) g.SideJoins++;
-                ea.Add(nodeOf[joinA[k]]); eb.Add(nodeOf[joinB[k]]); ec.Add(k < joins0 ? (sj ? SideCls : MapRoadKinds.Trakt) : MapRoadKinds.Bridge);
+                int qa = joinA[k], qb = joinB[k];
+                d.EA.Add(qa < np ? nodeOf[qa] : nn0 + (qa - np)); d.EB.Add(qb < np ? nodeOf[qb] : nn0 + (qb - np)); d.EC.Add(joinC[k]);
             }
-            g.Bridges = joinA.Count - joins0;
-            g.Length = length;
+            d.Length = length; d.SideLength = sideLength;
+            d.Ms = (Stopwatch.GetTimestamp() - tStart) * 1000.0 / Stopwatch.Frequency;
+            return d;
+        }
+
+        /// <summary>527: liczba skladowych lamanych (z co najmniej 2 punktami) w podziale par.</summary>
+        private static int Roots(List<int> par, List<int> ls, int nl)
+        {
+            var seen = new HashSet<int>();
+            for (int l = 0; l < nl; l++) if (ls[l + 1] - 1 > ls[l]) seen.Add(FindL(par, l));
+            return seen.Count;
+        }
+
+        /// <summary>527: SCIANY SIATKI GRY i reszta grafu (watek glowny - silnik gry): sciana kazdego wezla, krawedzie po siatce gry (prosta / sciezka silnika /
+        /// wycieta), sasiedztwo, skladowe (bez lacznikow 527 - jak przed 527 - i ze wszystkimi), siatka wezlow.</summary>
+        private static Graph Finish(Draft d, out string err)
+        {
+            err = null;
+            int nn = d.Nodes;
+            var g = new Graph();
+            g.Nodes = nn; g.Points = d.Points; g.Lines = d.Lines; g.Joins = d.Joins;
+            g.Classes = d.Classes;   // m96-valyria (recenzja: AdjCls jest zawsze - "klasy" z pliku rodzajow)
+            g.X = d.X; g.Y = d.Y; g.Face = new PathFaceRecord[nn]; g.Ok = new bool[nn]; g.Island = new int[nn];
+            g.NodeTrakt = d.Trakt; g.NodeRoad = d.Road;
+            g.SideLines = d.SideLines; g.SideSegJoins = d.SideSegJoins; g.SideLoose = d.SideLoose; g.SideJoins = d.SideJoins;
+            g.Bridges = d.ValBridges; g.Length = d.Length; g.SideLength = d.SideLength;
+            g.Hubs = d.Hubs; g.HubLinks = d.HubLinks; g.Links = d.Links; g.LinksTrakt = d.LinksTrakt; g.CompsGeo0 = d.CompsGeo0; g.CompsGeo1 = d.CompsGeo1;
+            g.DraftMs = d.Ms;
+            var ea = d.EA; var eb = d.EB; var ec = d.EC;
             // sciany siatki gry (raz): wezel bez sciany albo na scianie zakazanej dla marszu ladem = poza siecia
             int bad = 0;
             for (int i = 0; i < nn; i++)
@@ -1382,7 +1789,7 @@ namespace Armoury
             if (bad >= nn) { err = "zaden wezel nie lezy na siatce gry (siatka mapy niegotowa?) - proba w nastepnej dobie"; return null; }
             // krawedzie po siatce gry (raz, watek glowny, tym samym wywolaniem co ComputePath): ta sama sciana albo sciezka silnika = sama cieciwa (kazdy punkt
             // sciezki do 0.02 jedn. od cieciwy) -> PROSTA, w planowaniu bez silnika; sciezka z objazdem do 3 x cieciwa + 2 -> dlugosc sciezki, silnik w planowaniu;
-            // bez sciezki albo objazd dalszy (np. rzeka bez mostu pod farba drogi) -> krawedz WYCIETA
+            // bez sciezki albo objazd dalszy (np. rzeka bez mostu pod farba drogi) -> krawedz WYCIETA. 527: lacznik (LinkCls) - objazd najwyzej LinkBent x cieciwa + 1
             int ne = ea.Count;
             var elen = new float[ne];
             var edir = new bool[ne];
@@ -1394,16 +1801,17 @@ namespace Armoury
             for (int k = 0; k < ne; k++)
             {
                 int u = ea[k], v = eb[k];
+                bool link = ec[k] == LinkCls;
                 float chord = Dist(g, u, v);
                 elen[k] = -1f;
-                if (!g.Ok[u] || !g.Ok[v] || g.Island[u] != g.Island[v]) { g.EdgesCut++; continue; }
+                if (!g.Ok[u] || !g.Ok[v] || g.Island[u] != g.Island[v]) { g.EdgesCut++; CutLink(g, link, u, v); continue; }
                 if (g.Face[u].FaceIndex == g.Face[v].FaceIndex) { elen[k] = chord; edir[k] = true; g.EdgesDirect++; continue; }
                 Vec2 a = new Vec2(g.X[u], g.Y[u]), b = new Vec2(g.X[v], g.Y[v]);
                 bool ok;
                 try { ok = scene.GetPathBetweenAIFaces(g.Face[u], g.Face[v], a, b, AgentRadius, tmp, inv, 2f, s2l, l2s); }
                 catch { ok = false; }
                 int n = ok ? tmp.Size : 0;
-                if (n <= 0 || n > PathCap) { g.EdgesCut++; continue; }
+                if (n <= 0 || n > PathCap) { g.EdgesCut++; CutLink(g, link, u, v); continue; }
                 float pl = 0f, dev = 0f;
                 Vec2 last = a;
                 float dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
@@ -1417,10 +1825,10 @@ namespace Armoury
                     float ex = px - t * dx, ey = py - t * dy, e = ex * ex + ey * ey;
                     if (e > dev) dev = e;
                 }
-                if ((last - b).LengthSquared > 1e-4f) { g.EdgesCut++; continue; }   // silnik nie doszedl do konca krawedzi
+                if ((last - b).LengthSquared > 1e-4f) { g.EdgesCut++; CutLink(g, link, u, v); continue; }   // silnik nie doszedl do konca krawedzi
                 if (dev <= 0.02f * 0.02f) { elen[k] = chord; edir[k] = true; g.EdgesDirect++; }
-                else if (pl <= chord * 3f + 2f) { elen[k] = pl; g.EdgesBent++; }
-                else g.EdgesCut++;
+                else if (link ? pl <= chord * LinkBent + 1f : pl <= chord * 3f + 2f) { elen[k] = pl; g.EdgesBent++; }
+                else { g.EdgesCut++; CutLink(g, link, u, v); }
             }
             var deg = new int[nn + 1];
             for (int k = 0; k < ea.Count; k++) { deg[ea[k]]++; deg[eb[k]]++; }
@@ -1437,20 +1845,29 @@ namespace Armoury
                 int iv = g.AdjStart[v] + fill[v]++; g.Adj[iv] = u; g.AdjLen[iv] = elen[k]; g.AdjDirect[iv] = edir[k]; g.AdjCls[iv] = ec[k];
                 if (ec[k] == MapRoadKinds.Valyrian || ec[k] == MapRoadKinds.Bridge) { if (elen[k] >= 0f) g.ValLength += elen[k]; }
                 else if (ec[k] == MapRoadKinds.Caravan && elen[k] >= 0f) g.CarLength += elen[k];
+                if (elen[k] >= 0f) { float ch = Dist(g, u, v); if (ch > g.MaxEdge) g.MaxEdge = ch; }   // 527: najdluzsza cieciwa (rzut na odcinek w pokryciu)
             }
-            // skladowe (tylko do logu)
+            // skladowe (tylko do logu): 527 - najpierw bez lacznikow (ta sama miara co przed 527), potem ze wszystkimi; liczone wezly na drodze (bez wezlow bram)
             var par = new int[nn];
             for (int i = 0; i < nn; i++) par[i] = i;
             for (int k = 0; k < ea.Count; k++)
             {
-                int u = ea[k], v = eb[k];
-                if (elen[k] < 0f) continue;
-                int ru = Find(par, u), rv = Find(par, v);
+                if (elen[k] < 0f || ec[k] == LinkCls) continue;
+                int ru = Find(par, ea[k]), rv = Find(par, eb[k]);
                 if (ru != rv) par[ru] = rv;
             }
-            int comps = 0;
-            for (int i = 0; i < nn; i++) if (g.Ok[i] && Find(par, i) == i) comps++;
-            g.Comps = comps;
+            var roots = new HashSet<int>();
+            for (int i = 0; i < nn; i++) if (g.Ok[i] && g.NodeRoad[i]) roots.Add(Find(par, i));
+            g.CompsOld = roots.Count;
+            for (int k = 0; k < ea.Count; k++)
+            {
+                if (elen[k] < 0f || ec[k] != LinkCls) continue;
+                int ru = Find(par, ea[k]), rv = Find(par, eb[k]);
+                if (ru != rv) par[ru] = rv;
+            }
+            roots.Clear();
+            for (int i = 0; i < nn; i++) if (g.Ok[i] && g.NodeRoad[i]) roots.Add(Find(par, i));
+            g.Comps = roots.Count;
             // 520: skladowa kazdego wezla i czy zawiera trakt (pokrycie osad w logu); krawedzie drog bocznych (tylko log)
             g.Comp = new int[nn]; g.CompTrakt = new bool[nn];
             for (int i = 0; i < nn; i++) { int r = Find(par, i); g.Comp[i] = r; if (g.NodeTrakt[i] && g.Ok[i]) g.CompTrakt[r] = true; }
@@ -1469,6 +1886,13 @@ namespace Armoury
             var gf = new int[cells];
             for (int i = 0; i < nn; i++) { int c = (int)((g.Y[i] - g.GY0) * g.GInv) * g.GNx + (int)((g.X[i] - g.GX0) * g.GInv); g.GNode[g.GStart[c] + gf[c]++] = i; }
             return g;
+        }
+
+        /// <summary>527: wyciety lacznik (tylko log) - wezla bramy (jeden koniec poza droga) albo mostek.</summary>
+        private static void CutLink(Graph g, bool link, int u, int v)
+        {
+            if (!link) return;
+            if (!g.NodeRoad[u] || !g.NodeRoad[v]) g.HubLinksCut++; else g.LinksCut++;
         }
 
         private static int Find(int[] par, int a)
@@ -1563,7 +1987,9 @@ namespace Armoury
             sb.Append(P).Append("dzien ").Append(day.ToString(ci))
               .Append(" | ").Append(Status()).Append(", marsz od ").Append(MinDist(s).ToString("0", ci)).Append(" jedn., nadklad do ").Append((Detour(s) * 100f).ToString("0", ci)).Append('%')
               .Append(" | trasy AI (rody, karawany, wozy wsi; ladem do osady / punktu): liczone ").Append(_seen.ToString(ci))
-              .Append(", krotsze od progu ").Append(_short.ToString(ci)).Append(", powtorka celu ").Append(_repeat.ToString(ci))
+              .Append(", krotsze od progu ").Append(_short.ToString(ci))
+              .Append(" (527-d: ponizej 5 jedn. ").Append(_shortA.ToString(ci)).Append(", 5-10 ").Append(_shortB.ToString(ci)).Append(", 10-").Append(MinDist(s).ToString("0", ci)).Append(' ').Append(_shortC.ToString(ci)).Append(')')
+              .Append(", powtorka celu ").Append(_repeat.ToString(ci))
               .Append(", ponad ").Append(PlansPerHour.ToString(ci)).Append(" plany partii na godzine ").Append(_capped.ToString(ci))
               .Append(" (objazd utracony - limit planow albo trasa gry bez planu, np. krotka reszta trasy: ").Append(_lost.ToString(ci))
               .Append("), ponowione po objezdzie ").Append(_replan.ToString(ci))
@@ -1577,7 +2003,10 @@ namespace Armoury
               .Append(" | punkty patrolu (latka ").Append(_patrolNote).Append("): nowe ").Append(_patSeen.ToString(ci)).Append(", na droge ").Append(_patSnap.ToString(ci))
               .Append(" (").Append(Pct(_patSnap, _patSeen)).Append("%), bez drogi do ").Append(SnapR.ToString("0", ci)).Append(" jedn. ").Append(_patFar.ToString(ci))
               .Append(", z ucieczki bez zmiany ").Append(_patFlee.ToString(ci))
-              .Append(" | odrzucone ").Append(rej.ToString(ci)).Append(": bez drogi w zasiegu ").Append(_noRoad.ToString(ci)).Append(", droga sie nie oplaca ").Append(_notWorth.ToString(ci))
+              .Append(" | odrzucone ").Append(rej.ToString(ci)).Append(": bez drogi w zasiegu ").Append(_noRoad.ToString(ci))
+              .Append(" (527-d: inna wyspa / sciana ").Append(_noRoadIsl.ToString(ci)).Append(", brak wezla sieci do R od startu ").Append(_noRoadStart.ToString(ci))
+              .Append(", siec z zasiegu startu nie dochodzi do R od celu ").Append(_noRoadEnd.ToString(ci)).Append("; R = 1/4 trasy gry, ").Append(RadiusMin.ToString("0", ci)).Append("..").Append(RadiusMax.ToString("0", ci)).Append(" jedn.)")
+              .Append(", droga sie nie oplaca ").Append(_notWorth.ToString(ci))
               .Append(", malo drogi ").Append(_fewRoad.ToString(ci)).Append(", za dlugie ").Append(_tooLong.ToString(ci)).Append(", siatka gry (odcinek bez sciezki) ").Append(_navFail.ToString(ci))
               .Append(", ponad 128 punktow ").Append(_tooMany.ToString(ci))
               .Append("; ominiete wezly / krawedzie w strefie przepraw wrogiego pana ").Append(_crossAvoid.ToString(ci));
@@ -1591,6 +2020,14 @@ namespace Armoury
               .Append("%, proba (trasa gry, droga w zasiegu) ").Append(_arrCtlN.ToString(ci))
               .Append(" sr. ").Append(_arrCtlN > 0 ? (_arrCtlPm / (double)_arrCtlN / 10.0).ToString("0.0", ci) : "-")
               .Append("%, przerwane ").Append(_arrAbort.ToString(ci)).Append(", poza pomiarem ").Append(_arrOut.ToString(ci));
+            // 527-c: kalibracja szacunku (sesja): czas zmierzony / czas szacowany WYBRANEJ trasy z premia drogi; F = objazdy / proba (z wplywem poczatkowym)
+            long kdn = Interlocked.Read(ref _calDetN), kcn = Interlocked.Read(ref _calCtlN);
+            sb.Append(" | 527-c kalibracja szacunku (od wczytania): F = ").Append(CalF().ToString("0.000", ci))
+              .Append(" (objazd przyjety, gdy koszt objazdu x F <= koszt trasy gry; poczatkowo ").Append(CalPrior.ToString("0.00", ci)).Append(" o wadze ").Append(CalPriorN.ToString(ci))
+              .Append(" dojazdow); czas zmierzony / czas szac. wybranej trasy z premia drogi: objazdy ").Append(kdn.ToString(ci)).Append(" sr. ")
+              .Append(kdn > 0 ? (Interlocked.Read(ref _calDetPm) / (double)kdn / 10.0).ToString("0.0", ci) : "-")
+              .Append("%, trasa gry (proba) ").Append(kcn.ToString(ci)).Append(" sr. ")
+              .Append(kcn > 0 ? (Interlocked.Read(ref _calCtlPm) / (double)kcn / 10.0).ToString("0.0", ci) : "-").Append('%');
             int n = _hN[0] + _hN[1] + _hN[2], on = _hOn[0] + _hOn[1] + _hOn[2], det = _hDet[0] + _hDet[1] + _hDet[2], deton = _hDetOn[0] + _hDetOn[1] + _hDetOn[2];
             sb.Append(" | spis partio-godzin w marszu ladem (godzin ").Append(_hours.ToString(ci)).Append("): ").Append(n.ToString(ci)).Append(", na drodze ").Append(on.ToString(ci))
               .Append(" (").Append(Pct(on, n)).Append("%; rody ").Append(_hOn[0].ToString(ci)).Append('/').Append(_hN[0].ToString(ci)).Append(" (").Append(Pct(_hOn[0], _hN[0]))
