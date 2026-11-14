@@ -68,6 +68,8 @@ namespace Armoury
         private static int _post, _postCoin;                 // wywolania postfiksu / z dopisana waga (Interlocked)
         private static int _touch, _wageReads, _stumbles, _parStumbles, _dIn, _dOut, _dInN, _dOutN, _lostSiege, _moved;
         private static long _lostSiegeGold, _movedGold;
+        private static int _debtTakeN, _lootCutN;            // recenzja 521: wierzyciel ze skarbcow gracza / lup z lorda AI przyciety do sakiewki
+        private static long _debtTake, _lootCut;
         private static int _day = -1;
         private static string _hooks = "nie wpieta";
         private static bool _menus;
@@ -81,6 +83,7 @@ namespace Armoury
             _vault.Clear(); _wage.Clear(); _wageDay.Clear(); _bucket.Clear(); _sig = "";
             _post = _postCoin = 0; _touch = _wageReads = _stumbles = _parStumbles = 0; _dIn = _dOut = _dInN = _dOutN = 0;
             _lostSiege = _moved = 0; _lostSiegeGold = _movedGold = 0; _day = -1; _err.Clear();
+            _debtTakeN = _lootCutN = 0; _debtTake = _lootCut = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -163,6 +166,69 @@ namespace Armoury
             }
             catch (Exception e) { _hooks = "blad " + e.GetType().Name; Stumble("ApplyAll", e); }
             Log.Info(P + "latka wagi " + _hooks + ".");
+            // recenzja 521 (2): lup z pokonanego lorda AI (gra: 5% calego Hero.Gold, najwyzej 10 000) najwyzej do sakiewki roboczej - jedna zasada "ile lord wiezie"
+            string lh;
+            try
+            {
+                var m2 = AccessTools.DeclaredMethod(typeof(DefaultBattleRewardModel), "CalculatePlunderedGoldAmountFromDefeatedParty", new[] { typeof(PartyBase) });
+                if (m2 == null) lh = "BRAK CalculatePlunderedGoldAmountFromDefeatedParty - lup z lorda od calego zlota";
+                else { h.Patch(m2, postfix: new HarmonyMethod(typeof(MoneyWeight), nameof(LootPostfix))); lh = "wpieta (DefaultBattleRewardModel.CalculatePlunderedGoldAmountFromDefeatedParty)"; }
+            }
+            catch (Exception e) { lh = "blad " + e.GetType().Name; Stumble("ApplyAll(lup)", e); }
+            _hooks += "; lup z lorda do sakiewki " + lh;
+            Log.Info(P + "latka lupu z lorda AI " + lh + ".");
+        }
+
+        /// <summary>Postfiks lupu z pokonanego: partia lorda AI oddaje najwyzej sakiewke robocza (reszta majatku w skarbcu ksiegowo). Gracz i partie bez wodza - bez zmian.</summary>
+        public static void LootPostfix(PartyBase __0, ref int __result)
+        {
+            try
+            {
+                if (!_on || __result <= 0 || __0 == null || !__0.IsMobile) return;
+                var mp = __0.MobileParty;
+                if (mp == null || mp == MobileParty.MainParty) return;
+                bool lp; long whole;
+                long g = Carried(mp, out lp, out whole);
+                if (!lp || g >= __result) return;
+                int cut = __result - (int)Math.Max(0, g);
+                __result -= cut;
+                _lootCutN++; _lootCut += cut;
+            }
+            catch (Exception e) { Stumble("LootPostfix", e); }
+        }
+
+        // ------------------------------------------------------------ wierzyciele gracza (recenzja 521 (1))
+        /// <summary>
+        /// Wierzyciel (Bank Zelazny, drabina dlugu 168) siega do skarbcow gracza, gdy sakiewki brakuje: przelew skarbiec -> Hero.MainHero do 'need'
+        /// (najpierw depozyt w Banku, potem twierdze od najwiekszej kiesy). Ta sama zasada co u AI (Bank bierze z calego Hero.Gold lorda, skarbiec lorda
+        /// jest tylko ksiegowy). Przelew - suma swiata bez zmian; wierzyciel zabiera dalej z Hero.Gold wlasna droga. Zwraca przelane zloto.
+        /// </summary>
+        internal static int CoverPlayerDebt(long need, string who)
+        {
+            try
+            {
+                var h = Hero.MainHero;
+                if (h == null || need <= 0 || _vault.Count == 0) return 0;
+                long got = 0;
+                var keys = _vault.Where(kv => kv.Value > 0).OrderBy(kv => kv.Key == BankKey ? 0 : 1).ThenByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
+                foreach (var k in keys)
+                {
+                    if (got >= need) break;
+                    long x = Math.Min(need - got, VaultOf(k));
+                    x = Math.Min(x, int.MaxValue / 2 - got);
+                    if (x <= 0) continue;
+                    Put(k, -x);
+                    got += x;
+                }
+                if (got <= 0) return 0;
+                h.ChangeHeroGold((int)got);
+                Touch(MobileParty.MainParty);
+                _debtTakeN++; _debtTake += got;
+                Log.Player("Your creditors draw " + got + " gold from your treasuries (" + TotalNow() + " gold still kept there).");
+                Log.Info(P + who + " - brak w sakiewce gracza, " + got + " zl ze skarbcow gracza (zostaje " + TotalNow() + " zl).");
+                return (int)got;
+            }
+            catch (Exception e) { Stumble("CoverPlayerDebt", e); return 0; }
         }
 
         /// <summary>Postfiks wagi niesionej: pozycja "Coin" = zloto niesione x kg/zl. Bywa wolany rownolegle - tylko odczyt.</summary>
@@ -242,7 +308,9 @@ namespace Armoury
                         long g = Carried(mp, out lp, out whole);
                         int b = g > 0 ? (int)Math.Floor(g * (double)_kgPerGold / step) : 0;
                         int old;
-                        if (!_bucket.TryGetValue(mp, out old)) { _bucket[mp] = b; continue; }   // pierwszy odczyt - waga juz z moneta (Pull przeliczyl wszystkie)
+                        // pierwszy odczyt - waga juz z moneta (Pull przeliczyl wszystkie); recenzja 521: partia lorda AI byla liczona przed odczytem zoldu
+                        // (sakiewka = sama LordPurseFlat) - raz przeliczyc z zoldem (start sesji, zmiana MCM, nowa partia lorda)
+                        if (!_bucket.TryGetValue(mp, out old)) { _bucket[mp] = b; if (lp) Touch(mp); continue; }
                         if (old == b) continue;
                         _bucket[mp] = b;
                         Touch(mp);
@@ -307,12 +375,15 @@ namespace Armoury
               .Append(" kg), tabory wsi ").Append(vils).Append(" (").Append(Kg(vG * k)).Append(" kg), inne ").Append(oth).Append(" (").Append(Kg(oG * k)).Append(" kg)");
             sb.Append(" | skarbce gracza ").Append(TotalNow()).Append(" zl w ").Append(_vault.Count(kv => kv.Value > 0)).Append(" miejscach; wplaty ").Append(_dInN).Append(" (").Append(_dIn)
               .Append(" zl), wyplaty ").Append(_dOutN).Append(" (").Append(_dOut).Append(" zl)");
+            if (_debtTakeN > 0) sb.Append(", wierzyciele ze skarbcow ").Append(_debtTakeN).Append(" razy (").Append(_debtTake).Append(" zl)");
             if (_lostSiege > 0 || _moved > 0) sb.Append(", do zdobywcy ").Append(_lostSiege).Append(" (").Append(_lostSiegeGold).Append(" zl), przeniesione ").Append(_moved).Append(" (").Append(_movedGold).Append(" zl)");
             int post = Interlocked.Exchange(ref _post, 0), pc = Interlocked.Exchange(ref _postCoin, 0), ps = Interlocked.Exchange(ref _parStumbles, 0);
+            sb.Append(" | lup z lordow AI przyciety do sakiewki ").Append(_lootCutN).Append(" razy (-").Append(_lootCut).Append(" zl)");
             sb.Append(" | postfiks ").Append(post).Append(" wywolan (z moneta ").Append(pc).Append("), odswiezenia wagi ").Append(_touch).Append(", odczyty zoldu ").Append(_wageReads)
               .Append(" | potkniecia ").Append(_stumbles).Append(", rownolegle ").Append(ps).Append('.');
             Log.Info(sb.ToString());
             _touch = _wageReads = _stumbles = 0; _dIn = _dOut = _dInN = _dOutN = 0; _lostSiege = _moved = 0; _lostSiegeGold = _movedGold = 0;
+            _debtTakeN = _lootCutN = 0; _debtTake = _lootCut = 0;
         }
 
         // ------------------------------------------------------------ skarbiec gracza
@@ -353,6 +424,7 @@ namespace Armoury
                             string where;
                             string key = HereKey(out where);
                             if (key == null || !VaultKeyOn) return false;
+                            if (key == BankKey && !IronBank.On) return false;   // recenzja 521: Bank wylaczony - bez wplat (wyplata zostaje)
                             MBTextManager.SetTextVariable("ARM_VAULT_IN", "Leave coin in " + where + " (kept: " + VaultOf(key) + ")");
                             var h = Hero.MainHero;
                             if (h == null || h.Gold <= 0) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}You carry no coin."); }
@@ -389,6 +461,7 @@ namespace Armoury
             string key = HereKey(out where);
             var h = Hero.MainHero;
             if (key == null || h == null || !VaultKeyOn) return;
+            if (key == BankKey && !IronBank.On) return;
             int have = h.Gold;
             if (have <= 0) return;
             int wage = WageOfPlayer();
@@ -405,7 +478,7 @@ namespace Armoury
             double kgPer = s != null ? KgPerGold(s) : 0;
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                 "Treasury", "You carry " + have + " gold, about " + Kg(have * kgPer) + " kg of silver and gold. How much will you leave in " + where + "?"
-                + " Coin left here is safe from the road but can only be taken back here.", opts, true, 1, 1, "Leave it", "Cancel",
+                + " Coin left here is safe from the road but can only be taken back here. Your creditors can still claim it.", opts, true, 1, 1, "Leave it", "Cancel",
                 delegate (List<InquiryElement> sel)
                 {
                     try

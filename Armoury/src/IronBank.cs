@@ -410,9 +410,12 @@ namespace Armoury
                     var hero = c.Leader;
                     int reserve = c == Clan.PlayerClan ? 0 : Wages(c) * Math.Max(1, s.IronBankWageDays);
                     int pay;
+                    bool pc = c == Clan.PlayerClan;
+                    long vt = pc ? MoneyWeight.TotalNow() : 0;   // recenzja 521: skarbce gracza (z depozytem w Banku) - Bank siega do nich jak do calego zlota lorda AI
                     if (d.Defaulted)
                     {
-                        pay = (int)Math.Min(d.Principal, hero.Gold * 0.25);       // Bank sciaga przy kazdej okazji
+                        pay = (int)Math.Min(d.Principal, Math.Min((double)int.MaxValue / 2, (hero.Gold + vt) * 0.25));       // Bank sciaga przy kazdej okazji
+                        if (pc && hero.Gold < pay) { MoneyWeight.CoverPlayerDebt(pay - hero.Gold, "IronBank: sciaganie u bankruta"); pay = Math.Min(pay, Math.Max(0, hero.Gold)); }
                     }
                     else
                     {
@@ -434,6 +437,7 @@ namespace Armoury
                             int fromLoanStep;
                             if (_famToday.TryGetValue(kv.Key, out fromLoanStep) && hero.Gold - fromLoanStep < pay) { _famRates++; _famRatesViaLoan++; }
                         }
+                        if (pc && hero.Gold < pay) MoneyWeight.CoverPlayerDebt(pay - hero.Gold, "IronBank: rata");   // recenzja 521
                         if (hero.Gold < pay)
                         {
                             d.Missed++; missed++;
@@ -443,7 +447,9 @@ namespace Armoury
                             {
                                 d.Defaulted = true; d.EverDefaulted = true; d.Trust = 0f; defaults++;
                                 // zajecie od razu: polowa skarbca na poczet dlugu (wczesniej tylko 25% dziennie - do wydania przed sciagnieciem)
-                                int seize = (int)Math.Min(d.Principal, hero.Gold * Math.Max(0f, Math.Min(1f, s.IronBankDefaultSeizeShare)));
+                                double sh = Math.Max(0f, Math.Min(1f, s.IronBankDefaultSeizeShare));
+                                int seize = (int)Math.Min(d.Principal, Math.Min((double)int.MaxValue / 2, (hero.Gold + (pc ? MoneyWeight.TotalNow() : 0)) * sh));
+                                if (pc && hero.Gold < seize) { MoneyWeight.CoverPlayerDebt(seize - hero.Gold, "IronBank: zajecie przy bankructwie"); seize = Math.Min(seize, Math.Max(0, hero.Gold)); }
                                 if (seize > 0) { hero.ChangeHeroGold(-seize); d.Principal -= seize; _capital += seize; paidSum += seize; }
                                 if (seize > 0) CirculationWindows.NoteHeroGold(hero, -seize);   // paczka 169b (tylko licznik)
                                 Log.Info("IronBank: BANKRUCTWO " + c.Name + " - dlug " + (int)d.Principal + ", Bank odcina kredyt, sciaga zloto i pozycza wrogom.");

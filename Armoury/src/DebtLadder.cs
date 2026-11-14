@@ -1010,6 +1010,7 @@ namespace Armoury
                 return;
             }
             if (total > cap15 + 1) _dOver15++;
+            if (player && head.Gold < total) MoneyWeight.CoverPlayerDebt(total - head.Gold, "Dlugi (168): rata");   // recenzja 521: skarbce gracza jak cale zloto lorda AI
             if (!player && head.Gold < total) { try { IronBank.FamilyCoverAll(c, (int)Math.Min(int.MaxValue, total - head.Gold)); } catch (Exception e) { Stumble("FamilyCover", e); } }
             if (head.Gold >= total)
             {
@@ -1065,8 +1066,10 @@ namespace Armoury
             if (owed <= 0) { EndSeizure(c, l, d, today); return; }
             long vill = ClanIncomeBook.VillageIncomeOf(c);
             long fromVill = Math.Min(Math.Max(0, head.Gold), vill);
-            long purse = Math.Max(0, (long)head.Gold - fromVill - Math.Max(0, s.SeizeFloorGold));
+            long vt = c == Clan.PlayerClan ? MoneyWeight.TotalNow() : 0;   // recenzja 521: zajecie siega tez do skarbcow gracza (prog SeizeFloorGold zostaje w sakiewce)
+            long purse = Math.Max(0, (long)head.Gold + vt - fromVill - Math.Max(0, s.SeizeFloorGold));
             long take = Math.Min(owed, fromVill + purse);
+            if (vt > 0 && take > head.Gold) { MoneyWeight.CoverPlayerDebt(take - head.Gold, "Dlugi (168): zajecie"); take = Math.Min(take, Math.Max(0, (long)head.Gold)); }
             if (take > 0)
             {
                 head.ChangeHeroGold(-(int)Math.Min(int.MaxValue, take));
