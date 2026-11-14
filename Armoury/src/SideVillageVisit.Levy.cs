@@ -44,7 +44,7 @@ namespace Armoury
     ///     M = 1 / SideRecruitLevyPrice (1.5) / SideRecruitGeneralLevyPrice (2.0) - gdy chetni odeszli, rodziny chca wiecej.
     ///  P6 RODZAJ: notabl-soltys wsi okregu (albo pierwszy zywy notabl z CanHaveRecruits) - VolunteerModel.GetBasicVolunteer; pula BK osady &lt; 1 albo brak notabla - BasicTroop
     ///     kultury osady. Bohater, tier &gt; 1 albo konny - BasicTroop (z jednej wioski ida chlopi, nie wyszkoleni). Brak BasicTroop - opcja ukryta. Oferta (wioska, doba)
-    ///     tylko w pamieci.
+    ///     tylko w pamieci. 534: oferta to lista okienek (naplyw doby), KAZDE okienko osobne GetBasicVolunteer - mieszanka rodzajow, ceny wedlug rodzaju (OfferFor).
     ///  P7 BEZ PODWOJNEGO LICZENIA: werbunek gry, pula BK, VolunteerTypes, RecruitKit, VolunteerKit i szanse Levy/PeopleLevy bez zmian; BEZ DeduceManpower. Kazdy czlowiek
     ///     schodzi z DOM okregu dokladnie raz (TakeLevy dla rekrutow notabla - tu TakeLevyHere). Ksiega rozklada rekruta notabla na wszystkie osady okregu (ok. 0.3% ludzi
     ///     na rok): wioska z wpisem (pula ponizej pulapu) traci z puli swoj udzial (LevyNoteDistrictDraw z PeopleBook.FromVillage, MLevyVillage / MLevyA5 - to mlodzi);
@@ -105,12 +105,13 @@ namespace Armoury
             public double P, Home, Cap, Pool, Y;
             public double G; public string GWhy; public bool GFb;   // n36 (P3): stopa odnowy wsi okregu (% rocznie, ze znakiem), kod przyczyny, zapas
             public int Callable, Muster, Ready, Stage = 1, Idx, Price, Today, Room;
-            public CharacterObject Troop;
+            public CharacterObject Troop;    // 534: rodzaj pierwszego dostepnego okienka (null - brak okienek, opcja ukryta); Price - najnizsza cena z rodzajow (bramka zlota)
+            public LvOffer Offer; public List<LvSlot> Avail; public List<LvKind> Kinds;   // 534: okienka doby, dostepne dzis (pierwsze Ready niewziete), ich rodzaje
             // 474-P5: levy rodu ziemi (RotHouses - siedziba z tabeli ROT i jej okreg); H null - ziemia bez rodu albo klucz NIE
             public RotHouses.House H; public string HouseWhy; public int HouseReady, HousePrice, HouseToday;
         }
         private static LvQuote _lvQ;
-        private static readonly Dictionary<string, KeyValuePair<int, CharacterObject>> _lvOffer = new Dictionary<string, KeyValuePair<int, CharacterObject>>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, LvOffer> _lvOffer = new Dictionary<string, LvOffer>(StringComparer.Ordinal);   // 534: uid -> okienka doby
 
         // liczniki
         private static int _lvSt, _lvStDay;
@@ -168,7 +169,7 @@ namespace Armoury
             _ldRec = _ldMen = _ldDue = _ldDrop = _ldLostN = 0; _ldGold = 0; _ldGot = _ldFloor = _ldLack = _ldGrown = _ldLost = _ldVan = 0.0; _ldTicks = 0; _lvStDay = 0;
             _ldRefused.Clear(); _ldWhy.Clear(); _ldEx.Clear(); _lvOffer.Clear();
             _ldHouseRec = _ldHouseMen = 0; _ldHouseGold = 0;   // 474-P5
-            _ldNobHouse = _ldNobElite = _ldNobPeasant = _ldNobHouseMen = _ldNobEliteMen = 0; _ldNobEx.Clear(); _lvOfferKind.Clear();   // 531
+            _ldNobHouse = _ldNobElite = _ldNobPeasant = _ldNobHouseMen = _ldNobEliteMen = 0; _ldNobEx.Clear();   // 531 (534: oferty okienek w _lvOffer)
         }
 
         // ------------------------------------------------------------ wpisy
@@ -292,60 +293,168 @@ namespace Armoury
             return Math.Max(0, best);
         }
 
-        /// <summary>P6: rodzaj rekruta wioski na te dobe (oferta w pamieci). null - brak BasicTroop (opcja ukryta).</summary>
-        private static CharacterObject TroopFor(Settlement st, string uid, int today)
+        // ------------------------------------------------------------ 534: okienka oferty (kazde losowane osobno)
+        // Jeff 15.11 (Bluefork Bend "chlopi 8, ludzie rodu 0"): "nie wszyscy tego samego rodzaju - losuje w kazdym okienku, jesli wioska ma 5 okienek to losuje
+        // kazde okienko 5 razy kto bedzie". Oferta (wioska, doba) to lista okienek - tyle, ile wies ma dzis do zwerbowania (naplyw doby q.Muster, juz z zaufaniem 493);
+        // kazde okienko to osobne VolunteerModel.GetBasicVolunteer soltysa (BK: MBRandom.ChooseWeighted przy kazdym wywolaniu; RBM/BK ok. 15% elity) -> elita =
+        // szlachetny tier 1 (531), inaczej chlop.
+        /// <summary>534: jedno okienko oferty. Kind 0 chlop / 1 rekrut rodu pana / 2 elita kultury t1 / 3 elita -> chlop; Taken - wziety dzis z tego okienka.</summary>
+        private sealed class LvSlot { public CharacterObject T; public int Kind; public bool Taken; }
+        /// <summary>534: oferta wioski na dobe (tylko pamiec - po wczytaniu losowana od nowa). Own / Key - wlasnosc i klucz przy losowaniu: zmiana = nowe losowanie.</summary>
+        private sealed class LvOffer
         {
-            KeyValuePair<int, CharacterObject> o;
-            if (_lvOffer.TryGetValue(uid, out o) && o.Key == today && o.Value != null)
+            public int Day; public bool Own, Key, BkLow, NoHead; public int Elite;
+            public string HouseWhy, HouseName;
+            public readonly List<LvSlot> Slots = new List<LvSlot>();
+        }
+        /// <summary>534: rodzaj w oknie - okienka dostepne dzis tego samego oddzialu (N), jego kind i cena etapu.</summary>
+        private sealed class LvKind { public CharacterObject T; public int Kind, N, Price; }
+        private const int LvSlotMax = 400;   // bezpiecznik dlugosci listy okienek (naplyw doby wsi to zwykle kilka - kilkanascie)
+
+        /// <summary>534 (P6): oferta wioski na dobe - co najmniej need okienek (brakujace losowane teraz, kazde osobno). Okienko: GetBasicVolunteer soltysa (albo pierwszego
+        /// notabla z CanHaveRecruits); pula BK osady &lt; 1 albo brak notabla - BasicTroop. Elita kultury i klucz SideVillageHouseRecruit - NobleT1 (531); bohater, tier &gt; 1
+        /// albo konny - BasicTroop. Brak BasicTroop - okienka brak (pusta oferta = opcja ukryta). Kupno wsi / zmiana klucza w ciagu dnia - losowanie od nowa. Nie rzuca.</summary>
+        private static LvOffer OfferFor(Settlement st, string uid, int today, int need)
+        {
+            bool own = SideVillageFief.IsMine(uid) || OwnLands(st);
+            bool key = HouseRecruitKey;
+            LvOffer o;
+            if (!_lvOffer.TryGetValue(uid, out o) || o == null || o.Day != today || o.Own != own || o.Key != key)
             {
-                // 531 recenzja: rekrut rodu tylko we wsi nie gracza - kupno wsi (albo lenna) w ciagu dnia nie zostawia oferty rodu do konca doby
-                KeyValuePair<int, int> ok;
-                bool stale = _lvOfferKind.TryGetValue(uid, out ok) && ok.Key == today && ok.Value == 1 && (SideVillageFief.IsMine(uid) || OwnLands(st));
-                if (!stale) return o.Value;
-                _lvOffer.Remove(uid); _lvOfferKind.Remove(uid);
+                o = new LvOffer { Day = today, Own = own, Key = key };   // 531 recenzja zachowana: rekrut rodu tylko we wsi nie gracza - kupno w ciagu dnia losuje od nowa
+                _lvOffer[uid] = o;
             }
-            var cul = st.Culture ?? (st.OwnerClan != null ? st.OwnerClan.Culture : null);
-            CharacterObject basic = cul != null ? cul.BasicTroop : null, t = null;
-            var c = Campaign.Current;
-            var model = c != null && c.Models != null ? c.Models.VolunteerModel : null;
-            Hero h = null;
-            if (st.Notables != null)
+            need = Math.Max(1, Math.Min(LvSlotMax, need));
+            if (o.Slots.Count >= need) return o;
+            try
             {
-                foreach (var n in st.Notables) if (n != null && n.IsAlive && n.IsHeadman) { h = n; break; }
-                if (h == null && model != null)
-                    foreach (var n in st.Notables)
+                var cul = st.Culture ?? (st.OwnerClan != null ? st.OwnerClan.Culture : null);
+                CharacterObject basic = cul != null ? cul.BasicTroop : null;
+                var c = Campaign.Current;
+                var model = c != null && c.Models != null ? c.Models.VolunteerModel : null;
+                Hero h = null;
+                if (st.Notables != null)
+                {
+                    foreach (var n in st.Notables) if (n != null && n.IsAlive && n.IsHeadman) { h = n; break; }
+                    if (h == null && model != null)
+                        foreach (var n in st.Notables)
+                        {
+                            if (n == null || !n.IsAlive) continue;
+                            bool can = false;
+                            try { can = model.CanHaveRecruits(n); } catch (Exception e) { LvStumble("CanHaveRecruits", e); }
+                            if (can) { h = n; break; }
+                        }
+                }
+                float mp;
+                o.BkLow = Levy.BkManpower(st, out mp) && mp < 1f;
+                o.NoHead = h == null || model == null;
+                while (o.Slots.Count < need)
+                {
+                    CharacterObject t = null;
+                    if (!o.BkLow && !o.NoHead)
                     {
-                        if (n == null || !n.IsAlive) continue;
-                        bool can = false;
-                        try { can = model.CanHaveRecruits(n); } catch (Exception e) { LvStumble("CanHaveRecruits", e); }
-                        if (can) { h = n; break; }
+                        try { t = model.GetBasicVolunteer(h); } catch (Exception e) { LvStumble("GetBasicVolunteer", e); t = null; }   // potkniecie liczone, okienko = chlop
                     }
+                    // 531: elita kultury (w ROT tier 2) - z jednej wioski nie przyjdzie wyszkolony, ale przyjdzie szlachetny tier 1; inaczej, jak dotad, chlop
+                    CharacterObject noble = null; int kind = 0; string why = null;
+                    bool elite = t != null && !t.IsHero && IsCultureElite(t);
+                    if (elite) o.Elite++;
+                    if (key && elite) noble = NobleT1(st, uid, t, out kind, out why);
+                    if (noble != null) t = noble;
+                    else
+                    {
+                        if (key && elite && (t.Tier > 1 || t.IsMounted)) kind = 3;
+                        if (t == null || t.IsHero || t.Tier > 1 || t.IsMounted) t = basic;
+                    }
+                    if (t != null && t.IsHero) t = null;
+                    if (t == null) break;   // kultura bez BasicTroop - brak okienek (opcja ukryta jak dotad)
+                    if (why != null && o.HouseWhy == null) o.HouseWhy = why;
+                    if (kind == 1 && o.HouseName == null && st.OwnerClan != null) o.HouseName = Txt(st.OwnerClan.Name);
+                    o.Slots.Add(new LvSlot { T = t, Kind = kind });
+                    if (kind == 1) _ldNobHouse++; else if (kind == 2) _ldNobElite++; else if (kind == 3) _ldNobPeasant++;
+                    if (kind != 0 && _ldNobEx.Count < 3) _ldNobEx.Add(NameOf(Rec(uid)) + " (" + Txt(st.Name) + ") " + t.StringId);
+                }
             }
-            float mp;
-            bool bkLow = Levy.BkManpower(st, out mp) && mp < 1f;
-            if (!bkLow && h != null && model != null)
+            catch (Exception e) { LvStumble("OfferFor", e); }
+            return o;
+        }
+
+        /// <summary>534: okienka dostepne dzis (pierwsze q.Ready niewziete, w kolejnosci losowania) i ich rodzaje (chlopi pierwsi, potem szlachetni) z cena etapu.</summary>
+        private static void OfferQuote(LvQuote q, LvOffer o)
+        {
+            q.Offer = o;
+            q.Avail = new List<LvSlot>();
+            q.Kinds = new List<LvKind>();
+            if (o == null) return;
+            foreach (var s in o.Slots) { if (q.Avail.Count >= q.Ready) break; if (!s.Taken) q.Avail.Add(s); }
+            for (int pass = 0; pass < 2; pass++)
+                foreach (var s in q.Avail)
+                {
+                    bool peasant = s.Kind == 0 || s.Kind == 3;
+                    if (peasant != (pass == 0)) continue;
+                    LvKind g = null;
+                    foreach (var x in q.Kinds) if (x.T == s.T) { g = x; break; }
+                    if (g == null) { g = new LvKind { T = s.T, Kind = s.Kind, Price = PriceOf(s.T, q.Stage) }; q.Kinds.Add(g); }
+                    g.N++;
+                }
+        }
+
+        /// <summary>534: rodzaj oddzialu troop wsrod okienek dostepnych dzis (troop null - pierwszy rodzaj; null - brak).</summary>
+        private static LvKind KindOf(LvQuote q, CharacterObject troop)
+        {
+            if (q == null || q.Kinds == null) return null;
+            foreach (var g in q.Kinds) if (troop == null || g.T == troop) return g;
+            return null;
+        }
+
+        /// <summary>534: rodzaje slowami gracza ("6 Rivermen Peasant at 40 denars, 2 Blackwood Recruit at 95 denars"). Nie rzuca.</summary>
+        private static string KindsWords(LvQuote q)
+        {
+            try
             {
-                try { t = model.GetBasicVolunteer(h); } catch (Exception e) { LvStumble("GetBasicVolunteer", e); t = null; }
+                if (q == null || q.Kinds == null || q.Kinds.Count == 0) return null;
+                var parts = new List<string>();
+                foreach (var g in q.Kinds) parts.Add(g.N + " " + Txt(g.T.Name) + " at " + g.Price + " denars");
+                return string.Join(", ", parts.ToArray());
             }
-            // 531: model ochotnikow dal elite kultury (w ROT tier 2) - z jednej wioski nie przyjdzie wyszkolony, ale przyjdzie szlachetny tier 1
-            // (rekrut rodu pana wsi albo elita kultury tier 1); inaczej, jak dotad, zwykly chlop
-            CharacterObject noble = null; int kind = 0;
-            if (HouseRecruitKey && t != null && !t.IsHero && IsCultureElite(t)) noble = NobleT1(st, uid, t, out kind);
-            if (noble != null) t = noble;
-            else
+            catch { return null; }
+        }
+
+        /// <summary>534: linia logu przy otwarciu okna - okienek N (pokazanych shown z dostepnych dzis), rodzaje (chlopi a, rod b - nazwa, elita kultury c,
+        /// elita -> chlop d) i powod, gdy rodu 0. Nie rzuca.</summary>
+        private static string OfferLog(LvQuote q, int shown)
+        {
+            try
             {
-                if (t != null && !t.IsHero && (t.Tier > 1 || t.IsMounted) && HouseRecruitKey && IsCultureElite(t)) kind = 3;
-                if (t == null || t.IsHero || t.Tier > 1 || t.IsMounted) t = basic;
+                if (q == null || q.Offer == null || q.Avail == null) return "oferta brak";
+                var o = q.Offer;
+                int a = 0, b = 0, cc = 0, d = 0, n = 0; string bn = null;
+                var types = new List<string>();
+                foreach (var s in q.Avail)
+                {
+                    if (n >= shown) break;
+                    n++;
+                    if (s.Kind == 1) { b++; if (bn == null) bn = Txt(s.T.Name); } else if (s.Kind == 2) cc++; else { a++; if (s.Kind == 3) d++; }
+                    string id = s.T.StringId; if (!types.Contains(id)) types.Add(id);
+                }
+                int taken = 0; foreach (var s in o.Slots) if (s.Taken) taken++;
+                string why = null;
+                if (b == 0)
+                {
+                    if (!o.Key) why = "klucz Side Village House Recruit NIE";
+                    else if (o.Own) why = "wies gracza (rekrut rodu tylko we wsi cudzego pana)";
+                    else if (o.BkLow) why = "pula BK osady < 1 - sami chlopi";
+                    else if (o.NoHead) why = "brak soltysa / notabla z rekrutami - sami chlopi";
+                    else if (o.Elite == 0) why = "los: elity 0 w " + o.Slots.Count + " losowaniach modelu ochotnikow";
+                    else if (o.HouseWhy != null) why = o.HouseWhy;
+                    else why = "elita wylosowana w okienkach juz wzietych albo poza dzisiejszymi";
+                }
+                return "okienek " + n + " (gotowych " + q.Ready + ", wylosowanych dzis " + o.Slots.Count + ", wzietych " + taken + ", naplyw " + q.Muster + ", zaufanie " + q.Idx + ")"
+                       + " | rodzaje: chlopi " + a + (d > 0 ? " (w tym elita -> chlop " + d + ")" : "") + ", rod " + b + (bn != null ? " - " + bn + (o.HouseName != null ? " (" + o.HouseName + ")" : "") : "")
+                       + ", elita kultury " + cc + " [" + string.Join(", ", types.ToArray()) + "]" + (why != null ? " | rod 0: " + why : "")
+                       + " | elity w losowaniach doby " + o.Elite + "/" + o.Slots.Count;
             }
-            if (t != null && t.IsHero) t = null;
-            if (t != null)
-            {
-                _lvOffer[uid] = new KeyValuePair<int, CharacterObject>(today, t);
-                _lvOfferKind[uid] = new KeyValuePair<int, int>(today, kind);
-                if (kind == 1) _ldNobHouse++; else if (kind == 2) _ldNobElite++; else if (kind == 3) _ldNobPeasant++;
-                if (kind != 0 && _ldNobEx.Count < 3) _ldNobEx.Add(NameOf(Rec(uid)) + " (" + Txt(st.Name) + ") " + t.StringId);
-            }
-            return t;
+            catch (Exception e) { LvStumble("OfferLog", e); return "oferta (blad opisu)"; }
         }
 
         // ------------------------------------------------------------ 531: szlachetni tier 1 we wsiach pobocznych
@@ -354,7 +463,6 @@ namespace Armoury
         internal static bool HouseRecruitKey { get { try { var s = Settings.Current; return s != null && s.SideVillageHouseRecruit; } catch { return false; } } }
         private static readonly Dictionary<CharacterObject, bool> _lvEliteCache = new Dictionary<CharacterObject, bool>();
         private static readonly Dictionary<Clan, List<CharacterObject>> _lvHouseT1 = new Dictionary<Clan, List<CharacterObject>>();
-        private static readonly Dictionary<string, KeyValuePair<int, int>> _lvOfferKind = new Dictionary<string, KeyValuePair<int, int>>(StringComparer.Ordinal);
         private static int _ldNobHouse, _ldNobElite, _ldNobPeasant, _ldNobHouseMen, _ldNobEliteMen;
         private static readonly List<string> _ldNobEx = new List<string>();
 
@@ -419,9 +527,9 @@ namespace Armoury
 
         /// <summary>531: szlachetny tier 1 w miejsce elity t: (1) rekrut rodu pana wsi - klan z szablonem rodu, kultura pana = kultura wsi, wies nie gracza;
         /// (2) elita kultury tier 1, jesli kultura ja ma (inna niz zwykly rekrut); null - zwykly chlop jak dotad. kind 1 rod / 2 elita t1. Nie rzuca.</summary>
-        private static CharacterObject NobleT1(Settlement st, string uid, CharacterObject t, out int kind)
+        private static CharacterObject NobleT1(Settlement st, string uid, CharacterObject t, out int kind, out string why)
         {
-            kind = 0;
+            kind = 0; why = null;   // 534: why - czemu nie rekrut rodu (linia okna)
             try
             {
                 var cul = st.Culture;
@@ -431,12 +539,18 @@ namespace Armoury
                 {
                     var l = HouseT1Of(owner, cul);
                     if (l.Count > 0) { kind = 1; return l[MBRandom.RandomInt(l.Count)]; }
+                    why = "szablon rodu " + Txt(owner.Name) + " bez pieszego tier 1 kultury " + cul.StringId;
                 }
+                else if (mine) why = "wies gracza";
+                else if (owner == null) why = "brak pana";
+                else if (cul == null) why = "wies bez kultury";
+                else if (owner.Culture != cul) why = "kultura pana " + Txt(owner.Name) + " (" + (owner.Culture != null ? owner.Culture.StringId : "-") + ") != wsi (" + cul.StringId + ")";
+                else why = "rod " + Txt(owner.Name) + " bez szablonu";
                 var tc = t.Culture;
                 var e = tc != null ? tc.EliteBasicTroop : null;
                 if (FootT1(e) && e != tc.BasicTroop) { kind = 2; return e; }
             }
-            catch (Exception ex) { LvStumble("NobleT1", ex); }
+            catch (Exception ex) { LvStumble("NobleT1", ex); why = "wyjatek"; }
             kind = 0;
             return null;
         }
@@ -478,9 +592,13 @@ namespace Armoury
             string gw; bool gfb;
             q.G = LvRate(st, out gw, out gfb, true); q.GWhy = gw; q.GFb = gfb;
             q.Y = q.P * Math.Max(0.0, q.G) / 100.0 * LvMonth / LvYearDays();   // P3 (n36): mlodzi na miesiac z przyrostu wsi okregu
-            q.Troop = TroopFor(st, uid, today);
+            // 534: okienka doby - tyle, ile wies ma dzis do zwerbowania (naplyw doby), kazde losowane osobno; dostepne dzis = pierwsze Ready niewziete
+            var off = OfferFor(st, uid, today, q.Muster);
+            OfferQuote(q, off);
+            q.Troop = q.Kinds.Count > 0 ? q.Kinds[0].T : (off != null && off.Slots.Count > 0 ? off.Slots[0].T : null);
             if (q.Troop == null) { q.Hide = true; _lvQ = q; return q; }
             q.Price = PriceOf(q.Troop, q.Stage);
+            foreach (var g in q.Kinds) q.Price = Math.Min(q.Price, g.Price);   // bramka zlota: stac na najtanszego
             HouseQuote(q, st, uid, today);   // 474-P5
             _lvQ = q;
             return q;
@@ -611,8 +729,9 @@ namespace Armoury
                 string why = LevyGate(st, uid, fief, out hide, out code, out q);
                 if (hide) return false;
                 if (why != null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); NoteRefusal(uid, code); return true; }
-                a.Tooltip = new TextObject("{=!}" + q.Ready + (q.Ready == 1 ? " man" : " men") + " of this village will follow you today, at " + q.Price + " denars each (" + StageWords(q.Stage)
-                                           + "). " + q.Callable.ToString("N0", Inv) + " of its " + Num(q.P) + " people could still be spared; " + YouthWords(q)
+                string kw = KindsWords(q);   // 534: okienka roznego rodzaju - kazdy rodzaj ze swoja cena
+                a.Tooltip = new TextObject("{=!}" + q.Ready + (q.Ready == 1 ? " man" : " men") + " of this village will follow you today" + (kw != null ? ": " + kw : ", at " + q.Price + " denars each")
+                                           + " (" + StageWords(q.Stage) + "). " + q.Callable.ToString("N0", Inv) + " of its " + Num(q.P) + " people could still be spared; " + YouthWords(q)
                                            + ". Every man you take leaves its fields." + (q.H != null ? " " + HouseWords(q) : ""));
                 return true;
             }
@@ -684,20 +803,26 @@ namespace Armoury
                 if (hide || q == null) return;
                 if (why != null) { Log.Player(why, true); return; }
                 if (ScrTryOpen(st, uid, fief)) return;   // 474-P6: okno werbunku gry (klucz SideVillageRecruitScreen); nie wyszlo - lista wyboru jak dotad
-                int max = Math.Min(Math.Min(q.Ready, RoomNow()), Hero.MainHero.Gold / Math.Max(1, q.Price));
-                max = Math.Min(max, LvOfferMax);
-                if (max < 1) return;
-                string vn = NameOf(Rec(uid)), dn = Txt(st.Name), tn = Txt(q.Troop.Name);
+                string vn = NameOf(Rec(uid)), dn = Txt(st.Name);
                 var list = new List<InquiryElement>();
-                var counts = new List<int>();
-                foreach (int c in new[] { 1, 5, 10, 20 }) if (c < max) counts.Add(c);
-                counts.Add(max);
-                foreach (int c in counts)
+                // 534: wiersze na kazdy rodzaj okienek dostepnych dzis (chlopi, rekruci rodu, elita kultury t1) - kazdy ze swoja cena; wybor - KindPick
+                int max = 0;
+                foreach (var g in q.Kinds)
                 {
+                    int gmax = Math.Min(Math.Min(g.N, RoomNow()), Math.Min(Hero.MainHero.Gold / Math.Max(1, g.Price), LvOfferMax));
+                    if (gmax < 1) continue;
+                    max = Math.Max(max, gmax);
+                    string tn = Txt(g.T.Name);
                     ImageIdentifier img = null;
-                    try { img = new CharacterImageIdentifier(CharacterCode.CreateFrom(q.Troop)); } catch { img = null; }
-                    list.Add(new InquiryElement(c, (c == max && c > 1 ? "All " : "") + c + (c == 1 ? " man" : " men") + " (" + tn + ") - " + (c * q.Price).ToString("N0", Inv) + " denars", img, true, null));
+                    try { img = new CharacterImageIdentifier(CharacterCode.CreateFrom(g.T)); } catch { img = null; }
+                    var counts = new List<int>();
+                    foreach (int c in new[] { 1, 5, 10, 20 }) if (c < gmax) counts.Add(c);
+                    counts.Add(gmax);
+                    foreach (int c in counts)
+                        list.Add(new InquiryElement(new KindPick(g.T, c), (c == gmax && c > 1 ? "All " : "") + c + (c == 1 ? " man" : " men") + " (" + tn + ") - " + (c * g.Price).ToString("N0", Inv) + " denars", img, true, null));
                 }
+                Log.Info(LP + vn + " (" + uid + ", okreg " + st.StringId + "): lista wyboru (534) - " + OfferLog(q, q.Avail != null ? q.Avail.Count : 0) + ".");
+                if (max < 1) return;
                 // 474-P5: wiersze ludzi rodu ziemi (ta sama pula wioski, wlasna cena); wybor - HousePick
                 int hmax = q.H != null && q.HouseReady > 0 ? Math.Min(Math.Min(q.HouseReady, RoomNow()), Math.Min(Hero.MainHero.Gold / Math.Max(1, q.HousePrice), LvOfferMax)) : 0;
                 if (hmax >= 1)
@@ -715,11 +840,11 @@ namespace Armoury
                 string stage = q.Stage >= 3 ? "Only the last men are left - a general levy. Their families ask dearly."
                              : q.Stage == 2 ? "The willing are gone; the rest are a levy - their families want more for them."
                              : "Young men of " + vn + " are willing to follow you.";
-                string desc = stage + " Each man costs " + q.Price + " denars - the money goes to the families (the purse of " + dn + ").\n\nEvery man you take leaves its fields: fewer hands"
+                string kw = KindsWords(q);
+                string desc = stage + (kw != null ? " Today: " + kw + "." : " Each man costs " + q.Price + " denars.") + " The money goes to the families (the purse of " + dn + ").\n\nEvery man you take leaves its fields: fewer hands"
                               + " for its harvest, and he does not come back if he falls. " + Cap1(YouthWords(q)) + ".";
                 if (q.H != null) desc += "\n\n" + HouseWords(q);   // 474-P5
-                if (max < q.Ready)
-                    desc += " Now you can take " + max + " (" + (RoomNow() <= max ? "room in your party" : Hero.MainHero.Gold / Math.Max(1, q.Price) <= max ? "what you can pay" : "at most " + LvOfferMax + " at a time") + ").";
+                if (RoomNow() < q.Ready) desc += " Your party has room for " + RoomNow() + ".";   // 534: limit per rodzaj w wierszach (miejsce, zloto, najwyzej LvOfferMax)
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Men of " + vn, desc, list, true, 1, 1, "Recruit", GameTexts.FindText("str_cancel").ToString(),
                     delegate (List<InquiryElement> sel)
                     {
@@ -729,7 +854,7 @@ namespace Armoury
                             LvDone res;
                             var hp = sel[0].Identifier as HousePick;   // 474-P5: ludzie rodu
                             if (hp != null) res = LevyDo(st, uid, hp.N, fief ? "okno (wioska gracza), rod" : "okno, rod", true);
-                            else if (sel[0].Identifier is int) res = LevyDo(st, uid, (int)sel[0].Identifier, fief ? "okno (wioska gracza)" : "okno");
+                            else if (sel[0].Identifier is KindPick) { var kp = (KindPick)sel[0].Identifier; res = LevyDo(st, uid, kp.N, fief ? "okno (wioska gracza)" : "okno", false, kp.T); }   // 534
                             else return;
                             // recenzja: tekst menu (pula, etap, ludzie) od nowa - ten sam wzor co okup (Raid.cs PayTribute)
                             if (res != null && res.Keep > 0 && Campaign.Current != null && Campaign.Current.CurrentMenuContext != null)
@@ -745,6 +870,8 @@ namespace Armoury
 
         /// <summary>474-P5: wybor wiersza ludzi rodu w oknie poboru (Identifier InquiryElement).</summary>
         private sealed class HousePick { public readonly int N; public HousePick(int n) { N = n; } }
+        /// <summary>534: wybor wiersza rodzaju okienek wioski (oddzial i ilu).</summary>
+        private sealed class KindPick { public readonly CharacterObject T; public readonly int N; public KindPick(CharacterObject t, int n) { T = t; N = n; } }
 
         internal static void LevyOpenFief(MenuCallbackArgs a)
         {
@@ -767,7 +894,8 @@ namespace Armoury
         }
 
         /// <summary>A3: werbunek k ludzi z wioski uid (watek glowny, okno albo sonda testu). Kolejnosc: DOM (TakeLevyHere) -&gt; ludzie -&gt; pochodzenie -&gt; zaplata za przybylych.</summary>
-        private static LvDone LevyDo(Settlement st, string uid, int k, string how, bool house = false)
+        /// 534: want - rodzaj okienek wioski (null - pierwszy dostepny rodzaj, sonda testu); k najwyzej tyle, ile dzis okienek tego rodzaju; wziete okienka oznaczone (Taken).
+        private static LvDone LevyDo(Settlement st, string uid, int k, string how, bool house = false, CharacterObject want = null)
         {
             var res = new LvDone { Asked = k };
             try
@@ -782,6 +910,14 @@ namespace Armoury
                 var mp = MobileParty.MainParty; var hero = Hero.MainHero;
                 // 474-P5: ludzie rodu ziemi - ten sam pobor (pula, DOM, brak rak, zaplata rodzinom), inny oddzial i cena, limit 1 na 5 naplywu doby
                 CharacterObject troop = q.Troop; int price = q.Price; int ready = q.Ready;
+                LvKind kg = null;
+                if (!house)
+                {
+                    // 534: rodzaj okienek - oddzial, cena i ilu go dzis jest (okienka losowane osobno)
+                    kg = KindOf(q, want);
+                    if (kg == null) { res.Why = "rodzaj: brak"; NoteRefusal(uid, res.Why); Log.Player("No more men of that kind will come today.", true); return res; }
+                    troop = kg.T; price = kg.Price; ready = kg.N;
+                }
                 if (house)
                 {
                     if (q.H == null || q.HouseWhy != null || q.HouseReady < 1)
@@ -841,6 +977,12 @@ namespace Armoury
                     }
                     if (r != null) { r.Pool = Math.Max(0.0, r.Pool - keep); r.Today += keep; r.Total += keep; res.Pool1 = r.Pool; }
                     if (house) _lvHouseToday[uid] = new KeyValuePair<int, int>(today, q.HouseToday + keep);   // 474-P5: 1 na 5 naplywu doby
+                    else if (q.Offer != null)
+                    {
+                        // 534: wziete okienka tego rodzaju (w kolejnosci losowania - te same, ktore okno pokazalo)
+                        int m = keep;
+                        foreach (var s in q.Offer.Slots) { if (m <= 0) break; if (!s.Taken && s.T == troop) { s.Taken = true; m--; } }
+                    }
                 }
                 catch (Exception e) { LvStumble("Pool", e); }
                 _lvQ = null;
@@ -859,7 +1001,7 @@ namespace Armoury
                 _ldRec++; _ldMen += keep; _ldGold += res.Total; _ldGot += got; _ldFloor += Math.Max(0.0, keep - got); _ldLack += res.Lack;
                 if (_ldEx.Count < 3) _ldEx.Add(NameOf(Rec(uid)) + " " + keep + "x" + res.Price + (house ? " (rod)" : ""));
                 if (house) { _ldHouseRec++; _ldHouseMen += keep; _ldHouseGold += res.Total; }   // 474-P5
-                if (!house) { KeyValuePair<int, int> ok; if (_lvOfferKind.TryGetValue(uid, out ok) && ok.Key == Today() && _lvOffer.ContainsKey(uid) && _lvOffer[uid].Value == troop) { if (ok.Value == 1) _ldNobHouseMen += keep; else if (ok.Value == 2) _ldNobEliteMen += keep; } }   // 531
+                if (kg != null) { if (kg.Kind == 1) _ldNobHouseMen += keep; else if (kg.Kind == 2) _ldNobEliteMen += keep; }   // 531 / 534: rodzaj okienek
                 // 7. linie
                 string vn = NameOf(Rec(uid));
                 Log.Info(LP + vn + " (" + uid + ", okreg " + Txt(st.Name) + " " + st.StringId + ") - " + how + ": " + keep + " ludzi typu " + Txt(troop.Name) + " (" + troop.StringId + ", tier "
@@ -1052,7 +1194,7 @@ namespace Armoury
                     Log.Info(LP + "dzien " + (today - 1) + " | klucz " + (LevyKey ? "TAK" : "WYL") + " | werbunki " + _ldRec + " (ludzi " + _ldMen + ", zlota do kies wsi " + _ldGold + ", z DOM "
                              + _ldGot.ToString("0.##", Inv) + ", podloga " + _ldFloor.ToString("0.##", Inv) + ", brak rak +" + _ldLack.ToString("0.#", Inv) + ")"
                              + (_ldHouseRec > 0 ? " | w tym levy rodow (474-P5): werbunki " + _ldHouseRec + ", ludzi " + _ldHouseMen + ", zlota " + _ldHouseGold : "")
-                             + " | szlachetni tier 1 (531, klucz Side Village House Recruit " + (HouseRecruitKey ? "TAK" : "NIE") + "): oferty doby - rekrut rodu pana " + _ldNobHouse + " (ludzi wzietych " + _ldNobHouseMen
+                             + " | szlachetni tier 1 (531, klucz Side Village House Recruit " + (HouseRecruitKey ? "TAK" : "NIE") + "): okienka doby (534, kazde losowane osobno) - rekrut rodu pana " + _ldNobHouse + " (ludzi wzietych " + _ldNobHouseMen
                              + "), elita kultury t1 " + _ldNobElite + " (ludzi " + _ldNobEliteMen + "), elita -> chlop " + _ldNobPeasant + (_ldNobEx.Count > 0 ? " [" + string.Join("; ", _ldNobEx.ToArray()) + "]" : "")
                              + " | odmowy (wioska x powod, bez powtorzen): " + (sb.Length > 0 ? sb.ToString() : "-")
                              + " | pule: wpisow " + _lv.Count + ", przyrost mlodych w " + _ldDue + " (+" + _ldGrown.ToString("0.##", Inv) + "), odnowa: " + rs.Text() + ", pelne usuniete " + _ldDrop

@@ -34,6 +34,7 @@ namespace Armoury
         {
             public Settlement St; public string Uid; public bool Fief; public int Tick;
             public RecruitmentVM Vm; public RecruitVolunteerVM RowV, RowH; public int NV, NH, Builds;
+            public LvQuote Q;   // 534: wycena przy ostatnim zbudowaniu (okienka i rodzaje do linii logu)
         }
         private static ScrCtx _scr;
         private static bool _scrTried, _scrPatched; private static string _scrHook = "nie wpiete";
@@ -124,7 +125,8 @@ namespace Armoury
                     return false;
                 }
                 _scrOpen++;
-                Log.Info(SP + NameOf(Rec(uid)) + " (" + uid + ", okreg " + st.StringId + "): okno gry - chlopi " + ctx.NV + ", ludzie rodu " + ctx.NH + " | otwarte " + _scrOpen + "x, potkniecia " + _scrSt + ".");
+                Log.Info(SP + NameOf(Rec(uid)) + " (" + uid + ", okreg " + st.StringId + "): okno gry - okienka wsi " + ctx.NV + ", levy rodu ziemi (474-P5) " + ctx.NH
+                         + " | " + OfferLog(ctx.Q, ctx.NV) + " | otwarte " + _scrOpen + "x, potkniecia " + _scrSt + ".");   // 534
                 return true;
             }
             catch (Exception e) { _scr = null; _scrFail++; ScrStumble("Open", e); return false; }
@@ -146,17 +148,16 @@ namespace Armoury
             return false;
         }
 
-        private static RecruitVolunteerVM ScrRow(RecruitmentVM vm, Hero owner, CharacterObject troop, int n, int price, string title)
+        /// <summary>Wiersz okna: okienka list (534: kazde okienko swoj rodzaj, jak u notabla gry), cena okienka = price(rodzaj).</summary>
+        private static RecruitVolunteerVM ScrRow(RecruitmentVM vm, Hero owner, List<CharacterObject> list, Func<CharacterObject, int> price, string title)
         {
             var onRec = (Action<RecruitVolunteerVM, RecruitVolunteerTroopVM>)Delegate.CreateDelegate(typeof(Action<RecruitVolunteerVM, RecruitVolunteerTroopVM>), vm, _miOnRecruit);
             var onRem = (Action<RecruitVolunteerVM, RecruitVolunteerTroopVM>)Delegate.CreateDelegate(typeof(Action<RecruitVolunteerVM, RecruitVolunteerTroopVM>), vm, _miOnRemove);
-            var list = new List<CharacterObject>(n);
-            for (int i = 0; i < n; i++) list.Add(troop);
             var row = new RecruitVolunteerVM(owner, list, onRec, onRem);
             foreach (var t in row.Troops)
             {
                 if (t == null || t.Character == null) continue;
-                t.Cost = price;                   // nasza cena (etap poboru, rod) zamiast kosztu modelu gry
+                t.Cost = price(t.Character);      // nasza cena (etap poboru, rodzaj okienka, rod) zamiast kosztu modelu gry
                 t.PlayerHasEnoughRelation = true; // bramki zaufania i rodu liczy LevyGate / HouseQuote
                 t.CanBeRecruited = true;
             }
@@ -171,7 +172,7 @@ namespace Armoury
             c.Builds++;
             vm.VolunteerList.Clear();
             vm.TroopsInCart.Clear();
-            c.RowV = c.RowH = null; c.NV = c.NH = 0;
+            c.RowV = c.RowH = null; c.NV = c.NH = 0; c.Q = null;
             vm.InitialPartySize = PartyBase.MainParty.NumberOfAllMembers;
             _lvQ = null;
             bool hide; string code; LvQuote q;
@@ -181,20 +182,32 @@ namespace Armoury
             {
                 int slots = head.VolunteerTypes != null ? Math.Max(6, Math.Min(20, head.VolunteerTypes.Length)) : 6;
                 int nh = q.H != null && q.HouseReady > 0 ? Math.Min(q.HouseReady, slots) : 0;
-                int nv = Math.Min(Math.Max(0, q.Ready - nh), slots);
+                int nv = Math.Min(Math.Min(Math.Max(0, q.Ready - nh), slots), q.Avail != null ? q.Avail.Count : 0);
+                c.Q = q;
                 if (nh > 0)
                 {
                     Hero lead = q.H.Alive != null ? q.H.Alive.Leader : null;
                     RecruitVolunteerVM rh = null;
+                    var hl = new List<CharacterObject>(nh);
+                    for (int i = 0; i < nh; i++) hl.Add(q.H.Troop);
+                    int hp = q.HousePrice;
                     if (lead != null && lead.IsAlive)
                     {
-                        try { rh = ScrRow(vm, lead, q.H.Troop, nh, q.HousePrice, q.H.Name); }
+                        try { rh = ScrRow(vm, lead, hl, x => hp, q.H.Name); }
                         catch (Exception e) { ScrStumble("RowHouseLord", e); rh = null; }
                     }
-                    if (rh == null) rh = ScrRow(vm, head, q.H.Troop, nh, q.HousePrice, q.H.Name);
+                    if (rh == null) rh = ScrRow(vm, head, hl, x => hp, q.H.Name);
                     c.RowH = rh; c.NH = nh;
                 }
-                if (nv > 0) { c.RowV = ScrRow(vm, head, q.Troop, nv, q.Price, "Men of " + NameOf(Rec(c.Uid))); c.NV = nv; vm.VolunteerList.Add(c.RowV); }
+                if (nv > 0)
+                {
+                    // 534: jeden wiersz "Men of X", kazde okienko swoj rodzaj w kolejnosci losowania (np. 6 chlopow i 2 Blackwood Recruit), cena wedlug rodzaju
+                    var vl = new List<CharacterObject>(nv);
+                    for (int i = 0; i < nv; i++) vl.Add(q.Avail[i].T);
+                    var qq = q;
+                    c.RowV = ScrRow(vm, head, vl, x => { var g = KindOf(qq, x); return g != null ? g.Price : qq.Price; }, "Men of " + NameOf(Rec(c.Uid)));
+                    c.NV = nv; vm.VolunteerList.Add(c.RowV);
+                }
                 if (c.RowH != null) vm.VolunteerList.Add(c.RowH);
             }
             else if (why != null) Log.Player(why, true);
@@ -211,23 +224,37 @@ namespace Armoury
             int nv = 0, nh = 0;
             try
             {
+                var vk = new List<CharacterObject>(); var vn = new List<int>();   // 534: okienka wsi w koszyku wedlug rodzaju (kolejnosc pierwszego wystapienia)
                 foreach (var t in __instance.TroopsInCart)
                 {
                     if (t == null || t.IsTroopEmpty || t.Character == null) continue;
                     if (c.RowH != null && ReferenceEquals(t.Owner, c.RowH)) nh++;
-                    else if (c.RowV != null && ReferenceEquals(t.Owner, c.RowV)) nv++;
+                    else if (c.RowV != null && ReferenceEquals(t.Owner, c.RowV))
+                    {
+                        nv++;
+                        int i = vk.IndexOf(t.Character);
+                        if (i < 0) { vk.Add(t.Character); vn.Add(1); } else vn[i]++;
+                    }
                 }
                 if (nh + nv > 0)
                 {
                     _scrDone++;
                     string how = c.Fief ? "okno gry (wioska gracza)" : "okno gry";
                     LvDone rh = nh > 0 ? LevyDo(c.St, c.Uid, nh, how + ", rod", true) : null;
-                    LvDone rv = nv > 0 ? LevyDo(c.St, c.Uid, nv, how) : null;
+                    int vKeep = 0; bool vNone = false; var vs = new List<string>();
+                    for (int i = 0; i < vk.Count; i++)
+                    {
+                        var rv = LevyDo(c.St, c.Uid, vn[i], how, false, vk[i]);
+                        int kk = rv != null ? rv.Keep : 0;
+                        vKeep += kk;
+                        if (rv != null && rv.Why == "nic do wziecia") vNone = true;
+                        vs.Add(vk[i].StringId + " " + vn[i] + " (przybylo " + kk + (rv != null && rv.Why != null ? ", " + rv.Why : "") + ")");
+                    }
                     Log.Info(SP + NameOf(Rec(c.Uid)) + " (" + c.Uid + "): koszyk - ludzie rodu " + nh + " (przybylo " + (rh != null ? rh.Keep : 0) + (rh != null && rh.Why != null ? ", " + rh.Why : "")
-                             + "), chlopi " + nv + " (przybylo " + (rv != null ? rv.Keep : 0) + (rv != null && rv.Why != null ? ", " + rv.Why : "") + ") | zatwierdzone " + _scrDone + "x, potkniecia " + _scrSt + ".");
+                             + "), okienka wsi " + nv + (vs.Count > 0 ? " [" + string.Join("; ", vs.ToArray()) + "]" : "") + " | zatwierdzone " + _scrDone + "x, potkniecia " + _scrSt + ".");
                     // 474-P6-p (recenzja A4/B8): prefiks omija okno gry "Over Limit"; LevyDo tnie do RoomNow / zlota / gotowych - gracz dostaje powod zamiast cichej straty
-                    int came = (rh != null ? rh.Keep : 0) + (rv != null ? rv.Keep : 0);
-                    if (came < nh + nv && (came > 0 || (rh != null && rh.Why == "nic do wziecia") || (rv != null && rv.Why == "nic do wziecia")))   // reszta powodow - LevyDo sam pisze graczowi
+                    int came = (rh != null ? rh.Keep : 0) + vKeep;
+                    if (came < nh + nv && (came > 0 || (rh != null && rh.Why == "nic do wziecia") || vNone))   // reszta powodow - LevyDo sam pisze graczowi
                     {
                         int room = 0;
                         try { room = RoomNow(); } catch { room = 0; }

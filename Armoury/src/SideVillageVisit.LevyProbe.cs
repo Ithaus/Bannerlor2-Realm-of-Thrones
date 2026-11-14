@@ -298,14 +298,30 @@ namespace Armoury
             return all;
         }
 
+        /// <summary>534: okienka wioski maja rozne rodzaje - sonda bierze rodzaj po rodzaju (kazdy z pelnymi kontrolami), az wezmie want albo gotowi sie skoncza
+        /// (przysiolek musi byc oprozniony do konca dnia dla odmowy ponad dzis). Wynik - ostatni udany werbunek (albo pierwszy nieudany).</summary>
         private static LvDone ProbeRecruit(string label, string uid, int want)
+        {
+            LvDone last = null; int left = want;
+            for (int pass = 0; pass < 8 && left > 0; pass++)
+            {
+                var res = ProbeRecruitKind(pass == 0 ? label : label + " rodzaj " + (pass + 1), uid, left);
+                if (res == null || res.Keep <= 0) { if (last == null) last = res; break; }
+                last = res;
+                if (want != int.MaxValue) left -= res.Keep;
+            }
+            return last;
+        }
+
+        private static LvDone ProbeRecruitKind(string label, string uid, int want)
         {
             if (uid == null) { Log.Info(LP + "TEST " + label + ": brak wioski - INFO."); return null; }
             var st = DistOf(Rec(uid));
             if (st == null) return null;
             _lvQ = null;
             var q0 = LvQuoteFor(st, uid);
-            int k = Math.Min(want, q0 != null ? q0.Ready : 0);
+            var g0k = KindOf(q0, null);   // 534: pierwszy rodzaj okienek dostepnych dzis
+            int k = Math.Min(want, q0 != null && g0k != null ? Math.Min(q0.Ready, g0k.N) : 0);
             if (k < 1) { Log.Info(LP + "TEST " + label + " " + NameOf(Rec(uid)) + ": gotowych 0 (zaufanie " + (q0 != null ? q0.Idx : -1) + ") - INFO."); return null; }
             if (_pbRec == 0 || label.StartsWith("przysiolek", StringComparison.Ordinal))
             {
@@ -314,19 +330,19 @@ namespace Armoury
                 var mp = MobileParty.MainParty;
                 int over = mp != null && mp.Party != null && mp.MemberRoster != null ? mp.MemberRoster.TotalManCount + k - mp.Party.PartySizeLimit : 0;
                 if (over > 0) PbFreeRoom(over);
-                long needG = (long)k * Math.Max(1, q0.Price) - Hero.MainHero.Gold;
+                long needG = (long)k * Math.Max(1, g0k.Price) - Hero.MainHero.Gold;
                 if (needG > 0 && needG < int.MaxValue)
                 {
                     int g0 = Hero.MainHero.Gold;
                     Hero.MainHero.ChangeHeroGold((int)needG);
-                    Log.Info(LP + "TEST dotacja testu " + needG + " denarow (poza bilansem) - werbunek sondy " + label + ": " + k + " x " + q0.Price + ", zloto gracza " + g0 + " -> " + Hero.MainHero.Gold + ".");
+                    Log.Info(LP + "TEST dotacja testu " + needG + " denarow (poza bilansem) - werbunek sondy " + label + ": " + k + " x " + g0k.Price + " (" + g0k.T.StringId + "), zloto gracza " + g0 + " -> " + Hero.MainHero.Gold + ".");
                 }
             }
             double mine0, mine1;
             double all0 = PbHomes(st, uid, out mine0);
             var region = OutlawLaw.RegionFor(st);
             double vo0 = PeopleBook.VillOutOf(region);
-            var res = LevyDo(st, uid, k, "TEST sonda " + label);
+            var res = LevyDo(st, uid, k, "TEST sonda " + label, false, g0k.T);
             double all1 = PbHomes(st, uid, out mine1);
             double vo1 = PeopleBook.VillOutOf(region);
             var sb = new StringBuilder(700);

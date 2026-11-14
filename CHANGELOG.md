@@ -1,5 +1,37 @@
 # DZIENNIK ZMIAN
 
+## 534: wies poboczna - kazde okienko werbunku losowane osobno (mieszanka chlopow i ludzi rodu), okno z cena wedlug rodzaju - Armoury (SideVillageVisit.Levy / Screen / LevyProbe, klucz istniejacy SideVillageHouseRecruit)
+
+**Problem:** Jeff, czat 15.11, po wpisie 531: w Bluefork Bend okno werbunku `chlopi 8, ludzie rodu 0`. Wyjasnienie: wies poboczna losowala RAZ na dobe jeden rodzaj dla wszystkich rekrutow (`TroopFor` - jedna oferta `(wioska, doba) -> CharacterObject`), wiec albo wszyscy chlopi, albo wszyscy Blackwood Recruit. Jeff: "nie wszyscy tego samego rodzaju - losuje w kazdym okienku, jesli wioska ma 5 okienek to losuje kazde okienko 5 razy kto bedzie".
+
+**Przyczyna:** `SideVillageVisit.Levy.cs` `TroopFor`: jedno `VolunteerModel.GetBasicVolunteer(soltys)` na dobe, wynik w `_lvOffer[uid] = (doba, oddzial)` i `_lvOfferKind`; okno gry (474-P6, `ScrBuild`) budowalo wiersz "Men of X" z N kopii tego jednego oddzialu, lista wyboru - wiersze ilosci jednego oddzialu, `LevyDo` dawal zawsze `q.Troop`. BK `BKVolunteerModel.GetBasicVolunteer` losuje przy kazdym wywolaniu (`MBRandom.ChooseWeighted` po klasach ludnosci - dekompilacja BannerKings.dll), wiec osobne wywolanie na okienko daje osobny los (RBM/BK ok. 15% elity).
+
+**Zmiana:**
+- Oferta wsi na dobe to lista okienek (`LvOffer.Slots`, `LvSlot {oddzial, kind, wziete}`), tyle ile wies ma dzis do zwerbowania: `q.Muster` (naplyw doby - juz z zaufaniem 493 i etapem), co najmniej 1 (bramka "zaufanie" dalej widzi rodzaj), bezpiecznik 400. Brakujace okienka losowane przy wycenie (`OfferFor`), KAZDE osobnym `GetBasicVolunteer` soltysa (albo pierwszego notabla z CanHaveRecruits); regula okienka bez zmian wobec 531: elita kultury + klucz -> `NobleT1` (rekrut rodu pana tier 1, warunki jak dotad; inaczej elita kultury tier 1), bohater / tier > 1 / konny -> BasicTroop; pula BK < 1 albo brak notabla -> sami chlopi. Naplyw wzrosnie w ciagu dnia (relacja) - dolosowane nowe okienka, stare zostaja.
+- Wynik zapamietany na dobe (to samo przy ponownym otwarciu); nowe losowanie: nowa doba, kupno / utrata wsi (rekrut rodu tylko we wsi cudzego pana - zachowana recenzja 531), przelaczenie klucza SideVillageHouseRecruit. Tylko pamiec - po wczytaniu losowane od nowa (`LevyReset` / `LevyDayZero` czyszcza `_lvOffer`).
+- Dostepne dzis = pierwsze `q.Ready` niewziete okienka w kolejnosci losowania (`q.Avail`), pogrupowane w rodzaje `q.Kinds` (chlopi pierwsi) z cena `PriceOf(oddzial, etap)`. `q.Troop` = pierwszy rodzaj, `q.Price` = najnizsza cena (bramka zlota "stac na najtanszego").
+- Okno gry (474-P6): wiersz "Men of X" ma okienka w kolejnosci losowania, kazde swoj oddzial i swoja cena (jak notabl gry, np. 6 chlopow + 2 Blackwood Recruit w jednym wierszu); wiersz levy rodu ziemi (474-P5) bez zmian. Koszyk (`ScrDonePre`): okienka wsi zliczone wedlug oddzialu, `LevyDo` osobno na kazdy rodzaj (po levy rodu, jak dotad).
+- Lista wyboru (gdy okna gry brak): wiersze ilosci na kazdy rodzaj osobno (`KindPick`), kazdy ze swoja cena i limitem (miejsce, zloto, 40). Dymek opcji menu i opis okna: "8 men of this village will follow you today: 6 Rivermen Peasant at 40 denars, 2 Blackwood Recruit at 95 denars" (liczby przykladowe).
+- `LevyDo(..., want)`: rodzaj `want` (null - pierwszy rodzaj, sonda), k najwyzej tyle okienek tego rodzaju; po werbunku pierwsze `keep` niewziete okienka tego oddzialu oznaczone `Taken`; nowa odmowa `rodzaj: brak` ("No more men of that kind will come today."). Liczniki 531 ludzi wzietych (rod / elita t1) z rodzaju okienka.
+- Linia logu przy kazdym otwarciu okna (okno gry: `Okno werbunku wioski (474-P6): ... okno gry - okienka wsi N, levy rodu ziemi (474-P5) M | okienek N (gotowych, wylosowanych dzis, wzietych, naplyw, zaufanie) | rodzaje: chlopi a (w tym elita -> chlop d), rod b - Blackwood Recruit (Blackwood), elita kultury c [id oddzialow] | rod 0: powod | elity w losowaniach doby e/S`; lista wyboru: `Pobor w wioskach (m113): ... lista wyboru (534) - ...`). Powod rodu 0: klucz NIE, wies gracza, pula BK < 1, brak soltysa, "los: elity 0 w S losowaniach", powod `NobleT1` (kultura pana != wsi, szablon bez pieszego tier 1, rod bez szablonu, brak pana), albo elita w okienkach juz wzietych.
+- Linia doby 531: "okienka doby (534, kazde losowane osobno)" - liczniki sa teraz na okienko, nie na wies.
+- `LevyProbe` (`ProbeRecruit`): sonda bierze rodzaj po rodzaju (kazdy werbunek z pelnymi kontrolami: druzyna, zloto, kiesa, DOM, pula, cena etapu wedlug oddzialu), az wezmie prosbe albo gotowi sie skoncza - przysiolek nadal oprozniony do konca dnia przed proba "ponad dzis".
+- Opis MCM (Settings.cs komentarz + McmSettings.cs HintText, recznie - `gen_mcm.py` przepisalby recznie poprawione opisy innych kluczy i GrandTourney): "(every recruit slot of the day is drawn on its own, as with any notable, so a village can offer a few peasants and a couple of noble recruits side by side)".
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: liczba ludzi dziennie bez zmian - `Ready = min(Callable, Room, Muster - Today)` jak dotad; okienka tylko dziela tych samych ludzi na rodzaje. Pula, DOM, brak rak, zaplata rodzinom, pochodzenie, komplet DTE - ta sama droga `LevyDo` (osobno na rodzaj: `PlayerRecruit.SideVillageKit(oddzial, k)` jak dotad per oddzial). Zabranie zmniejsza pule (`r.Pool -= keep`, `r.Today += keep`) - kolejne okno pokazuje mniej okienek.
+- 493: liczba okienek idzie z naplywu doby, ktory juz skaluje zaufanie (`q.Idx` z `MaximumIndexHeroCanRecruitFromHero + 1`); zaufanie 0 - naplyw 0, okienko 1 tylko do bramki "zaufanie" (Ready 0, nic do wziecia).
+- 474-P5 (levy rodu ziemi): bez zmian - ta sama pula Ready; okno pokazuje okienka wsi = Ready - ludzie rodu, levy rodu bierze pierwszy i zmniejsza Ready, wiec okienka wsi w oknie sa dokladnie pierwszymi niewzietymi.
+- Wiecej wywolan `GetBasicVolunteer`: tyle co okienek naplywu (kilka - kilkanascie na wies), tylko przy wycenie wsi odwiedzanej przez gracza i tylko brakujace - koszt pomijalny. AI bez zmian (P10).
+- Ceny: kazde okienko swoja cena (`PriceOf` - koszt rekruta gry x etap); bramka zlota sprawdza najtanszy rodzaj, `LevyDo` tnie k do zlota na rodzaj. Kilka komunikatow "N men of X join your party" przy koszyku z kilkoma rodzajami (po jednym na rodzaj).
+- Wczytanie zapisu: okienka losowane od nowa (`Today` z zapisu zostaje, wiec ludzi nie przybywa); oznaczenia `Taken` gina - ale dostepne liczy `Ready`, nie oznaczenia.
+- Czestosc rodu: los modelu ochotnikow (ok. 15% elity) - przy 8 okienkach srednio ok. 1 rekrut rodu, ok. 27% dob bez zadnego (0.85^8); wtedy linia logu mowi "los: elity 0 w 8 losowaniach".
+- Bledy liczone (`LvStumble` "OfferFor", "OfferLog", "GetBasicVolunteer"; `ScrStumble` jak dotad) - nic nie gasnie.
+- CHANGELOG: 49910 -> 49942 linii (wpis dopisany na gorze, reszta bez zmian).
+- Build Armoury 0 bledow. Gra Jeffa moze byc wlaczona - NIE wgrane, w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA (galaz noc/534-okienka, nie wgrane).
+
 ## 533: pasek gotowosci zbrojowni DTE na mapie - podpowiedz z naszej liczby ("N kit slots empty" jak meldunek QM i Review the army) - Armoury (DteMapBar533, nowy klucz DteMapBarShowsKitPreview)
 
 **Problem:** Jeff, czat 14/15.11: "missing 6" przy ikonie ludzika w lewym dolnym rogu mapy, a meldunek QM mowi `QM: 31 kit slots empty (...)`. Po wyjasnieniu (wpis 532: to podpowiedz paska DTE, inna regula) i propozycji "moge podmienic, zeby pokazywala nasza liczbe" - Jeff 15.11: "tak zrob". Log `Armoury-2026-11-14_23-28-03.log` linia 9612 - nasz meldunek 31.
