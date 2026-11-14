@@ -376,6 +376,19 @@ namespace Armoury
 
         private static string Kg(double kg) { return kg.ToString("0.0", CultureInfo.InvariantCulture); }
 
+        /// <summary>Recenzja 522 (pytanie 3 Jeffa): udzwig partii do sumy i najwiekszy udzial monety w udzwigu. Tylko linia doby (raz na dobe).</summary>
+        private static void Cap(MobileParty p, double coinKg, ref double capSum, ref double maxPct)
+        {
+            int cap = 0;
+            try { cap = p.InventoryCapacity; } catch { }
+            if (cap <= 0) return;
+            capSum += cap;
+            double pct = coinKg * 100.0 / cap;
+            if (pct > maxPct) maxPct = pct;
+        }
+
+        private static string Pct(double kg, double cap) { return cap > 0 ? (kg * 100.0 / cap).ToString("0.0", CultureInfo.InvariantCulture) + "%" : "-"; }
+
         private static void DayLine(Settings s)
         {
             Prune();
@@ -402,6 +415,7 @@ namespace Armoury
             int lords = 0; long lCar = 0, lWhole = 0, lMax = 0; string lMaxN = ""; double lKg = 0, lMaxKg = 0;
             int cars = 0, bands = 0, vils = 0, oth = 0; long cG = 0; double cK = 0, bK = 0, vK = 0, oK = 0;
             int nEs = 0, nWe = 0; long gEs = 0, gWe = 0;   // 522: partie niosace monete po stronach morza (bez gracza)
+            double cCap = 0, bCap = 0, cMaxPct = 0, bMaxPct = 0;   // recenzja 522 (pytanie 3 Jeffa): udzwig karawan i band - moneta jako procent ladownosci
             foreach (var p in MobileParty.All)
             {
                 if (p == null || !p.IsActive || p == mp) continue;
@@ -411,13 +425,15 @@ namespace Armoury
                 if (g > 0) { if (InEssos(p)) { nEs++; gEs += g; } else { nWe++; gWe += g; } }
                 if (lp) { lords++; lCar += g; lKg += g * kp; lWhole += whole; if (g > lMax) { lMax = g; lMaxKg = g * kp; lMaxN = p.LeaderHero != null ? p.LeaderHero.Name.ToString() : "?"; } continue; }
                 if (g <= 0) continue;
-                if (p.IsCaravan) { cars++; cG += g; cK += g * kp; } else if (p.IsBandit) { bands++; bK += g * kp; } else if (p.IsVillager) { vils++; vK += g * kp; } else { oth++; oK += g * kp; }
+                if (p.IsCaravan) { cars++; cG += g; cK += g * kp; Cap(p, g * kp, ref cCap, ref cMaxPct); } else if (p.IsBandit) { bands++; bK += g * kp; Cap(p, g * kp, ref bCap, ref bMaxPct); } else if (p.IsVillager) { vils++; vK += g * kp; } else { oth++; oK += g * kp; }
             }
             sb.Append(" | lordowie AI: ").Append(lords).Append(" partii, niosa ").Append(lCar).Append(" zl (").Append(Kg(lKg)).Append(" kg, srednio ")
               .Append(Kg(lords > 0 ? lKg / lords : 0)).Append(" kg), w skarbcach ksiegowo ").Append(lWhole - lCar).Append(" zl; najciezsza sakiewka ")
               .Append(lMax).Append(" zl (").Append(Kg(lMaxKg)).Append(" kg, ").Append(lMaxN).Append(")");
             sb.Append(" | bez wodza: karawany ").Append(cars).Append(" (").Append(cG).Append(" zl, ").Append(Kg(cK)).Append(" kg), bandy ").Append(bands).Append(" (").Append(Kg(bK))
               .Append(" kg), tabory wsi ").Append(vils).Append(" (").Append(Kg(vK)).Append(" kg), inne ").Append(oth).Append(" (").Append(Kg(oK)).Append(" kg)");
+            sb.Append(" | moneta w ladownosci (recenzja 522): karawany ").Append(Pct(cK, cCap)).Append(" udzwigu (najwiecej ").Append(cMaxPct.ToString("0.0", CultureInfo.InvariantCulture))
+              .Append("%), bandy ").Append(Pct(bK, bCap)).Append(" (najwiecej ").Append(bMaxPct.ToString("0.0", CultureInfo.InvariantCulture)).Append("%)");
             sb.Append(" | strony morza (522): Westeros ").Append(nWe).Append(" partii (").Append(gWe).Append(" zl, ").Append((_kgPerGold * 1000.0).ToString("0.000", CultureInfo.InvariantCulture))
               .Append(" kg/1000 zl), Essos ").Append(nEs).Append(" partii (").Append(gEs).Append(" zl, ").Append((_kgPerGoldEssos * 1000.0).ToString("0.000", CultureInfo.InvariantCulture))
               .Append(" kg/1000 zl), odczyty strony ").Append(_sideReads);

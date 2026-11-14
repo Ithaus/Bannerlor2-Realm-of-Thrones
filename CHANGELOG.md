@@ -22,6 +22,15 @@
 - W logu: linia startu "sklad sakiewki (522, wedlug strony morza): Westeros ... 179 000 zl = 150.7 kg); Essos ... 179 000 zl = 111.5 kg)"; linia doby "strony morza (522): Westeros ... Essos ..." - Essos > 0 partii (Wolne Miasta, Dothrakowie), odczyty strony ok. liczby partii z moneta.
 - Build Armoury 0 bledow. NIE WGRANE (gra Jeffa moze byc wlaczona).
 
+**Recenzja 522 (14.11):**
+- Liczby sprawdzone: g/zl = 0.1 x 1.4 + udzial groszy x 0.975 + udzial nobli x 0.0975 -> Westeros 10/70/20 = 0.842 kg na 1000 zl (179 000 zl = 150.7 kg), Essos 10/45/45 = 0.623 (111.5 kg). Domyslne Settings.cs = McmSettings.cs, kopia do Settings 3 nowych kluczy jest. Armoury.json Jeffa bez kluczy Money* - nowe domyslne zadzialaja.
+- Rozpoznanie krainy: DothrakiArms.EssosAt = OutlawLaw.PoolRegionAt (najblizsze miasto / zamek) -> PeopleBook.CultureAtCalibration -> GearFit.IsEssos (MountLaw.IsEssosCulture + steppe_bandits) - ta sama zasada co bron Dothrakow 313. Gracz, lord AI, karawana, banda, tabor wsi - wszystkie przez Carried > 0 -> SideRefresh; postfiks (bywa rownolegle) czyta tylko ConcurrentDictionary.
+- Kolizje z 521: ta sama sciezka kubelkow; zmiana strony zmienia kubelek -> UpdateVersionNo (jak dotad); Pull po zmianie MCM czysci _bucket, _essos zostaje - pierwszy odczyt kubelka dotyka partie w Essos. Lup, wierzyciele, skarbiec, ksiega pieniadza nie czytaja kg - bez zmian. Prune / Reset czyszcza nowe slowniki.
+- Wydajnosc: nic co klatke. Odczyt strony raz na dobe na partie z moneta (wszystkie w pierwszej godzinie doby, ok. 1-1.5 tys. partii x ok. 250 twierdz odleglosci kwadratowych - kilka ms raz na dobe); bez zmian.
+- Drobne (bez zmian w kodzie): okno skarbca liczy kg z biezacej pozycji gracza (PlayerEssos), a waga w udzwigu ze strony odczytanej raz na dobe - po przeplynieciu morza do doby roznica tylko w podpowiedzi.
+- POPRAWKA (pytanie 3 Jeffa "jaki to procent ich ladownosci?"): linia doby nie podawala udzwigu, wiec liczby nie dalo sie odczytac z gry. MoneyWeight.cs: nowe `Cap` / `Pct` (tylko linia doby, raz na dobe, p.InventoryCapacity karawan i band) i odcinek "| moneta w ladownosci (recenzja 522): karawany X% udzwigu (najwiecej Y%), bandy X% (najwiecej Y%)" - X = kg monety wszystkich karawan / suma ich udzwigu. Logika wagi bez zmian.
+- Build Armoury 0 bledow. NIE WGRANE.
+
 **Status:** DO SPRAWDZENIA (galaz noc/522-zloto-krain, na noc/scal-perki 12e3ca1e).
 
 ## 521: waga pieniedzy - moneta w udzwigu partii (gracz i AI), sklad sakiewki pensy / grosze / noble, lordowie AI niosa tylko sakiewke robocza, skarbiec gracza w twierdzy i w Banku Zelaznym - Armoury (klucze MoneyWeightEnabled, PlayerVaultEnabled i 7 innych)
