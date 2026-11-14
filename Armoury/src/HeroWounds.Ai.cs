@@ -163,6 +163,16 @@ namespace Armoury
             return thr;
         }
 
+        /// <summary>Recenzja 524: zapas ponizej CastleFoodDays bez dzielenia przez 0 - gra GetNumDaysForFoodToLast dzieli przez -FoodChange; partia, ktora nie
+        /// je (FoodChange 0, np. umarli ROT) albo przybywa jej jedzenia, dawala NaN / ujemne dni = "malo jedzenia" (zamek nigdy). Taka partia nie jest "low".</summary>
+        internal static bool CastleFoodLow(MobileParty p)
+        {
+            if (p == null) return false;
+            float fc = p.FoodChange;
+            if (!(fc < -0.001f)) return false;
+            return p.GetNumDaysForFoodToLast() < CastleFoodDays();
+        }
+
         /// <summary>E2: twierdza "swoja" dla rannego - tej samej frakcji albo krolestwa sojuszniczego (Kingdom.IsAllyWith gry, bez wojny). Odczyt pol.</summary>
         internal static bool FriendlyFort(Settlement st, IFaction f)
         {
@@ -311,7 +321,7 @@ namespace Armoury
                     // 408-p: w zamku nikt partii lorda nie karmi (gra i BK kupuja jedzenie tylko w miescie / wsi), a nasza ocena przebijalaby wizyte gry po
                     // jedzenie az do glodu. Zapas ponizej progu gry (MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege, 12 dni) = w tej mysli bez
                     // wyjazdu do zamku: opcje bitwy zostaja na -1, wygrywa zwykla wizyta gry po zapasy; po zakupach partia wraca.
-                    if (party.GetNumDaysForFoodToLast() < CastleFoodDays()) { _aiFood++; return; }
+                    if (CastleFoodLow(party)) { _aiFood++; return; }
                 }
                 int mine = -1; float other = 0f;
                 for (int i = 0; i < scores.Count; i++)

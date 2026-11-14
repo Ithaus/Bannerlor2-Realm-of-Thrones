@@ -25,6 +25,19 @@
 - Build Armoury 0 bledow. NIE WGRANE (gra Jeffa moze byc wlaczona).
 
 **Status:** DO SPRAWDZENIA (galaz noc/524-ranni-glod, na noc/scal-perki 8476e167).
+### Recenzja 524 (galaz noc/524-rec -> noc/524-ranni-glod)
+
+Sprawdzone w kodzie: wejscie / postoj / Fort / CautionPostfix 55, 408 (AiRestPostfix, 408-p), zakup jedzenia gry (PartiesBuyFoodCampaignBehavior: zakup przy wejsciu i CO GODZINE w miescie / wsi, do MinimumDaysFoodToLastWhileBuyingFoodFromTown - ROT >= 40, BK 50) i BK (BKPartyBehavior.GoBuyFood / TryBuyingFood), wizyta gry po jedzenie (AiVisitSettlementBehavior: waga jedzenia rusza ponizej NeededFoodsInDaysThresholdForSiege = 12 - ten sam prog co 524, wiec partia wyprowadzona z zamku naprawde jedzie po zapasy, a po zakupie ma >= 40 dni - brak migotania wokol progu). E1-E4, NightRest, ArmsFirst - bez zmian w stosunku do 524.
+
+Poprawki:
+- **Dzielenie przez 0 w progu jedzenia** (408-p i 524): gra `MobileParty.GetNumDaysForFoodToLast` dzieli przez `-FoodChange`; partia, ktora nie je (FoodChange 0 - np. umarli ROT) albo ktorej jedzenia przybywa, dawala NaN / ujemne dni -> "malo jedzenia" -> 524 wyrzucal ja z Fort w zamku / nie wpuszczal, a 408-p nie wiozl do zamku. Nowa `HeroWounds.CastleFoodLow(MobileParty)` (FoodChange < -0.001, wzor ArmyReview.Pay 421) - czytana przez 408-p i 500-b (LowFood). Dla partii, ktore jedza, zachowanie bez zmian.
+- **Fort w MIESCIE przy malym zapasie**: 524 bral do oceny tylko cel 408 (NearFort), wiec partia leczaca sie w miescie z zamkiem rodu jako celem 408 byla wyrzucana z Fort, choc w miescie kupuje co godzine (raport 524 mowil "ta, w ktorej stoi, albo cel 408" - kod tego nie robil). Teraz: stoi w miescie - maly zapas nie konczy Fort (tylko glod); stoi w zamku - ocena tego zamku; poza osada - cel 408 (jak dotad). Przy okazji mniej wywolan NearFort (w osadzie zadne).
+
+Sprawdzone bez zmian: wodz na lozu (bedHold) - glod konczy stan wczesniej niz limit, 408 _aiStarve nie wiezie glodnego; brak migotania (FoodOut bez Say przy wejsciu, ponowne liczenie co 6 h, wyjscie z Fort raz); liczniki w mysli (watki AI) niezsynchronizowane jak dotychczasowe _dBoost (przyblizone, tylko log).
+
+Pliki: Armoury/src/AiWounded500b.cs (956 -> 960), Armoury/src/HeroWounds.Ai.cs (402 -> 412). Build Armoury 0 bledow. CHANGELOG 49582 -> 49595 linii. NIE WGRANE.
+
+**Status recenzji:** DO SPRAWDZENIA.
 
 ## 522: zloto w sakiewce wedlug strony Waskiego Morza - Westeros wiecej srebra (10/70/20), Essos wiecej zlota (10/45/45) - Armoury (klucze MoneyEssosPennyPercent / MoneyEssosGroatPercent / MoneyEssosNoblePercent, nowe domyslne Westeros MoneyGroatPercent 70 / MoneyNoblePercent 20)
 

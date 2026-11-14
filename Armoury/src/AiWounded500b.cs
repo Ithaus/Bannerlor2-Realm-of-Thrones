@@ -274,7 +274,7 @@ namespace Armoury
         private static bool LowFood(MobileParty mp, out bool starving)
         {
             starving = mp.Party != null && mp.Party.IsStarving;
-            return starving || mp.GetNumDaysForFoodToLast() < HeroWounds.CastleFoodDays();
+            return starving || HeroWounds.CastleFoodLow(mp);
         }
 
         /// <summary>524: cel bez jedzenia - glod (wszedzie) albo ZAMEK przy zapasie ponizej progu (w zamku nie kupi: gra i BK kupuja tylko w miescie / wsi).</summary>
@@ -455,7 +455,11 @@ namespace Armoury
             if (lowF)
             {
                 Settlement ff = null;
-                if (!starvingF) { float fh2; ff = NearFort(mp, out fh2); }   // tylko przy malym zapasie (rzadko); glod - koniec wszedzie
+                var atF = mp.CurrentSettlement;
+                // recenzja 524: stoi w MIESCIE - kupuje co godzine (PartiesBuyFood HourlyTickParty / BK), maly zapas nie konczy postoju (tylko glod);
+                // stoi w zamku - ten zamek; poza osada - cel 408 (NearFort)
+                bool inTown = atF != null && atF.IsTown;
+                if (!starvingF && !inTown) { if (atF != null && atF.IsFortification) ff = atF; else { float fh2; ff = NearFort(mp, out fh2); } }   // tylko przy malym zapasie; glod - koniec wszedzie
                 if (NoFoodAt(ff, lowF, starvingF))
                 {
                     _dFoodEnd++; _dFortEnd++;
