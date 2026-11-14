@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 - WGRANIE 240 (528 uklady w polu a stosunek sil, obroncy dotrzymuja slowa), bez autotestu
+
+- Armoury.dll 7334fff5 = noc/scal-perki (239 + 528). Kopie: .bak-2026-11-14-przed-wgranie240, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie240 i -przed).
+- Analiza paniki (sesja 237): panike robi tylko nasze zalamanie kompanii (BannerCompanies), mediana strat przy zalamaniu ok. 0.40 (cel 309: 0.25-0.40), elita T4+ nie lamie sie; problem: jeden rzut przy 1/6 strat lamie cala kompanie do 50 ludzi (Gylbert 52 z 77 przy 17% strat, szansa 8.2%). Propozycje do decyzji Jeffa.
+
 ## STAN 14.11 - WGRANIE 239 (527 drogi: siec AI w jedno, Coverage, objazd), bez autotestu
 
 - Armoury.dll 7094eed5 = noc/scal-perki (238 + 527). Kopie: .bak-2026-11-14-przed-wgranie239, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie239 i -przed).
