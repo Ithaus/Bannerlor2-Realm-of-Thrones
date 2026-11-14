@@ -6380,6 +6380,10 @@ namespace Armoury
         [SettingPropertyGroup("The worth of a lesson")]
         public bool PerkXpFix { get; set; } = true;
 
+        [SettingPropertyBool("Bk Perk Bug Fixes", HintText = "Fixes seven Banner Kings perk bugs. Ranger: track life +20% (Banner Kings cut it to 20%). Dune Rider: +8% speed in deserts (not +80%). Holy Matrimony: marriage influence cost -15% (not +5%). Sellsword Career: earnest money +10% (not +15%). Tutor: clan children coming of age get a point for each clan tutor (Banner Kings checked the child). Cavalry Tactics: +30% mounted volunteers and Well Strapped: +0.5 governor loyalty, both lost in the Banner Kings models. Off = exactly as Banner Kings does it", RequireRestart = false)]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public bool BkPerkBugFixes { get; set; } = true;
+
         [SettingPropertyBool("Skill Ledger Log", HintText = "Writes daily lines telling how much skill experience heroes and troops earned and from what (diagnostics only; nothing in the game changes).", RequireRestart = false)]
         [SettingPropertyGroup("The worth of a lesson")]
         public bool SkillLedgerLog { get; set; } = true;
@@ -14850,6 +14854,7 @@ namespace Armoury
             s.TournamentXpPercent = TournamentXpPercent;
             s.BattleXpScalesWithDamage = BattleXpScalesWithDamage;
             s.PerkXpFix = PerkXpFix;
+            s.BkPerkBugFixes = BkPerkBugFixes;
             s.SkillLedgerLog = SkillLedgerLog;
             s.ShotXpFair = ShotXpFair;
             s.StewardFoodXpFair = StewardFoodXpFair;
