@@ -155,6 +155,7 @@ namespace Armoury
             _lvLack = new Dictionary<string, double[]>(StringComparer.Ordinal);
             _lvQ = null; _lvOffer.Clear(); RecruitingAt = null;
             _lvHouseToday.Clear();   // 474-P5
+            _lvEliteCache.Clear(); _lvHouseT1.Clear();   // 531: nowa kampania - inne obiekty klanow i oddzialow
             _scr = null;             // 474-P6: wiazanie okna gry
             _lvSt = 0;
             _lvGDay = int.MinValue; _lvG.Clear();
@@ -167,6 +168,7 @@ namespace Armoury
             _ldRec = _ldMen = _ldDue = _ldDrop = _ldLostN = 0; _ldGold = 0; _ldGot = _ldFloor = _ldLack = _ldGrown = _ldLost = _ldVan = 0.0; _ldTicks = 0; _lvStDay = 0;
             _ldRefused.Clear(); _ldWhy.Clear(); _ldEx.Clear(); _lvOffer.Clear();
             _ldHouseRec = _ldHouseMen = 0; _ldHouseGold = 0;   // 474-P5
+            _ldNobHouse = _ldNobElite = _ldNobPeasant = _ldNobHouseMen = _ldNobEliteMen = 0; _ldNobEx.Clear(); _lvOfferKind.Clear();   // 531
         }
 
         // ------------------------------------------------------------ wpisy
@@ -294,7 +296,14 @@ namespace Armoury
         private static CharacterObject TroopFor(Settlement st, string uid, int today)
         {
             KeyValuePair<int, CharacterObject> o;
-            if (_lvOffer.TryGetValue(uid, out o) && o.Key == today && o.Value != null) return o.Value;
+            if (_lvOffer.TryGetValue(uid, out o) && o.Key == today && o.Value != null)
+            {
+                // 531 recenzja: rekrut rodu tylko we wsi nie gracza - kupno wsi (albo lenna) w ciagu dnia nie zostawia oferty rodu do konca doby
+                KeyValuePair<int, int> ok;
+                bool stale = _lvOfferKind.TryGetValue(uid, out ok) && ok.Key == today && ok.Value == 1 && (SideVillageFief.IsMine(uid) || OwnLands(st));
+                if (!stale) return o.Value;
+                _lvOffer.Remove(uid); _lvOfferKind.Remove(uid);
+            }
             var cul = st.Culture ?? (st.OwnerClan != null ? st.OwnerClan.Culture : null);
             CharacterObject basic = cul != null ? cul.BasicTroop : null, t = null;
             var c = Campaign.Current;
@@ -318,10 +327,118 @@ namespace Armoury
             {
                 try { t = model.GetBasicVolunteer(h); } catch (Exception e) { LvStumble("GetBasicVolunteer", e); t = null; }
             }
-            if (t == null || t.IsHero || t.Tier > 1 || t.IsMounted) t = basic;
+            // 531: model ochotnikow dal elite kultury (w ROT tier 2) - z jednej wioski nie przyjdzie wyszkolony, ale przyjdzie szlachetny tier 1
+            // (rekrut rodu pana wsi albo elita kultury tier 1); inaczej, jak dotad, zwykly chlop
+            CharacterObject noble = null; int kind = 0;
+            if (HouseRecruitKey && t != null && !t.IsHero && IsCultureElite(t)) noble = NobleT1(st, uid, t, out kind);
+            if (noble != null) t = noble;
+            else
+            {
+                if (t != null && !t.IsHero && (t.Tier > 1 || t.IsMounted) && HouseRecruitKey && IsCultureElite(t)) kind = 3;
+                if (t == null || t.IsHero || t.Tier > 1 || t.IsMounted) t = basic;
+            }
             if (t != null && t.IsHero) t = null;
-            if (t != null) _lvOffer[uid] = new KeyValuePair<int, CharacterObject>(today, t);
+            if (t != null)
+            {
+                _lvOffer[uid] = new KeyValuePair<int, CharacterObject>(today, t);
+                _lvOfferKind[uid] = new KeyValuePair<int, int>(today, kind);
+                if (kind == 1) _ldNobHouse++; else if (kind == 2) _ldNobElite++; else if (kind == 3) _ldNobPeasant++;
+                if (kind != 0 && _ldNobEx.Count < 3) _ldNobEx.Add(NameOf(Rec(uid)) + " (" + Txt(st.Name) + ") " + t.StringId);
+            }
             return t;
+        }
+
+        // ------------------------------------------------------------ 531: szlachetni tier 1 we wsiach pobocznych
+        // Jeff 14.11 (Bluefork Bend na ziemi Blackwoodow): "ale masz blackwood poziom 1 przeciez wiem ze szlachetni tez maja poziom 1". Czestosc NIE nasza:
+        // to los modelu ochotnikow (RBM/BK, ok. 15% elity). My tylko zamieniamy elite (tier 2) na szlachetnego tier 1 pieszego zamiast na chlopa.
+        internal static bool HouseRecruitKey { get { try { var s = Settings.Current; return s != null && s.SideVillageHouseRecruit; } catch { return false; } } }
+        private static readonly Dictionary<CharacterObject, bool> _lvEliteCache = new Dictionary<CharacterObject, bool>();
+        private static readonly Dictionary<Clan, List<CharacterObject>> _lvHouseT1 = new Dictionary<Clan, List<CharacterObject>>();
+        private static readonly Dictionary<string, KeyValuePair<int, int>> _lvOfferKind = new Dictionary<string, KeyValuePair<int, int>>(StringComparer.Ordinal);
+        private static int _ldNobHouse, _ldNobElite, _ldNobPeasant, _ldNobHouseMen, _ldNobEliteMen;
+        private static readonly List<string> _ldNobEx = new List<string>();
+
+        /// <summary>531: oddzial siedzi w drzewie elite_basic_troop swojej kultury (jak HouseLevies.IsElite / ROT IsEliteTroop). Nie rzuca.</summary>
+        private static bool IsCultureElite(CharacterObject troop)
+        {
+            if (troop == null) return false;
+            bool v;
+            if (_lvEliteCache.TryGetValue(troop, out v)) return v;
+            v = false;
+            try
+            {
+                var cult = troop.Culture;
+                if (cult != null && cult.EliteBasicTroop != null && cult.EliteBasicTroop != cult.BasicTroop)
+                {
+                    var stack = new Stack<CharacterObject>(); var seen = new HashSet<CharacterObject>();
+                    stack.Push(cult.EliteBasicTroop);
+                    while (stack.Count > 0)
+                    {
+                        var c = stack.Pop();
+                        if (c == null || !seen.Add(c)) continue;
+                        if (c == troop) { v = true; break; }
+                        if (c.UpgradeTargets != null) foreach (var u in c.UpgradeTargets) stack.Push(u);
+                    }
+                }
+            }
+            catch (Exception e) { LvStumble("IsCultureElite", e); }
+            _lvEliteCache[troop] = v;
+            return v;
+        }
+
+        /// <summary>531: pieszy tier 1 (tier 0 tez - nizej nie ma), nie bohater.</summary>
+        private static bool FootT1(CharacterObject c) { return c != null && !c.IsHero && c.Tier <= 1 && !c.IsMounted; }
+
+        /// <summary>531: ludzie rodu tier 1 z szablonu klanu (stacki + awanse, jak HouseLevies.TreeOf), kultury culture; bez zwyklego rekruta i elity kultury
+        /// (szablon zwyklego klanu to drzewo kultury - to nie "ludzie rodu"). Pamiec per klan na sesje. Nie rzuca.</summary>
+        private static List<CharacterObject> HouseT1Of(Clan clan, CultureObject culture)
+        {
+            List<CharacterObject> list;
+            if (_lvHouseT1.TryGetValue(clan, out list)) return list;
+            list = new List<CharacterObject>();
+            try
+            {
+                var tpl = clan.DefaultPartyTemplate;
+                if (tpl != null && tpl.Stacks != null)
+                {
+                    var stack = new Stack<CharacterObject>(); var seen = new HashSet<CharacterObject>();
+                    foreach (var s in tpl.Stacks) if (s.Character != null) stack.Push(s.Character);
+                    while (stack.Count > 0)
+                    {
+                        var c = stack.Pop();
+                        if (c == null || !seen.Add(c)) continue;
+                        if (FootT1(c) && c.Culture == culture && (culture == null || c != culture.BasicTroop) && !IsCultureElite(c)) list.Add(c);
+                        if (c.UpgradeTargets != null) foreach (var u in c.UpgradeTargets) stack.Push(u);
+                    }
+                }
+            }
+            catch (Exception e) { LvStumble("HouseT1Of", e); list = new List<CharacterObject>(); }
+            _lvHouseT1[clan] = list;
+            return list;
+        }
+
+        /// <summary>531: szlachetny tier 1 w miejsce elity t: (1) rekrut rodu pana wsi - klan z szablonem rodu, kultura pana = kultura wsi, wies nie gracza;
+        /// (2) elita kultury tier 1, jesli kultura ja ma (inna niz zwykly rekrut); null - zwykly chlop jak dotad. kind 1 rod / 2 elita t1. Nie rzuca.</summary>
+        private static CharacterObject NobleT1(Settlement st, string uid, CharacterObject t, out int kind)
+        {
+            kind = 0;
+            try
+            {
+                var cul = st.Culture;
+                var owner = st.OwnerClan;
+                bool mine = SideVillageFief.IsMine(uid) || OwnLands(st);
+                if (!mine && owner != null && cul != null && owner.Culture == cul && owner.DefaultPartyTemplate != null)
+                {
+                    var l = HouseT1Of(owner, cul);
+                    if (l.Count > 0) { kind = 1; return l[MBRandom.RandomInt(l.Count)]; }
+                }
+                var tc = t.Culture;
+                var e = tc != null ? tc.EliteBasicTroop : null;
+                if (FootT1(e) && e != tc.BasicTroop) { kind = 2; return e; }
+            }
+            catch (Exception ex) { LvStumble("NobleT1", ex); }
+            kind = 0;
+            return null;
         }
 
         private static int PriceOf(CharacterObject t, int stage)
@@ -742,6 +859,7 @@ namespace Armoury
                 _ldRec++; _ldMen += keep; _ldGold += res.Total; _ldGot += got; _ldFloor += Math.Max(0.0, keep - got); _ldLack += res.Lack;
                 if (_ldEx.Count < 3) _ldEx.Add(NameOf(Rec(uid)) + " " + keep + "x" + res.Price + (house ? " (rod)" : ""));
                 if (house) { _ldHouseRec++; _ldHouseMen += keep; _ldHouseGold += res.Total; }   // 474-P5
+                if (!house) { KeyValuePair<int, int> ok; if (_lvOfferKind.TryGetValue(uid, out ok) && ok.Key == Today() && _lvOffer.ContainsKey(uid) && _lvOffer[uid].Value == troop) { if (ok.Value == 1) _ldNobHouseMen += keep; else if (ok.Value == 2) _ldNobEliteMen += keep; } }   // 531
                 // 7. linie
                 string vn = NameOf(Rec(uid));
                 Log.Info(LP + vn + " (" + uid + ", okreg " + Txt(st.Name) + " " + st.StringId + ") - " + how + ": " + keep + " ludzi typu " + Txt(troop.Name) + " (" + troop.StringId + ", tier "
@@ -925,7 +1043,7 @@ namespace Armoury
                 }
                 _ldTicks += Stopwatch.GetTimestamp() - t0;   // czas doby bez sondy testu (POB-5)
                 try { LevyProbeDaily(today); } catch (Exception e) { LvStumble("Probe", e); }
-                act = _ldRec + _ldRefused.Count + _ldDue + _ldDrop + _ldLostN + _lvStDay;
+                act = _ldRec + _ldRefused.Count + _ldDue + _ldDrop + _ldLostN + _lvStDay + _ldNobHouse + _ldNobElite + _ldNobPeasant;   // 531: oferty szlachetnych tez
                 if (act > 0)
                 {
                     var sb = new StringBuilder(400);
@@ -934,6 +1052,8 @@ namespace Armoury
                     Log.Info(LP + "dzien " + (today - 1) + " | klucz " + (LevyKey ? "TAK" : "WYL") + " | werbunki " + _ldRec + " (ludzi " + _ldMen + ", zlota do kies wsi " + _ldGold + ", z DOM "
                              + _ldGot.ToString("0.##", Inv) + ", podloga " + _ldFloor.ToString("0.##", Inv) + ", brak rak +" + _ldLack.ToString("0.#", Inv) + ")"
                              + (_ldHouseRec > 0 ? " | w tym levy rodow (474-P5): werbunki " + _ldHouseRec + ", ludzi " + _ldHouseMen + ", zlota " + _ldHouseGold : "")
+                             + " | szlachetni tier 1 (531, klucz Side Village House Recruit " + (HouseRecruitKey ? "TAK" : "NIE") + "): oferty doby - rekrut rodu pana " + _ldNobHouse + " (ludzi wzietych " + _ldNobHouseMen
+                             + "), elita kultury t1 " + _ldNobElite + " (ludzi " + _ldNobEliteMen + "), elita -> chlop " + _ldNobPeasant + (_ldNobEx.Count > 0 ? " [" + string.Join("; ", _ldNobEx.ToArray()) + "]" : "")
                              + " | odmowy (wioska x powod, bez powtorzen): " + (sb.Length > 0 ? sb.ToString() : "-")
                              + " | pule: wpisow " + _lv.Count + ", przyrost mlodych w " + _ldDue + " (+" + _ldGrown.ToString("0.##", Inv) + "), odnowa: " + rs.Text() + ", pelne usuniete " + _ldDrop
                              + ", straty obroncow " + _ldLostN + " (" + _ldLost.ToString("0.#", Inv) + "), pobor gry z okregu -" + _ldVan.ToString("0.##", Inv) + " | braki rak " + _lvLack.Count + " wiosek (razem " + lackSum.ToString("0.#", Inv) + ")"
