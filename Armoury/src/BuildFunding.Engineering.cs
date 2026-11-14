@@ -42,7 +42,8 @@ namespace Armoury
 
         /// <summary>Punkty dodane przez zarzadce do punktow pana `paid` i przyspieszenia zlotem `boost` (0 - brak zarzadcy, klucz wylaczony, blad).
         /// Czyste: tylko odczyt zarzadcy i czola kolejki. count - tylko z bloku dobowego (watek glowny): liczniki perkow doby.</summary>
-        private static float EngExtra(Town town, float paid, float boost, bool count)
+        private static float EngExtra(Town town, float paid, float boost, bool count) { return EngGov(town, paid, boost, count) + PrisonLabor509.Extra(town, paid, boost); }   // 509: + praca jencow lochu (PrisonLabor509.cs, liniowa w podstawie)
+        private static float EngGov(Town town, float paid, float boost, bool count)
         {
             try
             {
@@ -80,6 +81,7 @@ namespace Armoury
                     e.AddFactor(DefaultPerks.Engineering.Stonecutters.PrimaryBonus, null);
                     if (count) _engStone++;
                 }
+                Perk509.BuildPerks(town, g, bt, ref e, count);   // 509 (perki 9, 56): Confidence (budowy wojskowe) i SelfMadeMan (targ, wodociag) zarzadcy na miejscu
                 float extra = e.ResultNumber - paid - boost;
                 return extra > 0f && !float.IsNaN(extra) && !float.IsInfinity(extra) ? extra : 0f;
             }
@@ -127,7 +129,9 @@ namespace Armoury
         /// <summary>PowerPostfix: pozycja dymku zarzadcy (dodana do wyniku osady objetej rozliczeniem).</summary>
         private static void EngAdd(Town town, float paid, float boost, ref ExplainedNumber r)
         {
-            float x = EngExtra(town, paid, boost, false);
+            float x = EngGov(town, paid, boost, false);
+            float px = PrisonLabor509.Extra(town, paid, boost);   // 509: osobna pozycja dymku "Prisoners at work"
+            if (px > 0f) r.Add(px, PrisonLabor509.WorkText);
             if (x <= 0f) return;
             if (_engTxt == null) _engTxt = new TextObject("{=!}Governor's engineering");
             r.Add(x, _engTxt);
@@ -149,7 +153,7 @@ namespace Armoury
                 _engTowns++;
                 float b = Boost(town);
                 _engBase += pts + b;
-                _engExtra += EngExtra(town, pts, b, true);
+                _engExtra += EngGov(town, pts, b, true);   // 509: sam zarzadca (praca jencow - linia 509)
                 var g = town.Governor;
                 if (g == null || !g.IsAlive || g.CurrentSettlement == null || g.CurrentSettlement.Town != town) return;
                 _engGov++;

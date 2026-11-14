@@ -163,6 +163,7 @@ namespace Armoury
                 if (!Covered(town))
                 {
                     if (WallOn) WallScaleGame(town, ref __result);   // 472: mury - moc gry przez czynnik ceny punktu murow (klucz wylaczony - nic)
+                    PrisonLabor509.AddGame(town, ref __result);   // 509: praca jencow lochu do mocy gry (lenno gracza bez rozliczenia; klucz wylaczony - nic)
                     if (fl > 0f) __result.Add(fl, _folkTxt);
                     if (WallOn) WallLimit(town, ref __result);       // 472: najkrotszy czas poziomu murow - granica mocy doby
                     return;
@@ -181,6 +182,9 @@ namespace Armoury
         }
         /// <summary>338 (linia doby murarza): dopisek Masona tej doby w osadzie objetej rozliczeniem (0 - nieobjeta).</summary>
         internal static float MasonDay(Town town) { if (!On || town == null || !Covered(town)) return 0f; float f; _funded.TryGetValue(town, out f); return Buildings338Mason.Extra(town, f + FolkHead(town) + Boost(town)); }   // 347e: jak dymek (z przyspieszeniem zlotem)
+        /// <summary>509 recenzja: podstawa pracy jencow tej doby (czy przy budowie naprawde jest praca) - osada objeta rozliczeniem: punkty pana + przyspieszenie zlotem
+        /// (jak Extra), lenno bez rozliczenia: moc modelu gry (jak AddGame; _depth - nasz postfiks przepuszcza). !On - 0 (premii jencow nie ma nigdzie). Czyste.</summary>
+        internal static float LaborBase(Town town) { if (!On || town == null) return 0f; if (Covered(town)) { float f; _funded.TryGetValue(town, out f); return f + Boost(town); } _depth++; try { return Campaign.Current.Models.BuildingConstructionModel.CalculateDailyConstructionPower(town, false).ResultNumber; } finally { _depth--; } }
         public static void PowerIntPostfix(Town town, ref int __result)
         {
             if (_depth > 1 || !On || town == null) return;
@@ -188,6 +192,7 @@ namespace Armoury
             if (!Covered(town))
             {
                 if (WallOn) __result = WallScaleGameInt(town, __result);   // 472: mury - moc gry przez czynnik ceny punktu murow
+                __result = PrisonLabor509.AddGameInt(town, __result);   // 509: praca jencow lochu (jak dymek)
                 if (fl > 0f) __result += (int)fl;
                 if (WallOn) __result = WallLimitInt(town, __result);      // 472: granica mocy doby murow
                 return;
