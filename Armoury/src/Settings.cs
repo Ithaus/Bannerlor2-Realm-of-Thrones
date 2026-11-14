@@ -2793,6 +2793,7 @@ namespace Armoury
 
         // --- House levies ---
         public bool HouseLeviesEnabled = true;             // in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice
+        public float HouseRecruitShare = 25f;               // with House Levies Enabled: on the land of a house with its own men at arms, held by that house in its own homeland, this share (25 = one in four) of the plain first-rank volunteers who come to its notables are that house's own first-rank recruits (a Blackwood Recruit beside the Riverlands Recruits in a Blackwood village), drawn once for each man when he comes; the rest stay plain recruits. A house without its own first-rank men always gives plain recruits. Also used for the plain recruit slots of side villages (with Side Village House Recruit). 0 = only noble volunteers become the house's men, as before
 
         // --- Northern fare ---
         public bool NorthernFareEnabled = true;            // vineyards in the North and at the Wall (Farsfog, Tumbledown, Olden Oak, Queenscrown) become fishers, cattle and swine farms - grapes do not grow in snow; wine presses in Winterfell and Castle Black turn into breweries. Applied at session start

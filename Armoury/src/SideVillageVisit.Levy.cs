@@ -169,7 +169,7 @@ namespace Armoury
             _ldRec = _ldMen = _ldDue = _ldDrop = _ldLostN = 0; _ldGold = 0; _ldGot = _ldFloor = _ldLack = _ldGrown = _ldLost = _ldVan = 0.0; _ldTicks = 0; _lvStDay = 0;
             _ldRefused.Clear(); _ldWhy.Clear(); _ldEx.Clear(); _lvOffer.Clear();
             _ldHouseRec = _ldHouseMen = 0; _ldHouseGold = 0;   // 474-P5
-            _ldNobHouse = _ldNobElite = _ldNobPeasant = _ldNobHouseMen = _ldNobEliteMen = 0; _ldNobEx.Clear();   // 531 (534: oferty okienek w _lvOffer)
+            _ldNobHouse = _ldNobElite = _ldNobPeasant = _ldNobHouseMen = _ldNobEliteMen = 0; _ldBasicRolls = _ldBasicHouse = 0; _ldNobEx.Clear();   // 531 (534: oferty okienek w _lvOffer)
         }
 
         // ------------------------------------------------------------ wpisy
@@ -366,6 +366,18 @@ namespace Armoury
                         if (key && elite && (t.Tier > 1 || t.IsMounted)) kind = 3;
                         if (t == null || t.IsHero || t.Tier > 1 || t.IsMounted) t = basic;
                     }
+                    // 536 (Jeff 15.11 "w wioskach blackwooda tez blackwood recruit, nie tylko riverland recruit"): ta sama regula co HouseLevies w osadach glownych -
+                    // zwykle okienko (chlop, kind 0) z szansa HouseRecruitShare to rekrut rodu tier 1 pana wsi (warunki jak NobleT1: wies nie gracza, kultura pana = wsi,
+                    // szablon z pieszym tier 1). Los raz na okienko przy jego losowaniu (oferta trzymana na dobe) - stabilnie.
+                    if (key && kind == 0 && t != null && t == basic)
+                    {
+                        var hl = HouseT1Here(st, uid);
+                        if (hl != null && hl.Count > 0)
+                        {
+                            _ldBasicRolls++;
+                            if (MBRandom.RandomFloat * 100f < HouseShareRecruitPct) { t = hl[MBRandom.RandomInt(hl.Count)]; kind = 1; _ldBasicHouse++; }
+                        }
+                    }
                     if (t != null && t.IsHero) t = null;
                     if (t == null) { o.NoBasic = true; break; }   // kultura bez BasicTroop - brak okienek (opcja ukryta jak dotad); recenzja: nie losuje od nowa do konca doby
                     if (why != null && o.HouseWhy == null) o.HouseWhy = why;
@@ -445,7 +457,7 @@ namespace Armoury
                     else if (o.Own) why = "wies gracza (rekrut rodu tylko we wsi cudzego pana)";
                     else if (o.BkLow) why = "pula BK osady < 1 - sami chlopi";
                     else if (o.NoHead) why = "brak soltysa / notabla z rekrutami - sami chlopi";
-                    else if (o.Elite == 0) why = "los: elity 0 w " + o.Slots.Count + " losowaniach modelu ochotnikow";
+                    else if (o.Elite == 0) why = "los: elity 0 w " + o.Slots.Count + " losowaniach modelu ochotnikow, zwykli -> rod 0 (536, " + HouseShareRecruitPct.ToString("0.#", Inv) + "%)";
                     else if (o.HouseWhy != null) why = o.HouseWhy;
                     else why = "elita wylosowana w okienkach juz wzietych albo poza dzisiejszymi";
                 }
@@ -464,6 +476,22 @@ namespace Armoury
         private static readonly Dictionary<CharacterObject, bool> _lvEliteCache = new Dictionary<CharacterObject, bool>();
         private static readonly Dictionary<Clan, List<CharacterObject>> _lvHouseT1 = new Dictionary<Clan, List<CharacterObject>>();
         private static int _ldNobHouse, _ldNobElite, _ldNobPeasant, _ldNobHouseMen, _ldNobEliteMen;
+        private static int _ldBasicRolls, _ldBasicHouse;   // 536: zwykle okienka na ziemi rodu - losowane / zamienione na rekruta rodu (czesc _ldNobHouse)
+        /// <summary>536: szansa (procent) zwyklego okienka na rekruta rodu - klucz HouseRecruitShare (wspolny z HouseLevies), 0..100.</summary>
+        internal static float HouseShareRecruitPct { get { try { var s = Settings.Current; return s == null ? 25f : Math.Max(0f, Math.Min(100f, s.HouseRecruitShare)); } catch { return 0f; } } }
+
+        /// <summary>536: ludzie rodu tier 1 pana wsi, gdy wies jest na wlasnej ziemi rodu (warunki NobleT1: nie gracza, kultura pana = wsi, szablon rodu); inaczej null. Nie rzuca.</summary>
+        private static List<CharacterObject> HouseT1Here(Settlement st, string uid)
+        {
+            try
+            {
+                var cul = st.Culture; var owner = st.OwnerClan;
+                if (owner == null || cul == null || owner.Culture != cul || owner.DefaultPartyTemplate == null) return null;
+                if (SideVillageFief.IsMine(uid) || OwnLands(st)) return null;
+                return HouseT1Of(owner, cul);
+            }
+            catch (Exception e) { LvStumble("HouseT1Here", e); return null; }
+        }
         private static readonly List<string> _ldNobEx = new List<string>();
 
         /// <summary>531: oddzial siedzi w drzewie elite_basic_troop swojej kultury (jak HouseLevies.IsElite / ROT IsEliteTroop). Nie rzuca.</summary>
@@ -499,7 +527,7 @@ namespace Armoury
 
         /// <summary>531: ludzie rodu tier 1 z szablonu klanu (stacki + awanse, jak HouseLevies.TreeOf), kultury culture; bez zwyklego rekruta i elity kultury
         /// (szablon zwyklego klanu to drzewo kultury - to nie "ludzie rodu"). Pamiec per klan na sesje. Nie rzuca.</summary>
-        private static List<CharacterObject> HouseT1Of(Clan clan, CultureObject culture)
+        internal static List<CharacterObject> HouseT1Of(Clan clan, CultureObject culture)
         {
             List<CharacterObject> list;
             if (_lvHouseT1.TryGetValue(clan, out list)) return list;
@@ -1194,7 +1222,7 @@ namespace Armoury
                     Log.Info(LP + "dzien " + (today - 1) + " | klucz " + (LevyKey ? "TAK" : "WYL") + " | werbunki " + _ldRec + " (ludzi " + _ldMen + ", zlota do kies wsi " + _ldGold + ", z DOM "
                              + _ldGot.ToString("0.##", Inv) + ", podloga " + _ldFloor.ToString("0.##", Inv) + ", brak rak +" + _ldLack.ToString("0.#", Inv) + ")"
                              + (_ldHouseRec > 0 ? " | w tym levy rodow (474-P5): werbunki " + _ldHouseRec + ", ludzi " + _ldHouseMen + ", zlota " + _ldHouseGold : "")
-                             + " | szlachetni tier 1 (531, klucz Side Village House Recruit " + (HouseRecruitKey ? "TAK" : "NIE") + "): okienka doby (534, kazde losowane osobno) - rekrut rodu pana " + _ldNobHouse + " (ludzi wzietych " + _ldNobHouseMen
+                             + " | szlachetni tier 1 (531, klucz Side Village House Recruit " + (HouseRecruitKey ? "TAK" : "NIE") + "): okienka doby (534, kazde losowane osobno) - rekrut rodu pana " + _ldNobHouse + " (w tym ze zwyklych 536: " + _ldBasicHouse + " z " + _ldBasicRolls + " przy " + HouseShareRecruitPct.ToString("0.#", Inv) + "%; ludzi wzietych " + _ldNobHouseMen
                              + "), elita kultury t1 " + _ldNobElite + " (ludzi " + _ldNobEliteMen + "), elita -> chlop " + _ldNobPeasant + (_ldNobEx.Count > 0 ? " [" + string.Join("; ", _ldNobEx.ToArray()) + "]" : "")
                              + " | odmowy (wioska x powod, bez powtorzen): " + (sb.Length > 0 ? sb.ToString() : "-")
                              + " | pule: wpisow " + _lv.Count + ", przyrost mlodych w " + _ldDue + " (+" + _ldGrown.ToString("0.##", Inv) + "), odnowa: " + rs.Text() + ", pelne usuniete " + _ldDrop
