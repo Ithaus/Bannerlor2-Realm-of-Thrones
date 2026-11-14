@@ -18,11 +18,14 @@ namespace Armoury
     /// Siedem bledow BK, kazdy potwierdzony w IL zainstalowanego BannerKings.dll (Modules/BannerKings.Redux) i w dekompilacji:
     ///  1 FianRanger (styl Fian = kultura battania = Polnoc w ROT): BKMapTrackTweakPatches.GetTrackLifePostfix mnozy zycie sladu x0.2 (opis: +20%).
     ///    Postfiks ma 67 bajtow IL - moglby byc wkompilowany (inline) w otoczke Harmony celu, wiec transpiler na nim nie jest pewny: latka BK
-    ///    zdjeta z DefaultMapTrackModel.GetTrackLife (Unpatch tym samym MethodInfo) i zastapiona nasza kopia z x1.2 (klucz NIE = x0.2 jak BK).
+    ///    zdjeta z DefaultMapTrackModel.GetTrackLife (Unpatch tym samym MethodInfo) i zastapiona nasza (klucz NIE = x0.2 jak BK).
+    ///    Recenzja 504: slady zostawiaja tylko partie inne niz gracza (CanPartyLeaveTrack wyklucza IsMainParty) i tylko gracz je czyta - wiec
+    ///    jak Scouting.Tracker w GetTrackLife gry: gdy WODZ PARTII GRACZA ma Ranger, kazdy tworzony slad x1.2 (nie slad partii z perkiem).
     ///  2 JawwalDuneRider: BKPartySpeedTweakPatches.CalculateFinalSpeedPostfix - AddFactor(0.8) na pustyni (opis: 8%). Transpiler na postfiksie BK
     ///    (851 bajtow IL - nie do wkompilowania): ldc.r4 0.8 po get_JawwalDuneRider -> DuneFactor() (0.08; klucz NIE = 0.8).
     ///  3 TheologyMatrimony: BKMarriageModel.GetInfluenceCost - Helpers.ApplyPerk(..., primary: true) = +5% (premia na ocene malzonka), a koszt
-    ///    wplywu ma druga polowa -15%. Transpiler: ldc.i4.1 przed call ApplyPerk -> Primary() (false = SecondaryBonus; klucz NIE = true).
+    ///    wplywu ma druga polowa -15%. Transpiler: call Helpers.ApplyPerk (po ldc.i4.1) -> MatrimonyApply (primary false = SecondaryBonus,
+    ///    licznik tylko gdy bohater ma perk; klucz NIE = primary jak BK), dalej oryginalny Helpers.ApplyPerk przez delegat.
     ///  4 LordshipSellswordCareer: BKDiplomacyModel.GetMercenaryDownPayment - to samo (+15% z punktow kariery zamiast +10% zaliczki). Transpiler jw.
     ///  5 ScholarshipTutor: BKEducationBehavior.ApplyScholarshipTutorEffect - Count((Hero _) => hero.GetPerkValue(Tutor)), hero = dorastajace
     ///    DZIECKO (lambda nie patrzy na swoj parametr) - nigdy nie dziala. Transpiler na OnHeroComesOfAge (wolanym przez zdarzenie, nie do
@@ -208,6 +211,8 @@ namespace Armoury
                 foreach (var p in info.Postfixes)
                     if (p.PatchMethod != null && p.PatchMethod.DeclaringType != null && p.PatchMethod.DeclaringType.Name == "BKMapTrackTweakPatches") { bk = p.PatchMethod; break; }
             if (bk == null) return "pominiete: brak postfiksu BK na DefaultMapTrackModel.GetTrackLife";
+            // recenzja 504: bez perka nie zdejmujemy latki BK (inaczej Ranger przepada w obu stanach klucza)
+            if (_fian == null) return "pominiete: brak perka LifestyleFianRanger w MBObjectManager (postfiks BK zostaje)";
             int r = FindConst(PatchProcessor.GetOriginalInstructions(bk), "get_FianRanger", 0.2f, 1.2f);
             if (r < 0) return Why(r, "x0.2 po get_FianRanger");
             if (_pCfg == null || _pEdu == null || _mGetEdu == null || _mHasPerk == null) return "pominiete: brak API BK (EducationManager.GetHeroEducation / EducationData.HasPerk)";
@@ -219,7 +224,7 @@ namespace Armoury
                 try { _h.Patch(target, postfix: new HarmonyMethod(bk)); } catch { }   // nie zostawiac gry bez perka - wraca latka BK
                 return "BLAD: nasza latka nie weszla - postfiks BK przywrocony";
             }
-            return "wpieta (postfiks BK zdjety z DefaultMapTrackModel.GetTrackLife, nasza kopia x1.2)";
+            return "wpieta (postfiks BK zdjety z DefaultMapTrackModel.GetTrackLife; nasz: wodz partii gracza z perkiem -> kazdy slad x1.2)";
         }
 
         private static bool HasEdu(Hero hero, PerkObject perk)
@@ -230,14 +235,24 @@ namespace Armoury
             return edu != null && (bool)_mHasPerk.Invoke(edu, new object[] { perk });
         }
 
-        /// <summary>Zamiast BKMapTrackTweakPatches.GetTrackLifePostfix: slad partii wodza z perkiem Ranger x1.2 (klucz NIE = x0.2 jak BK).</summary>
+        /// <summary>Zamiast BKMapTrackTweakPatches.GetTrackLifePostfix. Klucz TAK: wodz partii GRACZA ma Ranger -> kazdy tworzony slad zyje x1.2
+        /// ("Increase maximum track life by 20%", wzor Scouting.Tracker w GetTrackLife gry; slady czyta tylko gracz). Klucz NIE = BK: slad partii,
+        /// ktorej wodz ma perk, x0.2.</summary>
         public static void TrackLifePostfix(MobileParty __0, ref int __result)
         {
             try
             {
-                var hero = __0 != null ? __0.LeaderHero : null;
-                if (hero == null || _fian == null || !HasEdu(hero, _fian)) return;
-                __result = (int)((float)__result * (On ? 1.2f : 0.2f));
+                if (__0 == null || _fian == null) return;
+                if (!On)
+                {
+                    var own = __0.LeaderHero;
+                    if (own != null && HasEdu(own, _fian)) __result = (int)((float)__result * 0.2f);
+                    return;
+                }
+                var mp = MobileParty.MainParty;
+                var hero = mp != null ? mp.LeaderHero : null;
+                if (hero == null || __0.IsCurrentlyAtSea || !HasEdu(hero, _fian)) return;
+                __result = (int)((float)__result * 1.2f);
                 Interlocked.Increment(ref _dFian);
             }
             catch (Exception e) { Stumble("TrackLifePostfix", e); }
@@ -276,35 +291,55 @@ namespace Armoury
             var t = AccessTools.TypeByName(type);
             var m = t != null ? AccessTools.DeclaredMethod(t, name, args) : null;
             if (m == null) return "pominiete: brak " + type + "." + name;
-            int r = FindPrimary(PatchProcessor.GetOriginalInstructions(m), getter);
+            var orig = PatchProcessor.GetOriginalInstructions(m);
+            int r = FindPrimary(orig, getter);
             if (r < 0) return Why(r, "ApplyPerk(primary: true) z " + getter);
+            var ap = orig[r + 1].operand as MethodInfo;
+            if (ap == null || !ap.IsStatic) return "pominiete: Helpers.ApplyPerk nie jest metoda statyczna";
+            if (_applyPerk == null) _applyPerk = AccessTools.MethodDelegate<ApplyPerkFn>(ap);   // inna sygnatura = wyjatek w Try, bez latki
             _h.Patch(m, transpiler: new HarmonyMethod(typeof(BkPerkFix504), tr));
             return Wired(m, "transpiler " + t.Name + "." + name + ": ApplyPerk primary -> druga polowa perka");
         }
 
+        /// <summary>Sygnatura BK Helpers.ApplyPerk(PerkObject, Hero, ref ExplainedNumber, bool primary).</summary>
+        private delegate void ApplyPerkFn(PerkObject perk, Hero hero, ref ExplainedNumber result, bool primary);
+        private static ApplyPerkFn _applyPerk;
+
+        // ldc.i4.1 (argument primary BK) zostaje; podmieniamy tylko cel call Helpers.ApplyPerk na nasza otoczke o tej samej sygnaturze
         private static IEnumerable<CodeInstruction> SwapPrimary(IEnumerable<CodeInstruction> instructions, string getter, string helper)
         {
             var ins = new List<CodeInstruction>(instructions);
             int k = FindPrimary(ins, getter);
-            if (k >= 0) { ins[k].opcode = OpCodes.Call; ins[k].operand = AccessTools.Method(typeof(BkPerkFix504), helper); }
+            if (k >= 0 && _applyPerk != null) ins[k + 1].operand = AccessTools.Method(typeof(BkPerkFix504), helper);
             return ins;
         }
 
         public static IEnumerable<CodeInstruction> TrMatrimony(IEnumerable<CodeInstruction> instructions)
         {
-            return SwapPrimary(instructions, "get_TheologyMatrimony", nameof(MatrimonyPrimary));
+            return SwapPrimary(instructions, "get_TheologyMatrimony", nameof(MatrimonyApply));
         }
 
         public static IEnumerable<CodeInstruction> TrSellsword(IEnumerable<CodeInstruction> instructions)
         {
-            return SwapPrimary(instructions, "get_LordshipSellswordCareer", nameof(SellswordPrimary));
+            return SwapPrimary(instructions, "get_LordshipSellswordCareer", nameof(SellswordApply));
         }
 
-        /// <summary>Argument 'primary' w BKMarriageModel.GetInfluenceCost: false = -15% kosztu wplywu (klucz NIE = true, +5% jak BK).</summary>
-        public static bool MatrimonyPrimary() { Interlocked.Increment(ref _dMatr); return !On; }
+        /// <summary>Zamiast Helpers.ApplyPerk w BKMarriageModel.GetInfluenceCost: primary false = -15% kosztu wplywu (klucz NIE = primary BK, +5%).
+        /// Licznik doby tylko, gdy bohater perk ma (recenzja 504: dowod dzialania, nie liczba wywolan). Wyjatki BK leca dalej jak dotad.</summary>
+        public static void MatrimonyApply(PerkObject perk, Hero hero, ref ExplainedNumber result, bool primary)
+        {
+            bool on = On;
+            if (on && hero != null && perk != null && hero.GetPerkValue(perk)) Interlocked.Increment(ref _dMatr);
+            _applyPerk(perk, hero, ref result, on ? false : primary);
+        }
 
-        /// <summary>Argument 'primary' w BKDiplomacyModel.GetMercenaryDownPayment: false = +10% zaliczki (klucz NIE = true, +15% jak BK).</summary>
-        public static bool SellswordPrimary() { Interlocked.Increment(ref _dSell); return !On; }
+        /// <summary>Zamiast Helpers.ApplyPerk w BKDiplomacyModel.GetMercenaryDownPayment: primary false = +10% zaliczki (klucz NIE = primary BK, +15%).</summary>
+        public static void SellswordApply(PerkObject perk, Hero hero, ref ExplainedNumber result, bool primary)
+        {
+            bool on = On;
+            if (on && hero != null && perk != null && hero.GetPerkValue(perk)) Interlocked.Increment(ref _dSell);
+            _applyPerk(perk, hero, ref result, on ? false : primary);
+        }
 
         // ------------------------------------------------------------ 5 ScholarshipTutor
         private static string FixTutor()
@@ -461,9 +496,10 @@ namespace Armoury
         {
             try
             {
-                if (_dFian + _dDune + _dMatr + _dSell + _dTutorKids + _dCav + _dWell + _dStumbles > 0)
-                    Log.Info(P + "dzien " + day + " | klucz " + (On ? "TAK" : "NIE") + " | slad Ranger (x1.2): " + _dFian + " | Dune Rider na pustyni (+8%): " + _dDune
-                             + " | koszt slubu (wywolania, -15% przy perku): " + _dMatr + " | zaliczka najemnikow (wywolania, +10% przy perku): " + _dSell
+                // recenzja 504: linia tylko przy realnym dzialaniu perka (dorastajacy bez nauczyciela w rodzie sie nie liczy)
+                if (_dFian + _dDune + _dMatr + _dSell + _dTutorPts + _dCav + _dWell + _dStumbles > 0)
+                    Log.Info(P + "dzien " + day + " | klucz " + (On ? "TAK" : "NIE") + " | slady x1.2 (Ranger gracza): " + _dFian + " | Dune Rider na pustyni (+8%): " + _dDune
+                             + " | koszt slubu z perkiem (-15%): " + _dMatr + " | zaliczka najemnikow z perkiem (+10%): " + _dSell
                              + " | Tutor: dorastajacych " + _dTutorKids + ", punktow cech " + _dTutorPts + (_lastTutor.Length > 0 ? " (ostatnio " + _lastTutor + ")" : "")
                              + " | konny ochotnik (+30%): " + _dCav + " | Well Strapped (+0.5 lojalnosci): " + _dWell
                              + " | potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
