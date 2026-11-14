@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 07:10 - WGRANIE 229 (493 werbunek we wsiach pobocznych wedlug reputacji wsi glownej; test zbiorczy at-493b nocy 14.11)
+
+- Armoury.dll md5 4387bb464ae52ab1ace45e97755e9de9 = galaz noc/367c-jeniec-po-odejsciu f59c11bf (WGRANIE 228 + 493). GrandTourney, ForgeView, RealisticCaptivity, CrashScribe bez zmian. Kopie przed: Armoury.dll.bak-2026-11-14-przed-wgranie229 (= 228 a97b2e28), C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie229 i -przed).
+- at-493b (Armoury-2026-11-14_03-46-19.log): 220/220 dob z bitwami (3/5, lordowie pominieci - brak wolnej partii), 23 bledy cudze jak zwykle, 0 potkniec, 0 BLAD. 486 nocleg: zaplacono = rachunek (5 zl Highgarden), bonus wypoczecia dziala; 492 srebro: 14 miast ze zlotnikiem, karawany skierowane i sprzedaz 1-14 szt./d; 485: siedzacy 0.08-0.15 m od krzesla; 484: wpiete przed RBM, w bitwach z bandytami 9 trafien slabszych niz 12 HP - odbite (kolejnosc gry sprawdzona: rana liczona przed decyzja o wbiciu). Nie sprawdzone autotestem: 491 (brak turnieju), 493 (gracz testu nie bywa we wsiach pobocznych) - Jeff w grze.
+- Drugi test at-497 (494-497 scalone, f625d363, m497): tez czysty (220/220, 23 bledy, 0 potkniec, 22.7 s/dobe). 494/495/496 dzialaja. ALE 497 nie osiaga celu: zboze na targ Westeros tylko -2-3% (ksiega 12.1k -> 11.9k), za to ksiega zywca Westeros -5-10% (gra 0.66-0.83 Planu z czynnikami) - przy problemie z miesem to krok w zla strone. Przyczyna (hipoteza z logu): fach trzyma 50-57 ze 123 okregow zboza przy k = 1.00 na celu bez czynnikow. Decyzja domyslna (noc 14.11): 494-497 NIE wgrane; dalej poprawka fachu/zywca 497-q i test.
+- Do sprawdzenia w grze Jeffa: "Werbunek wsi pobocznych" - wies poboczna daje ludzi wedlug reputacji wsi glownej; "Rany szranek (491)" po turnieju.
+
 ## STAN 14.11 - WGRANIE 228 (486-q nocleg zgodny z rachunkiem, 491 rany na turnieju, 492 karawany wioza srebro do zlotnikow; bez autotestu - Jeff sprawdza w grze)
 
 - Armoury.dll md5 a97b2e28cc42498f8e6be06f5555c5d5, GrandTourney.dll md5 5a3e98b29b129b5519a58420eed928a1 = galaz noc/367c-jeniec-po-odejsciu (2f2dc3a4 + odstep CHANGELOG). CrashScribe bez zmian (62174c0a).
