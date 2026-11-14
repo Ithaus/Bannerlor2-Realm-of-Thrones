@@ -9118,7 +9118,7 @@ namespace Armoury
         public bool FixPrincelyArbiterWage { get; set; } = true;
 
         // 515 (perki 100/102)
-        [SettingPropertyBool("Naval Models Under Bk", HintText = "The War Sails rules for wages, food, militia and battle experience run again beneath Banner Kings (War Sails loads before Banner Kings, whose models never called it): a company at sea pays a fifth less and a caravan at sea far less, the boatswain wage and hiring perks count, a party at sea eats a fifth less (Smooth Operator too), port governors' militia perks and the Bolster the Fyrd policy count, and the Arr and Pirate Hunter perks add battle experience. Takes effect when a save is loaded. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Naval Models Under Bk", HintText = "The War Sails rules for wages, food, militia and battle experience run again beneath Banner Kings (War Sails loads before Banner Kings, whose models never called it): a company at sea pays a fifth less and a caravan at sea far less, the boatswain wage and hiring perks count, a party at sea eats a fifth less (Smooth Operator too), port governors' militia perks and the Bolster the Fyrd policy count, and the Arr and Pirate Hunter perks add battle experience. The wage part needs Fix Bkrot Wage Chain and Fix Bkrot Wage Sea Cut. Takes effect when a save is loaded. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool NavalModelsUnderBk { get; set; } = true;
 
@@ -9126,9 +9126,9 @@ namespace Armoury
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool NavalDeployStatsFix { get; set; } = true;
 
-        [SettingPropertyBool("Naval Deploy Ammo Fix", HintText = "In naval battles the extra ammunition and shields of War Sails work again: the captain's Well Stocked and Shipwright's Insight perks and each ship's extra quivers, throwing weapons and shield strength. Off = no extra ammunition at sea, as before", RequireRestart = false)]
+        [SettingPropertyBool("Naval Deploy Ammo Fix", HintText = "In naval battles the extra ammunition and shields of War Sails work again: the captain's Well Stocked and Shipwright's Insight perks and each ship's extra quivers, throwing weapons and shield strength. Off by default (extra arrows wait for a decision; the log still counts the soldiers who would get them). Off = no extra ammunition at sea, as before", RequireRestart = false)]
         [SettingPropertyGroup("Model chains under the BKROT patch")]
-        public bool NavalDeployAmmoFix { get; set; } = true;
+        public bool NavalDeployAmmoFix { get; set; } = false;
 
         [SettingPropertyBool("Patch Target Guard", HintText = "Fix hooks aimed at an inherited rule: when Armoury, CrashScribe, Realistic Captivity, Grand Tourney or ForgeView hooks a game rule by hand after Armoury has loaded, through a mod's model that only inherits that rule (like the Banner Kings smithing cost), the hook and its later removal are moved onto the class that really holds the rule, and a hook already in place there is not added a second time. Without it the game's patching tool refuses such a hook, the Banner Kings - Realm of Thrones patch hides the refusal, and the feature silently does nothing (this is how wood at the anvil failed). Hooks of other mods are only counted in the log, never changed. Off = only report such hooks in the log", RequireRestart = false)]
         [SettingPropertyGroup("Model chains under the BKROT patch")]

@@ -235,7 +235,7 @@ namespace Armoury
                 try { HarvestValve.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HarvestValve.ApplyAll", e); }   // E6/W3 (221): regulator wsi - pomiar produkcji w ticku wsi (PO lesie wsi i dymarce: postfiks Priority.Last)
                 PopulationLaw.ApplyTownTax(_harmony);
                 Rations.ApplyAll(_harmony);      // dlugi marsz, dlugie racje - zuzycie jedzenia w dol (gracz i AI)
-                try { FoodChain.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodChain.ApplyAll", e); }   // E4/6a: RBL liczy pory roku na wyniku lancucha ROT -> NavalDLC -> BEE -> BK (jeden lancuch modelu jedzenia)
+                try { FoodChain.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodChain.ApplyAll", e); }   // E4/6a: RBL liczy pory roku na wyniku lancucha ROT -> BEE -> BK (od 515: ROT -> BEE -> NavalDLC -> BK) (jeden lancuch modelu jedzenia)
                 try { WinterRealm.ApplyBkFeed(_harmony); } catch (Exception e) { Log.Error("WinterRealm.ApplyBkFeed", e); }   // wariant (a) Jeffa 11.10: pasza BK po glowie (warunki terenu BK bez zmian)
                 ScorchedEarth.ApplyAll(_harmony);
                 try { DayGate.Apply(_harmony); } catch (Exception e) { Log.Error("DayGate.Apply", e); }   // 280 (B2): straznik taktu doby - prefiks First na Campaign.DailyTick (pierwszy takt po wczytaniu z numerem dnia ostatniej doby z zapisu pomijany; P1 w OnSessionLaunched)

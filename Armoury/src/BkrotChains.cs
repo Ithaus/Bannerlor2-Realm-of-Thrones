@@ -247,7 +247,7 @@ namespace Armoury
 
         private static bool IsBkrot(object m) { var n = m != null ? m.GetType().FullName : null; return n != null && n.StartsWith("BKROTPatch.", StringComparison.Ordinal); }
 
-        /// <summary>CW (n20-towarzysze, recenzja): glowa lancucha zoldu czynnego modelu (ROT -> NavalDLC -> BEE -> BK) - samosprawdzenie zoldu bohaterow rodu
+        /// <summary>CW (n20-towarzysze, recenzja): glowa lancucha zoldu czynnego modelu (ROT -> BEE -> BK; od 515 przy NavalModelsUnderBk: ROT -> BEE -> NavalDLC -> BK) - samosprawdzenie zoldu bohaterow rodu
         /// szuka w nim ogniwa BKPartyWageModel, ktore naprawde liczy zold (BKROT dziedziczy po BK, ale jego wywolanie bazowe idzie lancuchem). Null - lancuch nieczynny.</summary>
         internal static object WageHead(object active) { return Head(K.Wage, active); }
 

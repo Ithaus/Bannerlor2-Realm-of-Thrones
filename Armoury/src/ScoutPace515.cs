@@ -39,6 +39,9 @@ namespace Armoury
         private static long _nPath, _nDesert, _nNight, _nDay, _nUncanny, _nForced, _nTracker, _nCall;
         private static int _stumbles, _dStumbles;
         private static volatile string _sample = "-";   // ostatnie wywolanie gracza (tylko log)
+        // recenzja 515: liczniki tylko na probce (co 16. wywolanie na watek, jak HorseState.SpeedBegin) - bez Interlocked przy kazdym wywolaniu goracej sciezki
+        private const int Every = 16;
+        [ThreadStatic] private static int _tick;
 
         internal static void Reset()
         {
@@ -74,11 +77,16 @@ namespace Armoury
             if (mp.IsCurrentlyAtSea) return 0f;
             var probe = new ExplainedNumber(1f);
             var scout = mp.EffectiveScout;
+            var army0 = mp.Army;
+            if (scout == null && (army0 == null || army0.LeaderParty == null || army0.LeaderParty == mp)) return 0f;   // recenzja 515: tanie odrzucenie
             if (scout != null)
             {
                 TerrainType face = TerrainType.Plain;
                 bool haveFace = false;
-                try { face = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace); haveFace = true; } catch { }
+                // recenzja 515: teren (wywolanie natywne) tylko, gdy zwiadowca ma perk terenu
+                var pf = DefaultPerks.Scouting.Pathfinder; var db = DefaultPerks.Scouting.DesertBorn;
+                if ((pf != null && scout.GetPerkValue(pf)) || (db != null && scout.GetPerkValue(db)))
+                    try { face = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace); haveFace = true; } catch { }
                 if (haveFace)
                 {
                     // jak gra: las i brod (woda, rzeka, most) bez tych perkow; pustynia i wydmy - DesertBorn; rownina i step - Pathfinder
@@ -137,10 +145,13 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || mp == null) return cap;
-                Interlocked.Increment(ref _bind);
+                bool sample = (++_tick % Every) == 0 || mp == MobileParty.MainParty;
+                if (sample) Interlocked.Increment(ref _bind);
                 int mask;
                 float share = PerkShare(mp, out mask);
                 if (share <= 0.0001f) return cap;
+                float lifted0 = s.ScoutPerksLiftMarchCap ? Math.Min(current, cap * (1f + share)) : cap;
+                if (!sample) return lifted0;
                 Interlocked.Increment(ref _withPerk);
                 if (mp == MobileParty.MainParty) Interlocked.Increment(ref _player);
                 Interlocked.Add(ref _sumPerkM, M(share));
@@ -158,7 +169,7 @@ namespace Armoury
                 float natural = f > 0.01f ? current / f * Math.Max(0.01f, f - share) : current / (1f + share);
                 float perkPart = Math.Max(0f, current - natural);
                 float lostBefore = Math.Min(perkPart, current - cap);
-                float lifted = s.ScoutPerksLiftMarchCap ? Math.Min(current, cap * (1f + share)) : cap;
+                float lifted = lifted0;
                 float lostAfter = Math.Max(0f, Math.Min(perkPart, current - lifted));
                 Interlocked.Add(ref _lostBeforeM, M(lostBefore));
                 Interlocked.Add(ref _lostAfterM, M(lostAfter));
@@ -193,7 +204,7 @@ namespace Armoury
                 double n = Math.Max(1, wp);
                 var s = Settings.Current;
                 Log.Info(P + "dzien " + day + " | klucz " + (s != null && s.ScoutPerksLiftMarchCap ? "TAK" : "NIE (pomiar)")
-                         + " | sufit kolumny wiazal " + bind + " razy, z premia perkow " + wp + " (gracz " + Interlocked.Read(ref _player) + ")"
+                         + " | probka (co " + Every + ". wywolanie, gracz zawsze): sufit kolumny wiazal " + bind + " razy, z premia perkow " + wp + " (gracz " + Interlocked.Read(ref _player) + ")"
                          + (wp > 0
                             ? " | srednio: wynik gry " + (Interlocked.Read(ref _curM) / 1000.0 / n).ToString("0.00", Inv)
                               + ", premia +" + (Interlocked.Read(ref _sumPerkM) / 10.0 / n).ToString("0.0", Inv) + "%"

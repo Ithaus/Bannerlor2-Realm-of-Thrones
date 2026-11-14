@@ -42,7 +42,8 @@ namespace Armoury
         }
 
         /// <summary>Priority.Last - po BK i po wszystkich, co dokladaja swoje.</summary>
-        // Licznik zagniezdzenia (audyt 04.10): ROT -> NavalDLC -> BEE -> BK woluja model wewnetrzny, a latka
+        // Licznik zagniezdzenia (audyt 04.10; lancuch poprawiony w recenzji 515: ROT -> BEE -> BK, od 515 przy NavalModelsUnderBk
+        // ROT -> BEE -> NavalDLC -> BK; NavalDLC nie deklaruje Rations - licznik obejmuje kazde ogniwo) woluja model wewnetrzny, a latka
         // siedzi na kazdym z nich - ciecie -40% szlo 3-4 razy (partie jadly ~13-22% normy). Tniemy RAZ, na zewnatrz.
         [ThreadStatic] private static int _depth;
         public static void Prefix() { _depth++; }

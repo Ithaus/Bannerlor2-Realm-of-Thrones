@@ -49,7 +49,7 @@ namespace Armoury
     /// (przy udziale 0.5: pustynia - BK pelna >= E4/1 0.5 x kraina, doplata tylko za wielblady; snieg - BK pol >= E4/1 0.5 x kraina, bez doplaty).
     /// U Jeffa aktywnym modelem jest RBL RealisticFoodConsumptionModel (RBL laduje sie po ROT, dziedziczy po Default i nie wola modelu
     /// wewnetrznego) - bez E4/6a BK nie karmi nigdzie, wiec doplata jest pelna takze na pustyni i w sniegu. Od E4/6a (FoodChain, FoodModelChain)
-    /// RBL oddaje swoje metody lancuchowi pod soba (ROT -> NavalDLC -> BEE -> BK) - regula paszy BK biegnie; FeedInfo idzie wtedy przez RBL
+    /// RBL oddaje swoje metody lancuchowi pod soba (ROT -> BEE -> BK; od 515 przy NavalModelsUnderBk: ROT -> BEE -> NavalDLC -> BK) - regula paszy BK biegnie; FeedInfo idzie wtedy przez RBL
     /// w glab (FoodChain.Chains). Lancuch ustalany raz na kampanie (FeedInfo):
     /// od aktywnego modelu w glab przez owijki (typ wprost po abstrakcyjnym MobilePartyFoodConsumptionModel - ROT _previousModel, BEE _baseModel,
     /// NavalDLC BaseModel); typ po klasie konkretnej (RBL po Default) konczy lancuch - ten sam test, ktorym ROT sprawdza modele (ValidateGameModel).

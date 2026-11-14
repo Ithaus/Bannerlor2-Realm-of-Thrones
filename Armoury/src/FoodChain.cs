@@ -207,7 +207,7 @@ namespace Armoury
             }
         }
 
-        /// <summary>Zamiast base w RBL: model wewnetrzny RBL (ROT -> NavalDLC -> BEE -> BK); bez lancucha / przy wyjatku - Default jak dotad.</summary>
+        /// <summary>Zamiast base w RBL: model wewnetrzny RBL (ROT -> BEE -> BK; od 515 przy NavalModelsUnderBk: ROT -> BEE -> NavalDLC -> BK); bez lancucha / przy wyjatku - Default jak dotad.</summary>
         public static ExplainedNumber InnerDaily(DefaultMobilePartyFoodConsumptionModel self, MobileParty party, ExplainedNumber baseConsumption)
         {
             var inner = InnerFor(self);
@@ -304,7 +304,7 @@ namespace Armoury
                 h.Patch(mEats, prefix: new HarmonyMethod(typeof(FoodChain), nameof(EatsPrefix)) { priority = Priority.First });
                 _patched = true;
                 _start = "wpiety";
-                Log.Info("FoodChain (E4/6a): wpiety - RBL liczy pory roku i pogode na wyniku swojego modelu wewnetrznego (ROT -> NavalDLC -> BEE -> BK);"
+                Log.Info("FoodChain (E4/6a): wpiety - RBL liczy pory roku i pogode na wyniku swojego modelu wewnetrznego (ROT -> BEE -> BK; od 515 przy NavalModelsUnderBk: ROT -> BEE -> NavalDLC -> BK);"
                          + " baza i DoesPartyConsumeFood RBL z lancucha; zima Armoury raz (w bazie najglebszego modelu). Linia lancucha w pierwszej dobie kampanii.");
             }
             catch (Exception e) { _patched = false; _start = "wyjatek przy wpinaniu " + e.GetType().Name; Log.Error("FoodChain.ApplyAll", e); }

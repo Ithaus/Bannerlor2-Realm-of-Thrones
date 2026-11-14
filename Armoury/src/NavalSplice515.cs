@@ -184,23 +184,35 @@ namespace Armoury
             return "BRAK - nikt nie owija " + bk.GetType().Name + " i nie jest czynny (czynny " + (active != null ? active.GetType().Name : "?") + ") - bez zmian";
         }
 
+        /// <summary>Cudze latki na metodzie XP z bitwy (wlasciciele inni niz my); pusty napis = brak.</summary>
+        private static string ForeignOwners(MethodBase decl)
+        {
+            var info = Harmony.GetPatchInfo(decl);
+            if (info == null) return "";
+            var bad = new List<string>();
+            foreach (var p in info.Prefixes) if (p != null && p.owner != Owner) bad.Add(p.owner);
+            foreach (var p in info.Postfixes) if (p != null && p.owner != Owner) bad.Add(p.owner);
+            foreach (var p in info.Transpilers) if (p != null && p.owner != Owner) bad.Add(p.owner);
+            foreach (var p in info.Finalizers) if (p != null && p.owner != Owner) bad.Add(p.owner);
+            return string.Join(", ", bad.ToArray());
+        }
+
         private static bool WireTraining(object bk)
         {
-            if (_trainTarget != null) return true;   // raz na proces (metoda gry, wspolna dla kampanii)
+            if (_trainTarget != null)
+            {
+                // recenzja 515: straz cudzych latek przy KAZDYM starcie sesji, nie raz na proces - latka dolozona pozniej
+                // (inny mod albo nasza) bieglaby dwa razy (wewnatrz NavalDLC -> BK -> gra i na zewnatrz) - wtedy przekierowanie wylaczone
+                var late = ForeignOwners(_trainTarget);
+                if (late.Length > 0) { _trainHook = "cudze latki na " + _trainTarget.DeclaringType.Name + "." + _trainTarget.Name + ": " + late; return false; }
+                return true;
+            }
             var m = AccessTools.Method(bk.GetType(), "CalculateXpGainFromBattles", new[] { typeof(FlattenedTroopRosterElement), typeof(PartyBase) });
             if (m == null) { _trainHook = "brak metody CalculateXpGainFromBattles"; return false; }
             var decl = AccessTools.DeclaredMethod(m.DeclaringType, "CalculateXpGainFromBattles", new[] { typeof(FlattenedTroopRosterElement), typeof(PartyBase) });
             if (decl == null) { _trainHook = "brak metody klasy deklarujacej " + m.DeclaringType.Name; return false; }
-            var info = Harmony.GetPatchInfo(decl);
-            if (info != null)
-            {
-                var bad = new List<string>();
-                foreach (var p in info.Prefixes) if (p != null && p.owner != Owner) bad.Add(p.owner);
-                foreach (var p in info.Postfixes) if (p != null && p.owner != Owner) bad.Add(p.owner);
-                foreach (var p in info.Transpilers) if (p != null && p.owner != Owner) bad.Add(p.owner);
-                foreach (var p in info.Finalizers) if (p != null && p.owner != Owner) bad.Add(p.owner);
-                if (bad.Count > 0) { _trainHook = "cudze latki na " + decl.DeclaringType.Name + "." + decl.Name + ": " + string.Join(", ", bad.ToArray()); return false; }
-            }
+            var foreign = ForeignOwners(decl);
+            if (foreign.Length > 0) { _trainHook = "cudze latki na " + decl.DeclaringType.Name + "." + decl.Name + ": " + foreign; return false; }
             if (_h == null) _h = new Harmony(Owner);
             _h.Patch(decl, prefix: new HarmonyMethod(typeof(NavalSplice515), nameof(TrainPrefix)) { priority = Priority.First });
             _trainTarget = decl;
@@ -232,6 +244,18 @@ namespace Armoury
             try
             {
                 if (_camp == null) { ResetDay(); return; }
+                // recenzja 515: cudza latka na metodzie XP dolozona w trakcie sesji - przekierowanie wylaczone (BRAK z wlascicielem)
+                if (_tNaval != null && _trainTarget != null)
+                {
+                    var late = ForeignOwners(_trainTarget);
+                    if (late.Length > 0)
+                    {
+                        _tNaval = null; _tBk = null;
+                        _trainHook = "cudze latki na " + _trainTarget.DeclaringType.Name + "." + _trainTarget.Name + ": " + late;
+                        foreach (var k in Kinds) if (k.Abs == typeof(PartyTrainingModel)) k.State = "BRAK - " + _trainHook + " (wylaczone w trakcie sesji)";
+                        Log.Info(P + "trening: " + _trainHook + " - przekierowanie wylaczone (bez podwojenia).");
+                    }
+                }
                 var sb = new StringBuilder();
                 foreach (var k in Kinds) sb.Append(sb.Length > 0 ? "; " : "").Append(k.Label).Append(" ").Append(k.State.StartsWith("TAK", StringComparison.Ordinal) ? "TAK" : "NIE");
                 Log.Info(P + "dzien " + day + " | wpiete: " + sb + " | XP z bitwy przez NavalDLC: " + Interlocked.Read(ref _dTrain) + " wywolan (Arr / PirateHunter wodza) (zold na morzu - linia P4 'bez obnizki morskiej') | potkniecia doby " + _dStumbles + " (od startu " + _stumbles + ").");

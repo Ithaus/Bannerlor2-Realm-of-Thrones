@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -30,6 +31,14 @@ namespace Armoury
     /// osobno, bo Jeff 14.11 o DeepQuivers: "dodatkowe strzaly to glupota"; NIE = amunicja jak dotad). Lancuch liczony raz na obiekt czynnego modelu.
     /// Pomiar: pierwsza bitwa morska misji pisze linie z lancuchem; liczniki (agenci, amunicja przed / po) w linii doby "NavalDLC po rozstawieniu (515)".
     /// Bledy liczone (potkniecia) - wyjatek = agent bez premii NavalDLC (jak dotad), bez globalnego wylacznika. Nic co klatke: dwa wywolania na agenta na bitwe.
+    ///
+    /// RECENZJA 515: (1) NavalDeployAmmoFix domyslnie NIE (Jeff 14.11, 16/20/25: "dodatkowe strzaly to glupota") - przy NIE linia doby liczy tylko agentow,
+    /// ktorzy dostaliby amunicje NavalDLC (pomiar na sucho). (2) Uspiony blad NavalDLC ozywiony przez 515: ApplyFigureheadBonuses dla Hawk/Boar robi
+    /// _agentFigureHeadSpawnMap.Add(agent, ...) (NavalAgentStatCalculateModel.cs:69), a slownika nikt nie czysci (tylko Add :69 i TryGetValue :216) - Agenci
+    /// (a przez nich cala Mission) zostawali w pamieci do konca sesji. Czyscimy go przy pierwszym wywolaniu w nowej misji i w linii doby (Mission.Current == null),
+    /// _loggedMission zerowany w linii doby. (3) Commodore + Hawk/Boar na okrecie flagowym i na okrecie agenta = drugi Add tego samego klucza w JEDNYM wywolaniu
+    /// (:46 i :56) - ArgumentException, agent tracil premie zalogi (:59). Prefiks na ApplyFigureheadBonuses (DeclaredMethod, tylko Hawk/Boar przy kluczu juz
+    /// w slowniku) pomija drugi wpis (zostaje pierwszy - galion flagowca, jak by bylo bez wyjatku); liczone osobno ("duplikat Commodore"), nie jako potkniecie.
     /// </summary>
     internal static class NavalDeploy515
     {
@@ -46,20 +55,53 @@ namespace Armoury
         private static AgentStatCalculateModel _naval;
         private static string _walk = "-";
         private static object _loggedMission;
+        private static FieldInfo _mapField;   // NavalAgentStatCalculateModel._agentFigureHeadSpawnMap (Dictionary<Agent, Figurehead>)
+        private static string _prefixHook = "nie wpiety";
 
         // liczniki doby
         private static int _dStats, _dEquip, _dMissions, _dAmmoBefore, _dAmmoAfter, _dHpAdd, _stumbles, _dStumbles;
+        private static int _dEquipDry, _dDup, _dCleared;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
 
         internal static void Reset()
         {
+            ClearMap(_naval);
             _forActive = null; _naval = null; _walk = "-"; _loggedMission = null;
             ResetDay();
             _stumbles = 0;
             _errSites.Clear();
         }
 
-        private static void ResetDay() { _dStats = 0; _dEquip = 0; _dMissions = 0; _dAmmoBefore = 0; _dAmmoAfter = 0; _dHpAdd = 0; _dStumbles = 0; }
+        private static void ResetDay() { _dStats = 0; _dEquip = 0; _dMissions = 0; _dAmmoBefore = 0; _dAmmoAfter = 0; _dHpAdd = 0; _dStumbles = 0; _dEquipDry = 0; _dDup = 0; _dCleared = 0; }
+
+        /// <summary>Czysci slownik galionow modelu NavalDLC (wpisy z poprzednich misji); liczy wyczyszczone wpisy do linii doby.</summary>
+        private static void ClearMap(object nav)
+        {
+            try
+            {
+                if (nav == null || _mapField == null || !_mapField.DeclaringType.IsInstanceOfType(nav)) return;
+                var d = _mapField.GetValue(nav) as System.Collections.IDictionary;
+                if (d == null || d.Count == 0) return;
+                _dCleared += d.Count;
+                d.Clear();
+            }
+            catch (Exception e) { Stumble("ClearMap", e); }
+        }
+
+        /// <summary>Prefiks NavalAgentStatCalculateModel.ApplyFigureheadBonuses: Hawk/Boar przy agencie juz w slowniku - pomin drugi Add (inaczej ArgumentException).</summary>
+        public static bool FigureheadPrefix(object __instance, Agent __0, Figurehead __2)
+        {
+            try
+            {
+                if (__0 == null || __2 == null || _mapField == null) return true;
+                if (__2 != DefaultFigureheads.Hawk && __2 != DefaultFigureheads.Boar) return true;   // inne galiony nie dotykaja slownika
+                var d = _mapField.GetValue(__instance) as System.Collections.IDictionary;
+                if (d == null || !d.Contains(__0)) return true;
+                _dDup++;   // klucz juz jest (Commodore + Hawk/Boar na dwoch okretach): dla Hawk/Boar metoda robi tylko Add - pomijamy, zostaje pierwszy
+                return false;
+            }
+            catch (Exception e) { Stumble("FigureheadPrefix", e); return true; }
+        }
 
         private static void Stumble(string where, Exception e)
         {
@@ -81,14 +123,27 @@ namespace Armoury
                     int n = 0;
                     if (mS != null) { _h.Patch(mS, postfix: new HarmonyMethod(typeof(NavalDeploy515), nameof(StatsPostfix))); n++; }
                     if (mE != null) { _h.Patch(mE, postfix: new HarmonyMethod(typeof(NavalDeploy515), nameof(EquipPostfix))); n++; }
+                    var navT = AccessTools.TypeByName(NavalNames[0]);
+                    if (navT != null)
+                    {
+                        _mapField = AccessTools.DeclaredField(navT, "_agentFigureHeadSpawnMap");
+                        var mF = AccessTools.DeclaredMethod(navT, "ApplyFigureheadBonuses");
+                        if (_mapField != null && mF != null)
+                        {
+                            _h.Patch(mF, prefix: new HarmonyMethod(typeof(NavalDeploy515), nameof(FigureheadPrefix)));
+                            _prefixHook = "wpiety";
+                        }
+                        else _prefixHook = "BRAK (" + (_mapField == null ? "brak pola _agentFigureHeadSpawnMap " : "") + (mF == null ? "brak ApplyFigureheadBonuses" : "") + ")";
+                    }
+                    else _prefixHook = "brak NavalDLC";
                     _hook = n == 2 ? "wpiete 2/2" : "BRAK (" + n + "/2: " + (mS == null ? "brak InitializeAgentStatsAfterDeploymentFinished " : "") + (mE == null ? "brak InitializeMissionEquipmentAfterDeploymentFinished" : "") + ")";
                 }
                 bool navalDll = AccessTools.TypeByName(NavalNames[0]) != null;
                 var s = Settings.Current;
-                Log.Info(P + "start sesji | latki " + _hook + " (postfiks na pustych metodach AgentStatCalculateModel - tylko czynny model w bitwie morskiej)"
+                Log.Info(P + "start sesji | latki " + _hook + " (postfiks na pustych metodach AgentStatCalculateModel - tylko czynny model w bitwie morskiej), straz duplikatu galionu " + _prefixHook
                          + " | NavalDLC " + (navalDll ? "jest" : "BRAK - nic do naprawy")
                          + " | klucze: statystyki (galiony, Commodore, zaloga) " + (s != null && s.NavalDeployStatsFix ? "TAK" : "NIE")
-                         + ", amunicja i tarcze (WellStocked, ShipwrightsInsight, kolczany okretu) " + (s != null && s.NavalDeployAmmoFix ? "TAK" : "NIE")
+                         + ", amunicja i tarcze (WellStocked, ShipwrightsInsight, kolczany okretu) " + (s != null && s.NavalDeployAmmoFix ? "TAK" : "NIE (pomiar na sucho)")
                          + " | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { _hook = "wyjatek " + e.GetType().Name; Stumble("EnsureHooks", e); }
@@ -124,11 +179,17 @@ namespace Armoury
             return _naval;
         }
 
-        private static AgentStatCalculateModel Target(AgentStatCalculateModel inst, bool stats)
+        private static AgentStatCalculateModel Target(AgentStatCalculateModel inst, bool stats, out bool dry)
         {
+            dry = false;
             if (_in || inst == null) return null;
             var s = Settings.Current;
-            if (s == null || (stats ? !s.NavalDeployStatsFix : !s.NavalDeployAmmoFix)) return null;
+            if (s == null) return null;
+            if (stats ? !s.NavalDeployStatsFix : !s.NavalDeployAmmoFix)
+            {
+                if (stats) return null;
+                dry = true;   // amunicja NIE: pomiar na sucho (ilu agentow dostaloby amunicje NavalDLC), bez wywolania
+            }
             var mi = Mission.Current;
             if (mi == null || !mi.IsNavalBattle) return null;
             var mg = MissionGameModels.Current;
@@ -137,6 +198,7 @@ namespace Armoury
             var nav = NavalUnder(active);
             if (!ReferenceEquals(_loggedMission, mi))
             {
+                ClearMap(nav);   // recenzja 515: wpisy galionow z poprzednich misji (slownik NavalDLC nie jest nigdzie czyszczony)
                 _loggedMission = mi; _dMissions++;
                 Log.Info(P + "bitwa morska - czynny model " + active.GetType().FullName + " | lancuch: " + _walk + " | "
                          + (nav != null ? "NavalDLC pod owijkami nie dostawal tych dwoch wywolan - przekazujemy" : "brak modelu NavalDLC w lancuchu - bez zmian") + ".");
@@ -164,7 +226,8 @@ namespace Armoury
             try
             {
                 if (__0 == null) return;
-                var nav = Target(__instance, true);
+                bool dry;
+                var nav = Target(__instance, true, out dry);
                 if (nav == null) return;
                 float hp = __0.HealthLimit;
                 _in = true;
@@ -181,8 +244,10 @@ namespace Armoury
             try
             {
                 if (__0 == null || !__0.IsHuman) return;
-                var nav = Target(__instance, false);
+                bool dry;
+                var nav = Target(__instance, false, out dry);
                 if (nav == null) return;
+                if (dry) { _dEquipDry++; return; }
                 int before = Ammo(__0);
                 _in = true;
                 try { nav.InitializeMissionEquipmentAfterDeploymentFinished(__0); }
@@ -198,9 +263,17 @@ namespace Armoury
         {
             try
             {
-                if (_dMissions == 0 && _dStumbles == 0) { ResetDay(); return; }
+                if (Mission.Current == null)
+                {
+                    ClearMap(_naval);          // slownik galionow NavalDLC - po misji juz niepotrzebny
+                    _loggedMission = null;     // bez trzymania ostatniej Mission
+                }
+                if (_dMissions == 0 && _dStumbles == 0 && _dCleared == 0) { ResetDay(); return; }
                 Log.Info(P + "dzien " + day + " | bitew morskich " + _dMissions + " | lancuch: " + _walk + " | przekazane: statystyki " + _dStats + " agentow (Oxen +HP "
                          + _dHpAdd + "), ekwipunek " + _dEquip + " agentow - amunicja " + _dAmmoBefore + " -> " + _dAmmoAfter + " szt. (WellStocked, ShipwrightsInsight, kolczany okretu)"
+                         + ", klucz amunicji NIE - pominietych (dostaliby amunicje NavalDLC) " + _dEquipDry + " agentow"
+                         + " | duplikat Commodore (Hawk/Boar na dwoch okretach, blad NavalDLC - pominiety drugi wpis) " + _dDup
+                         + " | slownik galionow NavalDLC: wyczyszczono " + _dCleared + " wpisow"
                          + " | potkniecia doby " + _dStumbles + " (od startu " + _stumbles + ").");
             }
             catch (Exception e) { Stumble("Daily", e); }
