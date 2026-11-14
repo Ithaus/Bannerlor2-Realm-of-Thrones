@@ -831,6 +831,7 @@ namespace Armoury
                         int med = surgeon.GetSkillValue(DefaultSkills.Medicine);
                         if (med >= 200) { p *= 0.5f; mods += ", chirurg " + med + " x0.5"; }
                         else if (med >= 100) { p *= 0.75f; mods += ", chirurg " + med + " x0.75"; }
+                        Perk513.CheatDeath(surgeon, ref p, ref mods);   // 513 (66): Cheat Death chirurga -50% (Perk513Healing.cs)
                     }
                 }
                 if (p > 1f) p = 1f;
