@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 ~19:00 - WGRANIE 235 (519 + 520 drogi + 520-a), bez autotestu - test = gra Jeffa
+
+- Armoury.dll 8ae696f0 + ModuleData/arm_map_roads_valyria.tsv 2e17142a (odswiezony roads_md5 - rodzaje drog czynne) = noc/scal-perki 66a8271b. RC/CrashScribe/GrandTourney bez zmian (234). Armoury.json: MapRoadSpeedPercent 15 -> 30 (kopia Armoury.json.bak-2026-11-14-przed-wgranie235). Kopie DLL/tsv/json: .bak-2026-11-14-przed-wgranie235, Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie235 i -przed).
+- Log sesji Jeffa na 234 (Armoury-2026-11-14_17-30-16.log, 22 doby): linie startu 503-515, D4, 500-b obecne, 0 potkniec; 507 konie ponad sufit srednio +0.21 m/s; 500-b: 2 postoje, 2 od razu twierdza; latka AI 500-a 2.2 ms/dobe.
+- Do sprawdzenia po 235: udzial AI na drodze (cel ~60%, bylo ~24%), czasy dostaw (MarketCarts, CaravanLeg), linia "Coverage" (twierdze bez polaczenia z traktem - decyzja C2), drogi Valyrii czynne, 519 (odzysk okretow, D7b, ucieczki jencow).
+- Nastepne: 521 waga pieniedzy (decyzje w docs/audyty-2026-11-14/PERKI-DECYZJE.md).
+
 ## STAN 14.11 ~17:25 - WGRANIE 234 (cala seria: 503-518 + 500-b z E1-E4), bez autotestu - test = gra Jeffa
 
 - Armoury 5cfbaad5, RealisticCaptivity fdff144e, CrashScribe 18e87a94 = galaz noc/scal-perki c23396ca (233 + decyzje D1-D16: 516 D1/D9/D16, 517 D3/D5-D8/D12-D14, 518 D2/D4/D10(+sufit RBM x1.10)/D11/D15; 500-b ranni lordowie AI + E1 obrona z szansa i w zasiegu 12 h, E2 sojusznik, E3 postoj od 20 HP (wyjscie > 30), E4 wodz armii tylko ostroznosc). Kopie przed: .bak-2026-11-14-przed-wgranie234, Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie234 i -przed).
