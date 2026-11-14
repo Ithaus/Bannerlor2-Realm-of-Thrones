@@ -304,6 +304,8 @@ namespace Armoury
                 try { PackMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackMarket.ApplyAll", e); }
                 // m97-oboz: woz taborowy i siodla transportowe - postfiks pojemnosci (jak PackMarket) i CalculateFinalSpeed wszystkich modeli predkosci (licznik glebokosci)
                 try { CampCart.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CampCart.ApplyAll", e); }
+                // 521: waga pieniedzy - postfiks DefaultInventoryCapacityModel.CalculateTotalWeightCarried (pozycja "Coin")
+                try { MoneyWeight.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MoneyWeight.ApplyAll", e); }
                 // 131: udzwig z Endurance bohaterow (postfiks pojemnosci, osobna linia "Endurance")
                 try { EnduranceCarry.ApplyAll(_harmony); } catch (Exception e) { Log.Error("EnduranceCarry.ApplyAll", e); }
                 // m6b (4): juczne nowego taboru wsi ze stada albo z targu (postfiks InitializeVillagerPartyProperties), juczne konwoju DTE bez kopii do zbrojowni,

@@ -5363,6 +5363,42 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float DebasementMintExtra { get; set; } = 0.1f;
 
+        [SettingPropertyBool("Money Weight Enabled", HintText = "coin has weight: the gold a party carries counts towards its load like any goods (a silver penny 1.4 g is 1 gold, a groat 3.9 g is 4, a gold noble 7.8 g is 80), so a heavy purse slows you down and can overburden you. AI lords carry only a working purse (Lord Purse Flat + Lord Purse Days of wages) - the rest of their wealth lies in their treasury. Off = coin weighs nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public bool MoneyWeightEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Money Penny Percent", 0, 100, "0", HintText = "share of the value of a purse held in silver pennies (1.4 g for 1 gold). With groats and nobles it sets how heavy a purse is; the three are taken as parts of their sum", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public int MoneyPennyPercent { get; set; } = 10;
+
+        [SettingPropertyInteger("Money Groat Percent", 0, 100, "0", HintText = "share of the value of a purse held in silver groats (3.9 g for 4 gold)", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public int MoneyGroatPercent { get; set; } = 60;
+
+        [SettingPropertyInteger("Money Noble Percent", 0, 100, "0", HintText = "share of the value of a purse held in gold nobles (7.8 g for 80 gold). More gold = a lighter purse: 10/60/30 makes 179000 gold weigh about 135 kg", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public int MoneyNoblePercent { get; set; } = 30;
+
+        [SettingPropertyFloatingInteger("Money Weight Step Kg", 0.5f, 20f, "0.0", HintText = "the weight of a purse is brought up to date once an hour, when it has changed by this many kilograms", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public float MoneyWeightStepKg { get; set; } = 2f;
+
+        [SettingPropertyInteger("Lord Purse Days", 0, 365, "0", HintText = "an AI lord carries this many days of his party's wages in his purse (plus Lord Purse Flat); the rest of his house's gold lies in his treasury and weighs nothing on the road", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public int LordPurseDays { get; set; } = 30;
+
+        [SettingPropertyInteger("Lord Purse Flat", 0, 100000, "0", HintText = "gold an AI lord carries above his days of wages", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public int LordPurseFlat { get; set; } = 5000;
+
+        [SettingPropertyBool("Money Weight Parties Without Lord", HintText = "caravans, village carts and bandits carry their whole purse and feel its weight. Off = only you and the lords carry the weight of coin", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public bool MoneyWeightPartiesWithoutLord { get; set; } = true;
+
+        [SettingPropertyBool("Player Vault Enabled", HintText = "you can leave coin in the treasury of your own towns and castles, or with the Iron Bank in Braavos, and take it back there later. Coin kept there weighs nothing and cannot be lost on the road - but your men are paid only from what you carry. A treasury taken by storm falls to the captor; a fief lost otherwise sends its coin to your other holdings. Off = no new deposits; what is kept can still be taken back", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public bool PlayerVaultEnabled { get; set; } = true;
+
         [SettingPropertyBool("Monopoly From Daily Profit", HintText = "State Monopolies: in the towns of the ruling clan the ruler takes 5% of what a workshop pays its owner that day, out of the workshop's capital - not 5% of all the profit the workshop has piled up, which was several times the policy's five percent, taken every day. Off = the old reckoning", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool MonopolyFromDailyProfit { get; set; } = true;
@@ -15029,6 +15065,16 @@ namespace Armoury
             s.MintSilverSkipSmithTowns = MintSilverSkipSmithTowns;
             s.CoinWearPerYear = CoinWearPerYear;
             s.DebasementMintExtra = DebasementMintExtra;
+            // 521 (waga pieniedzy)
+            s.MoneyWeightEnabled = MoneyWeightEnabled;
+            s.MoneyPennyPercent = MoneyPennyPercent;
+            s.MoneyGroatPercent = MoneyGroatPercent;
+            s.MoneyNoblePercent = MoneyNoblePercent;
+            s.MoneyWeightStepKg = MoneyWeightStepKg;
+            s.LordPurseDays = LordPurseDays;
+            s.LordPurseFlat = LordPurseFlat;
+            s.MoneyWeightPartiesWithoutLord = MoneyWeightPartiesWithoutLord;
+            s.PlayerVaultEnabled = PlayerVaultEnabled;
             s.MonopolyFromDailyProfit = MonopolyFromDailyProfit;
             s.BesiegedPayNothing = BesiegedPayNothing;
             s.NoRotClanBailout = NoRotClanBailout;

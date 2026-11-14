@@ -148,7 +148,8 @@ namespace Armoury
                           HFolkTown = 22, HFolkCastle = 23, HGmina = 24,   // E5/B1 (173): kiesy ludu miast (W/R/P), kiesy podzamczy, gminy miast - poza SettlementComponent.Gold
                           // E5/B6 (201): "pierwszy wolny (H22) + 15" = H37 - pula sakiewek weteranow w karczmach (VetPurse); H25-H36 wolne (zera)
                           HVetPurse = 37,
-                          Holders = 38;
+                          HVault = 38,   // 521: skarbce gracza w jego twierdzach i w Banku Zelaznym (MoneyWeight)
+                          Holders = 39;
 
         // zold wedlug rodzaju partii
         private const int WLord = 0, WGarrison = 1, WCaravan = 2, WOther = 3, Wages = 4;
@@ -921,6 +922,7 @@ namespace Armoury
             foreach (var v in Village.All) if (v != null) h[HVillageTax] += v.TradeTaxAccumulated;
             h[HPurses] = MenPurse.TotalNow();
             h[HFolkTown] = TownFolk.TotalTown(); h[HFolkCastle] = TownFolk.TotalCastle(); h[HGmina] = TownFolk.TotalGmina();   // E5/B1 (173)
+            h[HVault] = MoneyWeight.TotalNow();                                 // 521: skarbce gracza (wplaty z sakiewki gracza - przelew, suma swiata bez zmian)
             h[HVetPurse] = VetPurse.TotalNow();                                 // E5/B6 (201): pula sakiewek weteranow w karczmach (z osieroconymi)
             h[HBank] = IronBank.CapitalNow;
             foreach (var mp in MobileParty.All)
@@ -948,7 +950,7 @@ namespace Armoury
                 case HBank: return "Bank"; case HVillagers: return "tabory wsi"; case HCaravans: return "karawany"; case HGarrisons: return "garnizony";
                 case HBandits: return "bandy"; case HOtherParties: return "inne partie"; case HTownTax: return "liczniki cel"; case HVillageTax: return "licznik podatku wsi";
                 case HOtherSettlements: return "kryjowki i inne"; case HCallToWar: return "portfele wezwan"; case HFolkTown: return "kiesy ludu miast";
-                case HFolkCastle: return "kiesy podzamczy"; case HGmina: return "gminy"; case HVetPurse: return "sakiewki weteranow";
+                case HFolkCastle: return "kiesy podzamczy"; case HGmina: return "gminy"; case HVetPurse: return "sakiewki weteranow"; case HVault: return "skarbce gracza";
                 default: return "H" + i;
             }
         }
@@ -989,7 +991,7 @@ namespace Armoury
                    + " | skarbce krolestw " + D(now, last, HKingdoms)
                    + " | portfele wezwan do wojny (168) " + D(now, last, HCallToWar)   // 3.1 (31, E3/0)
                    + " | kapital warsztatow " + D(now, last, HWorkshops)
-                   + " | sakiewki ludzi " + D(now, last, HPurses) + " | sakiewki weteranow w karczmach (E5/B6) " + D(now, last, HVetPurse) + " | Bank Zelazny " + D(now, last, HBank)
+                   + " | sakiewki ludzi " + D(now, last, HPurses) + " | sakiewki weteranow w karczmach (E5/B6) " + D(now, last, HVetPurse) + " | skarbce gracza (521) " + D(now, last, HVault) + " | Bank Zelazny " + D(now, last, HBank)
                    + " | partie bez wodza: tabory wsi " + D(now, last, HVillagers) + ", karawany " + D(now, last, HCaravans) + ", garnizony " + D(now, last, HGarrisons)
                    + ", bandy " + D(now, last, HBandits) + ", inne " + D(now, last, HOtherParties)
                    + " | liczniki (zloto w drodze do panow): cla miast i zamkow " + D(now, last, HTownTax) + ", podatek wsi " + D(now, last, HVillageTax)

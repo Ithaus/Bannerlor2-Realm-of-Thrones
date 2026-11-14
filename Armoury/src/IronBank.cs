@@ -92,7 +92,7 @@ namespace Armoury
         private static double _capital = -1;
         private static int _logged, _lastDay = -1;
         private const string Menu = "arm_iron_bank";
-        private const string BraavosId = "town_EN5";   // Braavos w ROT-Map settlements.xml (sprawdzone 04.10)
+        internal const string BraavosId = "town_EN5";   // Braavos w ROT-Map settlements.xml (sprawdzone 04.10)
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.IronBankEnabled; } }
 
