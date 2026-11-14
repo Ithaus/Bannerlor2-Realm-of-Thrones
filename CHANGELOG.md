@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 526: D10 - premia predkosci konia z perkow zawsze do +10% predkosci samego konia (bez wzgledu na sufit RBM) - Armoury
+
+**Problem:** Jeff, czat 14.11, po raporcie logu 237: "D10 - tak" (pytanie: "perk ma dawac do +10% predkosci samego konia (dzis dla szybkich koni daje 0, bo RBM juz ustawia je ponad limit)?"). Log Armoury-2026-11-14_19-28-01.log: wszystkie linie doby 507 z premia konia mowia "+0.00", np. `przeliczen koni z premia 16 (ponad sufit RBM 16, srednio +0.00 m/s - D10) | per perk (trafienia/przeliczenia): SweepingWind 16` (21:46:51, dzien 108879).
+
+**Przyczyna:** Perk507Strike.cs HorsePostfix (D10 korekta): predkosc z premia przycinana do max(spd0, sufit x 1.10), gdzie sufit RBM = 10 m/s (8 przy koniu ponad 500 kg). Kon, ktoremu RBM juz dal predkosc >= sufit x 1.1 (szybkie konie ROT), dostawal spd0, czyli premie 0.
+
+**Zmiana:** Armoury/src/Perk507Strike.cs:
+- premie predkosci perkow (SweepingWind gry przy RBM, BK JawwalCamelMaster 8%, KheshigOutrider 5%) SUMOWANE (dotad mnozone), wynik = min(spd0 x (1 + suma), spd0 x 1.10) - spd0 = predkosc konia wedlug RBM; sufit RBM nie gra roli (klucz PerkMountOverCap). Np. kon RBM 12 m/s + SweepingWind 5% = 12.60 m/s (dotad 12.00); CamelMaster + Outrider = 13% -> 10% = 13.20.
+- klucz wylaczony: jak 507 - przy RBM ponad sufit przyciecie do max(spd0, sufit).
+- licznik doby: `przeliczen koni z premia N (premia predkosci K, srednio +X m/s = +Y%, ponad sufit RBM Z - D10)`.
+- Settings.cs / McmSettings.cs: opis PerkMountOverCap (po angielsku) wedlug nowej reguly; wartosc domyslna bez zmian (true).
+
+**Ryzyko / co sprawdzic (zasada 0; CHANGELOG 49595 -> 49617 linii):**
+- HorseWind (136): postfiks Last na UpdateAgentStats bierze MountSpeed po tym postfiksie jako Vbase, a drenaz liczy z u = v / Vbase - szybszy kon w pelnym galopie ma u ok. 1 jak kazdy inny, wiec nie meczy sie szybciej; kara m mnozy Vbase z premia. Probki odrzucane przy v > 1.5 Vbase - +10% nie zbliza sie do progu.
+- Mnozenie idempotentne: wynik modelu swiezy przy kazdym wolaniu UpdateHorseStats, postfiks ustawia v od spd0 (nie mnozy biezacej wartosci) - kolejne przeliczenia nie kumuluja premii.
+- Zmiana mnozenia na sume: SweepingWind + Outrider = 10% (dotad 10.25%), CamelMaster + Outrider 13% -> limit 10%. Szarza (Equites) i zwrotnosc (AdaptiveTactics) bez zmian.
+- Bez RBM (gra liczy SweepingWind sama): tylko perki BK, przy wlaczonym kluczu tez do +10%. MarchToContact (RBM wpisuje MountSpeed konnicy jako limit szyku) - szyk z koniem z perkiem moze isc o te kilka % szybciej, jak dotad ponad sufit.
+- W logu sprawdzic: linia "Sila ciosu perkow (507): dzien N" - "premia predkosci K, srednio +0.4..1.2 m/s = +5..10%" zamiast "+0.00".
+- Build Armoury 0 bledow. NIE WGRANE (gra Jeffa moze byc wlaczona).
+
+**Status:** DO SPRAWDZENIA (galaz noc/526-kon-d10, na noc/scal-perki 4f0c93c3).
+
 ## 524: ranni AI a glod - koniec twierdzy przy glodzie / zamku bez zapasu, bez podbicia zamkow dla glodnych, bez wejscia do zamku bez jedzenia, limit Fort nie przed koncem loza HW - Armoury (500-b)
 
 **Problem:** Jeff, czat 14.11 "sprawdz logi" (do 500-b: "lordowie stoja az sie wylecza a potem jada do zamku bo tam sie szybciej wylecza", pamiec "AI walczy o zycie"). Log Armoury-2026-11-14_19-28-01.log: Nocna Straz wchodzi w stan Fort w ZAMKU i zamiast leczyc - traci ludzi: `lord_5_17_party_1 (wodz Jon Snow, HP 169/169, ranni 145/361 = 40%) -> TWIERDZA (stoi w castle_N5, ranni 40%)` (21:35:13), po 10 dobach `ranni 325/361 = 90%) TWIERDZA -> KONIEC (limit 10 dob, 24 h bez wejscia, po 10.0 dob)` (21:55:54), po 24 h znowu `ranni 343/361 = 95%) -> TWIERDZA (stoi w castle_B7` (21:59:49), potem 100% i znow castle_N5. Linia doby 108900: "do twierdzy 15 ... koniec twierdzy 2 (limit 10 dob 2) ... wejscia wstrzymane (24 h ...) 28". Dzicy: `-> BEZ POSTOJU (postoj niebezpieczny: glod, ...)` (np. 19:32:10 Dunsen HP 1/100) albo z twierdza - do miasta 39-88 h jazdy glodni (-19 HP / dobe poza osada).
