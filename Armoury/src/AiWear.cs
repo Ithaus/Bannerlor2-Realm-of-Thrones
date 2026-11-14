@@ -628,7 +628,7 @@ namespace Armoury
                     int inUse = Math.Min(nd, kv.Value);
                     if (inUse <= 0) continue;
                     need[bk] = nd - inUse;
-                    int k = Math.Min(inUse, (int)Math.Floor(inUse * f + MBRandom.RandomFloat));
+                    int k = Math.Min(inUse, (int)Math.Floor(inUse * Perk512.AiLoss(f, intensity, won, keep, mp, it) + MBRandom.RandomFloat));   // 512 (perki): odzysk wedlug perka wodza
                     if (k <= 0) continue;
                     if (gone == null) gone = new List<KeyValuePair<ItemObject, int>>();
                     gone.Add(new KeyValuePair<ItemObject, int>(it, k));

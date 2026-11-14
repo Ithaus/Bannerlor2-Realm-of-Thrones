@@ -4108,6 +4108,35 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool AmmoRecoveryBySide { get; set; } = true;
 
+        // 512 (perki): Perk512.cs - amunicja i zwierzeta
+        [SettingPropertyBool("Ammo Perks Rework", HintText = "ammunition perks give no extra arrows, bolts or throwing weapons any more. Instead: a party led by a hero with Deep Quivers, Fletcher or Well Prepared gathers back more of its shot arrows, bolts or thrown weapons after a battle it holds the field in (Ammo Perk Party Percent); Fletcher makes your own crossbow wear less with every shot (Ammo Perk Own Percent); Saddlebags lets the party of the hero who has it carry more (Saddlebags Carry Percent, on land). Off = the perks as before", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public bool AmmoPerksRework { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ammo Perk Party Percent", 0.00f, 50.00f, "0", HintText = "with Ammo Perks Rework: how much more of its shot ammunition a party gathers back when its leader has Deep Quivers (arrows), Fletcher (bolts) or Well Prepared (thrown weapons) - a share of what it would gather anyway, only on a field it holds", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public float AmmoPerkPartyPercent { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Ammo Perk Own Percent", 0.00f, 90.00f, "0", HintText = "with Ammo Perks Rework: how much less your own crossbow (or a companion's) wears with every shot when the one shooting has Fletcher", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public float AmmoPerkOwnPercent { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Saddlebags Carry Percent", 0.00f, 25.00f, "0.#", HintText = "with Ammo Perks Rework: how much more the party of a leader with Saddlebags can carry, on land", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public float SaddlebagsCarryPercent { get; set; } = 5f;
+
+        [SettingPropertyBool("Breeder Realistic", HintText = "Breeder: animals in the party breed only on land, only while the party is not starving, and only where there is at least a pair of the same kind (horses with horses, sheep with sheep; mules do not breed); never dragons, elephants, mammoths, chariots or unique beasts. The young are of their parents' kind and eat like the rest of the herd. Off = as Realm of Thrones has it", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public bool BreederRealistic { get; set; } = true;
+
+        [SettingPropertyBool("Beast Whisperer Plain Mounts", HintText = "Beast Whisperer: on steppes and plains your scout finds only ordinary riding horses and pack animals - never war horses, noble horses, camels, chariots, elephants, dragons or unique beasts - and less often (Beast Whisperer Chance Factor). Off = as Realm of Thrones has it", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public bool BeastWhispererPlainMounts { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Beast Whisperer Chance Factor", 0.00f, 1.00f, "0.00", HintText = "with Beast Whisperer Plain Mounts: the perk's daily chance to find a mount is multiplied by this", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public float BeastWhispererChanceFactor { get; set; } = 0.5f;
+
         [SettingPropertyBool("Thrown As Missile", HintText = "javelins, throwing axes and throwing knives are missiles: they are spent by being thrown (some are gathered back after the battle, like arrows) and no longer get battered like a sword as well. A thrown weapon that is already damaged stays damaged until a smith mends it", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool ThrownAsMissile { get; set; } = true;
@@ -14282,6 +14311,14 @@ namespace Armoury
             s.AmmoRecoverPercent = AmmoRecoverPercent;
             s.AmmoRepairPercent = AmmoRepairPercent;
             s.AmmoRecoveryBySide = AmmoRecoveryBySide;
+            // 512 (perki)
+            s.AmmoPerksRework = AmmoPerksRework;
+            s.AmmoPerkPartyPercent = AmmoPerkPartyPercent;
+            s.AmmoPerkOwnPercent = AmmoPerkOwnPercent;
+            s.SaddlebagsCarryPercent = SaddlebagsCarryPercent;
+            s.BreederRealistic = BreederRealistic;
+            s.BeastWhispererPlainMounts = BeastWhispererPlainMounts;
+            s.BeastWhispererChanceFactor = BeastWhispererChanceFactor;
             s.ThrownAsMissile = ThrownAsMissile;
             s.KeepWearThroughBattle = KeepWearThroughBattle;
             s.StartKitEnabled = StartKitEnabled;

@@ -88,6 +88,7 @@ namespace Armoury
                     bool? won = PlayerWon();
                     if (won.HasValue && !won.Value) recover = 0f;         // pole w rekach wroga
                 }
+                recover = Perk512.Recover(recover, _agent, mw.Item);   // 512 (perki): odzysk x (1 + premia) przy perku wodza partii agenta (DeepQuivers / Fletcher / WellPrepared)
                 float lose = used * (1f - Math.Max(0f, Math.Min(1f, recover)));
                 bool lost = _rng.NextDouble() < lose;
                 __result = lost;
