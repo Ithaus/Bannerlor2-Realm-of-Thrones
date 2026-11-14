@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 ~20:15 - WGRANIE 237 (522 zloto Essos/Westeros), bez autotestu
+
+- Armoury.dll 5fd4f809 = noc/scal-perki 8476e167 (236 + 522: Westeros 10/70/20 = 0.842 kg/1000 zl, Essos 10/45/45 = 0.623 kg; linia doby: moneta jako procent ladownosci karawan i band). Kopie: .bak-2026-11-14-przed-wgranie237, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie237 i -przed).
+- Projekt lokaty w Banku: docs/audyty-2026-11-14/LOKATA-BANK-projekt.md (rekomendacja wariant B, faza 1 tylko gracz) - czeka na decyzje Jeffa.
+
 ## STAN 14.11 ~19:45 - WGRANIE 236 (521 waga pieniedzy), bez autotestu - test = gra Jeffa (235 jeszcze nie grane)
 
 - Armoury.dll f0aa81ec = noc/scal-perki 12e3ca1e (235 + 521). Reszta bez zmian. Kopie: .bak-2026-11-14-przed-wgranie236, Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie236 i -przed).
