@@ -1209,7 +1209,8 @@ namespace Armoury
                                     if (shw != null && shw.MaxDataValue > 0 && rawSh > shw.MaxDataValue) rawSh = shw.MaxDataValue;
                                 }
                             }
-                            if (sh >= 0) vled[sh] += rawSh * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor) * shieldMissile;
+                            if (sh >= 0) vled[sh] += rawSh * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor) * shieldMissile
+                                                    * Perk506.ShieldWearFactor(affectedAgent, attackCollisionData.CollidedWithShieldOnBack);   // 506 (perki): ArrowCatcher / Pavise
                         }
                         else
                         {

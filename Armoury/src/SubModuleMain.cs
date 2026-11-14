@@ -770,6 +770,8 @@ namespace Armoury
                 // zeruje liczniki i zdejmuje znacznik ostatniej ofiary; bez zalozonej latki poza kampania nic nie dochodzi
                 if ((Campaign.Current != null || RestedArmor416.Patched) && mission != null)
                     mission.AddMissionBehavior(new RestedArmor416.Logic());
+                // 506 (perki): pancerz i tarcze z perkow po RBM - odswiezenie perkow / stanu RBM i linia "Perki pancerza i tarcz (506): koniec misji"
+                if ((Campaign.Current != null || Perk506.Patched) && mission != null) mission.AddMissionBehavior(new Perk506.Logic());
                 // 417: mloty 2h z rodzimym obuchem i buzdygany 2h - liczniki ciosow i trafien, linia "Mloty (417): koniec misji"
                 // 417-p: jak 415-p / 416-p - latka zostaje w procesie, wiec w bitwie wlasnej po kampanii zachowanie zeruje flagi "w ciosie" i liczniki
                 if ((Campaign.Current != null || BluntHammers417.Patched) && mission != null)

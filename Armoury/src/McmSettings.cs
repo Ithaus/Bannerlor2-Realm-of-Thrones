@@ -684,6 +684,39 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float ThrownShieldDamagePercent { get; set; } = 100f;
 
+        // 506 (perki): pancerz i tarcze z perkow po RBM (Perk506.cs)
+        [SettingPropertyBool("Perk Shields After RBM", HintText = "Shield perks get their own effects back under Realistic Battle Mod. Arrow Catcher: your shield is tougher in battle and wears slower; as a commander the shields of the men in your formation are tougher. Pavise: a shield carried on your back is tougher and wears slower. Shieldwall: as a commander, the men of your formation lock their shields better against missiles, only in the shield wall formation. Off = Realistic Battle Mod as it is (these perks do nothing). The same rule for you and for the AI.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool PerkShieldsAfterRbm { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Arrow Catcher Shield Durability", 0.00f, 1.00f, "0.00", HintText = "With Perk Shields After RBM: Arrow Catcher makes your own shield this much tougher in battle (0.20 = it takes a fifth more punishment before it breaks).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float ArrowCatcherShieldDurability { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("Arrow Catcher Captain Durability", 0.00f, 1.00f, "0.00", HintText = "With Perk Shields After RBM: a commander with Arrow Catcher makes the shields of the men in his formation this much tougher in battle. Their wear is not changed.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float ArrowCatcherCaptainDurability { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Arrow Catcher Shield Wear Cut", 0.00f, 0.90f, "0.00", HintText = "With Perk Shields After RBM: Arrow Catcher cuts the wear of your own shield by this share (0.25 = a quarter less).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float ArrowCatcherShieldWearCut { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Pavise Back Shield Durability", 0.00f, 1.00f, "0.00", HintText = "With Perk Shields After RBM: Pavise makes a shield carried on your back this much tougher against hits from behind.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float PaviseBackShieldDurability { get; set; } = 0.30f;
+
+        [SettingPropertyFloatingInteger("Pavise Back Shield Wear Cut", 0.00f, 0.90f, "0.00", HintText = "With Perk Shields After RBM: Pavise cuts the wear of a shield carried on your back by this share.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float PaviseBackShieldWearCut { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Shield Wall Perk Cover", 0.00f, 0.30f, "0.00", HintText = "With Perk Shields After RBM: a commander with Shieldwall widens the missile cover of every shield in his formation by this much while it stands in the shield wall formation (Realistic Battle Mod gives every shield 0.01, the plain game 0.30). 0 = off.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float ShieldWallPerkCover { get; set; } = 0.10f;
+
+        [SettingPropertyBool("Perk Armour After RBM", HintText = "Armour perks count again under Realistic Battle Mod, with the game's own numbers: Ignore Pain (+10% armour on foot; as a commander +5 armour to foot troops in the formation), Dauntless Steed (as a commander +5 armour to mounted troops in the formation) and Tough Steed (+20% armour to your horse; as a commander +10 armour to the horses of the formation). Realistic Battle Mod reads armour straight from the equipment and dropped these bonuses. Off = as before this change. The same rule for you and for the AI.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool PerkArmourAfterRbm { get; set; } = true;
+
         [SettingPropertyInteger("Bow Uses At Tier1", 0, 10000, "0", HintText = "a tier-1 bow survives this many shots; each tier multiplies (tier 3 = x3, tier 6 = x6)", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int BowUsesAtTier1 { get; set; } = 2500;
@@ -13426,6 +13459,15 @@ namespace Armoury
             s.MissileShieldDamagePercent = MissileShieldDamagePercent;
             s.ShieldGuardArrowsOnly = ShieldGuardArrowsOnly;
             s.ThrownShieldDamagePercent = ThrownShieldDamagePercent;
+            // 506 (perki)
+            s.PerkShieldsAfterRbm = PerkShieldsAfterRbm;
+            s.ArrowCatcherShieldDurability = ArrowCatcherShieldDurability;
+            s.ArrowCatcherCaptainDurability = ArrowCatcherCaptainDurability;
+            s.ArrowCatcherShieldWearCut = ArrowCatcherShieldWearCut;
+            s.PaviseBackShieldDurability = PaviseBackShieldDurability;
+            s.PaviseBackShieldWearCut = PaviseBackShieldWearCut;
+            s.ShieldWallPerkCover = ShieldWallPerkCover;
+            s.PerkArmourAfterRbm = PerkArmourAfterRbm;
             s.BowUsesAtTier1 = BowUsesAtTier1;
             s.BowSkillBonusPercentPerPoint = BowSkillBonusPercentPerPoint;
             s.TierDurabilityFactor = TierDurabilityFactor;
