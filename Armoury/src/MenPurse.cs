@@ -586,6 +586,16 @@ namespace Armoury
         /// i zuzycie musztry (Drill.PlayerSurplus) - musztra nie zuzywa sztuk, ktore K1 uznaje za potrzebne (bez petli zuzycia i odkupu).</summary>
         internal static List<SwapMath.Piece> PlayerSurplusPlan(ItemRoster armory, ItemObject.ItemTypeEnum type)
         {
+            KitPreview.Result pv = null;
+            try { pv = KitPreview.ForArmoury(); } catch { pv = null; }   // z pamieci po kluczu (zbrojownia, sklad, sakwy, dzien)
+            return PlayerSurplusPlan(armory, type, pv);
+        }
+
+        /// <summary>535: pv - podglad nastepnej bitwy (null - bez ochrony, jak dotad). Sztuki, ktore podglad WYDAJE ludziom (Result.Given - takze bron boczna
+        /// z SkillsDecide, ktorej papier nie zna), nie ida do kupca ani do zuzycia musztry - inaczej ludzie kupowaliby bron boczna (BuyPlayerGapsPreview), a przy
+        /// nastepnym wjezdzie sprzedawali ja jako nadwyzke papieru (petla: polka -> zbrojownia -> polka za pol ceny). Zwraca null - bez nadwyzki.</summary>
+        internal static List<SwapMath.Piece> PlayerSurplusPlan(ItemRoster armory, ItemObject.ItemTypeEnum type, KitPreview.Result pv)
+        {
             var s = Settings.Current;
             var main = MobileParty.MainParty;
             if (armory == null || s == null || main == null || main.MemberRoster == null) return null;
@@ -604,7 +614,89 @@ namespace Armoury
             // ZB-3 (klucz SurplusUsableAnyGroup): "ktos udzwignie" - kazda grupa ludzi, nie tylko najzdolniejsza (wylaczony - SwapMath.Usable, jak dotad)
             if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, ArmouryZb.SurplusUsable(men, meets, false)) <= 0) return null;
             pieces.Sort(SwapMath.WorseFirst);
+            _keptGiven += KeepGiven(pieces, pv);
             return pieces;
+        }
+
+        private static int _keptGiven;   // 535: sztuki zdjete ze sprzedazy, bo podglad bitwy je wydaje (licznik do linii sprzedazy)
+
+        /// <summary>535: na kazdy przedmiot w zbrojowni zostaje co najmniej tyle sztuk, ile podglad bitwy wydaje ludziom (Given); nadmiar sprzedazy zdejmowany
+        /// od najlepszych egzemplarzy (lista WorseFirst - od konca). Zwraca liczbe sztuk zdjetych ze sprzedazy.</summary>
+        private static int KeepGiven(List<SwapMath.Piece> pieces, KitPreview.Result pv)
+        {
+            if (pv == null || pieces == null || !KitPreview.SideOptional) return 0;
+            var keep = KeepOf(pv);
+            if (keep.Count == 0) return 0;
+            var total = new Dictionary<ItemObject, int>();
+            var sell = new Dictionary<ItemObject, int>();
+            foreach (var p in pieces)
+            {
+                var it = QuartermasterLaw.ElOf(p).Item;
+                if (it == null) continue;
+                int v; total.TryGetValue(it, out v); total[it] = v + p.Total;
+                sell.TryGetValue(it, out v); sell[it] = v + Math.Max(0, p.Sell);
+            }
+            int cut = 0;
+            foreach (var kv in sell)
+            {
+                int given; if (kv.Value <= 0 || !keep.TryGetValue(kv.Key, out given) || given <= 0) continue;
+                int over = kv.Value - Math.Max(0, total[kv.Key] - given);
+                for (int i = pieces.Count - 1; i >= 0 && over > 0; i--)
+                {
+                    var p = pieces[i];
+                    if (p.Sell <= 0 || !ReferenceEquals(QuartermasterLaw.ElOf(p).Item, kv.Key)) continue;
+                    int take = Math.Min(p.Sell, over);
+                    p.Sell -= take; over -= take; cut += take;
+                }
+            }
+            return cut;
+        }
+
+        private static KitPreview.Result _keepPv;
+        private static Dictionary<ItemObject, int> _keep;
+
+        /// <summary>Recenzja 535: ile sztuk kazdego przedmiotu zostaje w zbrojowni gracza - wydawane w nastepnej bitwie (Given) plus sztuki lezace po rozdaniu
+        /// (Rem), ktore zapelniaja brak z listy podgladu (ta sama grupa broni, ktos z tych typow jej uzyje - IdleFor, jak zakupy). Bez tego taka sztuka szla do
+        /// kupca jako nadwyzka papieru, a zakup brakow tej samej wizyty kupowal nastepna (petla polka -> zbrojownia -> polka za pol ceny). Pamiec po wyniku podgladu.</summary>
+        private static Dictionary<ItemObject, int> KeepOf(KitPreview.Result pv)
+        {
+            if (ReferenceEquals(pv, _keepPv) && _keep != null) return _keep;
+            var keep = new Dictionary<ItemObject, int>(pv.Given);
+            var idle = new Dictionary<ItemObject, int>(pv.Rem);
+            foreach (var w in SortedWants(pv))
+            {
+                int gap = w.N;
+                foreach (var kv in IdleFor(idle, w, ref gap)) { int v; keep.TryGetValue(kv.Key, out v); keep[kv.Key] = v + kv.Value; }
+            }
+            _keepPv = pv; _keep = keep;
+            return keep;
+        }
+
+        /// <summary>Recenzja 535: braki podgladu w kolejnosci zakupow - niezbedne najpierw, w grupie najwiecej pustych slotow najpierw (bez koni i uprzezy).</summary>
+        private static List<KitPreview.Want> SortedWants(KitPreview.Result pv)
+        {
+            var wants = new List<KitPreview.Want>();
+            foreach (var w in pv.Wants.Values)
+                if (w != null && w.N > 0 && w.Type != ItemObject.ItemTypeEnum.Horse && w.Type != ItemObject.ItemTypeEnum.HorseHarness) wants.Add(w);
+            wants.Sort((a, b) => { int c = a.Side.CompareTo(b.Side); return c != 0 ? c : b.N.CompareTo(a.N); });
+            return wants;
+        }
+
+        /// <summary>Recenzja 535: sztuki z idle (resztka zbrojowni po rozdaniu), ktore zapelniaja brak w (ta sama grupa, ktos z tych typow jej uzyje) - zdejmowane
+        /// z idle i z gap. Rozdzielacz DTE ich nie wydal (klasa broni, tier, kolejnosc przydzialu), wiec kolejna taka sama z polki tez by nie zeszla.</summary>
+        private static List<KeyValuePair<ItemObject, int>> IdleFor(Dictionary<ItemObject, int> idle, KitPreview.Want w, ref int gap)
+        {
+            var got = new List<KeyValuePair<ItemObject, int>>();
+            foreach (var it in new List<ItemObject>(idle.Keys))
+            {
+                if (gap <= 0) break;
+                int have = idle[it];
+                if (have <= 0 || it == null || it.ItemType != w.Type || KitGaps.Group(it) != w.Group || !AnyUses(w.By.Keys, it)) continue;
+                int use = Math.Min(have, gap);
+                idle[it] = have - use; gap -= use;
+                got.Add(new KeyValuePair<ItemObject, int>(it, use));
+            }
+            return got;
         }
 
         private static void SellPlayerSurplus(Settlement st)
@@ -613,9 +705,13 @@ namespace Armoury
             if (armory == null || QuartermasterEscrow.Active) return;
             var main = MobileParty.MainParty;
             int sold = 0, gold = 0, horses = 0, horseGold = 0;
+            // 535: jeden podglad bitwy na cala sprzedaz (zbrojownia zmienia sie po kazdym typie - bez liczenia od nowa po kazdym); sztuki wydawane ludziom zostaja
+            KitPreview.Result pv = null;
+            try { pv = KitPreview.ForArmoury(); } catch { pv = null; }
+            _keptGiven = 0;
             foreach (var type in QuartermasterLaw.KitTypes)
             {
-                var pieces = PlayerSurplusPlan(armory, type);   // K1 A9 - jedna definicja nadwyzki (konie - przy PlayerMenSellSpareHorses, Jeff 15.10 (b))
+                var pieces = PlayerSurplusPlan(armory, type, pv);   // K1 A9 - jedna definicja nadwyzki (konie - przy PlayerMenSellSpareHorses, Jeff 15.10 (b))
                 if (pieces == null) continue;
                 foreach (var p in pieces)
                 {
@@ -653,14 +749,131 @@ namespace Armoury
                 if (!PartyWords.NoTroops)   // m110-sam: bez zolnierzy bez komunikatu "Your men sold" (sprzedaz jak dotad)
                     Log.Player("Your men sold " + sold + " spare pieces" + (horses > 0 ? " (" + horses + (horses == 1 ? " of them a horse)" : " of them horses)") : "") + " from the stores to the merchants of " + st.Name + " for " + gold
                                + " denars - their share of the spoils. Purse of the men: " + Get(main) + ".");
-                Log.Info("Sakiewka ludzi: gracz w " + st.Name + " - nadwyzki " + sold + " szt. za " + gold + " (w tym konie " + horses + " za " + horseGold + "), sakiewka " + Get(main) + ".");
+                Log.Info("Sakiewka ludzi: gracz w " + st.Name + " - nadwyzki " + sold + " szt. za " + gold + " (w tym konie " + horses + " za " + horseGold + "), sakiewka " + Get(main)
+                         + "; 535: zostawione, bo podglad bitwy je wydaje: " + _keptGiven + " szt." + (pv == null ? " (podglad niedostepny - bez ochrony)" : "") + ".");
             }
+            else if (_keptGiven > 0)
+                Log.Info("Sakiewka ludzi (535): gracz w " + st.Name + " - nadwyzki papieru zostawione, bo podglad bitwy je wydaje: " + _keptGiven + " szt.");
         }
 
         // ------------------------------------------------------------ gracz: braki w kompletach za pieniadze ludzi
         // K1 (A6): brak = ludzie bez UZYTECZNEJ sztuki (FitFor.UnfitMen); kupiona sztuka ma wymog <= UnfitMinSkill typu (to samo
         // "bring <= N", co pokazuje kwatermistrz). Dotad NeedForType - HaveFor liczylo jako "ma" takze sztuki ponad umiejetnosc.
+        // 535 (Jeff 15.11: "caly czas mam braki a dostaje informacje ze ludzie kupili brakujace rzeczy"): zakupy wedlug TEJ SAMEJ listy brakow co podglad
+        // nastepnej bitwy (KitPreview.Result.Wants - wzorzec po SkillsDecide, rozdzielacz DTE, straze wystawienia): najpierw niezbedne, potem - z tego, co
+        // zostanie - bron boczna. Dotad papier kwatermistrza (szablon XML) - broni bocznej dokladanej przez SkillsDecide nikt nie kupowal, a podglad liczyl ja
+        // jako pusty slot. Podglad niedostepny (bez DTE, CrashScribe sprzed 133a, potkniecie) - papier jak dotad (BuyPlayerGapsPaper).
         private static void BuyPlayerGaps(Settlement st)
+        {
+            KitPreview.Result pv = null;
+            try { pv = KitPreview.ForArmoury(); } catch (Exception e) { Log.Error("MenPurse.BuyPlayerGaps (podglad)", e); pv = null; }
+            if (pv == null || !KitPreview.SideOptional) { BuyPlayerGapsPaper(st); return; }   // klucz SideArmsAreOptional wylaczony - papier jak dotad
+            BuyPlayerGapsPreview(st, pv);
+        }
+
+        /// <summary>535: braki z podgladu bitwy. Kazdy brak to grupa broni sztuki wzorca (ItemType + klasa broni - jak KitGaps.Group, ta sama para co porownanie
+        /// z wzorcem; pancerz wedlug ItemType) u konkretnych typow wojska; kupiona sztuka musi pasowac do grupy i dac sie uzyc komus z tych typow (GearFit.ForTroop
+        /// - umiejetnosc, siodlo, kultura), nie ponad sufit tieru ludzi bez niej (MenUpgrade.CeilingsOf). Ekonomia jak papier: sakiewka ludzi -> kasa miasta,
+        /// sztuka z polki do zbrojowni, rezerwa na naprawy, ShopReserve, ksiega gracza (StockOf), limit sztuk na wizyte wspolny dla obu faz.</summary>
+        private static void BuyPlayerGapsPreview(Settlement st, KitPreview.Result pv)
+        {
+            var armory = QuartermasterLaw.DteArmory();
+            var main = MobileParty.MainParty;
+            if (armory == null || QuartermasterEscrow.Active) return;
+            int budget = Get(main) - TroopSelfMend.OutstandingCost(st);   // naprawy maja pierwszenstwo (z materialem - szacunek z tej polki)
+            if (budget <= 0) return;
+            SavingsByNeed.Saw(false);   // m96: przeglad brakow w tej wizycie
+            int spent = 0, pieces = 0, maxPieces = Math.Max(1, Settings.Current.AiGearMaxPiecesPerVisit);
+            int coreN = 0, coreG = 0, sideN = 0, sideG = 0, coreLeft = 0, sideLeft = 0, idleN = 0;
+            // recenzja 535: sztuki, ktore juz leza w zbrojowni po rozdaniu (Result.Rem), a ktos z tych typow by ich uzyl - rozdzielacz DTE ich nie wydal
+            // (klasa broni, tier, kolejnosc przydzialu); kolejna taka sama z polki tez by nie zeszla, a przy nastepnym wjezdzie poszlaby do kupca jako nadwyzka
+            // (petla polka -> zbrojownia -> polka za pol ceny). Papier tego nie mial, bo FitFor liczyl je jako "ma". Kazda lezaca sztuka zdejmuje jeden brak.
+            // Ta sama kolejnosc i to samo zdejmowanie co KeepOf (sprzedaz zostawia dokladnie te lezace sztuki)
+            var idle = new Dictionary<ItemObject, int>(pv.Rem);
+            var shelf = st.ItemRoster;
+            var wants = SortedWants(pv);   // niezbedne najpierw, w grupie - najwiecej pustych slotow najpierw
+            foreach (var w in wants)
+            {
+                var ceils = MenUpgrade.CeilingsOf(w.By, Settings.Current.MenUpgradeOneTierUp);
+                int gap = w.N, got = 0;
+                foreach (var kv in IdleFor(idle, w, ref gap)) idleN += kv.Value;
+                while (gap > 0 && pieces < maxPieces && spent < budget)
+                {
+                    int best = -1, bestPrice = 0; float bestScore = 0f;
+                    int maxTier = ceils.Count > 0 ? ceils[Math.Min(got, ceils.Count - 1)] : int.MaxValue;
+                    bool resHit = false;
+                    int poor = int.MaxValue;
+                    for (int i = 0; i < shelf.Count; i++)
+                    {
+                        var el = shelf.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (el.Amount <= 0 || it == null || it.ItemType != w.Type || KitGaps.Group(it) != w.Group) continue;
+                        if (!QuartermasterLaw.CountsAsKit(it, w.Type) || ArmsPricing.IsUnique(it)) continue;
+                        if (!AnyUses(w.By.Keys, it)) continue;
+                        if (AiGear.TierOf(it) > maxTier) continue;
+                        if (ArmouryBehavior.StockOf(it.StringId) > 0) continue;   // K1 (przeglad): ksiega per id - jak papier
+                        if (ShopReserve.Free(st, it) <= 0) { resHit = true; continue; }
+                        int price = st.Town.MarketData.GetPrice(el.EquipmentElement, main, false, st.Party);
+                        if (price <= 0) continue;
+                        if (price > budget - spent) { if (price < poor) poor = price; continue; }
+                        float score = XbowPrice.BuyScore(it, it.Effectiveness > 0f ? it.Effectiveness : 1f, price);
+                        if (score > bestScore) { bestScore = score; best = i; bestPrice = price; }
+                    }
+                    if (best < 0)
+                    {
+                        if (resHit) Measure174b.NoteHeld(Measure174b.BPlayerMen, 1);
+                        if (!w.Side) SavingsByNeed.NoteWant(poor, true);   // cel oszczedzania tylko z brakow niezbednych (bron boczna - dodatek)
+                        break;
+                    }
+                    var pick = shelf.GetElementCopyAtIndex(best).EquipmentElement;
+                    shelf.AddToCounts(pick, -1);
+                    armory.AddToCounts(pick, 1);   // wersja zbrojowni rosnie - podglad (klucz KitPreview.Key) i podpowiedz paska 533 licza od nowa
+                    Measure174b.NoteBuy(Measure174b.BPlayerMen, pick.Item, 1, bestPrice);
+                    Take(main, bestPrice);
+                    st.Town.ChangeGold(bestPrice);
+                    MoneyLedger.Note169(MoneyLedger.N169Kit, st, bestPrice);
+                    MenUpgrade.NoteChurn(main, pick.Item, true);
+                    XbowPrice.NoteBuy(pick.Item, 1, false);
+                    GearFit.NoteGapBuy(QuartermasterLaw.KeyOf(pick));
+                    spent += bestPrice; pieces++; gap--; got++;
+                    if (w.Side) { sideN++; sideG += bestPrice; } else { coreN++; coreG += bestPrice; }
+                }
+                if (w.Side) sideLeft += gap; else coreLeft += gap;
+            }
+            if (pieces > 0)
+            {
+                _dayGear += spent;
+                // 535: niezbedne i bron boczna osobno; "missing" - sztuki z listy brakow podgladu (te same co "kit slots empty")
+                string msg;
+                if (coreN > 0)
+                    msg = "Your men bought " + coreN + (coreN == 1 ? " missing piece of kit" : " missing pieces of kit")
+                          + (sideN > 0 ? " and " + sideN + (sideN == 1 ? " spare weapon" : " spare weapons") : "") + " for " + spent + " denars from their own purse.";
+                else
+                    msg = "Your men bought " + sideN + (sideN == 1 ? " spare weapon (side-arm)" : " spare weapons (side-arms)") + " for " + spent + " denars from their own purse.";
+                Log.Player(msg);
+            }
+            if (pieces > 0 || pv.Core + pv.Side > 0)
+                Log.Info("Sakiewka ludzi (535): gracz w " + st.Name + " - braki z podgladu bitwy: niezbedne kupione " + coreN + " szt. za " + coreG + " (zostalo " + coreLeft
+                     + " z " + pv.Core + "), bron boczna " + sideN + " szt. za " + sideG + " (zostalo " + sideLeft + " z " + pv.Side + "); budzet " + budget
+                     + ", limit sztuk " + maxPieces + ", rodzajow brakow " + wants.Count
+                     + "; bez zakupu, bo w zbrojowni lezy niewydana sztuka tej grupy: " + idleN + ".");
+        }
+
+        /// <summary>535: czy ktos z tych typow uzyje sztuki - ten sam predykat co papier (ItemReq; przy GearFit - pelne ForTroop: umiejetnosc, siodlo, kultura).</summary>
+        private static bool AnyUses(IEnumerable<CharacterObject> troops, ItemObject it)
+        {
+            bool gf = GearFit.On || GearFit.CultureOn;
+            foreach (var t in troops)
+            {
+                if (t == null) continue;
+                if (!ItemReq.Meets(t, it)) continue;
+                if (gf && !GearFit.ForTroop(t, it, GearFit.On)) continue;
+                return true;
+            }
+            return false;
+        }
+
+        private static void BuyPlayerGapsPaper(Settlement st)
         {
             var armory = QuartermasterLaw.DteArmory();
             var main = MobileParty.MainParty;

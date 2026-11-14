@@ -1271,6 +1271,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool DteMapBarShowsKitPreview { get; set; } = true;
 
+        [SettingPropertyBool("Side-Arms Are Optional", HintText = "the spare weapon a soldier gets for his second-best skill (a sword for a spearman or an archer), which his troop's own kit may lack, is counted apart as optional: the kit slots empty in the quartermaster's report, Review the army, the troops' armoury and the map's readiness bar tooltip count only the kit he needs - his main weapon, the shield his kit has, armour and ammunition - and the side-arms are shown on their own as men without a spare weapon (optional). Your men buy the missing kit from their own purse by that same list, needed kit first and side-arms with what is left, and do not sell to the merchants the pieces the next battle hands out. In the battle itself he still fights with an empty slot where the side-arm would be. Off = side-arms count as empty kit slots and your men buy by the quartermaster's list from the troop's own kit, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SideArmsAreOptional { get; set; } = true;
+
         [SettingPropertyBool("Bare Troops Wear Civilian Clothes", HintText = "in your battles a soldier who fights only with his party's stores (Troops Fight With Own Kit Only; garrisons with Garrison Fights With Armory Only) and gets no body armour or no boots from them wears plain civilian clothes instead of going bare: an undyed tunic in earth colours - grey, brown or natural linen - in the cut of his people (Andal, First Men or bandit; other peoples a plain linen or grey tunic), never one dyed red, gold, blue, green or purple and never one that takes the colours of the lord's house, and shoes picked at random from what his culture's tier 1 recruits, villagers and townsmen wear, likewise without dyed or house-coloured pairs. Each man gets his own random pick, though the tunics vary less than the shoes. Never armour: no gambesons or pieces named armour, and no piece protects (head, body, arms and legs together) more than the most protective clothes worn only by villagers or the most protective piece a tier 1 recruit wears (in Realm of Thrones 31 for a tunic, 32 for boots, so the recruit garbs with 33 body armour and the townsmen's long robes are left out). His own clothes from home, not armory gear: never taken from or returned to the stores, never looted, broken into scrap or sold. Only where his troop's template has a piece in that slot (troops bare-chested by design stay as they are) and only what his Athletics allows; head, hands, cape, weapons and horse are not affected, nor heroes and the dead (off = he fights bare, as before)", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool BareTroopsWearCivilianClothes { get; set; } = true;
@@ -14098,6 +14102,7 @@ namespace Armoury
             s.GarrisonArmoryMinFillPercent = GarrisonArmoryMinFillPercent;
             s.TroopsFightWithOwnKitOnly = TroopsFightWithOwnKitOnly;
             s.DteMapBarShowsKitPreview = DteMapBarShowsKitPreview;
+            s.SideArmsAreOptional = SideArmsAreOptional;
             s.BareTroopsWearCivilianClothes = BareTroopsWearCivilianClothes;
             s.BareTroopsTakeHomeWeapon = BareTroopsTakeHomeWeapon;
             s.LordBattleKitIsLent = LordBattleKitIsLent;

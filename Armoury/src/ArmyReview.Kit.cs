@@ -40,7 +40,7 @@ namespace Armoury
             if (pv == null || !pv.Ok || pv.Rows.Count == 0) { OpenMain(false); return; }
             var rows = new List<InquiryElement>();
             foreach (var t in pv.Rows)
-                rows.Add(new InquiryElement(t.Id, KitPreview.RowTitle(t, pv.Missing), TroopPortrait(t.Troop), t.Men > 0, KitPreview.RowHint(t)));
+                rows.Add(new InquiryElement(t.Id, KitPreview.RowTitle(t, pv.Core), TroopPortrait(t.Troop), t.Men > 0, KitPreview.RowHint(t)));
             rows.Add(new InquiryElement("~unused", KitPreview.UnusedTitle(pv), null, true, "What is left in the troops' armoury after the hand-out, and why no man took it."));
             bool photo = WindowPhotos.Active;   // paczka 132: okno proby zdjec - przyciski bez skutku
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Kit for the next battle", KitPreview.ListDesc(pv), rows, true, 1, 1, "Look", "Back",

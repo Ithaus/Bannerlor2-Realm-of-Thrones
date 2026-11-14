@@ -151,8 +151,9 @@ namespace Armoury
         internal static string Text(KitPreview.Result r)
         {
             string head;
-            if (r.Missing > 0)
-                head = "Kit for the next battle: " + r.Missing + (r.Missing == 1 ? " kit slot empty" : " kit slots empty") + " - " + KitPreview.EmptyDetail(r, 2);
+            // 535: tylko sprzet niezbedny (Core); bron boczna - spokojny dopisek w EmptyDetail / MainTitle
+            if (r.Core > 0)
+                head = "Kit for the next battle: " + r.Core + (r.Core == 1 ? " kit slot empty" : " kit slots empty") + " - " + KitPreview.EmptyDetail(r, 2);
             else head = KitPreview.MainTitle(r);
             return head.Replace("{", "(").Replace("}", ")") + "\nReview the army in camp for details";
         }
