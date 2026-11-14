@@ -1654,11 +1654,11 @@ namespace Armoury
         public bool PerkTradeGiftsPaid { get; set; } = true;
 
         // D4 (perki)
-        [SettingPropertyBool("Captured Workshops To Taker", HintText = "when a town changes hands, the workshops of lords whose realm is at war with the taker pass to the taker for nothing - it is war. Workshops of notables (gang leaders, merchants, artisans) and of anyone the taker is not at war with stay with their owners. The working capital stays in the workshop. Replaces the Banner Kings seizure, which handed such workshops to a notable of the town. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Captured Workshops To Taker", HintText = "when a town is taken by siege, the workshops of lords whose realm is at war with the taker pass to the taker for nothing - it is war, and the taker loses no standing with the town's other workshop owners as he would by buying. Workshops of notables (gang leaders, merchants, artisans) and of anyone the taker is not at war with stay with their owners. The working capital stays in the workshop. A town handed over in any other way (peace terms, a grant, a rebellion, a ruler's decision) takes nobody's workshops. Replaces the Banner Kings seizure, which handed such workshops to a notable of the town. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool CapturedWorkshopsToTaker { get; set; } = true;
 
-        [SettingPropertyBool("Rapid Development Saves Capital", HintText = "Rapid Development: when your workshop is seized in a captured town you manage to carry off its working capital - the money in the workshop's chest comes to your purse instead of staying with the workshop. Nobody pays it out of thin air. The same for every lord. Only with Captured Workshops To Taker", RequireRestart = false)]
+        [SettingPropertyBool("Rapid Development Saves Capital", HintText = "Rapid Development: when your workshop is seized in a captured town you manage to carry off its working capital - the money in the workshop's chest comes to your purse instead of staying with the workshop. The taker then puts new working capital in from his own purse (up to half of it, as a notable does when he takes over a bankrupt workshop); if he cannot afford a month of upkeep, the empty workshop soon goes bankrupt. Nobody pays out of thin air. The same for every lord and for you. Only with Captured Workshops To Taker", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool RapidDevelopmentSavesCapital { get; set; } = true;
 
@@ -4273,7 +4273,7 @@ namespace Armoury
         public bool PerkRecruitDiscounts { get; set; } = true;
 
         // D2 (perki)
-        [SettingPropertyBool("All Recruit Discounts", HintText = "every recruitment discount (your culture -5%, Frugal, Sword for Barter, Slick Negotiator, Ritter Oathbound, a low clan rank, the mounted-troop discount of some cultures, Popular Captain and the combat perks) lowers the prest money; Banner Kings' floor of ten days of pay only holds when the extra costs outweigh the discounts. Off: only the combat perks pass the floor", RequireRestart = false)]
+        [SettingPropertyBool("All Recruit Discounts", HintText = "every recruitment discount (your culture -5%, Frugal, Sword for Barter, Slick Negotiator, Ritter Oathbound, a low clan rank, the mounted-troop discount of some cultures, Popular Captain and the combat perks) lowers the prest money; Banner Kings' floor of ten days of pay only holds when the extra costs outweigh the discounts. While on, it also covers the combat perks whatever Perk Recruit Discounts says. Off: only the combat perks pass the floor (if Perk Recruit Discounts is on)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool AllRecruitDiscounts { get; set; } = true;
 
