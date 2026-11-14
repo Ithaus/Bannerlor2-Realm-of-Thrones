@@ -66,3 +66,15 @@ Zrodlo decyzji: Jeff, czat 14.11, odpowiedz na D1-D16 po serii perkow 505-515: "
 **Linie logu:** start "Perki amunicji i zwierzat (512): start sesji | AmmoPerksRework TAK (...) | D16 perki NavalDLC (WellStocked, ShipwrightsInsight) -> odzysk po wygranej bitwie morskiej TAK +10% za perk - perki znalezione | ..."; doba "Perki amunicji i zwierzat (512): dzien N | ... | D16 odzysk z perkami NavalDLC (bitwa morska): agenci bitwy gracza N, pozycje AI M | ...". Po wygranej bitwie morskiej gracza z pierwszym oficerem z WellStocked: N > 0 i linia AmmoRecovery "wrocilo" wieksza niz bez perka.
 
 **Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane). Armoury.dll md5 4b8fceb0.
+
+### Recenzja grupy A (14.11, commit 90b9ee95) - rozpatrzenie uwag
+
+Recenzja potwierdzila D1, D9 i D16 bez bledow poprawnosci, regresji ani kolizji. Jedna uwaga (low):
+
+**Uwaga 1 (low) - zakres D16: kolczany i bron miotana OKRETU bez odzysku.** Sprawdzona: PRAWDZIWA jako niejasnosc zakresu, ODRZUCONA jako zmiana kodu w tej poprawce.
+- Pytanie zadane Jeffowi (CHANGELOG, wpis 515, recenzja pkt 100): "WellStocked / ShipwrightsInsight / kolczany okretu to DODATKOWA amunicja ... wlaczyc albo dac TYM PERKOM nowy efekt (odzysk / zuzycie jak 512)". Odpowiedz Jeffa: "D16 - odzysk"; notatka w PERKI-DECYZJE: "D16 amunicja NavalDLC: odzysk (jak 512)". Pytanie wymienia kolczany okretu, ale nowy efekt proponuje "tym perkom" - nie da sie jednoznacznie wyczytac, czy ulepszenie okretu (AdditionalArcherQuivers, AdditionalThrowingWeaponStack - wyposazenie statku, nie perk) tez ma dawac odzysk.
+- Dlaczego bez kodu: zasada 3 CLAUDE.md ("zanim cos dodasz przy okazji - nie dodawaj"). Odzysk z ulepszen okretu wymagalby nowego odczytu ulepszen statkow partii po bitwie (NavalDLC, odbiciem) - nowy kod i nowe ryzyko bez wyraznej decyzji Jeffa.
+- Stan po tej poprawce (wprost, zeby drugie konto nie bralo tego za przeoczenie): przy NavalDeployAmmoFix = NIE (domyslnie) kolczany i bron miotana OKRETU nie daja nic - ani dodatkowej amunicji, ani odzysku; ulepszenie okretu jest dla gracza martwe. Tarcze okretu (CrewShieldHitPointsFactor) to nie amunicja - poza D16, tez martwe przy NIE.
+- **PYTANIE DO JEFFA (D16b):** czy dodatkowe kolczany / bron miotana okretu maja dawac odzysk po wygranej bitwie morskiej (np. +10% za ulepszenie, ten sam warunek NavalDeployAmmoFix = NIE, wspolny limit 100% z 512 B i D16), czy zostaja martwe? Osobno: czy wlaczyc same tarcze okretu? Jesli "tak" - dopisac w Perk512 NavalBonus premie wedlug ulepszen okretow partii (najpierw sprawdzic w dekompilacji NavalDLC, skad NavalAgentStatCalculateModel bierze AdditionalArcherQuivers).
+
+Kod bez zmian w tej poprawce (tylko ten zapis); Armoury przebudowany kontrolnie.
