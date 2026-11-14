@@ -38,6 +38,8 @@
 - ODLOZONE (drobne) docs/pytania-2026-10-14/ROZWOJ-POSTACI.md:168 - pliku nie ma na tej galezi (jest w historii repo glownego, galaz claude/bannerlord-rot-setup-o75kvo, commit 6c4a3632); poprawka przy scaleniu: "Tutor: martwy w BK (lambda sprawdzala dziecko) - naprawiony 504; Teacher dziala". Dopisane jako otwarta sprawa na gorze docs/STAN-PRAC.md, zeby nie przepadlo.
 - Odrzuconych uwag brak.
 - Linie logu po recenzji: start - FianRanger "wpieta (postfiks BK zdjety z DefaultMapTrackModel.GetTrackLife; nasz: wodz partii gracza z perkiem -> kazdy slad x1.2)"; doba (tylko gdy perk zadzialal) "Bledy perkow BK (504): dzien N | klucz TAK | slady x1.2 (Ranger gracza): a | Dune Rider na pustyni (+8%): b | koszt slubu z perkiem (-15%): c | zaliczka najemnikow z perkiem (+10%): d | Tutor: dorastajacych e, punktow cech f (ostatnio ...) | konny ochotnik (+30%): g | Well Strapped (+0.5 lojalnosci): h | potkniecia doby 0 (razem 0)."
+**504-a (Jeff 14.11):** "fian tak zostaw, tutor tylko glowa rodu" - Ranger jak Tracker zostaje; Tutor: +1 punkt cechy dziecku tylko gdy GLOWA rodu (Clan.Leader, zywa, nie samo dziecko) ma perk (rola BK ClanLeader), nie za kazdego czlonka rodu.
+
 **Status:** DO SPRAWDZENIA (galaz noc/p3-bledy-bk z 3fb9ed48; po recenzji Armoury.dll db1712ec; nie wgrane; latki nie widziane w grze).
 
 ## 503 (P2 audytu perkow): Armoury - premie perkow do XP wojska z bitwy liczone znow (RBM je gubil)

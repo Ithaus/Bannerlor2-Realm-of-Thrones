@@ -29,8 +29,8 @@ namespace Armoury
     ///  4 LordshipSellswordCareer: BKDiplomacyModel.GetMercenaryDownPayment - to samo (+15% z punktow kariery zamiast +10% zaliczki). Transpiler jw.
     ///  5 ScholarshipTutor: BKEducationBehavior.ApplyScholarshipTutorEffect - Count((Hero _) => hero.GetPerkValue(Tutor)), hero = dorastajace
     ///    DZIECKO (lambda nie patrzy na swoj parametr) - nigdy nie dziala. Transpiler na OnHeroComesOfAge (wolanym przez zdarzenie, nie do
-    ///    wkompilowania): call ApplyScholarshipTutorEffect -> TutorEffect(hero): +1 punkt cechy za kazdego zywego czlonka rodu (bez dziecka) z perkiem
-    ///    Tutor; klucz NIE = oryginal BK.
+    ///    wkompilowania): call ApplyScholarshipTutorEffect -> TutorEffect(hero): +1 punkt cechy, gdy glowa rodu (zywa, nie samo dziecko) ma perk
+    ///    Tutor (504-a, Jeff: tylko glowa rodu); klucz NIE = oryginal BK.
     ///  6 Riding.CavalryTactics: BKVolunteerModel.GetDailyVolunteerProductionProbability liczy po swojemu (GetDraftEfficiency) i gubi +30% gry dla
     ///    konnego ochotnika (DefaultVolunteerModel:104-107). Postfiks: warunki gry (miasto albo wies przy miescie, ochotnik w miejscu jest konny,
     ///    PerkHelper.GetPerkValueForTown) -> wynik x(1 + PrimaryBonus). Levy.ProbabilityPostfix na tej samej metodzie dziala tylko dla PUSTEGO
@@ -394,14 +394,11 @@ namespace Armoury
             try
             {
                 if (hero == null || hero.Clan == null || hero.HeroDeveloper == null) return;
+                // 504-a (Jeff 14.11 "tutor tylko glowa rodu"): rola perka w BK = ClanLeader - liczy sie tylko zywa glowa rodu z perkiem (+1 punkt cechy)
                 int n = 0;
                 string who = "";
-                foreach (var h in hero.Clan.Heroes)
-                {
-                    if (h == null || h == hero || !h.IsAlive || !h.GetPerkValue(_tutor)) continue;
-                    n++;
-                    if (who.Length < 120) who += (who.Length > 0 ? ", " : "") + h.Name;
-                }
+                var h = hero.Clan.Leader;
+                if (h != null && h != hero && h.IsAlive && h.GetPerkValue(_tutor)) { n = 1; who = h.Name.ToString(); }
                 Interlocked.Increment(ref _dTutorKids);
                 if (n <= 0) return;
                 hero.HeroDeveloper.UnspentAttributePoints += n;
