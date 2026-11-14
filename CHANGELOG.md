@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 494: CloseRanks - alarm 146 tylko przy sytuacjach, w ktorych RBM naprawde decyduje o szyku
+
+**Problem:** przeglad sesji Jeffa 14.11 (anomalia 146): log l.32885 [02:23:37] "wywolan latki 0 ... pewnych ... Charge z pieszym celem: 180); UWAGA: 0 wywolan przy pewnych sytuacjach RBM - latka nie biegnie (JIT ...)". Ta sama bitwa to bitwa z looterami (HIT-y main_hero -> looter l.~32785-32805), Jeff sam, konno z lukiem. Alarm falszywy: w logu 18-38-46 latka wywolala sie 205 razy, wiec gdy RBM wola metode, latka dziala.
+
+**Przyczyna:** licznik "pewnych" sytuacji (CloseRanks.One: `sure = sit && (Charge ? gap < MaxValue : gap < SureAdvanceGap)`) nie znal warunkow RBM. RBM OverrideBehaviorCharge.PrefixCalculateCurrentOrder (dekompilacja rbmai.cs:12953-12962) dla druzyny ani gracza, ani sojusznika w bitwie, w ktorej strona mapy jest bandyta (`mobileParty.IsBandit || mobileParty2.IsBandit`), robi `return true` - zwykly Charge gry bez DecideArrangementOrderForFormation. Cel Charge / Advance RBM bierze z FindSignificantEnemy(includeInfantry, includeRanged) (rbmai.cs:12966, 4778-4787), a FootGap liczy kazdy szyk poza konnica.
+
+**Zmiana (decyzja domyslna (noc 14.11), tylko diagnostyka, bez klucza):** CloseRanks.cs - w Begin `_bandit` = ten sam warunek co RBM (Campaign / MainParty.MapEvent / PlayerMapEvent, LeaderParty.MobileParty obu stron, IsBandit; wyjatek = false). W One: Charge szyku AI spoza strony gracza (Team.IsPlayerTeam / IsPlayerAlly jak w RBM) w bitwie z bandytami nie jest "pewny" - liczony osobno (`_sitBandit`); pozostale Charge "pewne" tylko przy wrogu piechoty albo strzelcow (nowe InfRangedGap: IsInfantryFormation / IsRangedFormation) i ClosestSignificantlyLargeEnemyFormation != null; Advance "pewny" przy wrogu piechoty albo strzelcow blizej niz SureAdvanceGap (100 m). Linia "Szyk pod ostrzalem (146)" dopisuje licznik Charge pominietych przy bandytach i znacznik ", bitwa z bandytami". Sama latka (prefiks / postfiks DecideArrangementOrderForFormation, decyzje, 310) bez zmian.
+
+**Ryzyko / co sprawdzic:** kontrola calosci: `sure` czyta tylko `_sitSure` (licznik + warunek UWAGI w Write) - decyzje szyku, `sit`, `gap`, `contact`, 310 i liczniki RBM bez zmian. InfRangedGap liczony tylko przy `sit` (szyk AI piechoty od 30 w Advance / Charge, co 0.5 s) - koszt jak FootGap. Kryterium jest ostrozniejsze niz RBM (FindSignificantEnemy ma zapasowe zwracanie dowolnego szyku, np. jedynego szyku wroga) - mniej "pewnych" sytuacji, wiec UWAGA rzadziej, nigdy czesciej. Bitwa bez kampanii (custom battle) - _bandit false, jak RBM. Alarm z logu 13.11 18-20-15 sprawdzic tak samo (z kim byla bitwa). W grze: bitwa z bandytami - "pominiete: N, bitwa z bandytami" i brak UWAGI; bitwa lordow (autotest armii 200 vs 240) - pewne > 0 i wywolan latki > 0.
+
+**Status:** DO SPRAWDZENIA
+
 ## 493: wsie poboczne - werbunek wedlug reputacji wsi glownej
 
 **Problem:** Jeff 14.11: "czemu w wioskach pobocznych nie moge rekrutowac, a w glownej moge, przeciez jak zabijam bandytow, to reputacja tez powinna pozwalac rekrutowac w wioskach pobocznych". Log Armoury-2026-11-14_00-24-57.log: :44521 wjazd do Tumblestone (wies glowna, werbunek gry dziala), :45198 wjazd do Littlecross (wioska poboczna okregu Tumblestone), :45703 linia doby m113 "werbunki 0 ... odmowy: zaufanie 1" - jedyna odmowa w sesji.
