@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 ~23:00 - WGRANIE 238 (524 ranni AI a glod, 525 meldunek QM = zbrojownia, 526 D10 konie), bez autotestu
+
+- Armoury.dll deb58b7f = noc/scal-perki fb5c5dc3. Kopie: .bak-2026-11-14-przed-wgranie238, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie238 i -przed). 523 (D9) odrzucone - D9 dziala juz przez 506 (RBM przepisuje cios wrecz w tarcze na plecach na blok).
+- W toku: 527 drogi (siec, Coverage, objazd), 528 uklady a stosunek sil (Kevan 228 vs 40 - zgoda, potem atak).
+- Do sprawdzenia: Nocna Straz (ranni nie rosna w zamku; 'koniec twierdzy: glod'), meldunek QM z rozpiska, linia 507 premia koni %.
+
 ## STAN 14.11 ~20:15 - WGRANIE 237 (522 zloto Essos/Westeros), bez autotestu
 
 - Armoury.dll 5fd4f809 = noc/scal-perki 8476e167 (236 + 522: Westeros 10/70/20 = 0.842 kg/1000 zl, Essos 10/45/45 = 0.623 kg; linia doby: moneta jako procent ladownosci karawan i band). Kopie: .bak-2026-11-14-przed-wgranie237, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie237 i -przed).
