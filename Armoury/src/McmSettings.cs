@@ -1929,11 +1929,11 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool PerkStrikeAfterRbm { get; set; } = true;
 
-        [SettingPropertyBool("Perk Lifestyle Damage", HintText = "Bannerlord Kings lifestyle perks that had no effect at all now work: Klibanophori (mounted thrusts +6%, mounted men take 5% less damage), Highlander (greatswords on foot +4%), Fennid (two-handed weapons +10%), Drengr (infantry in the formation you lead +10% melee damage). For you and the AI alike. Off = they do nothing, as before", RequireRestart = false)]
+        [SettingPropertyBool("Perk Lifestyle Damage", HintText = "Banner Kings lifestyle perks that had no effect at all now work: Klibanophori (mounted thrusts +6%, mounted men take 5% less damage), Highlander (greatswords on foot +4%), Fennid (two-handed weapons +10%), Drengr (infantry in the formation you lead +10% melee damage). The percentages apply to the strength of the blow before armour. For you and the AI alike. Off = they do nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool PerkLifestyleDamage { get; set; } = true;
 
-        [SettingPropertyBool("Perk Mount After Rbm", HintText = "perks that should make the horse faster or stronger now reach the horse: Sweeping Wind (+5% top speed, lost to RBM's horse speed), and the Bannerlord Kings perks Equites (+10% charge damage), Adaptive Tactics (+8% maneuver), Camel Master (+8% speed) and Outrider (+5% speed), which Bannerlord Kings put on the rider where the game never reads them. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Perk Mount After Rbm", HintText = "perks that should make the horse faster or stronger now reach the horse: Sweeping Wind (+5% top speed, lost to RBM's horse speed), and the Banner Kings perks Equites (+10% charge damage), Adaptive Tactics (+8% maneuver), Camel Master (+8% speed) and Outrider (+5% speed), which Banner Kings put on the rider where the game never reads them. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool PerkMountAfterRbm { get; set; } = true;
 

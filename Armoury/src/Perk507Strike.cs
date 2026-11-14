@@ -78,8 +78,10 @@ namespace Armoury
 
         // ---- BK (odbiciem, leniwie)
         private const int BHigh = 1, BFennid = 2, BDrengr = 4, BKlib = 8, BEquites = 16, BAdapt = 32, BCamel = 64, BOutrider = 128;
-        private static bool _bkTried, _bkOk;
+        private static bool _bkTypesTried, _bkTypesOk, _bkOk;   // typy/odbicie raz na proces; obiekty perkow co sesje (recenzja 507)
         private static string _bkState = "nie szukane";
+        private static Type _bkPerksT;
+        private static bool _bkOnHorse;   // BK sam latka UpdateHorseStats (poprawka u autora) - czesc BK w D pominieta
         private static PropertyInfo _cfgInstance, _eduManager;
         private static MethodInfo _getEducation, _hasPerk;
         private static object[] _bkPerks;   // indeks = bit (0..7)
@@ -90,9 +92,14 @@ namespace Armoury
         };
 
         // ---- pamiec misji (wyksztalcenie BK bohatera, obecnosc RBM na koniu)
-        private static Mission _mission;
+        private static WeakReference _mission = new WeakReference(null);   // slaba referencja - zakonczona misja nie zostaje w pamieci (recenzja 507)
         private static readonly Dictionary<Hero, int> _mask = new Dictionary<Hero, int>();
         private static int _rbmHorse = -1;
+        private static string _rbmVer = "?";
+
+        // drugie wolanie gry bez predkosci (MissionCombatMechanicsHelper.ComputeBlowMagnitudeMelee - do napisu premii predkosci): nie liczyc w logu
+        [ThreadStatic] private static bool _expectSecond;
+        [ThreadStatic] private static float _lastProgress, _lastImpact;
         private static readonly object _lock = new object();
 
         private static string F2(double v) { return v.ToString("0.00", Inv); }
@@ -137,7 +144,17 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("EnsureHooks", e); }
-            try { BkResolve(); } catch (Exception e) { Stumble("BkResolve", e); }
+            // co sesje: obiekty perkow BK od nowa (BK tworzy nowe PerkObject przy kazdym starcie gry, HasPerk porownuje referencje), pamiec misji czysta
+            lock (_lock) { _mission = new WeakReference(null); _mask.Clear(); _rbmHorse = -1; }
+            try { BkRefresh(); } catch (Exception e) { _bkOk = false; _bkState = "wyjatek " + e.GetType().Name; Stumble("BkRefresh", e); }
+            _bkOnHorse = ForeignOn(_horseTarget, "BannerKings");
+            try
+            {
+                var rt = AccessTools.TypeByName("RBMCombat.MagnitudeChanges");
+                _rbmVer = rt != null ? rt.Assembly.GetName().Version.ToString() : "brak";
+            }
+            catch { _rbmVer = "?"; }
+            string foreignMelee = ForeignPostfixes(AccessTools.DeclaredMethod(typeof(MissionCombatMechanicsHelper), "CalculateBaseMeleeBlowMagnitude"));
 
             var s = Settings.Current;
             string rbmMelee = RbmPrefixOn(AccessTools.DeclaredMethod(typeof(MissionCombatMechanicsHelper), "CalculateBaseMeleeBlowMagnitude"));
@@ -148,7 +165,8 @@ namespace Armoury
                      + " | postfiksy: cios wrecz " + _hMelee + " (prefiks RBM " + rbmMelee + "), pocisk " + _hMissile + " (prefiks RBM " + rbmMissile
                      + ", wzor RBM pocisku " + (_rbmMissile != null ? "TAK" : "BRAK") + "), cios ogolnie " + _hBlow + ", kon " + _hHorse
                      + " (postfiks RBM na UpdateHorseStats " + rbmHorse + ")"
-                     + " | BK " + _bkState
+                     + " | RBM " + _rbmVer + " | obce postfiksy na sile ciosu wrecz: " + foreignMelee
+                     + " | BK " + _bkState + (_bkOnHorse ? " | BK juz latka UpdateHorseStats - perki konne BK na koniu pominiete" : "")
                      + " | perki: predkosc wrecz RecklessCharge/DashAndSlash/SurgingBlow/Lancer/UnstoppableForce, kuznia SharpenedEdge/Tip, RunningThrow,"
                      + " SweepingWind; BK Klibanophori/Highlander/Fennid/Drengr (obrazenia), Equites/AdaptiveTactics/CamelMaster/Outrider (kon)"
                      + " | potkniecia " + _stumbles + ".");
@@ -199,6 +217,40 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>Czy na celu jest latka (dowolna) z typu w przestrzeni nazw ns.</summary>
+        private static bool ForeignOn(MethodBase m, string ns)
+        {
+            try
+            {
+                var info = m != null ? Harmony.GetPatchInfo(m) : null;
+                if (info == null) return false;
+                foreach (var list in new[] { info.Prefixes, info.Postfixes, info.Transpilers })
+                    foreach (var p in list)
+                    {
+                        var dt = p != null && p.PatchMethod != null ? p.PatchMethod.DeclaringType : null;
+                        if (dt != null && dt.FullName != null && dt.FullName.StartsWith(ns, StringComparison.Ordinal)) return true;
+                    }
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>Postfiksy innych modow niz RBM i nasz (do linii startu - kolizja widoczna w logu).</summary>
+        private static string ForeignPostfixes(MethodBase m)
+        {
+            try
+            {
+                var info = m != null ? Harmony.GetPatchInfo(m) : null;
+                var l = new List<string>();
+                if (info != null)
+                    foreach (var p in info.Postfixes)
+                        if (p != null && p.owner != Owner && !IsRbm(p))
+                            l.Add(p.owner + (p.PatchMethod != null && p.PatchMethod.DeclaringType != null ? "/" + p.PatchMethod.DeclaringType.Name : ""));
+                return l.Count > 0 ? string.Join(", ", l) + " (premia predkosci skaluje ich wynik)" : "brak";
+            }
+            catch { return "?"; }
+        }
+
         // ============================================================ A) cios wrecz
 
         /// <summary>Postfiks MissionCombatMechanicsHelper.CalculateBaseMeleeBlowMagnitude - tylko gdy prefiks (RBM) zdjal metode gry.</summary>
@@ -216,7 +268,11 @@ namespace Armoury
                 var usage = w.CurrentUsageItem;
                 var item = w.Item;
                 if (usage == null || item == null) return;
-                _dMelee++;
+                // gra wola te metode drugi raz z predkoscia 0 (gdy progressEffect > 0.7) - tylko do napisu premii; w logu liczymy cios raz
+                bool second = _expectSecond && exraLinearSpeed == 0f && progressEffect == _lastProgress && impactPointAsPercent == _lastImpact;
+                _expectSecond = !second && progressEffect > 0.7f;
+                _lastProgress = progressEffect; _lastImpact = impactPointAsPercent;
+                if (!second) _dMelee++;
                 float result = __result;
 
                 // predkosc z perkami - warunki 1:1 z SandboxStrikeMagnitudeModel (val2 != null && extraLinearSpeed > 0)
@@ -226,14 +282,20 @@ namespace Armoury
                         attackInformation.DoesAttackerHaveMountAgent, usage.RelevantSkill);
                     if (speed > exraLinearSpeed + 1e-4f)
                     {
-                        float up;
+                        // stosunek RBM(predkosc z perkami) / RBM(predkosc) skaluje __result - zmiany obcych postfiksow (wyzszy priorytet) zostaja
+                        float up, bas;
                         _inner = true;
-                        try { up = MissionCombatMechanicsHelper.CalculateBaseMeleeBlowMagnitude(in attackInformation, in collisionData, strikeType, progressEffect, impactPointAsPercent, speed); }
-                        finally { _inner = false; }
-                        if (up > result)
+                        try
                         {
-                            _dMeleeUp++; _dMeleeRatio += up / result;
-                            result = up;
+                            up = MissionCombatMechanicsHelper.CalculateBaseMeleeBlowMagnitude(in attackInformation, in collisionData, strikeType, progressEffect, impactPointAsPercent, speed);
+                            bas = MissionCombatMechanicsHelper.CalculateBaseMeleeBlowMagnitude(in attackInformation, in collisionData, strikeType, progressEffect, impactPointAsPercent, exraLinearSpeed);
+                        }
+                        finally { _inner = false; }
+                        if (bas > 0f && up > bas)
+                        {
+                            float r = up / bas;
+                            _dMeleeUp++; _dMeleeRatio += r;
+                            result *= r;
                         }
                     }
                 }
@@ -244,7 +306,7 @@ namespace Armoury
                     var perk = strikeType == StrikeType.Thrust ? DefaultPerks.Crafting.SharpenedTip : DefaultPerks.Crafting.SharpenedEdge;
                     var en = new ExplainedNumber(result, false, null);
                     PerkHelper.AddPerkBonusForCharacter(perk, ch, true, ref en, false);
-                    if (en.ResultNumber > result + 1e-5f) { _dHit[strikeType == StrikeType.Thrust ? ITip : IEdge]++; result = en.ResultNumber; }
+                    if (en.ResultNumber > result + 1e-5f) { if (!second) _dHit[strikeType == StrikeType.Thrust ? ITip : IEdge]++; result = en.ResultNumber; }
                 }
                 __result = result;
             }
@@ -353,7 +415,7 @@ namespace Armoury
                         if (mounted && acd.StrikeType == (int)StrikeType.Thrust && (both & BKlib) != 0) { f *= 1.06f; _dHit[IKlibT]++; }
                         if (!mounted && usage.WeaponClass == WeaponClass.TwoHandedSword && (both & BHigh) != 0) { f *= 1.04f; _dHit[IHigh]++; }
                         if (usage.RelevantSkill == DefaultSkills.TwoHanded && (mSelf & BFennid) != 0) { f *= 1.10f; _dHit[IFennid]++; }
-                        if (!mounted && capA != null && capA != att && (mCap & BDrengr) != 0) { f *= 1.10f; _dHit[IDrengr]++; }
+                        if (!mounted && capA != null && capA != att && QueryLibrary.IsInfantry(att) && (mCap & BDrengr) != 0) { f *= 1.10f; _dHit[IDrengr]++; }
                     }
                 }
                 // ofiara: czlowiek w siodle, trafienie w cialo (nie w tarcze)
@@ -385,19 +447,28 @@ namespace Armoury
                 MissionChanged();
                 bool any = false;
                 var ch = rider.Character as CharacterObject;
-                if (ch != null && ch.IsHero && RbmHorse())
+                bool rbm = RbmHorse();
+                float spd0 = agentDrivenProperties.MountSpeed;   // po RBM (z jego sufitem)
+                if (ch != null && ch.IsHero && rbm)
                 {
                     var en = new ExplainedNumber(1f, false, null);
                     PerkHelper.AddPerkBonusForCharacter(DefaultPerks.Riding.SweepingWind, ch, true, ref en, false);
                     if (en.ResultNumber > 1.0001f) { agentDrivenProperties.MountSpeed *= en.ResultNumber; _dHit[ISweep]++; any = true; }
                 }
-                if (BkResolve())
+                if (!_bkOnHorse && BkResolve())
                 {
                     int m = Mask(HeroOf(rider)) | Mask(HeroOf(CaptainOf(rider)));
                     if ((m & BEquites) != 0) { agentDrivenProperties.MountChargeDamage *= 1.1f; _dHit[IEquites]++; any = true; }
                     if ((m & BAdapt) != 0) { agentDrivenProperties.MountManeuver *= 1.08f; _dHit[IAdapt]++; any = true; }
                     if ((m & BCamel) != 0) { agentDrivenProperties.MountSpeed *= 1.08f; _dHit[ICamel]++; any = true; }
                     if ((m & BOutrider) != 0) { agentDrivenProperties.MountSpeed *= 1.05f; _dHit[IOutrider]++; any = true; }
+                }
+                // RBM sciaga predkosc ponad sufit (10 m/s, 8 przy koniu ponad 500 kg; HorseChanges) - premia nie przebija sufitu, kon juz ponad nim zostaje jak u RBM
+                if (rbm && agentDrivenProperties.MountSpeed > spd0)
+                {
+                    var hw = agent.SpawnEquipment != null ? agent.SpawnEquipment[EquipmentIndex.Horse] : EquipmentElement.Invalid;
+                    float cap = !hw.IsEmpty && hw.Weight > 500f ? 8f : 10f;
+                    if (agentDrivenProperties.MountSpeed > cap) agentDrivenProperties.MountSpeed = Math.Max(spd0, cap);
                 }
                 if (any) _dHorse++;
             }
@@ -427,8 +498,8 @@ namespace Armoury
         private static void MissionChanged()
         {
             var m = Mission.Current;
-            if (ReferenceEquals(m, _mission)) return;
-            lock (_lock) { _mission = m; _mask.Clear(); _rbmHorse = -1; }
+            if (ReferenceEquals(m, _mission.Target)) return;
+            lock (_lock) { _mission = new WeakReference(m); _mask.Clear(); _rbmHorse = -1; }
         }
 
         /// <summary>Perki BK bohatera (bity), raz na misje na bohatera.</summary>
@@ -453,35 +524,48 @@ namespace Armoury
             return v;
         }
 
-        private static bool BkResolve()
+        /// <summary>Czy perki BK sa gotowe w tej sesji (odswiezane w EnsureHooks).</summary>
+        private static bool BkResolve() { return _bkOk; }
+
+        /// <summary>Typy i odbicie BK - raz na proces.</summary>
+        private static bool BkTypes()
         {
-            if (_bkTried) return _bkOk;
-            _bkTried = true;
-            try
+            if (_bkTypesTried) return _bkTypesOk;
+            _bkTypesTried = true;
+            var cfgT = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+            if (cfgT == null) return false;
+            _bkPerksT = AccessTools.TypeByName("BannerKings.Managers.Skills.BKPerks");
+            var eduMgrT = AccessTools.TypeByName("BannerKings.Managers.EducationManager");
+            var eduT = AccessTools.TypeByName("BannerKings.Managers.Education.EducationData");
+            _cfgInstance = AccessTools.Property(cfgT, "Instance");
+            _eduManager = AccessTools.Property(cfgT, "EducationManager");
+            _getEducation = eduMgrT != null ? AccessTools.Method(eduMgrT, "GetHeroEducation", new[] { typeof(Hero) }) : null;
+            _hasPerk = eduT != null ? AccessTools.Method(eduT, "HasPerk") : null;
+            _bkTypesOk = _cfgInstance != null && _eduManager != null && _getEducation != null && _hasPerk != null && _bkPerksT != null;
+            return _bkTypesOk;
+        }
+
+        /// <summary>Obiekty perkow BK - co sesje (BK robi nowe PerkObject przy kazdym starcie gry; stare po wczytaniu innego zapisu nie pasuja).</summary>
+        private static void BkRefresh()
+        {
+            _bkOk = false;
+            if (!BkTypes())
             {
-                var cfgT = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
-                if (cfgT == null) { _bkState = "BRAK (BannerKings nie zaladowany)"; return false; }
-                var perksT = AccessTools.TypeByName("BannerKings.Managers.Skills.BKPerks");
-                var eduMgrT = AccessTools.TypeByName("BannerKings.Managers.EducationManager");
-                var eduT = AccessTools.TypeByName("BannerKings.Managers.Education.EducationData");
-                _cfgInstance = AccessTools.Property(cfgT, "Instance");
-                _eduManager = AccessTools.Property(cfgT, "EducationManager");
-                _getEducation = eduMgrT != null ? AccessTools.Method(eduMgrT, "GetHeroEducation", new[] { typeof(Hero) }) : null;
-                _hasPerk = eduT != null ? AccessTools.Method(eduT, "HasPerk") : null;
-                object perks = perksT != null ? StaticInstance(perksT) : null;
-                _bkPerks = new object[BkProps.Length];
-                var found = new List<string>();
-                for (int i = 0; i < BkProps.Length; i++)
-                {
-                    try { _bkPerks[i] = perks != null ? Traverse.Create(perks).Property(BkProps[i]).GetValue() : null; } catch { _bkPerks[i] = null; }
-                    found.Add(BkProps[i] + (_bkPerks[i] != null ? "" : " BRAK"));
-                }
-                _bkOk = _cfgInstance != null && _eduManager != null && _getEducation != null && _hasPerk != null && perks != null;
-                _bkState = (_bkOk ? "TAK" : "BRAK typow (cfg " + (_cfgInstance != null) + ", edukacja " + (_getEducation != null) + ", HasPerk " + (_hasPerk != null)
-                            + ", BKPerks " + (perks != null) + ")") + " [" + string.Join(", ", found) + "]";
+                _bkState = AccessTools.TypeByName("BannerKings.BannerKingsConfig") == null ? "BRAK (BannerKings nie zaladowany)"
+                    : "BRAK typow (cfg " + (_cfgInstance != null) + ", edukacja " + (_getEducation != null) + ", HasPerk " + (_hasPerk != null) + ", BKPerks " + (_bkPerksT != null) + ")";
+                return;
             }
-            catch (Exception e) { _bkOk = false; _bkState = "wyjatek " + e.GetType().Name; Stumble("BkResolve", e); }
-            return _bkOk;
+            object perks = StaticInstance(_bkPerksT);
+            var arr = new object[BkProps.Length];
+            var found = new List<string>();
+            for (int i = 0; i < BkProps.Length; i++)
+            {
+                try { arr[i] = perks != null ? Traverse.Create(perks).Property(BkProps[i]).GetValue() : null; } catch { arr[i] = null; }
+                found.Add(BkProps[i] + (arr[i] != null ? "" : " BRAK"));
+            }
+            _bkPerks = arr;
+            _bkOk = perks != null;
+            _bkState = (_bkOk ? "TAK (obiekty perkow odswiezone w tej sesji)" : "BRAK instancji BKPerks") + " [" + string.Join(", ", found) + "]";
         }
 
         private static object StaticInstance(Type t)
