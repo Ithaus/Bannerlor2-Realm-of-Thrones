@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 536 recenzja: pamiec losu zwyklych - bez przyciecia do 6 slotow (BK do 20), werbunek wedlug kultury osady notabla, zapis bez umarlych notabli - Armoury (HouseLevies)
+
+**Problem:** recenzja kodu 536 (gra nie uruchamiana, dowod tylko z kodu): (1) `Import` i `OnRecruited` przycinaly liczbe rozstrzygnietych do 6, a BK trzyma u notabla do 20 slotow (`SideVillageVisit.Screen` :183) - notabl z np. 9 zwyklymi po kazdym wczytaniu mial 3 "nowych", wiec ludzie juz rozstrzygnieci losowali drugi raz (po wielu wczytaniach udzial rodu ponad 25% i zmiana ludzi w slotach przy wczytaniu); (2) `OnRecruited` porownywal oddzial z BasicTroop kultury miejsca werbunku - autowerbunek zalogi miasta z notabla wsi innej kultury nie zmniejszal licznika, a nowy czlowiek w tym slocie tej samej doby nie dostawal losu; (3) `_decided` trzymal wpisy umarlych notabli na zawsze (zapis rosnie przez cala kampanie).
+
+**Przyczyna:** `HouseLevies.Import` / `OnRecruited` `Math.Min(6, ...)`; kultura z parametru `settlement` zdarzenia; `Export` bez spisu zywych.
+
+**Zmiana:**
+- `MaxSlots = 64` (bezpiecznik) zamiast 6 w `Import` i `OnRecruited`.
+- `OnRecruited`: kultura osady notabla (`CurrentSettlement` -> `HomeSettlement` -> miejsce werbunku -> kultura oddzialu) - ta sama, ktora liczy `Basics`.
+- `Export`: zapisywani tylko zywi notable z `Settlement.All` (spis nieudany = zapis jak dotad, potkniecie liczone).
+- Bez zmian (sprawdzone): sloty stabilne - zamieniony rekrut rodu ma kulture osady (`HouseT1Of` filtruje `c.Culture == culture`), wiec `Mends.LocalLevies` go nie wyrzuca; gra awansuje go po jego drzewie (Blackwood t2), elity -> rod go nie rusza (nie jest w drzewie elite_basic_troop); zwykli nie losowani drugi raz w ciagu doby ani przy wjezdzie gracza (liczba, nie numer slotu - sortowanie gry `UpdateVolunteersOfNotablesInSettlement` bez wplywu). Warunki: osada gracza / obcej kultury pana / rod bez pieszego tier 1 - zwykly rekrut. Wsie poboczne: ta sama szansa tylko dla okienka chlopa (kind 0, `t == BasicTroop`), oferta trzymana na dobe jak 534. Ceny: `PriceOf` / `GetTroopRecruitmentCost` oddzialu rodu, LevyGold bez zmian. AI: werbunek gry `ApplyInternal` (VolunteerFromIndividual i do zalogi) zawsze wola `OnTroopRecruited` z liczba 1 na slot. Wydajnosc: jeden przebieg slotow na notabla raz na dobe, spis zywych tylko przy zapisie.
+
+**Ryzyko / co sprawdzic:** znane, NIE poprawiane (zasada 3, ryzyko wieksze niz zysk): awans zwyklego (gra: szansa log2(moc/tier)*1% w bramce produkcji, ok. 3-5% na slot na dobe) i nowy zwykly u tego samego notabla w tej samej dobie - nowy bez losu; szacunek z kodu gry: realny udzial rodu ok. 22% zamiast 25%. Proba sledzenia awansow (licznik celow awansu BasicTroop) mogla by przy innych zrodlach tier 2 (BK) losowac ludzi juz rozstrzygnietych - wolalem nizszy udzial niz migotanie. W logu: `HouseLevies: dzien N ... notabli w pamieci` nie powinno rosnac bez konca po zapisie i wczytaniu; po wczytaniu "nowych z losem" nie powinno skakac (dawniej tak przy BK > 6 slotow). RecruitKit "bez zapisu" w linii HouseLevies rosnie tez od zamian tier 1 (rekrut tier 1 nie ma zapisu kompletu - komplet DTE jak dotad) - szum licznika, nie blad.
+
+**Status:** DO SPRAWDZENIA (nie wgrane; build Armoury 0 bledow).
+
 ## 536: osady glowne rodu - zwykly ochotnik tier 1 z szansa House Recruit Share (25%) jest rekrutem rodu (Blackwood Recruit obok Riverlands Recruit); wsie poboczne ta sama regula - Armoury (HouseLevies, SideVillageVisit.Levy, nowy klucz HouseRecruitShare)
 
 **Problem:** Jeff, czat 15.11: "w wioskach glownych tez dawaj blackwood recruit, nie tylko riverland recruit, oczywiscie w wioskach blackwooda, bo w innych jesli nie ma wojska rodowego to nie, to wtedy general recruit". Dotad w osadach glownych rodu (np. Wendish Town, wies Raventree Hall, kultura `river`, pan Blackwood) u notabli byli tylko `river_recruit` (zwykli) i szlachta zamieniona na ludzi rodu tego samego tieru (Riverlord's Son t2 -> Blackwood Levy) - zwyklych nie ruszalismy (`HouseLevies.cs`: `if (!IsElite(troop)) continue;`). Ludzie rodu tier 1 (`blackwood_recruit`, najwiekszy stack szablonu `clan_blackwood_party_template`: 16 z 53) byli tylko z elit.

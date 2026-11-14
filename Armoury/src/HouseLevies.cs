@@ -63,12 +63,25 @@ namespace Armoury
             catch (Exception e) { Log.Error("HouseLevies.SyncData", e); }
         }
 
+        private const int MaxSlots = 64;   // recenzja 536: bezpiecznik liczby slotow notabla (gra 6, BK do 20)
+
         private string Export()
         {
+            // recenzja 536: tylko zywi notable osad - umarli / zastapieni nie rosna w zapisie bez konca (gdy spisu nie da sie zrobic - wszystko jak bylo)
+            HashSet<string> live = null;
+            try
+            {
+                live = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var st in Settlement.All)
+                    if (st != null && st.Notables != null)
+                        foreach (var h in st.Notables) if (h != null && h.IsAlive && h.StringId != null) live.Add(h.StringId);
+            }
+            catch (Exception e) { Stumble("Export", e); live = null; }
             var sb = new System.Text.StringBuilder(_decided.Count * 24);
             foreach (var kv in _decided)
             {
                 if (kv.Value <= 0 || string.IsNullOrEmpty(kv.Key) || kv.Key.IndexOf(';') >= 0 || kv.Key.IndexOf('=') >= 0) continue;
+                if (live != null && live.Count > 0 && !live.Contains(kv.Key)) continue;
                 if (sb.Length > 0) sb.Append(';');
                 sb.Append(kv.Key).Append('=').Append(kv.Value);
             }
@@ -83,7 +96,7 @@ namespace Armoury
             {
                 int eq = part.LastIndexOf('='); int n;
                 if (eq <= 0 || !int.TryParse(part.Substring(eq + 1), out n) || n <= 0) continue;
-                _decided[part.Substring(0, eq)] = Math.Min(6, n);
+                _decided[part.Substring(0, eq)] = Math.Min(MaxSlots, n);   // recenzja 536: BK trzyma do 20 slotow - przyciecie do 6 losowalo od nowa ludzi juz rozstrzygnietych po kazdym wczytaniu
             }
         }
 
@@ -93,11 +106,13 @@ namespace Armoury
             try
             {
                 if (source == null || troop == null || source.StringId == null) return;
-                var cul = settlement != null && settlement.Culture != null ? settlement.Culture : troop.Culture;
+                // recenzja 536: kultura osady NOTABLA (tam liczy Basics), nie miejsca werbunku - zaloga miasta bierze tez z notabli wsi innej kultury
+                var home = source.CurrentSettlement ?? source.HomeSettlement;
+                var cul = home != null && home.Culture != null ? home.Culture : (settlement != null && settlement.Culture != null ? settlement.Culture : troop.Culture);
                 if (cul == null || troop != cul.BasicTroop) return;
                 int d;
                 if (!_decided.TryGetValue(source.StringId, out d) || d <= 0) return;
-                d -= Math.Max(1, Math.Min(6, count));
+                d -= Math.Max(1, Math.Min(MaxSlots, count));
                 if (d > 0) _decided[source.StringId] = d; else _decided.Remove(source.StringId);
                 _bRecruited++;
             }
