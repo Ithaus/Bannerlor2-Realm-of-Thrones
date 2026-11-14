@@ -180,6 +180,7 @@ namespace Armoury
                 }
                 float b = r.BaseNumber;
                 if (b <= 0f) return false;
+                if (heroes && !prisoners) pct = Perk513.MarchPct(party, mp, pct);   // 513 (37/60): WalkItOff - lekko ranni bohaterowie w marszu WalkItOffLightWoundPercent (Perk513Healing.cs)
                 float before = r.ResultNumber;
                 r.Add(-b * (1f - pct / 100f), _marchText);
                 if (prisoners) { if (ai) _aiPrisCuts++; else _cutsPris++; }

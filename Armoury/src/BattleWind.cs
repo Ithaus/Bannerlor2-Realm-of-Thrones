@@ -623,6 +623,7 @@ namespace Armoury
                 float a2 = CurvedAthletics(a, c);
                 float kg = 0f;
                 try { kg = Math.Max(0f, agent.SpawnEquipment.GetTotalWeightOfArmor(true)); } catch { kg = 0f; }
+                kg = Perk513.ArmorKg(agent, kg);   // 513 (36): Form Fitting Armor -15% wagi zbroi, jak gra (Perk513Healing.cs)
                 float max = _rMaxStamina(stance);
                 var b = new Breath();
                 b.Agent = agent;

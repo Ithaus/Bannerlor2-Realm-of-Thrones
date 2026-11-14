@@ -458,6 +458,7 @@ namespace Armoury
             catch { }
             float w = 0f;
             try { w = agent.SpawnEquipment.GetTotalWeightOfArmor(true); } catch { }
+            w = Perk513.ArmorKg(agent, w);   // 513 (36): Form Fitting Armor -15% wagi zbroi, jak gra (Perk513Healing.cs)
 
             // 292: pelny bieg do zera x mnoznik staminy ludzi - pula RBM jest x K (BattleWind.ApplyHumanMul), a drenaz biegu = pula / RunSeconds, wiec bez tego
             // bieg trwalby tyle samo; ta sama liczba idzie do AiBreath (budzet biegu AI) i PanicRun (pomiar). Linia "Bieg (127)" liczy regule 127/203 (t0)

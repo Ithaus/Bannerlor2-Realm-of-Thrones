@@ -848,6 +848,35 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int LitterSpeedPercentSledges { get; set; } = 75;
 
+        // 513 (perki): perki leczenia (Perk513Healing.cs)
+        [SettingPropertyInteger("Walk It Off Light Wound Percent", 0, 100, "0", HintText = "with Athletics Walk It Off on your party leader or Medicine Walk It Off on your surgeon, lightly wounded heroes (above 20 hit points but not whole) still mend on the march at this percent of the full daily rate - a man with a few cuts walks it off. The badly wounded (20 hit points or less) and wounded soldiers still mend only at Moving Heal Percent: they need rest. Both perks do the same and do not add up. The same for AI parties. Only with Heal Only At Rest. 0 (or not above Moving Heal Percent) = the perks give nothing on the march", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int WalkItOffLightWoundPercent { get; set; } = 50;
+
+        [SettingPropertyBool("Camp Healing Perks", HintText = "A Good Days Rest (your party leader) and Bush Doctor (your surgeon) also work in a camp in the field - your own camp, a Banner Kings camp or the night camp - not only in a settlement: A Good Days Rest +10% healing in camp, Bush Doctor +20% when the camp stands right by any village that is not being raided (the game counts only the last village you visited). The same for AI parties camped for the night. Off = only as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool CampHealingPerks { get; set; } = true;
+
+        [SettingPropertyBool("Battle Dressing Enabled", HintText = "after a battle your side has won, your surgeon (or the party leader, without one) dresses the wounds of every hero in the party, you too: each gets back a share of the hit points he lost - Battle Dressing Per 100 Medicine percent for every 100 points of the surgeon's Medicine (up to 300), plus 30% if the surgeon has Preventive Medicine. This replaces the game's own Preventive Medicine (which only healed the hero who had the perk himself). The surgeon learns Medicine from the hit points he restored. A grave wound still keeps you bedridden (Hero Wounds). The losing side heals as in the game. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool BattleDressingEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Battle Dressing Per 100 Medicine", 0, 50, "0", HintText = "how much of his lost hit points a hero gets back from the surgeon after a victory, in percent for every 100 points of the surgeon's Medicine (15 = a surgeon with 100 Medicine restores 15%, with 200 - 30%). Preventive Medicine on the surgeon adds 30% on top; never more than 90% in all. Only with Battle Dressing Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int BattleDressingPer100Medicine { get; set; } = 15;
+
+        [SettingPropertyBool("Battle Dressing Ai", HintText = "AI lords get the same dressing after the battles they win. Off = AI parties heal after battle as in the game. Only with Battle Dressing Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool BattleDressingAi { get; set; } = true;
+
+        [SettingPropertyInteger("Battle Dressing Naval Resilience", 0, 100, "0", HintText = "Resilience (NavalDLC, Boatswain): after a won battle at sea the dressing of a hero who has this perk is this much bigger, in percent (30 = +30%). The perk's own healing after victory stays off, so it never counts twice. Only with Battle Dressing Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int BattleDressingNavalResilience { get; set; } = 30;
+
+        [SettingPropertyBool("Cheat Death At Crisis", HintText = "Cheat Death on the surgeon of the party also counts at the crisis of a grave wound (Hero Wounds): the chance to die of the wound is halved, as the perk halves the chance to die when falling in battle. Off = only the surgeon's Medicine skill counts, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool CheatDeathAtCrisis { get; set; } = true;
+
         [SettingPropertyBool("Prisoner Care Xp", HintText = "whoever tends your party's wounded also tends your wounded prisoners and learns Medicine from it: each prisoner who recovers gives your surgeon (or you, if no one holds the surgeon's post) Medicine experience the same way your own wounded men do - more for higher tier prisoners, double while resting in a town or village. Prisoners heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day), never halved by Healing Regen Percent - or as fast as your own men with Prisoners Heal Like Your Men. Off = no Medicine for prisoners, as before", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool PrisonerCareXp { get; set; } = true;
@@ -1623,6 +1652,11 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Athletics Stamina Curve", 1.00f, 1.50f, "0.00", HintText = "how stamina and breath grow with Athletics: each further point counts a little more than the one before, as each costs more experience to learn. Athletics 300 gives what Realistic Battle Mod gives; at 1.12 Athletics 100 counts as 88, 200 as 191 and 400 as 414. 1.0 = a straight line, as in Realistic Battle Mod", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float AthleticsStaminaCurve { get; set; } = 1.12f;
+
+        // 513 (perki): Form Fitting Armor w biegu i zadyszce (Perk513Healing.cs)
+        [SettingPropertyBool("Form Fitting Armor In Breath", HintText = "Form Fitting Armor (Athletics) also counts in our running and breath in battle: a hero with the perk feels his armour 15% lighter when he runs and when he gets his breath back, as the game already counts it for his movement. Off = the full weight of the armour, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool FormFittingArmorInBreath { get; set; } = true;
 
         [SettingPropertyBool("Breath Two Phase", HintText = "how breath comes back in battle, one rule for every man - you, lords and soldiers: a short effort comes back within about a minute, but a man who ran himself empty gets his first half back in a minute or two and the rest only over many minutes, as real lungs and muscles do. Each point of Athletics brings it back a little faster and makes the pool bigger, heavy armour slows it a little, walking slows it and fighting slows it a lot; a second collapse soon after the first is slower to recover from. Off = Realistic Battle Mod's own regeneration, as before. Turning it on works from the next battle - but if Battle Stamina Enabled was off too when the game started, it may need a game restart", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
@@ -13467,6 +13501,14 @@ namespace Armoury
             s.LitterHpRelease = LitterHpRelease;
             s.LitterSpeedPercent = LitterSpeedPercent;
             s.LitterSpeedPercentSledges = LitterSpeedPercentSledges;
+            // 513 (perki)
+            s.WalkItOffLightWoundPercent = WalkItOffLightWoundPercent;
+            s.CampHealingPerks = CampHealingPerks;
+            s.BattleDressingEnabled = BattleDressingEnabled;
+            s.BattleDressingPer100Medicine = BattleDressingPer100Medicine;
+            s.BattleDressingAi = BattleDressingAi;
+            s.BattleDressingNavalResilience = BattleDressingNavalResilience;
+            s.CheatDeathAtCrisis = CheatDeathAtCrisis;
             s.PrisonerCareXp = PrisonerCareXp;
             s.PrisonersHealLikeYourMen = PrisonersHealLikeYourMen;
             s.PrisonerCareXpPercent = PrisonerCareXpPercent;
@@ -13661,6 +13703,7 @@ namespace Armoury
             s.HumanStaminaMultiplier = HumanStaminaMultiplier;
             s.AthleticsMasteryDoubling = AthleticsMasteryDoubling;
             s.AthleticsStaminaCurve = AthleticsStaminaCurve;
+            s.FormFittingArmorInBreath = FormFittingArmorInBreath;   // 513 (perki)
             s.BreathTwoPhase = BreathTwoPhase;
             s.BreathFastSeconds = BreathFastSeconds;
             s.BreathSlowSeconds = BreathSlowSeconds;
