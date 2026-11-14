@@ -10928,6 +10928,10 @@ namespace Armoury
         [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
         public bool CaravanGlutToShortTown { get; set; } = true;
 
+        [SettingPropertyBool("Caravans Bring Silver To Silversmiths", HintText = "a caravan carrying silver ore heads for a nearby town whose silversmith is short of it and sells it there at that town's market price, paid from the town's own treasury and never below what the caravan paid for it (off = as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
+        public bool CaravanSilverToSmiths { get; set; } = true;
+
         [SettingPropertyBool("Ks Iron Market Full Counts Iron On The Road", HintText = "with Ks Iron Hands Count Iron On The Road: the weekly step also counts the iron on its way to the towns when it decides the market is full (until now only when it decided it was short)", RequireRestart = false)]
         [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
         public bool KsIronFullCountsTransit { get; set; } = true;
@@ -15931,6 +15935,7 @@ namespace Armoury
             s.CaravanGuardByRisk = CaravanGuardByRisk;
             s.TownMaterialOrderLuxuryInputs = TownMaterialOrderLuxuryInputs;
             s.CaravanGlutToShortTown = CaravanGlutToShortTown;
+            s.CaravanSilverToSmiths = CaravanSilverToSmiths;
             s.KsIronFullCountsTransit = KsIronFullCountsTransit;
             s.KsIronStockTrend = KsIronStockTrend;
             s.CaravanGuardByRoadStrength = CaravanGuardByRoadStrength;

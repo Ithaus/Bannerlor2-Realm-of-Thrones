@@ -1185,6 +1185,7 @@ namespace Armoury
         {
             int keep = Math.Max(SafeKeep(t, _items[m]), (int)Math.Ceiling(10f * UseOf(t, m)));
             if (Settings.Current.TownMaterialOrderAhead) keep = Math.Max(keep, (int)Math.Ceiling((TravelDays(t, m) + 2f) * UseDest(t, m)));
+            keep = Math.Max(keep, CaravanSilver492.SmithKeep(t, _items[m]));   // 492: zapas zlotnika (srebro dowiezione karawana) nie wyjezdza na wozy kupcow przed pierwszym cyklem
             return keep;
         }
 

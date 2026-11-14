@@ -140,6 +140,9 @@ namespace Armoury
         }
 
         /// <summary>Karawana poza regula 294c (ocena BK bez zmian): nie handluje (konwoje DTE), kontrakt 174, rozkaz BK gracza (filtr zakupu albo kotwica), zadanie.</summary>
+        /// <summary>492 (CaravanSilver492.OnEntered): te same wyjecia co decyzja celu (DTE, kontrakt 174, rozkaz BK, zadanie).</summary>
+        internal static bool ExemptOf(MobileParty mp) { return Exempt(mp); }
+
         private static bool Exempt(MobileParty mp)
         {
             if (mp == null || !mp.IsCaravan || !CaravanBulk.TradesForT1(mp) || MaterialOrders.HasContract(mp) || CaravanBulk.HasOrders(mp) || mp.IsCurrentlyUsedByAQuest) return true;
@@ -275,6 +278,8 @@ namespace Armoury
                 }
                 // 308a: karawana ze statkami - rejs dalszy niz Caravan Sea Near Days tylko z lepszym zyskiem na dobe niz bliski port; pomiar dni drogi morskiej
                 if (ReferenceEquals(_mp, __0)) CaravanSea308.Decide(__instance, __0, ref __result);
+                // 492 (klucz CaravanSilverToSmiths): karawana ze srebrem w jukach - miasto ze zlotnikiem i brakiem srebra (ostatnie slowo po 139 C i 308; przed wpisem Inbound)
+                if (ReferenceEquals(_mp, __0)) CaravanSilver492.Redirect(__instance, __0, ref __result);
                 if (__result != null && __result.Settlement != null && CaravanBulk.TradesForT1(__0))
                 {
                     var rec = RecOf(__0, __result);

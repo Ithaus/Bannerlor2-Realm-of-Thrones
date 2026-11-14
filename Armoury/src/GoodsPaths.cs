@@ -576,6 +576,33 @@ namespace Armoury
             catch (Exception e) { Stumble("SilverNeedOf", e); return 0f; }
         }
 
+        /// <summary>492 (CaravanSilver492): najwiekszy wsad rudy srebra JEDNEJ linii produkcji warsztatow miasta (szt. na cykl, np. zlotnik 25) - cykl rusza tylko
+        /// z pelnym wsadem na polce. 0 - miasto bez linii srebra. Blad - 0 (potkniecie liczone). Tylko odczyt, wedlug petli NeedOf.</summary>
+        internal static int SilverBatchOf(Town town)
+        {
+            try
+            {
+                int best = 0;
+                var ws = town != null ? town.Workshops : null;
+                if (ws == null) return 0;
+                foreach (var w in ws)
+                {
+                    var wt = w != null ? w.WorkshopType : null;
+                    if (wt == null || wt.Productions == null) continue;
+                    foreach (var p in wt.Productions)
+                    {
+                        if (p.Inputs == null) continue;   // Production to struct
+                        int k = 0;
+                        foreach (var i in p.Inputs)
+                            if (i.Item1 != null && i.Item2 > 0 && i.Item1.StringId == "silver") k += i.Item2;
+                        if (k > best) best = k;
+                    }
+                }
+                return best;
+            }
+            catch (Exception e) { Stumble("SilverBatchOf", e); return 0; }
+        }
+
         /// <summary>Zapas warsztatow miasta (szt.), ktorego mieszczanie nie biora: CraftDays x dzienny wsad linii warsztatow tej kategorii x przejscie. 0 - poza regula.</summary>
         internal static float CraftReserve(Town town, ItemCategory c)
         {

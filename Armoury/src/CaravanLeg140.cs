@@ -159,7 +159,8 @@ namespace Armoury
 
         /// <summary>Klucz 2: miasta dla karawany utknietej - wykluczenia BK FindNextDestinationForCaravan (poza oblezeniem, wojna, ostatnio odwiedzonym, biezacym,
         /// gracz-wrog w miescie, lista BK 'zmienione przez wroga w drodze') i droga ladowa; dni drogi <= dmax; najblizsze max wedlug dni (CaravanWait139.Days).</summary>
-        internal static List<KeyValuePair<Town, double>> Towns(MobileParty mp, object bk, Town skip, double dmax, int max)
+        // 492: keep - dodatkowy filtr miast (CaravanSilver492: zlotnik z brakiem srebra); null - jak dotad
+        internal static List<KeyValuePair<Town, double>> Towns(MobileParty mp, object bk, Town skip, double dmax, int max, Func<Town, bool> keep = null)
         {
             var all = new List<KeyValuePair<Town, double>>();
             var prev = PrevChanged(bk, mp);
@@ -174,6 +175,7 @@ namespace Armoury
                 if (t.MapFaction != null && mf != null && t.MapFaction.IsAtWarWith(mf)) continue;
                 if (mainWar && st.Parties != null && st.Parties.Contains(main)) continue;
                 if (prev != null && prev.Contains(st)) continue;
+                if (keep != null && !keep(t)) continue;
                 double d = CaravanWait139.Days(mp, st);
                 if (d <= dmax + 1e-6) all.Add(new KeyValuePair<Town, double>(t, d));
             }

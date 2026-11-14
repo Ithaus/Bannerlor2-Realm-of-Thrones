@@ -951,6 +951,8 @@ namespace Armoury
                 try { if (CaravanTrade284.BuyBlocked(_bkBuyer, __0, __1)) { __result = 0f; return; } }
                 catch (Exception e) { Stumble("BkValuePostfix(284)", e); }
             }
+            // 492: srebro, ktore TA karawana sprzedala zlotnikom w TEJ wizycie - bez odkupu (pusty ruch; ta sama zasada co blokada T1 - inne karawany moga kupic)
+            if (_bkBuyer != null && CaravanSilver492.SoldHere(_bkBuyer, __1, __0)) { __result = 0f; return; }
             if (_blocks.Count == 0) return;
             try
             {
