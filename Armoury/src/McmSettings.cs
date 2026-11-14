@@ -736,6 +736,18 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool ArenaNoWear { get; set; } = true;
 
+        [SettingPropertyBool("Tourney Gear Wear", HintText = "in the lists your own armour and your own melee weapon wear from the blows, less than in battle (the weapons are blunted); borrowed weapons, shields, bows and horses of the games never wear your gear. Off = the lists do not wear your gear (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool TourneyGearWear { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Tourney Armour Wear Percent", 0.00f, 100.00f, "0.00", HintText = "share of a battle blow's wear your own armour takes in the lists", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float TourneyArmourWearPercent { get; set; } = 50f;
+
+        [SettingPropertyFloatingInteger("Tourney Weapon Wear Percent", 0.00f, 100.00f, "0.00", HintText = "share of a battle blow's wear your own melee weapon takes in the lists (blunted edge)", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float TourneyWeaponWearPercent { get; set; } = 50f;
+
         [SettingPropertyBool("Unique Crowns Enabled", HintText = "crowns of kings and queens are unique regalia: sane armour, out of the shops, impossible to forge - the pieces already in play become the only ones", RequireRestart = false)]
         [SettingPropertyGroup("Crown jewels")]
         public bool UniqueCrownsEnabled { get; set; } = true;
@@ -13395,6 +13407,9 @@ namespace Armoury
             s.RepairCostFactor = RepairCostFactor;
             s.BreakAtZeroCondition = BreakAtZeroCondition;
             s.ArenaNoWear = ArenaNoWear;
+            s.TourneyGearWear = TourneyGearWear;
+            s.TourneyArmourWearPercent = TourneyArmourWearPercent;
+            s.TourneyWeaponWearPercent = TourneyWeaponWearPercent;
             s.UniqueCrownsEnabled = UniqueCrownsEnabled;
             s.UniqueCrownHeadArmor = UniqueCrownHeadArmor;
             s.BkSupplyDaysCap = BkSupplyDaysCap;

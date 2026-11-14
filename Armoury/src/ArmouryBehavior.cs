@@ -4350,6 +4350,46 @@ namespace Armoury
             catch (Exception e) { Log.Error("ApplyWearPerSlot", e); }
         }
 
+        /// <summary>499 (Jeff 14.11): zuzycie z ksiegi turnieju (FieldCraft.TourneyLedger) - wolane z FieldCraft.OnEndMission misji turnieju, czyli PRZED
+        /// wykupem GrandTourney (AppTick na mapie liczy wartosc z juz zuzytego stanu). Slot idzie do zapisu tylko, gdy w BattleEquipment lezy wciaz ta sama
+        /// sztuka (Item + ItemModifier), ktora spisano przy ciosie; inaczej punkty przepadaja (licznik w linii). Reszta jak w bitwie: ApplyWearPerSlot z flat 0
+        /// (bez WearPerBattle) - te same WearAfter, ArmorPool, solidnosc tieru, GearState, BreakAtZeroCondition. Zwraca opis do linii "Zuzycie turnieju (499)".</summary>
+        internal string ApplyTourneyWear(float[] perSlot, ItemObject[] items, ItemModifier[] mods)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new System.Text.StringBuilder(200);
+            int lost = 0;
+            try
+            {
+                if (perSlot == null || items == null || mods == null) return "brak ksiegi";
+                var eq = Hero.MainHero != null ? Hero.MainHero.BattleEquipment : null;
+                if (eq == null) return "brak ekwipunku bojowego";
+                var use = new float[12];
+                var before = new float[12];
+                for (int slot = 0; slot < 12; slot++)
+                {
+                    if (perSlot[slot] <= 0.01f) continue;
+                    var el = eq[slot];
+                    if (el.IsEmpty || el.Item == null || el.Item != items[slot] || el.ItemModifier != mods[slot]) { lost++; continue; }
+                    use[slot] = perSlot[slot];
+                    before[slot] = GetCondition(slot, el);
+                }
+                ApplyWearPerSlot(use, 0f);
+                for (int slot = 0; slot < 12; slot++)
+                {
+                    if (use[slot] <= 0.01f) continue;
+                    if (sb.Length > 0) sb.Append(", ");
+                    var now = eq[slot];
+                    sb.Append("slot ").Append(slot).Append(' ').Append(items[slot].StringId).Append(' ')
+                      .Append(before[slot].ToString("0.0", inv)).Append("% -> ");
+                    if (now.IsEmpty || now.Item != items[slot]) sb.Append("PEKL");
+                    else sb.Append(GetConditionQuiet(slot).ToString("0.0", inv)).Append('%');
+                }
+            }
+            catch (Exception e) { Log.Error("ApplyTourneyWear", e); sb.Append(" BLAD"); }
+            return (sb.Length > 0 ? sb.ToString() : "nic do zapisu") + (lost > 0 ? " | sztuk zmienionych w slocie (punkty przepadly) " + lost : "");
+        }
+
         private void ApplyWear(float amount)
         {
             try

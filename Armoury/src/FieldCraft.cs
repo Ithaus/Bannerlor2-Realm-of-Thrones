@@ -696,6 +696,188 @@ namespace Armoury
             return _battle == 1;
         }
 
+        // 499 (Jeff 14.11: "ma sie zuzywac miecz i pancerz ... bron jest stepiona na turniejach wiec moze mniej"): na TURNIEJU (TournamentFightMissionController)
+        // osobna ksiega - nie WearLedger, wiec DropLedger i rozliczenie bitwy jej nie ruszaja. Tylko WLASNE sztuki gracza po tozsamosci (Item + ItemModifier):
+        // zbroja 5-9, gdy sztuka agenta w slocie == sztuka w BattleEquipment (AddRandomClothes kopiuje zbroje gracza); bron biala - tylko wstawka GrandTourney 498
+        // (ta sama sztuka, ktora 498 wybiera z BattleEquipment). Pozyczone (bron RBM / szablonu, tarcza, luk, kon, uprzaz) - nic. ArenaNoWear dalej rzadzi arena
+        // treningowa, bojkami i pojedynkami. Rozliczenie raz, w OnEndMission misji turnieju (ArmouryBehavior.ApplyTourneyWear) - nic nie piszemy do sprzetu co klatke.
+        internal static readonly float[] TourneyLedger = new float[12];
+        private static readonly ItemObject[] _tourItem = new ItemObject[12];     // sztuka BattleEquipment spisana przy ciosie (kontrola przy rozliczeniu)
+        private static readonly ItemModifier[] _tourMod = new ItemModifier[12];
+        private static int _tourStumbles;                                         // potkniecia 499 w sesji (liczone, nic nie gasimy)
+        private int _tourney = -1;                                                // -1 nie sprawdzone, 0 nie turniej, 1 misja turnieju (walka wrecz)
+        private int _own498 = -1;                                                 // klucz GrandTourney 498 (Enabled + TourneyOwnMeleeWeapon): 1 TAK, 0 NIE, 2 brak moda / blad
+        private int _tourTaken, _tourGiven, _tourArmN, _tourWepN, _tourBorrowed, _tourAmbig, _tourShots;
+        private float _tourArm, _tourWep;
+
+        private bool InTourney()
+        {
+            if (_tourney < 0)
+            {
+                try { _tourney = Mission.GetMissionBehavior<SandBox.Tournaments.MissionLogics.TournamentFightMissionController>() != null ? 1 : 0; }
+                catch { _tourney = 0; }
+            }
+            return _tourney == 1;
+        }
+
+        private static void TourStumble(string where, Exception e)
+        {
+            _tourStumbles++;
+            try { Log.Error("FieldCraft." + where + " (499, potkniecie " + _tourStumbles + ")", e); } catch { }
+        }
+
+        /// <summary>499: stan klucza 498 w GrandTourney (odbiciem, raz na misje). Bez 498 wlasna bron gracza nie wchodzi do meczu - kazda bron w reku jest pozyczona.</summary>
+        private int Own498()
+        {
+            if (_own498 >= 0) return _own498;
+            _own498 = 2;
+            try
+            {
+                var t = Type.GetType("GrandTourney.Settings, GrandTourney");
+                var f = t != null ? t.GetField("Current", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) : null;
+                var cur = f != null ? f.GetValue(null) : null;
+                var en = t != null ? t.GetField("Enabled") : null;
+                var ow = t != null ? t.GetField("TourneyOwnMeleeWeapon") : null;
+                if (cur != null && en != null && ow != null) _own498 = (bool)en.GetValue(cur) && (bool)ow.GetValue(cur) ? 1 : 0;
+            }
+            catch (Exception e) { _own498 = 2; TourStumble("Own498", e); }
+            return _own498;
+        }
+
+        private static bool Melee498(ItemObject it)
+        {
+            if (it == null) return false;
+            var t = it.ItemType;
+            if (t != ItemObject.ItemTypeEnum.OneHandedWeapon && t != ItemObject.ItemTypeEnum.TwoHandedWeapon && t != ItemObject.ItemTypeEnum.Polearm) return false;
+            var w = it.PrimaryWeapon;
+            if (w == null || !w.IsMeleeWeapon || w.IsRangedWeapon || w.IsConsumable) return false;
+            return w.SwingDamage > 0 || w.ThrustDamage > 0;
+        }
+
+        private static readonly ItemObject.ItemTypeEnum[] Order498 =
+        {
+            ItemObject.ItemTypeEnum.TwoHandedWeapon, ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.Polearm
+        };
+
+        /// <summary>499: slot BattleEquipment (0-3) z bronia, ktora GrandTourney 498 wstawia graczowi do meczu - ten sam wybor co TourneyOwnWeapon.OwnWeapon
+        /// (dwureczna, potem jednoreczna, potem drzewce; w meczu konnym bez RequiresNoMount). -1 - brak.</summary>
+        private static int OwnSlot498(Equipment eq, bool mounted)
+        {
+            foreach (var type in Order498)
+                for (int i = 0; i < 4; i++)
+                {
+                    var el = eq[(EquipmentIndex)i];
+                    if (el.IsEmpty || el.Item.ItemType != type || !Melee498(el.Item)) continue;
+                    if (mounted)
+                    {
+                        var w = el.Item.PrimaryWeapon;
+                        if (w != null && !string.IsNullOrEmpty(w.ItemUsage)
+                            && (MBItem.GetItemUsageSetFlags(w.ItemUsage) & ItemObject.ItemUsageSetFlags.RequiresNoMount) != 0) continue;
+                    }
+                    return i;
+                }
+            return -1;
+        }
+
+        private static void TourPut(int slot, EquipmentElement own, float add)
+        {
+            TourneyLedger[slot] += add;
+            _tourItem[slot] = own.Item;
+            _tourMod[slot] = own.ItemModifier;
+        }
+
+        private static void TourClear()
+        {
+            for (int i = 0; i < 12; i++) { TourneyLedger[i] = 0f; _tourItem[i] = null; _tourMod[i] = null; }
+        }
+
+        /// <summary>499: cios w turnieju - ofiara albo napastnik to gracz. Tylko ksiega turnieju (tablica), zadnego zapisu do sprzetu.</summary>
+        private void TourneyHit(Settings c, Agent victim, Agent by, MissionWeapon w, int raw, bool missile, bool blocked, BoneBodyPartType part)
+        {
+            if (raw <= 0) return;
+            try
+            {
+                var hero = Hero.MainHero;
+                var eq = hero != null ? hero.BattleEquipment : null;
+                if (eq == null) return;
+                // a) zbroja gracza (blok tarcza - tarcza pozyczona, nic)
+                if (victim != null && victim.IsMainAgent)
+                {
+                    _tourTaken++;
+                    if (blocked) _tourBorrowed++;
+                    else
+                    {
+                        int s = ArmorSlotFor(part, victim);
+                        var sp = victim.SpawnEquipment[(EquipmentIndex)s];
+                        var own = eq[(EquipmentIndex)s];
+                        if (!sp.IsEmpty && !own.IsEmpty && sp.Item == own.Item && sp.ItemModifier == own.ItemModifier)
+                        {
+                            float scale = missile ? Math.Max(0f, Math.Min(100f, c.MissileArmorWearPercent)) / 100f : 1f;
+                            float add = raw * scale * Math.Max(0f, Math.Min(100f, c.TourneyArmourWearPercent)) / 100f;
+                            if (add > 0f) { TourPut(s, own, add); _tourArm += add; _tourArmN++; }
+                        }
+                        else _tourBorrowed++;                         // slot z szablonu turnieju (gracz nie ma tam swojej sztuki)
+                    }
+                }
+                // b) wlasna bron biala gracza (wstawka 498); luk, kusza, rzucana, pocisk - pozyczone
+                if (by != null && by.IsMainAgent && w.Item != null)
+                {
+                    _tourGiven++;
+                    var it = w.Item;
+                    var t = it.ItemType;
+                    if (missile || t == ItemObject.ItemTypeEnum.Bow || t == ItemObject.ItemTypeEnum.Crossbow || t == ItemObject.ItemTypeEnum.Thrown || !Melee498(it))
+                    { _tourBorrowed++; return; }
+                    bool mounted = false;
+                    try { mounted = !by.SpawnEquipment[EquipmentIndex.Horse].IsEmpty; } catch { }
+                    int j = Own498() == 1 ? OwnSlot498(eq, mounted) : -1;
+                    var own = j >= 0 ? eq[(EquipmentIndex)j] : EquipmentElement.Invalid;
+                    if (own.IsEmpty || own.Item != it || own.ItemModifier != w.ItemModifier) { _tourBorrowed++; return; }
+                    if (own.ItemModifier == null)
+                    {
+                        // ta sama sztuka bez modyfikatora moze byc tez bronia RBM / szablonu (RBM daje zawsze modyfikator null) - liczymy tylko, gdy w zestawie
+                        // meczu jest jedna taka (wstawka 498); dwie jednakowe - nie wiadomo, ktora jest gracza: pomijamy
+                        int same = 0;
+                        for (int i = 0; i < 4; i++)
+                        {
+                            var se = by.SpawnEquipment[(EquipmentIndex)i];
+                            if (!se.IsEmpty && se.Item == it && se.ItemModifier == null) same++;
+                        }
+                        if (same != 1) { _tourAmbig++; return; }
+                    }
+                    float addW = Math.Max(0f, c.WearWeaponPerHit) * Math.Max(0f, Math.Min(100f, c.TourneyWeaponWearPercent)) / 100f;
+                    if (addW > 0f) { TourPut(j, own, addW); _tourWep += addW; _tourWepN++; }
+                }
+            }
+            catch (Exception e) { TourStumble("TourneyHit", e); }
+        }
+
+        /// <summary>499: rozliczenie ksiegi turnieju raz, na koniec misji turnieju (przed wykupem GrandTourney w AppTick na mapie) i linia logu.</summary>
+        private void TourneySettle()
+        {
+            try
+            {
+                float sum = 0f;
+                for (int i = 0; i < 12; i++) sum += TourneyLedger[i];
+                if (_tourTaken + _tourGiven + _tourShots == 0 && sum <= 0f) return;
+                var c = Settings.Current;
+                var inv = System.Globalization.CultureInfo.InvariantCulture;
+                string res = "nic do zapisu";
+                if (sum > 0.01f)
+                {
+                    var b = ArmouryBehavior.Instance;
+                    res = b != null ? b.ApplyTourneyWear(TourneyLedger, _tourItem, _tourMod) : "brak ArmouryBehavior - punkty przepadly";
+                }
+                Log.Info("Zuzycie turnieju (499): ciosy przyjete " + _tourTaken + ", zadane " + _tourGiven
+                         + " | zbroja " + _tourArm.ToString("0.0", inv) + " pkt z " + _tourArmN + " ciosow (x" + (c.TourneyArmourWearPercent / 100f).ToString("0.00", inv) + ")"
+                         + " | bron " + _tourWep.ToString("0.00", inv) + " pkt z " + _tourWepN + " ciosow (x" + (c.TourneyWeaponWearPercent / 100f).ToString("0.00", inv) + ")"
+                         + " | pozyczone pominiete " + _tourBorrowed + ", niepewne (2 jednakowe bez modyfikatora) " + _tourAmbig + ", strzaly pozyczonym lukiem " + _tourShots
+                         + " | 498 " + (_own498 == 1 ? "TAK" : _own498 == 0 ? "NIE" : _own498 < 0 ? "-" : "brak") + " | rozliczenie: " + res
+                         + " | potkniec w sesji " + _tourStumbles + ".");
+            }
+            catch (Exception e) { TourStumble("TourneySettle", e); }
+            finally { TourClear(); }
+        }
+
         /// <summary>E8/A: suma ksiegi bohatera i jej wyzerowanie (poczatek bitwy gracza, bitwa przegrana albo opuszczona).</summary>
         internal static float DropLedger()
         {
@@ -742,6 +924,8 @@ namespace Armoury
 
         protected override void OnEndMission()
         {
+            // 499: ksiega turnieju rozliczona raz, zanim misja zniknie (wykup GrandTourney liczy potem wartosc z mapy - juz ze stanu po turnieju)
+            if (_tourney == 1) TourneySettle();
             try
             {
                 if (_skipHits + _skipShots > 0)
@@ -820,6 +1004,7 @@ namespace Armoury
         public override void AfterStart()
         {
             try { MissionTeams.Begin(Mission); } catch { }
+            TourClear();                                      // 499: ksiega turnieju od zera w kazdej misji (urwana misja nie przenosi ciosow)
             ResetRunStats();
             _k292Said = false;                                // 292: linia "Stamina (292)" kilka sekund po starcie misji
             try { _k292From = Mission.CurrentTime; } catch { _k292From = 0f; }
@@ -871,7 +1056,13 @@ namespace Armoury
                 // E8/A: poza bitwa kampanii (arena, turniej, cwiczenia) strzal nie zuzywa luku bohatera ani wojska - cala metoda pisze tylko do ksiag
                 if (c.ArenaNoWear && !InBattle())
                 {
-                    if (c.WearEnabled && shooterAgent != null && shooterAgent.IsMainAgent) _skipShots++;
+                    if (c.WearEnabled && shooterAgent != null && shooterAgent.IsMainAgent) { if (c.TourneyGearWear && InTourney()) _tourShots++; else _skipShots++; }
+                    return;
+                }
+                // 499: na turnieju luk / kusza sa pozyczone - strzal nie zuzywa niczego gracza (takze przy ArenaNoWear NIE: dotad szlo do WearLedger po numerze slotu)
+                if (c.TourneyGearWear && InTourney())
+                {
+                    if (c.WearEnabled && shooterAgent != null && shooterAgent.IsMainAgent) _tourShots++;
                     return;
                 }
                 // wpis 96: strzal zolnierza partii gracza - luk/kusza
@@ -912,7 +1103,9 @@ namespace Armoury
             {
                 var c = Settings.Current;
                 // E8/A: ksiegi zuzycia pisza tylko w bitwie kampanii (arena, turniej, bojka - nie); odpinanie strzal nizej dziala wszedzie jak dotad
-                bool counts = !c.ArenaNoWear || InBattle();
+                // 499: turniej (klucz TourneyGearWear) ma wlasna ksiege - stare ksiegi (po numerze slotu) go nie licza, takze przy ArenaNoWear NIE
+                bool tourney = c.TourneyGearWear && InTourney();
+                bool counts = !tourney && (!c.ArenaNoWear || InBattle());
 
                 // 313d: rana do kolejki (pod zamkiem - OnAgentHit bywa wolany z ticku asynchronicznego); rzut krwawienia i liczniki ran w ticku na glownym watku.
                 // Tylko czlowiek, cios z obrazeniami, nie blok tarcza, tylko bitwa na mapie (turniej, arena, bojka - bez krwawienia i rzutow)
@@ -934,7 +1127,12 @@ namespace Armoury
                     catch { }
                 }
 
-                if (!counts && c.WearEnabled && blow.InflictedDamage + Math.Max(0, attackCollisionData.AbsorbedByArmor) > 0
+                if (tourney && c.WearEnabled
+                    && ((affectedAgent != null && affectedAgent.IsMainAgent) || (affectorAgent != null && affectorAgent.IsMainAgent)))
+                    TourneyHit(c, affectedAgent, affectorAgent, affectorWeapon, blow.InflictedDamage + Math.Max(0, attackCollisionData.AbsorbedByArmor),
+                               blow.IsMissile, attackCollisionData.AttackBlockedWithShield, blow.VictimBodyPart);
+
+                if (!counts && !tourney && c.WearEnabled && blow.InflictedDamage + Math.Max(0, attackCollisionData.AbsorbedByArmor) > 0
                     && ((affectedAgent != null && affectedAgent.IsMainAgent) || (affectorAgent != null && affectorAgent.IsMainAgent)))
                     _skipHits++;
 
