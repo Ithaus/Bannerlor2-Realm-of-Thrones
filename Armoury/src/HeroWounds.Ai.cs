@@ -154,6 +154,15 @@ namespace Armoury
             return best;
         }
 
+        /// <summary>408-p / 524: prog zapasu jedzenia (dni) na pobyt w ZAMKU - MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege gry (12). W zamku
+        /// nikt partii lorda nie karmi (gra PartiesBuyFoodCampaignBehavior i BK BKPartyBehavior kupuja tylko w miescie / wsi). Ta sama liczba w 408 i 500-b.</summary>
+        internal static float CastleFoodDays()
+        {
+            float thr = 12f;
+            try { var c0 = Campaign.Current; if (c0 != null && c0.Models != null && c0.Models.MobilePartyAIModel != null) thr = c0.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege; } catch { }
+            return thr;
+        }
+
         /// <summary>E2: twierdza "swoja" dla rannego - tej samej frakcji albo krolestwa sojuszniczego (Kingdom.IsAllyWith gry, bez wojny). Odczyt pol.</summary>
         internal static bool FriendlyFort(Settlement st, IFaction f)
         {
@@ -302,9 +311,7 @@ namespace Armoury
                     // 408-p: w zamku nikt partii lorda nie karmi (gra i BK kupuja jedzenie tylko w miescie / wsi), a nasza ocena przebijalaby wizyte gry po
                     // jedzenie az do glodu. Zapas ponizej progu gry (MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege, 12 dni) = w tej mysli bez
                     // wyjazdu do zamku: opcje bitwy zostaja na -1, wygrywa zwykla wizyta gry po zapasy; po zakupach partia wraca.
-                    float thr = 12f;
-                    try { var c0 = Campaign.Current; if (c0 != null && c0.Models != null && c0.Models.MobilePartyAIModel != null) thr = c0.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege; } catch { }
-                    if (party.GetNumDaysForFoodToLast() < thr) { _aiFood++; return; }
+                    if (party.GetNumDaysForFoodToLast() < CastleFoodDays()) { _aiFood++; return; }
                 }
                 int mine = -1; float other = 0f;
                 for (int i = 0; i < scores.Count; i++)

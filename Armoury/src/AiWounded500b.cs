@@ -33,7 +33,10 @@ namespace Armoury
     ///      - Stand -> Fort: HP &gt; AiWoundedRestReleaseHp (E3: 30), bez loza Grave i ranni &lt;= RestExitShare% (zdolna do drogi) ALBO RestMaxDays dob postoju ALBO zagrozenie /
     ///        glod ALBO cudzy rozkaz drugi raz przestawil partie (bez migotania - ustepujemy). Gdy przy wyjsciu c &lt; 0.25 - od razu None; gdy nie ma
     ///        twierdzy z droga - None i CoolHours bez wejscia (bez petli postoj -> Fort bez celu -> postoj).
-    ///      - Fort -> None: c &lt; 0.25 albo FortMaxDays (10) dob (zapas; potem CoolHours bez wejscia).
+    ///      - Fort -> None: c &lt; 0.25 albo FortMaxDays (10) dob (zapas; potem CoolHours bez wejscia) - ale nie przed koncem loza HeroWounds wodza (524).
+    ///      - 524 JEDZENIE (w zamku nie kupi: gra i BK kupuja tylko w miescie / wsi; gra przy glodzie odejmuje rannych): glod albo zapas ponizej progu zamku
+    ///        (HeroWounds.CastleFoodDays = NeededFoodsInDaysThresholdForSiege, 12) przy ZAMKU jako twierdzy spoczynku - Fort konczy sie, postoj nie jedzie do zamku,
+    ///        wejscie nie nastepuje (glod - zadne wejscie); stan None BEZ blokady CoolHours, cel liczony ponownie najwczesniej po FoodRecheckHours. Miasto - bez zmian.
     ///     Przy zmianie stanu RethinkAtNextHourlyTick (mysl w ciagu godziny, nie rozkaz). Postoj: SetMoveModeHold raz (gdy AI czynne, poza osada, bez ucieczki,
     ///     bez zaczepki z INICJATYWY; poscig z mysli - EngageParty / GoAroundParty jako rozkaz domyslny - przerywamy Holdem).
     ///     Migawka dla watkow AI: slownik podmieniany w calosci (volatile, wzor NightMarch._aiPenalty), nigdy nie zmieniany po publikacji.
@@ -42,7 +45,7 @@ namespace Armoury
     ///     rabunek - gdy Hold jeszcze nie wszedl) NIE zamrazamy: mysl dziala, a postfiks 55 daje w postoju opcjom bitwy -1.
     /// (C) TWIERDZA - regula 408 (HeroWounds.Ai.cs) bierze tez partie w stanie Fort (WantsFort): opcje bitwy -1, wyjazd do twierdzy rodu / frakcji.
     /// (D) OSTROZNOSC W MYSLI - postfiks 55 (po 408 = 60, przed wetami 50/48/45 i Last): opcje bitwy (te same co 408 - HeroWounds.AiIsBattle) o ocenie &gt; 0
-    ///     x (1 - K c); GoToSettlement do nieoblezonej twierdzy swojej frakcji x (1 + 0.5 c). Ocen &lt;= 0 nie ruszamy (cudze blokady), obrona osady rodu zostaje.
+    ///     x (1 - K c); GoToSettlement do nieoblezonej twierdzy swojej frakcji x (1 + 0.5 c) (524: ZAMEK bez podbicia przy glodzie / malym zapasie). Ocen &lt;= 0 nie ruszamy (cudze blokady), obrona osady rodu zostaje.
     ///     Stand: opcje zwolania armii -1 (ROT AIThinkPatch / gra tworzy armie przed sprawdzeniem DoNotChangeBehavior - galaz WillGatherArmy); bez flagi
     ///     (rozkaz szukajacy bitwy - B) takze opcje bitwy -1.
     /// (E) OSTROZNOSC W INICJATYWIE - postfiks DefaultMobilePartyAIModel.CalculateInitiativeScoresForEnemy (prywatna, watki AI co 0.25 h). Gra mnozy atak
@@ -73,6 +76,7 @@ namespace Armoury
         private const int PartyErrMax = 5;         // potkniecia partii do konca doby
         private const double CoolHours = 24.0;     // po wyjsciu bez wyleczenia (brak twierdzy, limit Fort) - tyle godzin bez ponownego wejscia
         private const float AdvPerCaution = 2f;    // inicjatywa: atak tylko przy przewadze sil >= 1 + 2 K c (pelna ostroznosc, K 75%: 2.5 x sila wroga)
+        private const double FoodRecheckHours = 6.0;   // 524: glodna partia z zamkiem za cel - ponowne liczenie celu najwczesniej po tylu godzinach (tylko koszt; najedzona wchodzi od razu)
 
         internal struct Snap { internal float C; internal byte St; internal bool Road; }   // Road: wodz na lozu, ktorego regula 408 prowadzi do twierdzy (E1 w inicjatywie)
 
@@ -83,6 +87,7 @@ namespace Armoury
 
         private static readonly Dictionary<MobileParty, Row> _rows = new Dictionary<MobileParty, Row>();
         private static readonly Dictionary<MobileParty, double> _cool = new Dictionary<MobileParty, double>();   // partia -> godzina, do ktorej bez wejscia
+        private static readonly Dictionary<MobileParty, double> _foodWait = new Dictionary<MobileParty, double>();   // 524: partia -> godzina ponownego liczenia celu (glod / zamek bez zapasu)
         private static readonly Dictionary<MobileParty, Snap> Empty = new Dictionary<MobileParty, Snap>();
         private static volatile Dictionary<MobileParty, Snap> _snap = Empty;
         private static volatile bool _live;                 // klucz odpoczynku albo ostroznosci wlaczony (odczyt w bramkach armii)
@@ -101,7 +106,8 @@ namespace Armoury
         private static int _dThinkStand, _dArmyOff, _dCut, _dBoost, _dThinkC, _dSkipStory;
         private static int _dNoFort, _dCool, _dThinkFree, _dStandBattleOff;
         private static int _dDefThink, _dDefOff, _dDefOnly, _dDefRide, _dDefFar;   // E1: mysli wolne dla obrony z szansa, obrony bez szansy -1, inne opcje -1 przy obronie, godziny jazdy na obrone
-        private static int _iDefOff, _iArmyLead;                          // E1 inicjatywa: atak na napastnika osady rodu bez szansy zgaszony; E4: inicjatywa wodza armii przycieta
+        private static int _dFoodEnd, _dFoodStand, _dFoodNoEnter, _dBoostFood, _dFortBed;   // 524: koniec twierdzy z glodu, postoj bez wyjazdu na zamek (glod), wejscia wstrzymane (glod / zamek bez zapasu), zamki bez podbicia (malo jedzenia), godziny Fort ponad limit z lozem HW
+        private static int _iDefOff, _iArmyLead;                         // E1 inicjatywa: atak na napastnika osady rodu bez szansy zgaszony; E4: inicjatywa wodza armii przycieta
         private static int _cArmy;                                        // E4: ostatni przeglad - wodzowie armii z c > 0
         private static int _iCut, _iCap, _iZero, _iZeroFort, _iAvoid, _iKeep, _gArmy;
         private static int _cMax, _cHalf, _cSome;   // ostatni przeglad: partie z c > 0, c >= 0.5, liczba w stanie
@@ -112,7 +118,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _rows.Clear(); _cool.Clear(); _snap = Empty; _anyFort = false; _drop.Clear(); _copy.Clear(); _day = -1;
+            _rows.Clear(); _cool.Clear(); _foodWait.Clear(); _snap = Empty; _anyFort = false; _drop.Clear(); _copy.Clear(); _day = -1;
             ClearDay();
             _sScan = _sThink = _sCaution = _sInit = _sArmy = _sParty = 0;
         }
@@ -123,6 +129,7 @@ namespace Armoury
             _dThinkStand = _dArmyOff = _dCut = _dBoost = _dThinkC = _dSkipStory = 0;
             _dNoFort = _dCool = _dThinkFree = _dStandBattleOff = 0;
             _dDefThink = _dDefOff = _dDefOnly = _dDefRide = _dDefFar = 0;
+            _dFoodEnd = _dFoodStand = _dFoodNoEnter = _dBoostFood = _dFortBed = 0;
             Interlocked.Exchange(ref _iDefOff, 0); Interlocked.Exchange(ref _iArmyLead, 0);
             Interlocked.Exchange(ref _iCap, 0); Interlocked.Exchange(ref _iZeroFort, 0);
             Interlocked.Exchange(ref _iCut, 0); Interlocked.Exchange(ref _iZero, 0); Interlocked.Exchange(ref _iAvoid, 0); Interlocked.Exchange(ref _iKeep, 0);
@@ -192,7 +199,7 @@ namespace Armoury
             _live = rest || caution;
             if (!_live)
             {
-                if (_rows.Count > 0 || _snap.Count > 0 || _cool.Count > 0) { _rows.Clear(); _cool.Clear(); _snap = Empty; _anyFort = false; }
+                if (_rows.Count > 0 || _snap.Count > 0 || _cool.Count > 0 || _foodWait.Count > 0) { _rows.Clear(); _cool.Clear(); _foodWait.Clear(); _snap = Empty; _anyFort = false; }
                 return;
             }
             long t0 = Stopwatch.GetTimestamp();
@@ -246,12 +253,44 @@ namespace Armoury
 
         private static void PruneCool()
         {
-            if (_cool.Count == 0) return;
             double now = CampaignTime.Now.ToHours;
-            _drop.Clear();
-            foreach (var kv in _cool) if (kv.Key == null || !kv.Key.IsActive || kv.Value <= now) _drop.Add(kv.Key);
-            foreach (var p in _drop) _cool.Remove(p);
-            _drop.Clear();
+            if (_cool.Count > 0)
+            {
+                _drop.Clear();
+                foreach (var kv in _cool) if (kv.Key == null || !kv.Key.IsActive || kv.Value <= now) _drop.Add(kv.Key);
+                foreach (var p in _drop) _cool.Remove(p);
+                _drop.Clear();
+            }
+            if (_foodWait.Count > 0)
+            {
+                _drop.Clear();
+                foreach (var kv in _foodWait) if (kv.Key == null || !kv.Key.IsActive || kv.Value <= now) _drop.Add(kv.Key);
+                foreach (var p in _drop) _foodWait.Remove(p);
+                _drop.Clear();
+            }
+        }
+
+        /// <summary>524: partia glodna albo z zapasem ponizej progu zamku (HeroWounds.CastleFoodDays, gra: 12 dni). Watek glowny i mysl.</summary>
+        private static bool LowFood(MobileParty mp, out bool starving)
+        {
+            starving = mp.Party != null && mp.Party.IsStarving;
+            return starving || mp.GetNumDaysForFoodToLast() < HeroWounds.CastleFoodDays();
+        }
+
+        /// <summary>524: cel bez jedzenia - glod (wszedzie) albo ZAMEK przy zapasie ponizej progu (w zamku nie kupi: gra i BK kupuja tylko w miescie / wsi).</summary>
+        private static bool NoFoodAt(Settlement fort, bool low, bool starving)
+        {
+            return starving || (low && fort != null && !fort.IsTown);
+        }
+
+        /// <summary>524: wyjscie / brak wejscia z powodu jedzenia - stan None BEZ blokady CoolHours (partia jedzie po zapasy droga gry; najedzona moze wejsc
+        /// od razu); tylko ponowne liczenie celu najwczesniej po FoodRecheckHours, dopoki brakuje jedzenia.</summary>
+        private static byte FoodOut(MobileParty mp, ref Row row, double now)
+        {
+            if (row != null) { _rows.Remove(mp); row = null; }
+            _foodWait[mp] = now + FoodRecheckHours;
+            try { mp.Ai.RethinkAtNextHourlyTick = true; } catch { }
+            return None;
         }
 
         /// <summary>Wyjscie bez wyleczenia - stan None i CoolHours bez ponownego wejscia (bez petli wejsc co godzine / co FortMaxDays).</summary>
@@ -315,15 +354,33 @@ namespace Armoury
                     if (now < until) { _dCool++; return None; }
                     _cool.Remove(mp);
                 }
-                row = new Row { Lead = lh, SinceH = now };
-                _rows[mp] = row;
+                // 524 (log 14.11: Jon Snow w castle_N5 40% -> 95% rannych; glod w zamku odejmuje rannych, wiec c = 1 i znow Fort): glodna partia nie wchodzi
+                // wcale (najpierw jedzenie - droga gry, jak 408 _aiStarve), a z zapasem ponizej progu zamku nie wchodzi, gdy celem jest ZAMEK (miasto - tak, tam kupi)
+                bool starving;
+                bool low = LowFood(mp, out starving);
+                if (low)
+                {
+                    double fw;
+                    if (_foodWait.TryGetValue(mp, out fw) && now < fw) { _dFoodNoEnter++; return None; }
+                    if (starving) { _dFoodNoEnter++; return FoodOut(mp, ref row, now); }
+                }
+                else _foodWait.Remove(mp);
                 string why = hurt ? (grade == HeroWounds.Grave ? "wodz na lozu Grave" : "HP wodza " + hp) : "ranni " + Pct(w);
                 // skrot: w twierdzy swojej frakcji albo twierdza blisko - ta sama, ktora wybierze 408 (recenzja: wczesniej najblizsza frakcji, a 408 jechal do rodu)
                 float hrs;
                 var at = mp.CurrentSettlement;
                 if (at != null && HeroWounds.FriendlyFort(at, mp.MapFaction))   // E2: takze twierdza sojusznika
-                { Enter(mp, row, Fort, now); _dFortDirect++; Say(s, mp, lh, w, "-> TWIERDZA (stoi w " + at.StringId + ", " + why + ")"); return Fort; }
+                {
+                    if (NoFoodAt(at, low, starving)) { _dFoodNoEnter++; return FoodOut(mp, ref row, now); }
+                    row = new Row { Lead = lh, SinceH = now };
+                    _rows[mp] = row;
+                    Enter(mp, row, Fort, now); _dFortDirect++; Say(s, mp, lh, w, "-> TWIERDZA (stoi w " + at.StringId + ", " + why + ")"); return Fort;
+                }
                 var near = NearFort(mp, out hrs);
+                // 524: zamek bez zapasu jedzenia - ani twierdza, ani postoj (postoj to wstep do zamku); partia najpierw jedzie po zapasy (zwykle decyzje)
+                if (near != null && NoFoodAt(near, low, starving)) { _dFoodNoEnter++; return FoodOut(mp, ref row, now); }
+                row = new Row { Lead = lh, SinceH = now };
+                _rows[mp] = row;
                 int skip = Math.Max(0, s.AiWoundedRestSkipHours);
                 if (near != null && skip > 0 && hrs <= skip)
                 { Enter(mp, row, Fort, now); _dFortDirect++; Say(s, mp, lh, w, "-> TWIERDZA (" + FortName(near, hrs) + " <= " + skip + " h, " + why + ")"); return Fort; }
@@ -374,6 +431,16 @@ namespace Armoury
                     Say(s, mp, lh, w, "POSTOJ -> KONIEC (" + why + ", po " + days.ToString("F1", Inv) + " dob; brak twierdzy z droga - zwykle decyzje z ostroznoscia, " + CoolHours.ToString("F0", Inv) + " h bez wejscia)");
                     return Cool(mp, ref row, now);
                 }
+                bool starvingS;
+                bool lowS = LowFood(mp, out starvingS);
+                if (NoFoodAt(fort, lowS, starvingS))
+                {
+                    // 524: glod albo zamek bez zapasu - bez wyjazdu do twierdzy; None bez blokady 24 h (najpierw zapasy - droga gry)
+                    _dFoodStand++;
+                    Say(s, mp, lh, w, "POSTOJ -> KONIEC (" + why + ", po " + days.ToString("F1", Inv) + " dob; " + (starvingS ? "glod" : "zamek " + fort.StringId + " bez zapasu jedzenia")
+                        + " - najpierw zapasy, " + FoodRecheckHours.ToString("F0", Inv) + " h do ponownego liczenia celu)");
+                    return FoodOut(mp, ref row, now);
+                }
                 Enter(mp, row, Fort, now); _dFortFromStand++;
                 Say(s, mp, lh, w, "POSTOJ -> TWIERDZA (" + FortName(fort, fh) + "; " + why + ", po " + days.ToString("F1", Inv) + " dob)");
                 return Fort;
@@ -381,7 +448,28 @@ namespace Armoury
 
             // Fort
             double fd = (now - row.SinceH) / 24.0;
-            if (c < FortCalm || fd >= FortMaxDays)
+            // 524 (1): glod albo zapas ponizej progu zamku, gdy twierdza spoczynku (ta, w ktorej stoi, albo cel 408) jest ZAMKIEM - w zamku nie kupi, a gra
+            // przy glodzie odejmuje rannych (DefaultPartyHealingModel) - petla glod -> ranni -> c = 1 -> Fort. Koniec bez blokady 24 h (najpierw zapasy).
+            bool starvingF;
+            bool lowF = LowFood(mp, out starvingF);
+            if (lowF)
+            {
+                Settlement ff = null;
+                if (!starvingF) { float fh2; ff = NearFort(mp, out fh2); }   // tylko przy malym zapasie (rzadko); glod - koniec wszedzie
+                if (NoFoodAt(ff, lowF, starvingF))
+                {
+                    _dFoodEnd++; _dFortEnd++;
+                    Say(s, mp, lh, w, "TWIERDZA -> KONIEC (" + (starvingF ? "glod" : "zamek " + ff.StringId + ", jedzenie na " + mp.GetNumDaysForFoodToLast() + " dni < "
+                        + HeroWounds.CastleFoodDays().ToString("F0", Inv)) + " - najpierw zapasy, bez blokady " + CoolHours.ToString("F0", Inv) + " h, po " + fd.ToString("F1", Inv) + " dob)");
+                    return FoodOut(mp, ref row, now);
+                }
+            }
+            // 524 (4): wodz na lozu HeroWounds - limit dob nie konczy twierdzy przed koncem loza. Wybor: trzymac, nie wracac w kolko - loze i tak prowadzi
+            // regula 408 do twierdzy (wyjscie po 10 dobach dawalo 24 h zwyklych decyzji bez stanu, potem ponowne wejscie); loze jest skonczone (w twierdzy
+            // schodzi 2 x szybciej), a glod konczy stan wyzej
+            bool bedHold = fd >= FortMaxDays && grade > 0 && c >= FortCalm;
+            if (bedHold) _dFortBed++;
+            if (c < FortCalm || (fd >= FortMaxDays && !bedHold))
             {
                 bool calm = c < FortCalm;
                 if (!calm) _dFortMax++;
@@ -701,6 +789,7 @@ namespace Armoury
                 var f = party.MapFaction;
                 float k = K(s) * x.C;
                 bool any = false;
+                int food = -1;   // 524: -1 nie liczone, 0 zapas w porzadku, 1 glod albo zapas ponizej progu zamku (liczone raz, przy pierwszym zamku)
                 for (int i = 0; i < _copy.Count; i++)
                 {
                     float v = _copy[i].Item2;
@@ -716,6 +805,12 @@ namespace Armoury
                     {
                         var st = d.Party as Settlement;
                         if (st == null || !st.IsFortification || st.IsUnderSiege || st.MapFaction != f) continue;
+                        if (!st.IsTown)
+                        {
+                            // 524 (2): zamek dla glodnej / z malym zapasem bez podbicia (jak 408 _aiStarve / _aiFood) - w zamku nie kupi, wygrywa wizyta gry po zapasy
+                            if (food < 0) { bool sv; food = LowFood(party, out sv) ? 1 : 0; }
+                            if (food == 1) { _dBoostFood++; continue; }
+                        }
                         partyThinkParams.SetBehaviorScore(in d, v * (1f + 0.5f * x.C));
                         _dBoost++; any = true;
                     }
@@ -833,12 +928,14 @@ namespace Armoury
                 int stand = 0, fort = 0;
                 foreach (var r in _rows.Values) { if (r.St == Stand) stand++; else if (r.St == Fort) fort++; }
                 int stumbles = _sScan + _sThink + _sCaution + _sInit + _sArmy + _sParty;
-                if (stand + fort + _dStand + _dFortDirect + _dStandEnd + _dFortEnd + _cSome + _dDefThink + _dDefOff + stumbles == 0 && !s.AiWoundedLog) return;
+                if (stand + fort + _dStand + _dFortDirect + _dStandEnd + _dFortEnd + _cSome + _dDefThink + _dDefOff + _dFoodNoEnter + _dBoostFood + stumbles == 0 && !s.AiWoundedLog) return;
                 double f = 1000.0 / Stopwatch.Frequency;
                 Log.Info(Tag + "doba " + _day + " - teraz postoj " + stand + ", do twierdzy " + fort
                          + " | wejscia: postoj " + _dStand + ", od razu twierdza " + _dFortDirect + " (z tego postoj niebezpieczny " + _dUnsafe + "), postoj -> twierdza " + _dFortFromStand
                          + ", koniec postoju " + _dStandEnd + " (limit dob " + _dMaxDays + ", zagrozenie " + _dThreat + ", glod/jedzenie " + _dHunger + ", ustapienie cudzemu rozkazowi " + _dYield
-                         + "), koniec twierdzy " + _dFortEnd + " (limit " + FortMaxDays.ToString("F0", Inv) + " dob " + _dFortMax + ")"
+                         + "), koniec twierdzy " + _dFortEnd + " (limit " + FortMaxDays.ToString("F0", Inv) + " dob " + _dFortMax + ", koniec twierdzy: glod " + _dFoodEnd + ")"
+                         + ", godziny ponad limit dob z lozem HW " + _dFortBed + ", postoj bez wyjazdu na zamek (glod / malo jedzenia) " + _dFoodStand
+                         + ", wejscia wstrzymane (glod / zamek bez zapasu jedzenia) " + _dFoodNoEnter + ", zamki bez podbicia (malo jedzenia) " + _dBoostFood
                          + ", bez twierdzy z droga (koniec bez celu) " + _dNoFort + ", wejscia wstrzymane (" + CoolHours.ToString("F0", Inv) + " h po wyjsciu bez wyleczenia) " + _dCool
                          + " | postoj: Hold " + _dHold + ", Hold ponownie po cudzym rozkazie " + _dReHold + ", mysli z DoNotChangeBehavior " + _dThinkStand
                          + ", mysli bez flagi (rozkaz szukajacy bitwy) " + _dThinkFree + ", opcje bitwy -1 " + _dStandBattleOff + ", opcje zwolania armii -1 " + _dArmyOff
