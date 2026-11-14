@@ -61,6 +61,7 @@ namespace Armoury
         internal sealed class Ctx
         {
             public int Kind; public Village V; public Hero H; public Settlement S; public float H0; public bool Done, Player, Off;
+            public Hero NewOwner;   // 510 (perk 54): nowy pan miasta - platnik Rapid Development
         }
 
         private static readonly Ctx[] _stack = new Ctx[4];
@@ -281,19 +282,19 @@ namespace Armoury
                 if (__1 == null || !Live || !__1.IsCaravan || __1 == MobileParty.MainParty) return;
                 var owner = __1.Party != null ? __1.Party.Owner : null;
                 if (owner == null || !owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans)) return;   // ten sam warunek co gra (DestroyPartyAction.cs:19)
-                __state = new Ctx { Kind = KIns, H = owner, Player = owner == Hero.MainHero };
+                __state = new Ctx { Kind = KIns, H = owner, Player = owner == Hero.MainHero, S = __1.HomeSettlement };   // 510 (perk 53): S - miasto macierzyste karawany (platnik)
                 Push(__state);
             }
             catch (Exception e) { __state = null; Stumble("InsPre", e); }
         }
 
-        public static void RapidPre(Settlement __0, out Ctx __state)
+        public static void RapidPre(Settlement __0, Hero __2, out Ctx __state)
         {
             __state = null;
             try
             {
                 if (__0 == null || !Live || !__0.IsTown || __0.Town == null) return;
-                __state = new Ctx { Kind = KRapid, S = __0 };
+                __state = new Ctx { Kind = KRapid, S = __0, NewOwner = __2 };
                 Push(__state);
             }
             catch (Exception e) { __state = null; Stumble("RapidPre", e); }
@@ -308,7 +309,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ wspolny prefiks na GiveGoldAction.ApplyInternal (Low)
-        public static void GivePrefix(Hero __0, ref PartyBase __1, Hero __2, PartyBase __3, ref int __4)
+        public static void GivePrefix(ref Hero __0, ref PartyBase __1, Hero __2, PartyBase __3, ref int __4)
         {
             if (_depth == 0) return;
             try
@@ -347,6 +348,7 @@ namespace Armoury
                     perk = __4 == bonus && OwnsWorkshopIn(c.S, __2) && __2.GetPerkValue(DefaultPerks.Trade.RapidDevelopment);
                 }
                 if (!perk) return;                                               // inne zdarzenia w oknie perka (np. zwrot ceny warsztatu gracza - ChangeOwnerOfWorkshopAction) nie sa nasze
+                if (Perk510Gold.TradeGiftPayer(c.Kind == KIns, c.S, c.NewOwner, __2, ref __0, ref __1, ref __4)) return;   // 510 (perki 53/54): platnik - gildia miasta karawany / nowy pan miasta (gracz i AI)
                 bool player = __2 == Hero.MainHero;
                 if (player)
                 {

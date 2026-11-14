@@ -1536,6 +1536,35 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool TradePerkGiftsAiOff { get; set; } = true;
 
+        // 510 (perki): okupy i zloto z platnikiem (Perk510Gold)
+        [SettingPropertyBool("Perk Ransom By Captor", HintText = "a lord's ransom (the one paid by his family, or by the treasury for a king) is raised by the perks of whoever holds him, as in the game: Ransom Broker of the party leader holding him (+25%, half at sea) and the Banner Kings Kidnapper lifestyle perk (+30%). Until now our ransom by wealth ignored them. The captive's family pays it, in cash and debt like the rest of the ransom. The same rule for you and for the AI. Off = as before this change", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PerkRansomByCaptor { get; set; } = true;
+
+        [SettingPropertyBool("Perk Man Of Means Ransom", HintText = "with the Man of Means perk your own ransom is 30% lower, as in the game - until now our ransom by wealth ignored the perk. Off = as before this change", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PerkManOfMeansRansom { get; set; } = true;
+
+        [SettingPropertyBool("Perk Manhunter After Bk", HintText = "the Manhunter perk (+20% for ordinary prisoners sold to a ransom broker, on land) also counts in towns where Banner Kings sells prisoners as slaves - until now the slave price replaced the game's price and the perk was lost. The buyer (the town) pays it, like the rest of the price. The same rule for you and for the AI. Off = as before this change", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PerkManhunterAfterBk { get; set; } = true;
+
+        [SettingPropertyBool("Perk Spring Of Gold From Merchants", HintText = "the daily interest of the Spring of Gold perk (0.1% of the clan leader's gold, up to 1,000) is paid by the merchants of the towns where the clan's members own workshops, out of the town's purse - no workshops or empty purses, no interest. Until now it came out of thin air, for the AI too. Off = as before this change", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PerkSpringOfGoldFromMerchants { get; set; } = true;
+
+        [SettingPropertyBool("Perk Trade Gifts Paid", HintText = "the 5,000 denars of the Insurance Plans perk (a caravan destroyed) are paid by the merchants of the caravan's home town, as much as its purse holds, and the 5,000 of the Rapid Development perk (a workshop's town taken by an enemy) by the town's new lord out of his own purse, as much as he has. The same rule for you and for the AI (until now: the AI got nothing, you got it out of thin air). If you take a town, you pay for the enemy workshops there. Off = as before this change", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PerkTradeGiftsPaid { get; set; } = true;
+
+        [SettingPropertyBool("Perk Naval Port Gold Paid", HintText = "with War Sails: the 40 denars of the Salvage perk for every merchant convoy entering a governed port are paid by the convoy out of its own purse (as much as it has), and the Shipwright's Hand perk no longer adds a recruit to the garrison out of thin air. Off = as before this change", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PerkNavalPortGoldPaid { get; set; } = true;
+
+        [SettingPropertyBool("Perk Veterinarian Horses", HintText = "the Veterinarian perk no longer creates a horse out of thin air for every second slain horseman; instead, when a horse of a party whose surgeon has the perk falls in battle (not at sea), it is only wounded half of the time and comes back to the party. Needs Horses Die Only Killed. The same rule for you and for the AI. Off = as before this change", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PerkVeterinarianHorses { get; set; } = true;
+
         [SettingPropertyBool("Gentry Purse From Town", HintText = "a new Banner Kings gentry house (a local who takes up a vacant estate) no longer gets 15,000 out of thin air - it starts with nothing (see Gentry Start From Town). The estate passes without a price, as it always did in practice (Banner Kings paid that price to nobody). Off = out of thin air, as before", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool GentryPurseFromTown { get; set; } = true;
@@ -13639,6 +13668,13 @@ namespace Armoury
             s.GarrisonNoStartPurse = GarrisonNoStartPurse;
             s.TierIncomeAiOff = TierIncomeAiOff;
             s.TradePerkGiftsAiOff = TradePerkGiftsAiOff;
+            s.PerkRansomByCaptor = PerkRansomByCaptor;   // 510 (perki)
+            s.PerkManOfMeansRansom = PerkManOfMeansRansom;   // 510 (perki)
+            s.PerkManhunterAfterBk = PerkManhunterAfterBk;   // 510 (perki)
+            s.PerkSpringOfGoldFromMerchants = PerkSpringOfGoldFromMerchants;   // 510 (perki)
+            s.PerkTradeGiftsPaid = PerkTradeGiftsPaid;   // 510 (perki)
+            s.PerkNavalPortGoldPaid = PerkNavalPortGoldPaid;   // 510 (perki)
+            s.PerkVeterinarianHorses = PerkVeterinarianHorses;   // 510 (perki)
             s.GentryPurseFromTown = GentryPurseFromTown;
             s.GentryStartFromTown = GentryStartFromTown;
             s.BanditHeroPurseFromHideout = BanditHeroPurseFromHideout;
