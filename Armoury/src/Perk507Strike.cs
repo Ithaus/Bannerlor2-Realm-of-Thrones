@@ -74,6 +74,7 @@ namespace Armoury
             IHigh = 10, IFennid = 11, IDrengr = 12, IKlibT = 13, IKlibD = 14, ISweep = 15, IEquites = 16, IAdapt = 17, ICamel = 18, IOutrider = 19;
         private static readonly int[] _dHit = new int[20];
         private static int _dMelee, _dMeleeUp, _dMissileUp, _dHorse;
+        private static int _dOverCap; private static float _dOverCapGain;   // D10: przeliczenia konia ponad sufit RBM (i suma nadwyzki m/s ponad sufit albo predkosc RBM)
         private static double _dMeleeRatio, _dMissileRatio;
 
         // ---- BK (odbiciem, leniwie)
@@ -113,7 +114,7 @@ namespace Armoury
         private static void ResetDay()
         {
             Array.Clear(_dHit, 0, _dHit.Length);
-            _dMelee = _dMeleeUp = _dMissileUp = _dHorse = 0; _dMeleeRatio = _dMissileRatio = 0; _dStumbles = 0;
+            _dMelee = _dMeleeUp = _dMissileUp = _dHorse = 0; _dOverCap = 0; _dOverCapGain = 0f; _dMeleeRatio = _dMissileRatio = 0; _dStumbles = 0;
         }
 
         // ============================================================ wpiecie
@@ -161,7 +162,7 @@ namespace Armoury
             string rbmMissile = RbmPrefixOn(AccessTools.DeclaredMethod(typeof(MissionCombatMechanicsHelper), "ComputeBlowMagnitudeMissile"));
             string rbmHorse = RbmPostfixOn(_horseTarget) ? "TAK" : "NIE";
             Log.Info(P + "start sesji | klucze PerkStrikeAfterRbm " + Yn(s != null && s.PerkStrikeAfterRbm)
-                     + ", PerkLifestyleDamage " + Yn(s != null && s.PerkLifestyleDamage) + ", PerkMountAfterRbm " + Yn(s != null && s.PerkMountAfterRbm)
+                     + ", PerkLifestyleDamage " + Yn(s != null && s.PerkLifestyleDamage) + ", PerkMountAfterRbm " + Yn(s != null && s.PerkMountAfterRbm) + ", PerkMountOverCap (D10) " + Yn(s != null && s.PerkMountOverCap)
                      + " | postfiksy: cios wrecz " + _hMelee + " (prefiks RBM " + rbmMelee + "), pocisk " + _hMissile + " (prefiks RBM " + rbmMissile
                      + ", wzor RBM pocisku " + (_rbmMissile != null ? "TAK" : "BRAK") + "), cios ogolnie " + _hBlow + ", kon " + _hHorse
                      + " (postfiks RBM na UpdateHorseStats " + rbmHorse + ")"
@@ -463,12 +464,18 @@ namespace Armoury
                     if ((m & BCamel) != 0) { agentDrivenProperties.MountSpeed *= 1.08f; _dHit[ICamel]++; any = true; }
                     if ((m & BOutrider) != 0) { agentDrivenProperties.MountSpeed *= 1.05f; _dHit[IOutrider]++; any = true; }
                 }
-                // RBM sciaga predkosc ponad sufit (10 m/s, 8 przy koniu ponad 500 kg; HorseChanges) - premia nie przebija sufitu, kon juz ponad nim zostaje jak u RBM
+                // RBM sciaga predkosc ponad sufit (10 m/s, 8 przy koniu ponad 500 kg; HorseChanges) - recenzja 507: premia nie przebijala sufitu, kon juz ponad
+                // nim zostawal jak u RBM. D10 (Jeff 14.11 "nie sa wystarczajaco szybkie", klucz PerkMountOverCap): premia liczona od predkosci RBM PRZEBIJA sufit -
+                // przyciecie tylko przy wylaczonym kluczu; licznik doby mowi, ile przeliczen poszlo ponad sufit
                 if (rbm && agentDrivenProperties.MountSpeed > spd0)
                 {
                     var hw = agent.SpawnEquipment != null ? agent.SpawnEquipment[EquipmentIndex.Horse] : EquipmentElement.Invalid;
                     float cap = !hw.IsEmpty && hw.Weight > 500f ? 8f : 10f;
-                    if (agentDrivenProperties.MountSpeed > cap) agentDrivenProperties.MountSpeed = Math.Max(spd0, cap);
+                    if (agentDrivenProperties.MountSpeed > cap)
+                    {
+                        if (s.PerkMountOverCap) { _dOverCap++; _dOverCapGain += agentDrivenProperties.MountSpeed - Math.Max(spd0, cap); }
+                        else agentDrivenProperties.MountSpeed = Math.Max(spd0, cap);
+                    }
                 }
                 if (any) _dHorse++;
             }
@@ -595,7 +602,7 @@ namespace Armoury
                     Log.Info(P + "dzien " + day + " | wolan ciosu wrecz po RBM " + _dMelee + ", z premia predkosci " + _dMeleeUp
                              + (_dMeleeUp > 0 ? " (sila x" + F2(_dMeleeRatio / _dMeleeUp) + " srednio)" : "")
                              + " | pociski z RunningThrow " + _dMissileUp + (_dMissileUp > 0 ? " (x" + F2(_dMissileRatio / _dMissileUp) + ")" : "")
-                             + " | przeliczen koni z premia " + _dHorse
+                             + " | przeliczen koni z premia " + _dHorse + (_dOverCap > 0 ? " (ponad sufit RBM " + _dOverCap + ", srednio +" + F2(_dOverCapGain / _dOverCap) + " m/s - D10)" : "")
                              + " | per perk (trafienia/przeliczenia): " + (parts.Count > 0 ? string.Join(", ", parts) : "-")
                              + " | potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
                 }

@@ -927,6 +927,15 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int BattleDressingNavalResilience { get; set; } = 30;
 
+        // D11 (perki)
+        [SettingPropertyBool("Loser Self Dressing Cap", HintText = "after a lost battle nobody dresses your wounds: your own healing perks (Preventive Medicine, Walk It Off) give together at most Loser Self Dressing Max Hp hit points - you bind your wounds yourself while you flee. The same for every lord. Off = the game's healing after a defeat (up to 30% of the lost hit points)", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool LoserSelfDressingCap { get; set; } = true;
+
+        [SettingPropertyInteger("Loser Self Dressing Max Hp", 0, 50, "0", HintText = "the most hit points a hero gets back by his own perks after a lost battle", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int LoserSelfDressingMaxHp { get; set; } = 10;
+
         [SettingPropertyBool("Cheat Death At Crisis", HintText = "Cheat Death on the surgeon of the party also counts at the crisis of a grave wound (Hero Wounds): the chance to die of the wound is halved, as the perk halves the chance to die when falling in battle. Off = only the surgeon's Medicine skill counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool CheatDeathAtCrisis { get; set; } = true;
@@ -1640,9 +1649,18 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PerkSpringOfGoldFromMerchants { get; set; } = true;
 
-        [SettingPropertyBool("Perk Trade Gifts Paid", HintText = "the 5,000 denars of the Insurance Plans perk (a caravan destroyed by an enemy; a caravan merely disbanded gets nothing) are paid by the merchants of the caravan's home town, as much as they hold above their reserve, and the 5,000 of the Rapid Development perk (a workshop's town taken by an enemy) by the town's new lord out of his own purse, as much as he has. The same rule for you and for the AI (until now: the AI got nothing, you got it out of thin air). If you take a town, you pay for the enemy workshops there. Off = as before this change", RequireRestart = false)]
+        [SettingPropertyBool("Perk Trade Gifts Paid", HintText = "the 5,000 denars of the Insurance Plans perk (a caravan destroyed by an enemy; a caravan merely disbanded gets nothing) are paid by the merchants of the caravan's home town, as much as they hold above their reserve, and the 5,000 of the Rapid Development perk (a workshop's town taken by an enemy) by the town's new lord out of his own purse, as much as he has. The same rule for you and for the AI (until now: the AI got nothing, you got it out of thin air). If you take a town, you pay for the enemy workshops there (with Captured Workshops To Taker on this never happens: the enemy workshops become yours for nothing). Off = as before this change", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PerkTradeGiftsPaid { get; set; } = true;
+
+        // D4 (perki)
+        [SettingPropertyBool("Captured Workshops To Taker", HintText = "when a town changes hands, the workshops of lords whose realm is at war with the taker pass to the taker for nothing - it is war. Workshops of notables (gang leaders, merchants, artisans) and of anyone the taker is not at war with stay with their owners. The working capital stays in the workshop. Replaces the Banner Kings seizure, which handed such workshops to a notable of the town. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool CapturedWorkshopsToTaker { get; set; } = true;
+
+        [SettingPropertyBool("Rapid Development Saves Capital", HintText = "Rapid Development: when your workshop is seized in a captured town you manage to carry off its working capital - the money in the workshop's chest comes to your purse instead of staying with the workshop. Nobody pays it out of thin air. The same for every lord. Only with Captured Workshops To Taker", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool RapidDevelopmentSavesCapital { get; set; } = true;
 
         [SettingPropertyBool("Perk Naval Port Gold Paid", HintText = "with War Sails: the 40 denars of the Salvage perk for every merchant convoy entering a governed port are paid by the convoy out of its own purse (as much as it has), and the Shipwright's Hand perk no longer adds a recruit to the garrison out of thin air. Off = as before this change", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -2057,6 +2075,11 @@ namespace Armoury
         [SettingPropertyBool("Perk Mount After Rbm", HintText = "perks that should make the horse faster or stronger now reach the horse: Sweeping Wind (+5% top speed, lost to RBM's horse speed), and the Banner Kings perks Equites (+10% charge damage), Adaptive Tactics (+8% maneuver), Camel Master (+8% speed) and Outrider (+5% speed), which Banner Kings put on the rider where the game never reads them. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool PerkMountAfterRbm { get; set; } = true;
+
+        // D10 (perki)
+        [SettingPropertyBool("Perk Mount Over Cap", HintText = "the horse speed bonus of perks (Sweeping Wind, Camel Master, Outrider) is added on top of RBM's horse speed even above RBM's top speed limit (10 m/s, 8 for a horse over 500 kg) - a perk horse can outrun every other horse. Off = the bonus stops at that limit", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool PerkMountOverCap { get; set; } = true;
 
         [SettingPropertyBool("Horse Stamina Enabled", HintText = "horses tire in battle like men do: a gallop spends a horse's wind and a blown horse slows down, while a walk or a trot gives the wind back. How long a horse lasts depends on the horse itself (speed, weight, breed), the load it carries (rider, armour, weapons, barding) and the rider's Riding skill - the same rule for you, your men and the enemy. Dragons, chariots, elephants, mammoths and the horses of the dead do not tire. Off = horses never tire, as before", RequireRestart = false)]
         [SettingPropertyGroup("Horse wind")]
@@ -4248,6 +4271,11 @@ namespace Armoury
         [SettingPropertyBool("Perk Recruit Discounts", HintText = "the recruitment discounts of perks (Head Hunter, Chink in the Armor, Show of Strength, Hardy Frontline, Renowned Archer, Piercer) lower the prest money as in the base game; Banner Kings' floor of ten days of pay no longer swallows them", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool PerkRecruitDiscounts { get; set; } = true;
+
+        // D2 (perki)
+        [SettingPropertyBool("All Recruit Discounts", HintText = "every recruitment discount (your culture -5%, Frugal, Sword for Barter, Slick Negotiator, Ritter Oathbound, a low clan rank, the mounted-troop discount of some cultures, Popular Captain and the combat perks) lowers the prest money; Banner Kings' floor of ten days of pay only holds when the extra costs outweigh the discounts. Off: only the combat perks pass the floor", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool AllRecruitDiscounts { get; set; } = true;
 
         [SettingPropertyBool("Companion Naval Skills Priced", HintText = "a wanderer's sailing skills count like body skills and party roles in his price and pay (Mariner like Riding, Boatswain and Shipmaster like Scouting or Engineering), not like command as Banner Kings counted them - about two fifths of a Realm of Thrones companion's skill premium came from the sea. The same rule sets the pay of heroes in every party and of your own mercenary contract", RequireRestart = false)]
         [SettingPropertyGroup("Hiring companions")]
@@ -9340,6 +9368,11 @@ namespace Armoury
         [SettingPropertyGroup("Banner Kings perks as described (514)")]
         public bool BkPerkHalvesCourt { get; set; } = true;
 
+        // D15 (perki)
+        [SettingPropertyBool("Lithurgy Lasting Ai", HintText = "Lithurgy works the same for every lord: when a lord of the AI gains +1 relation with a preacher of his fiefs, the preacher keeps it for good (Banner Kings no longer pulls it back), as it always stayed for you. Only with Bk Perk Halves Court. Off = for AI lords the gain fades again", RequireRestart = false)]
+        [SettingPropertyGroup("Banner Kings perks as described (514)")]
+        public bool LithurgyLastingAi { get; set; } = true;
+
         [SettingPropertyBool("Bk Perk Halves Lifestyle", HintText = "Banner Kings lifestyle perks on the map do what their descriptions say: Sea-Toughness (party morale +5%, food -5%), Sea Commander (party size +8, renown from victories +10%), Inspirer (halves the Kheshig morale penalty for men of other cultures), Ghazw (mounts +12%, not 10%), Honor Guard (one more recruitment level with notables), Helmsman (bad morale fades 10% faster), Pathfinder (+3% speed in forests and on beaches), Sea-Eyes (the +8% sight only at night), Tour de Calradia (double the tournament bet), Crowds' Favorite (double tournament renown). Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings perks as described (514)")]
         public bool BkPerkHalvesLifestyle { get; set; } = true;
@@ -13738,6 +13771,8 @@ namespace Armoury
             s.BattleDressingPer100Medicine = BattleDressingPer100Medicine;
             s.BattleDressingAi = BattleDressingAi;
             s.BattleDressingNavalResilience = BattleDressingNavalResilience;
+            s.LoserSelfDressingCap = LoserSelfDressingCap;       // D11 (perki)
+            s.LoserSelfDressingMaxHp = LoserSelfDressingMaxHp;
             s.CheatDeathAtCrisis = CheatDeathAtCrisis;
             s.PrisonerCareXp = PrisonerCareXp;
             s.PrisonersHealLikeYourMen = PrisonersHealLikeYourMen;
@@ -13917,6 +13952,8 @@ namespace Armoury
             s.PerkManhunterAfterBk = PerkManhunterAfterBk;   // 510 (perki)
             s.PerkSpringOfGoldFromMerchants = PerkSpringOfGoldFromMerchants;   // 510 (perki)
             s.PerkTradeGiftsPaid = PerkTradeGiftsPaid;   // 510 (perki)
+            s.CapturedWorkshopsToTaker = CapturedWorkshopsToTaker;           // D4 (perki)
+            s.RapidDevelopmentSavesCapital = RapidDevelopmentSavesCapital;
             s.PerkNavalPortGoldPaid = PerkNavalPortGoldPaid;   // 510 (perki)
             s.PerkVeterinarianHorses = PerkVeterinarianHorses;   // 510 (perki)
             s.GentryPurseFromTown = GentryPurseFromTown;
@@ -14020,6 +14057,7 @@ namespace Armoury
             s.PerkStrikeAfterRbm = PerkStrikeAfterRbm;   // 507 (perki)
             s.PerkLifestyleDamage = PerkLifestyleDamage;
             s.PerkMountAfterRbm = PerkMountAfterRbm;
+            s.PerkMountOverCap = PerkMountOverCap;   // D10 (perki)
             s.HorseStaminaEnabled = HorseStaminaEnabled;
             s.HorseStaminaBar = HorseStaminaBar;
             s.HorseGallopDrainScale = HorseGallopDrainScale;
@@ -14568,6 +14606,7 @@ namespace Armoury
             s.HistoricalRecruitCost = HistoricalRecruitCost;
             s.RecruitCostDays = RecruitCostDays;
             s.PerkRecruitDiscounts = PerkRecruitDiscounts;   // 508 (perki)
+            s.AllRecruitDiscounts = AllRecruitDiscounts;     // D2 (perki)
             s.CompanionNavalSkillsPriced = CompanionNavalSkillsPriced;
             s.CompanionHireByWage = CompanionHireByWage;
             s.CompanionHireDays = CompanionHireDays;
@@ -15841,6 +15880,7 @@ namespace Armoury
             s.FixBkrotWageSeaCut = FixBkrotWageSeaCut;
             s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
             s.BkPerkHalvesCourt = BkPerkHalvesCourt;   // 514 (perki)
+            s.LithurgyLastingAi = LithurgyLastingAi;   // D15 (perki)
             s.BkPerkHalvesLifestyle = BkPerkHalvesLifestyle;
             s.BkPerkHalvesBattle = BkPerkHalvesBattle;
             s.NavalModelsUnderBk = NavalModelsUnderBk; s.NavalDeployStatsFix = NavalDeployStatsFix; s.NavalDeployAmmoFix = NavalDeployAmmoFix;   // 515 (perki)

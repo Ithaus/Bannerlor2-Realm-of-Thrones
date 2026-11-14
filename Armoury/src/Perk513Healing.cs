@@ -76,12 +76,15 @@ namespace Armoury
         [ThreadStatic] private static List<Dress> _dress;
         [ThreadStatic] private static bool _inEnd;
         [ThreadStatic] private static Hero _dressedHero;   // bohater, ktoremu DressPostfix dal opatrunek w biezacym wywolaniu modelu (straz 69 / NavalDLC)
+        [ThreadStatic] private static Hero _cappedHero;    // D11: bohater strony przegranej, ktoremu DressPostfix przycial samoopatrunek w biezacym wywolaniu (straz NavalDLC)
+        [ThreadStatic] private static int _capMax;         // D11: sufit tego bohatera (LoserSelfDressingMaxHp)
 
         // linia doby
         private static int _day = -1;
         private static int _dRaise, _dRaisePlayer, _dLight, _dHeavy, _dHeavyCut, _dWin;
         private static int _dDressBattles, _dDressHeroes, _dDressHp, _dDressXpCalls, _dDressAi, _dDressNaval, _dDressPlayerHp = -1, _dNavalCut;
         private static int _dGoodRest, _dBush, _dCheat, _dFfa;
+        private static int _dLoseCut, _dLoseCutHp, _dLosePlayer;   // D11: przegrani z samoopatrunkiem ponad sufit (wywolania modelu), sciete HP, w tym gracz/jego partia
         private static int _sDressHp, _sCheat, _sFfa;
         private static PerkObject _resilience; private static bool _resTried;
         private static TextObject _tDress, _tCampRest, _tBush;
@@ -89,7 +92,7 @@ namespace Armoury
         internal static void Reset()
         {
             _raiseParty = null; _raiseAt = -1; _raiseLo = 0; _raiseHi = 0; _win = null; _winScale = 1f; _dress = null; _inEnd = false; _dressedHero = null;
-            _resTried = false; _resilience = null;   // recenzja: PerkObject NavalDLC zyje w MBObjectManager danej gry (NavalPerks.Create) - stara referencja po wczytaniu innego zapisu = GetPerkValue false
+            _resTried = false; _resilience = null; _cappedHero = null;   // recenzja: PerkObject NavalDLC zyje w MBObjectManager danej gry (NavalPerks.Create) - stara referencja po wczytaniu innego zapisu = GetPerkValue false
             _stumbles = 0; _errSites.Clear(); _day = -1; DayReset(); _sDressHp = 0; _sCheat = 0; _sFfa = 0;
         }
 
@@ -98,6 +101,7 @@ namespace Armoury
             _dRaise = _dRaisePlayer = _dLight = _dHeavy = _dHeavyCut = _dWin = 0;
             _dDressBattles = _dDressHeroes = _dDressHp = _dDressXpCalls = _dDressAi = _dDressNaval = _dNavalCut = 0; _dDressPlayerHp = -1;
             _dGoodRest = _dBush = _dCheat = _dFfa = 0;
+            _dLoseCut = _dLoseCutHp = _dLosePlayer = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -140,7 +144,8 @@ namespace Armoury
             Log.Info(P + "start sesji - latki " + _hookNote + " | 37/60 WalkItOff lekko ranni (HP > progu) w marszu " + Math.Max(0, Math.Min(100, s.WalkItOffLightWoundPercent))
                      + "% stawki (marsz " + s.MovingHealPercent + "%, Heal Only At Rest " + (s.HealOnlyAtRest ? "TAK" : "NIE") + ") | 62 opatrunek po wygranej "
                      + (s.BattleDressingEnabled ? "TAK" : "NIE") + " (Medicine chirurga " + s.BattleDressingPer100Medicine + "% na 100 pkt + Preventive Medicine chirurga albo wlasne 30% raz, AI "
-                     + (s.BattleDressingAi ? "TAK" : "NIE") + ", 69 Resilience na morzu +" + s.BattleDressingNavalResilience + "%) | 63/68 Bush Doctor i A Good Days Rest w obozie "
+                     + (s.BattleDressingAi ? "TAK" : "NIE") + ", 69 Resilience na morzu +" + s.BattleDressingNavalResilience + "%) | D11 przegrani: samoopatrunek najwyzej "
+                     + (s.LoserSelfDressingCap ? s.LoserSelfDressingMaxHp + " HP" : "NIE (wynik gry)") + " | 63/68 Bush Doctor i A Good Days Rest w obozie "
                      + (s.CampHealingPerks ? "TAK" : "NIE") + " | 66 Cheat Death chirurga w przesileniu " + (s.CheatDeathAtCrisis ? "TAK" : "NIE") + " | 36 Form Fitting Armor w biegu i zadyszce "
                      + (s.FormFittingArmorInBreath ? "TAK" : "NIE") + " | Resilience (NavalDLC) " + (Resilience != null ? "jest" : "BRAK") + ".");
         }
@@ -294,14 +299,18 @@ namespace Armoury
         /// bohatera zostaje (recenzja: perk osobisty), ale z Preventive Medicine chirurga liczy sie RAZ (30%, nie 60%) - wygrany nigdy gorzej niz przegrany.</summary>
         public static void DressPostfix(PartyBase __0, Hero __1, ref ExplainedNumber __result)
         {
-            _dressedHero = null;
+            _dressedHero = null; _cappedHero = null;
             try
             {
                 var s = Settings.Current;
                 var party = __0; var hero = __1;
-                if (s == null || !s.BattleDressingEnabled || party == null || hero == null) return;
+                if (s == null || party == null || hero == null) return;
                 var me = party.MapEvent;
-                if (me == null || !me.HasWinner || party.Side == BattleSideEnum.None || party.Side != me.WinningSide) return;   // przegrani - wynik gry
+                if (me == null || !me.HasWinner || party.Side == BattleSideEnum.None) return;
+                // D11 (Jeff 14.11 "wersja realna, perki najwyzej moga dac max 10hp"): strona PRZEGRANA - nikt nie opatruje, bohater sam wiaze rany: wlasne perki
+                // gry (Preventive Medicine 30% utraconego HP, Medicine.WalkItOff +10 po bitwie zaczepnej) daja razem najwyzej LoserSelfDressingMaxHp; gracz i AI
+                if (party.Side != me.WinningSide) { LoserCap(s, party, hero, ref __result); return; }
+                if (!s.BattleDressingEnabled) return;
                 bool player = party == PartyBase.MainParty || hero == Hero.MainHero;
                 if (!player && !s.BattleDressingAi) return;
                 int lost = hero.MaxHitPoints - hero.HitPoints;
@@ -347,6 +356,19 @@ namespace Armoury
             catch (Exception e) { _dressedHero = null; Stumble("DressPostfix", e); }
         }
 
+        /// <summary>D11: sufit samoopatrunku przegranego (wynik gry - wlasne PreventiveMedicine i WalkItOff - przyciety do LoserSelfDressingMaxHp).</summary>
+        private static void LoserCap(Settings s, PartyBase party, Hero hero, ref ExplainedNumber r)
+        {
+            if (!s.LoserSelfDressingCap) return;
+            int max = Math.Max(0, s.LoserSelfDressingMaxHp);
+            _cappedHero = hero; _capMax = max;
+            float was = r.ResultNumber;
+            if (was <= max) return;
+            r.LimitMax(max);
+            _dLoseCut++; _dLoseCutHp += (int)Math.Round(was - max);
+            if (party == PartyBase.MainParty || hero == Hero.MainHero) _dLosePlayer++;
+        }
+
         /// <summary>69 straz (recenzja; scalanie z 515 / punkt 102): gdyby NavalDLCPartyHealingModel wszedl do lancucha modeli, dolozylby swoje 30%
         /// utraconego HP (Resilience) na KAZDEJ bitwie do wyniku bazy, w ktorym jest juz nasz opatrunek z mnoznikiem Resilience. Gdy opatrunek byl dany
         /// temu bohaterowi w tym wywolaniu (_dressedHero) - dodatek DLC zdjety. Dzis metoda jest poza lancuchem (BkrotChains) - latka bez skutku.</summary>
@@ -354,8 +376,12 @@ namespace Armoury
         {
             var dh = _dressedHero;
             _dressedHero = null;
+            var ch = _cappedHero;
+            _cappedHero = null;
             try
             {
+                // D11: gdyby NavalDLC wszedl do lancucha, jego Resilience (+30% na kazdej bitwie) dolozylby sie przegranemu ponad sufit - ten sam sufit na koncu
+                if (ch != null && __1 != null && ReferenceEquals(ch, __1) && __result.ResultNumber > _capMax) { __result.LimitMax(_capMax); _dNavalCut++; }
                 if (dh == null || __1 == null || !ReferenceEquals(dh, __1)) return;
                 var res = Resilience;
                 if (res == null || !__1.GetPerkValue(res)) return;
@@ -462,6 +488,7 @@ namespace Armoury
                 Log.Info(P + "doba " + _day + " - 37/60 WalkItOff: okna podniesionej stawki " + _dWin + " (gracz " + _dRaisePlayer + "), leczenia lekko rannych " + _dLight
                          + ", ciezko rannych przycietych " + _dHeavy + " (-" + _dHeavyCut + " HP) | 62 opatrunek: bitwy " + _dDressBattles + " (AI " + _dDressAi + ", morskie " + _dDressNaval
                          + ", zdjete Resilience NavalDLC " + _dNavalCut + "), bohaterowie " + _dDressHeroes + ", +" + _dDressHp + " HP, XP chirurga " + _dDressXpCalls + ", gracz " + (_dDressPlayerHp < 0 ? "-" : "+" + _dDressPlayerHp + " HP")
+                         + " | D11 przegrani - samoopatrunek przyciety do " + (Settings.Current != null ? Settings.Current.LoserSelfDressingMaxHp : 0) + " HP: " + _dLoseCut + " (-" + _dLoseCutHp + " HP, gracz/jego partia " + _dLosePlayer + ")"
                          + " | 68 A Good Days Rest w obozie " + _dGoodRest + ", 63 Bush Doctor w obozie " + _dBush + " (wywolania modelu) | 66 Cheat Death w przesileniu " + _dCheat
                          + " | 36 Form Fitting Armor agenci " + _dFfa + " | sesja: opatrunek +" + _sDressHp + " HP, Cheat Death " + _sCheat + ", Form Fitting Armor " + _sFfa
                          + " | potkniecia " + _stumbles);
