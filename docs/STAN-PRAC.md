@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 16:20 - WGRANIE 232 (500 leczenie w spoczynku, 500-a AI/jency/morze, 501 nosze, 502 P1 podwojne perki BK)
+
+- Armoury.dll cbe0cc9a, RealisticCaptivity.dll d38000dd, CrashScribe.dll 8de73f55 = galaz noc/367c-jeniec-po-odejsciu 315ef30a (= noc/500a-leczenie-ai-jency-morze + cherry-pick P1). GrandTourney, ForgeView bez zmian (231). Kopie przed: .bak-2026-11-14-przed-wgranie232, C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie232 i -przed).
+- Test at-502 (Armoury-2026-11-14_15-56-22.log): 20/20 dob, 21.7 s/dobe (bez spowolnienia), bitwy 3/5, 23 bledy cudze, 0 potkniec; linia doby 500-a AI: ok. 72 tys. wywolan modelu/dobe, latka ok. 2 ms/dobe. Marszu gracza i noszy autotest nie sprawdza (druzyna stoi, pelne HP) - Jeff w grze: tooltip leczenia "Marching (no rest)", nosze przy HP <= 10, linie "Leczenie w spoczynku (500)", "Nosze (501)", CrashScribe "Mends: atuty BK ... pominiete ... (P1)".
+- W toku: 503 (P2 XP perkow, galaz noc/p2-xp-perkow 3fb9ed48, gotowe), 504 (P3 bledy BK, workflow), seria 505-515 rownolegle (workflow; galezie noc/505..515, wpisy w docs/changelog-oczekuje/), potem scalenie, test, wgranie. 500-b (lordowie odpoczywaja, ostrozne ranne AI) - po serii perkow.
+- Decyzje Jeffa w docs/audyty-2026-11-14/PERKI-DECYZJE.md (perki 1-105, leczenie, praca jencow, XP mnozy).
+
 ## STAN 14.11 15:15 - WGRANIE 231 (498 wlasna bron wrecz gracza na turnieju, 499 zuzycie wlasnej zbroi i broni na turnieju)
 
 - Armoury.dll md5 161df0fa2b7e2ae64965299e172dbef8, GrandTourney.dll md5 8a85e9cd2d724338cdff21749fe0925f = galaz noc/367c-jeniec-po-odejsciu 2cf56e38 (= noc/499-turniej-zuzycie; 498 + recenzja f63efa0d, 499 + recenzja 97bd329b). Oba DLL razem (499 czyta MatchOwnSlot z GrandTourney odbiciem). Kopie przed: .bak-2026-11-14-przed-wgranie231 (Armoury ea06b3b9 = 230, GrandTourney 5f67df14), C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie231 i -przed).
