@@ -33,7 +33,8 @@ namespace Armoury
     /// (gra liczy tam caly oboz oblegajacych; obrona osad to osobna regula, nie dublujemy); (2) obrona osady wlasnego rodu (ArmsFirst.DefendsOwn - rod broni
     /// swego, jak w p9 i 500-b); (3) obronca / chroniony 335 (LordEscort.GuardAllowsAttack - ratuje swojego lorda); (4) cel ucieka i O / E &gt;= 1 - poscig za
     /// uciekajacym nie szuka walki; (5) cel - banda: prog 1 (bandy nie maja sojusznikow-krolestw, gra liczy je dobrze); (6) tylko partie lordow AI (bez gracza,
-    /// band, karawan, patroli).
+    /// band, karawan, patroli). Recenzja 530: (7) poscig ratunkowy RescueHunt (sam liczy sile lowcow w 22.5 jedn.); (8) swoi juz walcza z celem w polu - dolaczenie
+    /// od progu 1; cel musi byc w wojnie z napastnikiem; wyjatki sprawdzane dopiero, gdy atak bylby wstrzymany.
     /// Koszt: wyszukiwanie wokol celu (jak gra w tych samych watkach) TYLKO dla ataku &gt;= 1; wynik w pamieci na pare (napastnik, cel) przez 0.25 h,
     /// slownik podmieniany co godzine (watek glowny). Watki AI: odczyty (jak gra), liczniki Interlocked, przyklady pod lockiem (najwyzej 3 na dobe).
     /// Bez wizerunkow, nic co klatke, bledy liczone (bez globalnego wylacznika).
@@ -45,7 +46,7 @@ namespace Armoury
         private const double CacheHours = 0.25;   // wynik pary wazny tyle godzin (jeden takt inicjatywy)
         private const int ExMax = 3;              // przykladow w linii doby
 
-        private struct Odds { internal double At; internal float Own, Foe, FoeSelf, FoeAllies; internal MobileParty Ally; }
+        private struct Odds { internal double At; internal float Own, Foe, FoeSelf, FoeAllies, OwnBattle; internal MobileParty Ally; }
 
         private sealed class Ex
         {
@@ -60,7 +61,7 @@ namespace Armoury
         private static Harmony _h;
         private static string _hInit = "nie wpieta", _hThink = "nie wpieta";
         private static int _day = -1;
-        private static int _iVeto, _iKeep, _iFlee, _iBand, _iOk, _iCalc, _iHit, _iOwnSide, _tVeto, _tKeep, _tOk, _sInit, _sThink, _sCalc;
+        private static int _iVeto, _iKeep, _iFlee, _iBand, _iOk, _iCalc, _iHit, _iOwnSide, _iJoin, _tVeto, _tKeep, _tOk, _sInit, _sThink, _sCalc;
 
         internal static void Reset()
         {
@@ -74,7 +75,7 @@ namespace Armoury
         private static void ClearDay()
         {
             Interlocked.Exchange(ref _iVeto, 0); Interlocked.Exchange(ref _iKeep, 0); Interlocked.Exchange(ref _iFlee, 0); Interlocked.Exchange(ref _iBand, 0);
-            Interlocked.Exchange(ref _iOk, 0); Interlocked.Exchange(ref _iCalc, 0); Interlocked.Exchange(ref _iHit, 0); Interlocked.Exchange(ref _iOwnSide, 0);
+            Interlocked.Exchange(ref _iOk, 0); Interlocked.Exchange(ref _iCalc, 0); Interlocked.Exchange(ref _iHit, 0); Interlocked.Exchange(ref _iOwnSide, 0); Interlocked.Exchange(ref _iJoin, 0);
             _tVeto = _tKeep = _tOk = 0;
             lock (ExGate) _ex.Clear();
         }
@@ -98,6 +99,9 @@ namespace Armoury
         private static bool InScope(MobileParty a, MobileParty t)
         {
             if (a == null || t == null || a.IsMainParty || !a.IsLordParty || a.MapEvent != null) return false;
+            // recenzja 530: tylko wrog (opcje GoAroundParty z mysli moga miec cel nie-wrogi z cudzych zachowan - bez wojny liczenie stron nie ma sensu)
+            IFaction fa = a.MapFaction, ft = t.MapFaction;
+            if (fa == null || ft == null || !FactionManager.IsAtWarAgainstFaction(fa, ft)) return false;
             var army = a.Army;
             if (army != null && army.LeaderParty != a && a.AttachedTo != null) return false;   // doczepiony - decyduje wodz
             if (t.BesiegerCamp != null || t.BesiegedSettlement != null || t.SiegeEvent != null || t.CurrentSettlement != null) return false;
@@ -106,10 +110,11 @@ namespace Armoury
             return true;
         }
 
-        /// <summary>Wyjatki (2) i (3): obrona osady rodu, obronca / chroniony 335.</summary>
+        /// <summary>Wyjatki (2), (3) i (7): obrona osady rodu, obronca / chroniony 335, poscig ratunkowy RescueHunt (sile lowcow liczy sam - 1.5 x cel w 22.5 jedn.,
+        /// czyli dalej niz nasz promien; bez wyjatku 530 rozbijalby lowy). Wolane TYLKO, gdy atak bylby wstrzymany (licznik 335 nie rosnie bez potrzeby).</summary>
         private static bool Exempt(MobileParty a, MobileParty t)
         {
-            return ArmsFirst.DefendsOwn(a, t) || LordEscort.GuardAllowsAttack(a, t);
+            return ArmsFirst.DefendsOwn(a, t) || LordEscort.GuardAllowsAttack(a, t) || RescueHunt.Chases(a, t);
         }
 
         // ------------------------------------------------------------ liczenie sil
@@ -157,7 +162,7 @@ namespace Armoury
                 }
                 float s = Str(p) * w;
                 if (warA) { allies += s; if (s > best) { best = s; o.Ally = p; } }
-                else o.Own += s;
+                else { o.Own += s; if (inBattle) o.OwnBattle += s; }
             }
             o.FoeAllies = allies;
             o.Foe = o.FoeSelf + allies;
@@ -177,7 +182,7 @@ namespace Armoury
             }
         }
 
-        /// <summary>Decyzja: true = atak dozwolony. Liczniki w kind (0 inicjatywa, 1 mysl).</summary>
+        /// <summary>Decyzja: true = atak dozwolony. Liczniki w kind (0 inicjatywa, 1 mysl). Wyjatki (Exempt) sprawdzane dopiero, gdy atak bylby wstrzymany.</summary>
         private static bool Allowed(MobileParty a, MobileParty t, Settings s, int kind)
         {
             var o = Count(a, t);
@@ -185,6 +190,9 @@ namespace Armoury
             float edge = t.IsBandit ? 1f : Edge(s);
             if (q >= edge) { if (kind == 0) Interlocked.Increment(ref _iOk); else _tOk++; return true; }
             if (q >= 1f && t.IsFleeing()) { if (kind == 0) Interlocked.Increment(ref _iFlee); else _tOk++; return true; }
+            // recenzja 530: (8) swoi juz walcza z celem (toczaca sie bitwa w polu) - dolacza przy sile >= 1, nie zostawia ich przy rownej walce
+            if (q >= 1f && o.OwnBattle > 0f) { if (kind == 0) Interlocked.Increment(ref _iJoin); else _tOk++; return true; }
+            if (Exempt(a, t)) { if (kind == 0) Interlocked.Increment(ref _iKeep); else _tKeep++; return true; }
             if (t.IsBandit && kind == 0) Interlocked.Increment(ref _iBand);
             if (o.FoeAllies > 0f && kind == 0) Interlocked.Increment(ref _iOwnSide);
             Note(a, t, in o, kind == 0 ? "na widoku" : "poscig z mysli");
@@ -200,7 +208,6 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.AiAttackOdds || !InScope(__0, __1)) return;
-                if (Exempt(__0, __1)) { Interlocked.Increment(ref _iKeep); return; }
                 if (!Allowed(__0, __1, s, 0)) { __3 = Math.Min(__3, 0.99f); Interlocked.Increment(ref _iVeto); }
             }
             catch (Exception e) { Stumble(ref _sInit, "InitPostfix", e); }
@@ -232,7 +239,6 @@ namespace Armoury
                     if (!(_copy[i].Item2 > 0f) || (d.AiBehavior != AiBehavior.GoAroundParty && d.AiBehavior != AiBehavior.EngageParty)) continue;
                     var t = d.Party as MobileParty;
                     if (t == null || !InScope(party, t)) continue;
-                    if (Exempt(party, t)) { _tKeep++; continue; }
                     if (!Allowed(party, t, s, 1)) { partyThinkParams.SetBehaviorScore(in d, -1f); _tVeto++; }
                 }
                 _copy.Clear();
@@ -313,7 +319,8 @@ namespace Armoury
                 sb.Append(Tag).Append("doba ").Append(_day)
                   .Append(" | inicjatywa: zaczepki wstrzymane ").Append(veto).Append(" (z tego cel z sojusznikami w poblizu ").Append(Volatile.Read(ref _iOwnSide))
                   .Append(", cel-banda ").Append(Volatile.Read(ref _iBand)).Append("), z przewaga ").Append(ok).Append(", poscig za uciekajacym ").Append(flee)
-                  .Append(", wyjatki (obrona osady rodu / 335) ").Append(keep)
+                  .Append(", dolaczenie do bitwy swoich ").Append(Volatile.Read(ref _iJoin))
+                  .Append(", wyjatki (obrona osady rodu / 335 / lowy ratunkowe) ").Append(keep)
                   .Append(" | mysl: poscigi -1 ").Append(_tVeto).Append(", z przewaga ").Append(_tOk).Append(", wyjatki ").Append(_tKeep)
                   .Append(" | liczenia ").Append(Volatile.Read(ref _iCalc)).Append(", z pamieci ").Append(Volatile.Read(ref _iHit));
                 lock (ExGate)

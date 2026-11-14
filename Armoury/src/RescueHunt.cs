@@ -226,6 +226,19 @@ namespace Armoury
             }
             catch { return false; }
         }
+
+        /// <summary>Recenzja 530 (z watkow AI i z mysli): partia p ma rozkaz poscigu ratunkowego za t (OChase) - sile lowcow liczy sam RescueHunt (1.5 x cel
+        /// w 22.5 jedn.), 530 jej nie wstrzymuje. Tylko odczyt migawki. Nie rzuca.</summary>
+        internal static bool Chases(MobileParty p, MobileParty t)
+        {
+            try
+            {
+                var snap = Volatile.Read(ref _snap);
+                Order o;
+                return snap.Count != 0 && p != null && t != null && On && snap.TryGetValue(p, out o) && o != null && o.Kind == OChase && ReferenceEquals(o.Target, t);
+            }
+            catch { return false; }
+        }
         private static double NowH { get { return CampaignTime.Now.ToHours; } }
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
 

@@ -24,6 +24,13 @@
 - Watki AI: tylko odczyty jak gra (`StartFindingLocatablesAroundPosition`, `IsAtWarAgainstFaction`, `EstimatedStrength`), nazwy (TextObject) dopiero w linii doby w watku glownym.
 - Build Armoury 0 bledow. Gra Jeffa wlaczona - NIE wgrane, w grze nie sprawdzone.
 
+**Recenzja 530 (14.11, poprawki na tej samej galezi):** sprawdzone w dekompilacji `GetBestInitiativeBehavior` / `CalculateInitiativeScoresForEnemy` / `MobilePartyAi.GetBehaviors` (sojusznicy celu tylko z jego MapFaction - potwierdzone; inicjatywa tylko przy wyniku > 1 - 0.99 = brak zaczepki, a ucieczka gry nie jest liczona, bo oryginal liczy avoid tylko przy ataku < 1 - partia nie ucieka przed celem, ktorego nie atakuje, ucieczke przed armia sojusznika gra liczy osobno dla tej armii). Poprawione:
+- **Kolizja z RescueHunt (lowy ratunkowe):** poscig GoAroundParty z RescueHunt (postfiks 150, przed nami 52) liczy sile lowcow do 22.5 jedn. od celu (1.5 x cel), a 530 tylko do 9 jedn. - pojedynczy lowca dostawal -1 i lowy sie rozpadaly. Nowy `RescueHunt.Chases(p, t)` (odczyt migawki rozkazow, bezpieczny z watkow AI) jako wyjatek (7) w inicjatywie i w mysli.
+- **Dolaczanie do bitwy swoich:** przy prog 1.3 lord nie dolaczal do rownej bitwy, w ktorej juz walcza jego sojusznicy (np. swoi 100 + on 60 = 160 na 150 -> 1.07 -> wstrzymane) - zostawial swoich. Teraz wyjatek (8): gdy po naszej stronie sa juz uczestnicy bitwy celu (pole `OwnBattle`), prog 1. Licznik w linii doby "dolaczenie do bitwy swoich".
+- **Cel musi byc wrogiem:** `InScope` sprawdza wojne frakcji napastnika i celu (opcja GoAroundParty z cudzego zachowania o nie-wrogim celu dawalaby O / E < 1.3 i -1 dla zwyklego podazania).
+- **Wyjatki dopiero przy wstrzymaniu:** `Exempt` (DefendsOwn / 335 / RescueHunt) wolany tylko, gdy atak bylby wstrzymany - dotad przy kazdym ataku >= 1 podbijal licznik 335 `GuardAllowsAttack` i licznik "wyjatki" 530 bez wplywu na decyzje.
+- Bez zmian (do decyzji Jeffa): prog 130 dla zwyklych starc lord-lord. Uwaga dla testu: linia doby "wstrzymane" vs "z przewaga" - jesli wstrzymanych jest wielokrotnie wiecej, a wojny stoja, obnizyc `AiAttackEdgePercent` (100 = jak gra, ale z sojusznikami celu). Build Armoury 0 bledow; nie wgrane.
+
 **Status:** DO SPRAWDZENIA (galaz noc/530-atak-sily, nie wgrane).
 
 ## 529: panika kompanii - kompania 10 ludzi (sztandary jak dotad, jeden na 50), bez rzutu 1/6 strat pod okiem lorda albo przed zwarciem, stan bitwy najwyzej x1.25 - Armoury (BannerCompanies)
