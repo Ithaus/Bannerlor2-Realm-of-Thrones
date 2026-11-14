@@ -33,3 +33,8 @@ Nowe efekty 16, 20, 21, 23, 25a, 25b: zaakceptowane.
 26 ToughSteed, 27 DauntlessSteed (pancerz po RBM): ok. 28 NomadicTraditions: ok, sprawdzic HorsePace (podwojne liczenie). 29 SweepingWind: ok. 31 WellStraped: ok. 32 ThunderousCharge/AnnoyingBuzz zostawic: ok. 33 Breeder urealnic (lad, para tego samego gatunku, bez smokow, zwierzeta jedza): tak.
 34 IgnorePain, 35 SurgingBlow, 36 FormFittingArmor, 37 WalkItOff (lekko ranny HP > 20 leczy sie w marszu w polowie tempa), 38 SharpenedEdge, 39 SharpenedTip, 40 IronMaker (+20% sztab z tej samej rudy), 41 PracticalSmith (cala kuznia), 42 ArtisanSmith (nasze zbroje i luki): ok.
 30 CavalryTactics: Jeff pyta, o co chodzi - wyjasnione 14.11 (DefaultVolunteerModel.GetDailyVolunteerProductionProbability: +30% szansy dziennej na ochotnika w slocie z konnym, w miastach i wsiach przy miastach rodu gracza; BKVolunteerModel ma wlasna formule i perk przepada). Czeka.
+
+## Leczenie - decyzje Jeffa 14.11 (do 500-a)
+- Statek: "plywanie statkiem to nie marsz, statek moze plynac a ja moge odpoczywac w kajucie" - morze = spoczynek (tratwa: ujemne bez zmian).
+- "jency i partie AI tez maja miec ten sam efekt" - leczenie tylko w spoczynku takze dla partii AI i jencow (gracza i AI).
+- Nosze (501): Jeff "tak zrob nosze".
