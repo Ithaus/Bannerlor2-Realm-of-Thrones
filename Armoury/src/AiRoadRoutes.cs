@@ -68,6 +68,22 @@ namespace Armoury
     /// spis partio-godzin w marszu - ta sama miara co MapRoads: MapRoads.KindAt == 2 (trakt) w punkcie partii - osobno partie na objezdzie, koszt ms/dobe). Nic w zapisie
     /// gry: trasa liczy sie od nowa po wczytaniu (ComputePathAfterLoad / nowy cel), stary zapis bez zmian; Reset przy nowej kampanii i przed wczytaniem.
     /// Klucze NOWE: MapRoadAiRoutes (TAK), MapRoadAiMinDistance (30), MapRoadAiDetourPercent (15). Wylaczony klucz albo MapRoadSpeedBonus = trasy gry.
+    ///
+    /// 520 (Jeff 14.11 "karawany kupcy ludzie jezdza drogami lub drogami pobocznymi i po tych drogach tez poruszaja sie patrole i armie ... tylko w wyjatkowych
+    /// momentach podrozowano polami i lasami"; domyslne MapRoadAiMinDistance 30 -> 15, MapRoadAiDetourPercent 15 -> 30 - przy premii traktu 30%):
+    ///  - DROGI BOCZNE W SIECI (MapRoadAiSideRoads, TAK; wymaga MapSideRoadSpeedBonus): plan drog bocznych (MapRoads.SidePlan - ten sam co na mapie i w premii)
+    ///    dokladany do grafu jako lamane klasy SideCls (waga w Dijkstrze 1/(1 + premia boczna)); konce drog bocznych laczone z najblizszym wierzcholkiem dowolnej
+    ///    lamanej do JoinSideR (1.2 jedn.), konce traktow - jak dotad tylko z traktami (siec traktow bez zmian). Graf przebudowywany na watku glownym w spisie
+    ///    godzinnym, gdy plan drog bocznych sie zmienil (raz na plan; nowa referencja volatile, planowanie trzyma stara do konca). Droga boczna liczy sie do
+    ///    udzialu drogi (RideCost, "malo drogi"). Do czasu planu (kilka s po wczytaniu) - same trakty.
+    ///  - PATROLE (MapRoadAiPatrols, TAK): Cat 3 = patrol (IsPatrolParty), milicja, patrol / garnizon BK (komponent z nazwa Patrol / Garrison) - daleki marsz
+    ///    jak karawana; postfiks MobilePartyAi.GetLandPatrolBehavior: NOWY punkt patrolu (inny niz dotychczasowy cel, nie srodek, nie brama) przesuniety na
+    ///    najblizszy wezel sieci do SnapR (3 jedn.) - ta sama wyspa, nie dalej od srodka patrolu niz punkt gry + 1 jedn.; patrol, milicja i lord w PatrolAroundPoint
+    ///    (bez band, bez partii questa). Liczenie z ucieczki (GetFleeBehavior wola GetLandPatrolBehavior) - bez zmiany (licznik prefiks / finalizer).
+    ///  - MARSZ WOJENNY (MapRoadAiWarMarch, TAK): rod / wodz armii z DefaultBehavior BesiegeSettlement / RaidSettlement / DefendSettlement w fazie dojscia
+    ///    (krotkoterminowe GoToSettlement / GoToPoint, najazd - RaidSettlement) - te same warunki (nie wolniej, droga >= polowa). Oblezenie, szturm, najazd
+    ///    w toku (MapEvent / SiegeEvent / BesiegedSettlement), poscig (EngageParty), ucieczka, bitwa - trasa gry. Ostatni odcinek pod mury - trasa gry (zejscie R).
+    ///  - Bandy - BEZ ZMIAN (nie sa w Cat; Jeff o nie nie prosil): jezdza trasa gry, premie drogi dostaja tylko, gdy trafia na droge.
     /// </summary>
     internal static class AiRoadRoutes
     {
@@ -90,6 +106,10 @@ namespace Armoury
         private const float RatioCap = 5f;        // ponad 5 x czas szacowany - poza pomiarem (oblezenie, dlugi postoj po drodze)
         private const int RouteOk = 0, RouteCtl = 1, RouteOther = 2;   // wynik planu: objazd / odrzucony mimo drogi w zasiegu (proba) / inny powod
         private const byte GrpDet = 1, GrpCtl = 2;
+        private const byte SideCls = 4;           // 520: klasa krawedzi drogi bocznej (poza MapRoadKinds 0..3)
+        private const float JoinSideR = 1.2f;     // 520: koniec drogi bocznej do wierzcholka innej lamanej (wlot planu lezy w polu traktu / drogi)
+        private const float SnapR = 3f;           // 520: punkt patrolu na droge - najblizszy wezel do 3 jedn. (ok. 14 km)
+        private const int NCat = 4;               // 520: 0 rody, 1 karawany, 2 wozy wsi, 3 patrole / milicja
 
         // ------------------------------------------------------------------ graf (niezmienny po budowie)
         private sealed class Graph
@@ -108,6 +128,11 @@ namespace Armoury
             public int Bridges;        // m96-valyria: mosty Valyrii w sieci
             public bool Classes;       // m96-valyria: rodzaje drog wczytane (PointClasses != null) - bez nich wszystkie krawedzie to Trakt (tylko log)
             public double ValLength, CarLength;   // m96-valyria: dlugosc krawedzi Valyrii (z mostami) i szlakow karawan (tylko log)
+            public int SideLines, SideJoins, SideEdgesCut, SideEdges;   // 520: drogi boczne w sieci (tylko log)
+            public double SideLength;
+            public bool[] NodeTrakt;   // 520: wezel lezy na trakcie (klasa punktu < SideCls) - skladowe z traktem (tylko log)
+            public int[] Comp;         // 520: korzen skladowej wezla (krawedzie ze sciezka) - tylko log pokrycia osad
+            public bool[] CompTrakt;   // 520: skladowa (po korzeniu) zawiera trakt
             public float GX0, GY0, GInv;
             public int GNx, GNy;
             public int[] GStart, GNode;
@@ -207,14 +232,24 @@ namespace Armoury
         private static long _capped, _replan, _lost, _aiOff;
         private static long _arrDetN, _arrDetPm, _arrCtlN, _arrCtlPm, _arrAbort, _arrOut;
         private static long _seen, _short, _repeat, _planned, _noRoad, _notWorth, _fewRoad, _tooLong, _navFail, _tooMany, _legCalls, _ticks;
-        private static readonly long[] _acc = new long[3];
+        private static readonly long[] _acc = new long[NCat];
         private static long _overPm, _roadPm, _timePm;
+        private static long _accWar, _planWar, _accSide;   // 520: objazdy marszu wojennego (przyjete / planowane), objazdy z odcinkiem drogi bocznej
+        private static long _patSeen, _patSnap, _patFar, _patFlee;   // 520: nowe punkty patrolu - widziane, na drodze, bez wezla w zasiegu, z ucieczki (bez zmiany)
         private static int _stumbles, _stumblesAll;
         private static Exception _first;
-        // spis partio-godzin (watek glowny): 0 rody, 1 karawany, 2 wozy wsi
-        private static readonly int[] _hN = new int[3], _hOn = new int[3], _hDet = new int[3], _hDetOn = new int[3];
+        // spis partio-godzin (watek glowny): 0 rody, 1 karawany, 2 wozy wsi, 3 patrole / milicja (520); _hSide - na drodze bocznej (520), _hWar* - marsz wojenny rodow
+        private static readonly int[] _hN = new int[NCat], _hOn = new int[NCat], _hSide = new int[NCat], _hDet = new int[NCat], _hDetOn = new int[NCat];
+        private static int _hWarN, _hWarOn;
         private static int _hours;
         private static long _censusTicks;
+        // 520: plan drog bocznych, z ktorego zbudowano biezacy graf (null = same trakty); przebudowa w spisie godzinnym (watek glowny)
+        private static object _sideBuilt;
+        private static string _sideNote = "same trakty";
+        private static AccessTools.FieldRef<MobilePartyAi, MobileParty> _aiParty;
+        private static bool _hookedPatrol;
+        private static string _patrolNote = "nie wpinana";
+        [ThreadStatic] private static int _fleeDepth;   // GetFleeBehavior w toku - punkt patrolu z ucieczki bez zmiany
 
         private static float MinDist(Settings s)
         {
@@ -265,9 +300,24 @@ namespace Armoury
             }
         }
 
-        private static int Cat(MobileParty mp)
+        private static int Cat(MobileParty mp, Settings s)
         {
-            return mp.IsLordParty ? 0 : mp.IsCaravan ? 1 : mp.IsVillager ? 2 : -1;
+            if (mp.IsLordParty) return 0;
+            if (mp.IsCaravan) return 1;
+            if (mp.IsVillager) return 2;
+            if (mp.IsBandit) return -1;   // 520: bandy bez zmian
+            return s.MapRoadAiPatrols && IsGuard(mp) ? 3 : -1;
+        }
+
+        /// <summary>520: patrol osady (IsPatrolParty), milicja, patrol / garnizon w polu z BK (komponent z nazwa Patrol / Garrison; nie garnizon osady gry).</summary>
+        private static bool IsGuard(MobileParty mp)
+        {
+            if (mp.IsPatrolParty || mp.IsMilitia) return true;
+            if (mp.IsGarrison || mp.IsBandit) return false;
+            var pc = mp.PartyComponent;
+            if (pc == null) return false;
+            string n = pc.GetType().Name;
+            return n.IndexOf("Patrol", StringComparison.Ordinal) >= 0 || n.IndexOf("Garrison", StringComparison.Ordinal) >= 0;
         }
 
         // ------------------------------------------------------------------ latki
@@ -298,8 +348,120 @@ namespace Armoury
                 }
                 _hookNote = (ok ? "wpieta" : "NIE wpieta (brak postfiksu po Patch)") + " (cudzych latek na ComputePath " + others + ")";
                 Log.Info(P + "latka MobileParty.ComputePath " + _hookNote + ", straznik ucieczki RecalculateLongTermPath wpiety - wpieta zawsze, dziala przy kluczu MapRoadAiRoutes.");
+                if (ok) ApplyPatrol(h);
             }
             catch (Exception e) { _hookNote = "NIE wpieta (" + e.GetType().Name + ")"; Log.Error("AiRoadRoutes.ApplyAll", e); }
+        }
+
+        /// <summary>520: punkty patrolu na drogach - postfiks MobilePartyAi.GetLandPatrolBehavior (prywatna, DeclaredMethod) i straznik GetFleeBehavior
+        /// (prefiks / finalizer - punkt patrolu liczony w ucieczce zostaje punktem gry). Bez straznika - bez postfiksu.</summary>
+        private static void ApplyPatrol(Harmony h)
+        {
+            try
+            {
+                var mp = AccessTools.DeclaredMethod(typeof(MobilePartyAi), "GetLandPatrolBehavior");
+                var mf = AccessTools.DeclaredMethod(typeof(MobilePartyAi), "GetFleeBehavior");
+                var fi = AccessTools.DeclaredField(typeof(MobilePartyAi), "_mobileParty");
+                if (mp == null || mf == null || fi == null || fi.FieldType != typeof(MobileParty))
+                {
+                    _patrolNote = "NIE wpieta (brak MobilePartyAi.GetLandPatrolBehavior / GetFleeBehavior / _mobileParty)";
+                    Log.Info(P + "latka punktow patrolu " + _patrolNote + " - patrole jak w grze.");
+                    return;
+                }
+                var ps = mp.GetParameters();
+                if (ps.Length != 4 || ps[1].ParameterType != typeof(CampaignVec2).MakeByRefType() || ps[2].ParameterType != typeof(CampaignVec2))
+                {
+                    _patrolNote = "NIE wpieta (inna sygnatura GetLandPatrolBehavior)";
+                    Log.Info(P + "latka punktow patrolu " + _patrolNote + " - patrole jak w grze.");
+                    return;
+                }
+                _aiParty = AccessTools.FieldRefAccess<MobilePartyAi, MobileParty>(fi);
+                h.Patch(mf, prefix: new HarmonyMethod(typeof(AiRoadRoutes).GetMethod("FleePrefix", BindingFlags.Public | BindingFlags.Static)),
+                        finalizer: new HarmonyMethod(typeof(AiRoadRoutes).GetMethod("FleeFinalizer", BindingFlags.Public | BindingFlags.Static)));
+                if (!HasOurs(mf, true) || !HasOurs(mf, false))
+                {
+                    _patrolNote = "NIE wpieta (straznik ucieczki GetFleeBehavior niewpiety)";
+                    Log.Info(P + "latka punktow patrolu " + _patrolNote + " - patrole jak w grze.");
+                    return;
+                }
+                h.Patch(mp, postfix: new HarmonyMethod(typeof(AiRoadRoutes).GetMethod("PatrolPostfix", BindingFlags.Public | BindingFlags.Static)));
+                var pi = Harmony.GetPatchInfo(mp);
+                bool ok = false;
+                if (pi != null) foreach (var x in pi.Postfixes) if (x.PatchMethod != null && x.PatchMethod.DeclaringType == typeof(AiRoadRoutes)) { ok = true; break; }
+                _hookedPatrol = ok;
+                _patrolNote = ok ? "wpieta" : "NIE wpieta (brak postfiksu po Patch)";
+                Log.Info(P + "latka punktow patrolu MobilePartyAi.GetLandPatrolBehavior " + _patrolNote + ", straznik ucieczki GetFleeBehavior wpiety - dziala przy kluczach MapRoadAiRoutes i MapRoadAiPatrols.");
+            }
+            catch (Exception e) { _patrolNote = "NIE wpieta (" + e.GetType().Name + ")"; Log.Error("AiRoadRoutes.ApplyPatrol", e); }
+        }
+
+        public static void FleePrefix() { _fleeDepth++; }
+
+        public static Exception FleeFinalizer(Exception __exception) { if (_fleeDepth > 0) _fleeDepth--; return __exception; }
+
+        /// <summary>520: nowy punkt patrolu ladowego (gra wylosowala inny niz dotychczasowy cel) -> najblizszy wezel sieci drog do SnapR, ta sama wyspa, nie dalej
+        /// od srodka patrolu niz punkt gry + 1 jedn. Tylko patrol / milicja / garnizon BK / lord (bez band, questow, czlonkow armii). Raz na nowy punkt, nie co klatke.</summary>
+        public static void PatrolPostfix(MobilePartyAi __instance, ref CampaignVec2 __1, CampaignVec2 __2)
+        {
+            if (_fleeDepth > 0) { Interlocked.Increment(ref _patFlee); return; }
+            var g = _g;
+            var f = _aiParty;
+            if (g == null || f == null || __instance == null) return;
+            var s = Settings.Current;
+            if (s == null || !s.MapRoadAiRoutes || !s.MapRoadAiPatrols || !s.MapRoadSpeedBonus || s.MapRoadSpeedPercent <= 0) return;
+            try
+            {
+                var mp = f(__instance);
+                if (mp == null || mp.IsMainParty || mp.IsBandit || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || mp.IsCurrentlyUsedByAQuest) return;
+                if (mp.Army != null && mp.Army.LeaderParty != mp) return;
+                if (!mp.IsLordParty && !IsGuard(mp)) return;
+                CampaignVec2 pt = __1;
+                if (!pt.IsOnLand || !pt.IsNonZero()) return;
+                Vec2 p = pt.ToVec2(), c = __2.ToVec2();
+                if ((p - mp.AiBehaviorTarget.ToVec2()).LengthSquared < 1e-4f) return;   // ten sam cel - gra nie losowala
+                if ((p - c).LengthSquared < 1e-4f) return;                               // powrot do srodka
+                var ts = mp.TargetSettlement;
+                if (ts != null && (p - ts.GatePosition.ToVec2()).LengthSquared < 1e-4f) return;   // powrot pod brame
+                Interlocked.Increment(ref _patSeen);
+                var face = pt.Face;
+                if (!face.IsValid()) return;
+                int island = face.FaceIslandIndex;
+                float lim = (p - c).Length + 1f, lim2 = lim * lim;
+                Vec2 me = mp.Position.ToVec2();
+                // najblizszy punkt drogi: wezel albo rzut na krawedz prosta (cieciwa po siatce gry - sprawdzona przy budowie; na trakcie prostym wezly bywaja rzadkie);
+                // nie pod nogami partii (1.5 jedn. - bez stania w miejscu), nie dalej od srodka patrolu niz punkt gry + 1
+                const float Reach = SnapR + 2f * NodeCell;   // krawedz do ok. 8 jedn. od punktu - wezel w oknie
+                bool found = false; float bx = 0f, by = 0f, bd = SnapR * SnapR;
+                int gx0 = (int)((p.x - Reach - g.GX0) * g.GInv), gx1 = (int)((p.x + Reach - g.GX0) * g.GInv);
+                int gy0 = (int)((p.y - Reach - g.GY0) * g.GInv), gy1 = (int)((p.y + Reach - g.GY0) * g.GInv);
+                if (gx0 < 0) gx0 = 0; if (gy0 < 0) gy0 = 0;
+                if (gx1 >= g.GNx) gx1 = g.GNx - 1; if (gy1 >= g.GNy) gy1 = g.GNy - 1;
+                for (int cy = gy0; cy <= gy1; cy++)
+                    for (int cx = gx0; cx <= gx1; cx++)
+                    {
+                        int cc = cy * g.GNx + cx;
+                        for (int k = g.GStart[cc]; k < g.GStart[cc + 1]; k++)
+                        {
+                            int n = g.GNode[k];
+                            if (!g.Ok[n] || g.Island[n] != island) continue;
+                            SnapTry(g.X[n], g.Y[n], p, c, me, lim2, ref found, ref bx, ref by, ref bd);
+                            for (int a = g.AdjStart[n]; a < g.AdjStart[n + 1]; a++)
+                            {
+                                int m = g.Adj[a];
+                                if (g.AdjLen[a] < 0f || !g.AdjDirect[a] || !g.Ok[m] || g.Island[m] != island) continue;   // krawedz bywa liczona dwa razy - bez szkody
+                                float ax = g.X[n], ay = g.Y[n], dx = g.X[m] - ax, dy = g.Y[m] - ay, l2 = dx * dx + dy * dy;
+                                if (l2 < 1e-6f) continue;
+                                float t = ((p.x - ax) * dx + (p.y - ay) * dy) / l2;
+                                if (t <= 0f || t >= 1f) continue;
+                                SnapTry(ax + t * dx, ay + t * dy, p, c, me, lim2, ref found, ref bx, ref by, ref bd);
+                            }
+                        }
+                    }
+                if (!found) { Interlocked.Increment(ref _patFar); return; }
+                __1 = new CampaignVec2(new Vec2(bx, by), true);
+                Interlocked.Increment(ref _patSnap);
+            }
+            catch (Exception e) { ParStumble(e); }
         }
 
         private static bool HasOurs(MethodBase m, bool prefix)
@@ -327,6 +489,18 @@ namespace Armoury
             catch (Exception e) { ParStumble(e); }
         }
 
+        /// <summary>520: kandydat punktu patrolu (x, y) - blizej punktu gry niz dotad, w pierscieniu patrolu, nie pod nogami partii.</summary>
+        private static void SnapTry(float x, float y, Vec2 p, Vec2 c, Vec2 me, float lim2, ref bool found, ref float bx, ref float by, ref float bd)
+        {
+            float dx = x - p.x, dy = y - p.y, d2 = dx * dx + dy * dy;
+            if (d2 >= bd) return;
+            float ex = x - c.x, ey = y - c.y;
+            if (ex * ex + ey * ey > lim2) return;
+            float mx = x - me.x, my = y - me.y;
+            if (mx * mx + my * my < 1.5f * 1.5f) return;
+            found = true; bx = x; by = y; bd = d2;
+        }
+
         // ------------------------------------------------------------------ planowanie (watek roboczy)
         private static void Plan(Graph g, Settings s, MobileParty mp, CampaignVec2 target, MobileParty.NavigationType nav, bool cacheNext)
         {
@@ -346,7 +520,7 @@ namespace Armoury
         private static bool PlanCore(Graph g, Settings s, MobileParty mp, CampaignVec2 target, MobileParty.NavigationType nav, bool cacheNext)
         {
             if (nav != MobileParty.NavigationType.Default || !target.IsOnLand || mp.IsMainParty) return false;
-            int cat = Cat(mp);
+            int cat = Cat(mp, s);
             if (cat < 0) return false;
             if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || mp.IsInRaftState) return false;
             if (mp.PartyMoveMode != MoveModeType.Point || mp.ForceAiNoPathMode) return false;
@@ -355,12 +529,20 @@ namespace Armoury
             var ai = mp.Ai;
             if (ai == null) return false;
             var db = mp.DefaultBehavior;
-            if (db != AiBehavior.GoToSettlement && db != AiBehavior.GoToPoint && db != AiBehavior.PatrolAroundPoint) return false;
+            // 520: marsz wojenny rodu / wodza armii (dojscie do oblezenia, najazdu, obrony) - MapRoadAiWarMarch; samo oblezenie / najazd / bitwa wyciete wyzej
+            bool war = cat == 0 && s.MapRoadAiWarMarch
+                       && (db == AiBehavior.BesiegeSettlement || db == AiBehavior.RaidSettlement || db == AiBehavior.DefendSettlement);
+            if (!war && db != AiBehavior.GoToSettlement && db != AiBehavior.GoToPoint && db != AiBehavior.PatrolAroundPoint) return false;
             // AI wylaczone przez inny mod (uczta BK, majatek gentry BK) - tylko rozkaz do osady / punktu (patrol wokol punktu to wlasne myslenie AI)
             bool aiOff = ai.IsDisabled;
-            if (aiOff && db == AiBehavior.PatrolAroundPoint) return false;
+            if (aiOff && (db == AiBehavior.PatrolAroundPoint || war)) return false;
             var sb = mp.ShortTermBehavior;
-            if (sb != AiBehavior.GoToSettlement && sb != AiBehavior.GoToPoint && sb != AiBehavior.PatrolAroundPoint && sb != AiBehavior.None) return false;
+            if (war)
+            {
+                // dojscie: gra daje GoToSettlement (oblezenie) / GoToPoint (obrona, brama) / RaidSettlement (najazd); szturm, Hold, EngageParty - trasa gry
+                if (sb != AiBehavior.GoToSettlement && sb != AiBehavior.GoToPoint && !(sb == AiBehavior.RaidSettlement && db == AiBehavior.RaidSettlement)) return false;
+            }
+            else if (sb != AiBehavior.GoToSettlement && sb != AiBehavior.GoToPoint && sb != AiBehavior.PatrolAroundPoint && sb != AiBehavior.None) return false;
             if (mp.IsFleeing()) return false;
             var path = mp.Path;
             if (path == null) return false;
@@ -401,8 +583,9 @@ namespace Armoury
             try
             {
                 Interlocked.Increment(ref _planned);
+                if (war) Interlocked.Increment(ref _planWar);
                 res = Route(g, s, mp, target, S, T, L, path, cacheNext, cat);
-                if (res == RouteOk) { st = StAccepted; if (aiOff) Interlocked.Increment(ref _aiOff); }
+                if (res == RouteOk) { st = StAccepted; if (aiOff) Interlocked.Increment(ref _aiOff); if (war) Interlocked.Increment(ref _accWar); }
             }
             finally
             {
@@ -494,7 +677,7 @@ namespace Armoury
                         if (k == 2) { cost += sl * wr; tr += sl; }
                         else if (k == 4) { cost += sl * wv; tr += sl; }
                         else if (k == 5) { cost += sl * wc; tr += sl; }
-                        else if (k == 1) cost += sl * ws;
+                        else if (k == 1) { cost += sl * ws; tr += sl; }   // 520: droga boczna tez jest droga (udzial drogi)
                         else cost += sl;
                     }
                 }
@@ -520,6 +703,7 @@ namespace Armoury
             // m96-valyria: waga krawedzi wedlug rodzaju czynnego (MapRoadKinds.Eff) - droga Valyrii, szlak karawan, most bez klucza = poza droga (1)
             float vpct = MapRoads.ValPctNow(s), cpct = MapRoads.CarPctNow(s);
             float wv = 1f / (1f + vpct), wc = 1f / (1f + cpct);
+            float wsd = 1f / (1f + (s.MapSideRoadSpeedBonus ? SidePct(s) : 0f));   // 520: waga krawedzi drogi bocznej (premia jak w MapRoads)
             float R = L * RadiusShare;
             if (R < RadiusMin) R = RadiusMin; else if (R > RadiusMax) R = RadiusMax;
             float R2 = R * R;
@@ -568,8 +752,14 @@ namespace Armoury
                     int m = g.Adj[a];
                     float el = g.AdjLen[a];
                     if (el < 0f || !g.Ok[m] || g.Island[m] != island) continue;
-                    int ef = g.AdjCls != null ? MapRoadKinds.Eff(s, g.AdjCls[a]) : MapRoadKinds.Trakt;
-                    float nk = pk + el * (ef == MapRoadKinds.Trakt ? w : ef == MapRoadKinds.Valyrian ? wv : ef == MapRoadKinds.Caravan ? wc : 1f);
+                    byte ac = g.AdjCls != null ? g.AdjCls[a] : MapRoadKinds.Trakt;
+                    float nk;
+                    if (ac == SideCls) nk = pk + el * wsd;   // 520: droga boczna
+                    else
+                    {
+                        int ef = MapRoadKinds.Eff(s, ac);
+                        nk = pk + el * (ef == MapRoadKinds.Trakt ? w : ef == MapRoadKinds.Valyrian ? wv : ef == MapRoadKinds.Caravan ? wc : 1f);
+                    }
                     if (nk > L) continue;
                     if (scr.Stamp[m] == scr.Now && nk >= scr.Cost[m]) continue;
                     if (scr.Nc > 0 && ZoneHit(scr, g.X[pn], g.Y[pn], g.X[m], g.Y[m])) continue;
@@ -629,6 +819,8 @@ namespace Armoury
             path.Size = scr.Size;
             if (cacheNext) mp.NextLongTermPathPoint = new CampaignVec2(scr.Out[0], true);
             Interlocked.Increment(ref _acc[cat]);
+            if (g.AdjCls != null)
+                for (int i = 1; i < cn; i++) if (g.AdjCls[scr.PrevA[scr.Chain[i]]] == SideCls) { Interlocked.Increment(ref _accSide); break; }   // 520: objazd z droga boczna
             Interlocked.Add(ref _overPm, (long)Math.Round((total / L - 1f) * 1000f));   // bywa ujemny: trasa gry liczona z mnoznikiem 2, cieciwy bez niego
             Interlocked.Add(ref _roadPm, (long)Math.Round(detTrakt / total * 1000f));
             Interlocked.Add(ref _timePm, (long)Math.Round(costDet / costGame * 1000f));
@@ -718,6 +910,7 @@ namespace Armoury
             _g = null;
             _note = "nie zbudowana";
             _tried = false;
+            _sideBuilt = null; _sideNote = "same trakty";   // 520
             _cross = new TaleWorlds.CampaignSystem.Settlements.Settlement[0];
             _crossPos = new Vec2[0];
             Array.Clear(_slotKey, 0, _slotKey.Length);
@@ -735,6 +928,8 @@ namespace Armoury
             for (int i = 0; i < _acc.Length; i++) _acc[i] = 0;
             _overPm = _roadPm = _timePm = 0;
             _crossAvoid = 0;
+            _accWar = _planWar = _accSide = 0;                   // 520
+            _patSeen = _patSnap = _patFar = _patFlee = 0;
             _capped = _replan = _lost = _aiOff = 0;
             _arrDetN = _arrDetPm = _arrCtlN = _arrCtlPm = _arrAbort = _arrOut = 0;
             _stumbles = 0;
@@ -742,7 +937,8 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            for (int i = 0; i < 3; i++) { _hN[i] = 0; _hOn[i] = 0; _hDet[i] = 0; _hDetOn[i] = 0; }
+            for (int i = 0; i < NCat; i++) { _hN[i] = 0; _hOn[i] = 0; _hSide[i] = 0; _hDet[i] = 0; _hDetOn[i] = 0; }
+            _hWarN = 0; _hWarOn = 0;
             _hours = 0; _censusTicks = 0;
             ZeroCounters();
         }
@@ -774,10 +970,15 @@ namespace Armoury
             int cross = FindCrossings();
             Log.Info(P + "start sesji - klucz MapRoadAiRoutes tak, marsz od " + MinDist(s).ToString("0", Inv) + " jedn., nadklad do " + (Detour(s) * 100f).ToString("0", Inv)
                      + "% (sufit dlugosci), premia traktu w koszcie " + (RoadPct(s) * 100f).ToString("0", Inv) + "% (MapRoadSpeedPercent; droga boczna "
-                     + (SidePct(s) * 100f).ToString("0.0", Inv) + "%), droga >= " + (MinRoadShare * 100f).ToString("0", Inv) + "% trasy, tylko rody / karawany / wozy wsi | " + _note
+                     + (SidePct(s) * 100f).ToString("0.0", Inv) + "%, Valyria " + (MapRoads.ValPctNow(s) * 100f).ToString("0", Inv) + "%), droga >= " + (MinRoadShare * 100f).ToString("0", Inv)
+                     + "% trasy | 520: rody, karawany, wozy wsi" + (s.MapRoadAiPatrols ? ", patrole / milicja (MapRoadAiPatrols tak; punkty patrolu na droge - latka " + _patrolNote + ")" : " (MapRoadAiPatrols nie - bez patroli)")
+                     + ", marsz wojenny " + (s.MapRoadAiWarMarch ? "tak" : "nie") + " (MapRoadAiWarMarch), drogi boczne w sieci "
+                     + (s.MapRoadAiSideRoads && s.MapSideRoadSpeedBonus ? "tak - dolaczane po planie drog bocznych (osobna linia)" : "NIE (MapRoadAiSideRoads / MapSideRoadSpeedBonus)")
+                     + ", bandy bez zmian | " + _note
                      + (g != null ? " | siec: wezlow " + g.Nodes + " (poza siatka gry " + g.BadNodes + "), polaczen " + (g.AdjCount / 2) + ", rozstajow " + g.Joins + ", skladowych " + g.Comps
                                     + ", lamanych " + g.Lines + ", punktow pliku " + g.Points + ", dlugosc " + g.Length.ToString("0.0", Inv) + " jedn.; krawedzie po siatce gry: proste " + g.EdgesDirect
                                     + ", z objazdem " + g.EdgesBent + ", wyciete " + g.EdgesCut : "")
+                     + (g != null ? " | " + Coverage(g) : "")
                      + " | przeprawy CrossingLaw " + cross + "/" + CrossingIds.Length + " (wrogi lord bez objazdu przez strefe)"
                      + " | latka ComputePath " + _hookNote + " | budowa " + ms.ToString("0.0", Inv) + " ms | " + Status() + ".");
         }
@@ -810,8 +1011,9 @@ namespace Armoury
                 string path = MapVillageData.DataPathFor(MapRoads.FileName);
                 if (path == null || !File.Exists(path)) { _note = "BRAK pliku ModuleData\\" + MapRoads.FileName; return 0; }
                 string err;
-                var g = Build(path, out err);
+                var g = Build(path, null, out err);
                 if (g == null) { _note = "siec niezbudowana: " + err; if (err != null && err.StartsWith("zaden wezel", StringComparison.Ordinal)) _tried = false; return 0; }
+                _sideBuilt = null; _sideNote = "same trakty";
                 _g = g;
                 _note = "siec z pliku " + MapRoads.FileName;
                 MapRoadKinds.AiNote = "siec AI drog: mosty Valyrii " + g.Bridges + ", krawedzie Valyrii " + g.ValLength.ToString("0", Inv) + " jedn., szlakow karawan "
@@ -821,7 +1023,92 @@ namespace Armoury
             return (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
         }
 
-        private static Graph Build(string file, out string err)
+        /// <summary>520 (watek glowny, spis godzinny): plan drog bocznych inny niz ten w grafie (nowy plan, zdjety, klucz zmieniony) - graf od nowa (trakty +
+        /// drogi boczne albo same trakty). Nieudana budowa - zostaje graf biezacy (plan zapamietany, bez ponawiania co godzine). Linia logu z pokryciem osad.</summary>
+        private static void SideCheck(Settings s)
+        {
+            object want = s.MapRoadAiSideRoads && s.MapSideRoadSpeedBonus ? MapRoads.SidePlan() : null;
+            if (ReferenceEquals(want, _sideBuilt)) return;
+            _sideBuilt = want;
+            var res = want as SideRoadPlan.Result;
+            long t0 = Stopwatch.GetTimestamp();
+            Graph g = null;
+            string err = null;
+            try
+            {
+                string path = MapVillageData.DataPathFor(MapRoads.FileName);
+                if (path == null || !File.Exists(path)) err = "BRAK pliku ModuleData\\" + MapRoads.FileName;
+                else g = Build(path, res, out err);
+            }
+            catch (Exception e) { g = null; err = e.GetType().Name + ": " + (e.Message ?? ""); _stumblesAll++; }
+            double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+            if (g == null)
+            {
+                _sideNote = "przebudowa nieudana (" + err + ") - zostaje siec poprzednia";
+                Log.Info(P + "siec tras AI z drogami bocznymi NIE - " + _sideNote + " | " + ms.ToString("0.0", Inv) + " ms.");
+                return;
+            }
+            _g = g;
+            _sideNote = res != null ? "trakty + drogi boczne (" + g.SideLines + ")" : "same trakty";
+            string cov = Coverage(g);
+            Log.Info(P + "siec tras AI " + (res != null ? "z drogami bocznymi TAK" : "same trakty (plan drog bocznych zdjety albo klucz MapRoadAiSideRoads / MapSideRoadSpeedBonus nie)")
+                     + " - wezlow " + g.Nodes + " (poza siatka gry " + g.BadNodes + "), polaczen " + (g.AdjCount / 2) + ", skladowych " + g.Comps
+                     + ", trakty " + g.Length.ToString("0", Inv) + " jedn., drogi boczne: lamanych " + g.SideLines + ", " + g.SideLength.ToString("0", Inv) + " jedn., krawedzi "
+                     + g.SideEdges + " (wyciete - bez sciezki po siatce gry " + g.SideEdgesCut + "), rozstajow z droga boczna " + g.SideJoins
+                     + "; krawedzie po siatce gry: proste " + g.EdgesDirect + ", z objazdem " + g.EdgesBent + ", wyciete " + g.EdgesCut
+                     + " | " + cov + " | budowa " + ms.ToString("0.0", Inv) + " ms (watek glowny, raz na plan drog bocznych).");
+        }
+
+        /// <summary>520 (tylko log): osady (miasta, zamki, wsie) z wezlem sieci do 2.5 jedn. od bramy ("w sieci") i z polaczeniem z traktem (skladowa z traktem).
+        /// Miasta / zamki bez polaczenia z traktem - z nazwy (do 12). Watek glowny, raz na budowe grafu.</summary>
+        private static string Coverage(Graph g)
+        {
+            const float R = 2.5f;
+            int[] n = new int[3], inNet = new int[3], linked = new int[3];
+            var lonely = new List<string>();
+            int lonelyAll = 0;
+            try
+            {
+                foreach (var st in TaleWorlds.CampaignSystem.Settlements.Settlement.All)
+                {
+                    if (st == null) continue;
+                    int t = st.IsTown ? 0 : st.IsCastle ? 1 : st.IsVillage ? 2 : -1;
+                    if (t < 0) continue;
+                    n[t]++;
+                    Vec2 p = st.GatePosition.ToVec2();
+                    int best = -1; float bd = R * R;
+                    int gx0 = (int)((p.x - R - g.GX0) * g.GInv), gx1 = (int)((p.x + R - g.GX0) * g.GInv);
+                    int gy0 = (int)((p.y - R - g.GY0) * g.GInv), gy1 = (int)((p.y + R - g.GY0) * g.GInv);
+                    if (gx0 < 0) gx0 = 0; if (gy0 < 0) gy0 = 0;
+                    if (gx1 >= g.GNx) gx1 = g.GNx - 1; if (gy1 >= g.GNy) gy1 = g.GNy - 1;
+                    bool link = false;
+                    for (int cy = gy0; cy <= gy1; cy++)
+                        for (int cx = gx0; cx <= gx1; cx++)
+                        {
+                            int c = cy * g.GNx + cx;
+                            for (int k = g.GStart[c]; k < g.GStart[c + 1]; k++)
+                            {
+                                int q = g.GNode[k];
+                                if (!g.Ok[q]) continue;
+                                float dx = g.X[q] - p.x, dy = g.Y[q] - p.y, d2 = dx * dx + dy * dy;
+                                if (d2 > R * R) continue;
+                                if (g.CompTrakt[g.Comp[q]]) link = true;
+                                if (d2 < bd) { bd = d2; best = q; }
+                            }
+                        }
+                    if (best >= 0) inNet[t]++;
+                    if (link) linked[t]++;
+                    else if (t < 2) { lonelyAll++; if (lonely.Count < 12) lonely.Add(st.Name != null ? st.Name.ToString() : st.StringId); }
+                }
+            }
+            catch (Exception e) { _stumblesAll++; return "pokrycie osad: blad (" + e.GetType().Name + ")"; }
+            return "osady w sieci (wezel do " + R.ToString("0.0", Inv) + " jedn. od bramy) / polaczone z traktem: miasta " + inNet[0] + "/" + linked[0] + " z " + n[0]
+                   + ", zamki " + inNet[1] + "/" + linked[1] + " z " + n[1] + ", wsie " + inNet[2] + "/" + linked[2] + " z " + n[2]
+                   + "; miasta i zamki bez polaczenia z traktem " + lonelyAll + (lonely.Count > 0 ? " (" + string.Join(", ", lonely.ToArray()) + (lonelyAll > lonely.Count ? ", ..." : "") + ")" : "")
+                   + " - sciezki dla nich: osobny krok (plan C2 wpisu 520)";
+        }
+
+        private static Graph Build(string file, SideRoadPlan.Result side, out string err)
         {
             err = null;
             var ids = new List<int>(11000);
@@ -855,8 +1142,37 @@ namespace Armoury
                 }
                 catch { }
             }
+            // m96-valyria: klasa odcinka konczacego sie w punkcie (MapRoadKinds: trakt / Valyria / szlak) - granice klas wymuszone jako wezly; mosty Valyrii
+            // (przerwy farby) jako krawedzie sieci przy kluczu MapValyrianRoads na starcie budowy. null = siec jak przed zmiana. 520: liczone z samych traktow
+            // (przed dolozeniem drog bocznych - indeksy punktow traktow bez zmian)
+            int mainPts = xs.Count;
+            List<int> brA = null, brB = null;
+            byte[] pcls = null;
+            if (mainPts >= 2) pcls = MapRoadKinds.PointClasses(file, ids, out brA, out brB);
+            // 520: drogi boczne planu (MapRoads.SidePlan) jako dalsze lamane (id ponad id traktow), os co ok. 0.25 jedn. - Douglas-Peucker nizej
+            int sideLines = 0;
+            if (side != null)
+            {
+                int nid = 0;
+                for (int i = 0; i < ids.Count; i++) if (ids[i] >= nid) nid = ids[i] + 1;
+                foreach (var rd in side.Roads)
+                {
+                    if (rd == null || rd.X == null || rd.Y == null) continue;
+                    int n = Math.Min(rd.X.Length, rd.Y.Length), added = 0;
+                    for (int i = 0; i < n; i++)
+                    {
+                        float x = rd.X[i], y = rd.Y[i];
+                        if (float.IsNaN(x) || float.IsNaN(y) || float.IsInfinity(x) || float.IsInfinity(y)) continue;
+                        ids.Add(nid); xs.Add(x); ys.Add(y); added++;
+                    }
+                    if (added > 0) { nid++; if (added >= 2) sideLines++; }
+                }
+            }
             int np = xs.Count;
             if (np < 2) { err = "plik bez punktow"; return null; }
+            var cls = new byte[np];   // 520: klasa punktu - trakty z pliku rodzajow (albo Trakt), drogi boczne SideCls
+            if (pcls != null) Array.Copy(pcls, cls, Math.Min(pcls.Length, mainPts));
+            for (int i = mainPts; i < np; i++) cls[i] = SideCls;
             // lamane: [ls[i], ls[i+1]) - plik posortowany po road, seq (jak MapRoads.Build)
             var ls = new List<int>();
             for (int i = 0; i < np; i++) if (i == 0 || ids[i] != ids[i - 1]) ls.Add(i);
@@ -877,10 +1193,6 @@ namespace Armoury
             var plist = new int[np];
             for (int i = 0; i < np; i++) { int c = (int)((ys[i] - minY) / pc) * pnx + (int)((xs[i] - minX) / pc); plist[pstart[c] + pfill[c]++] = i; }
             var joinA = new List<int>(); var joinB = new List<int>();
-            // m96-valyria: klasa odcinka konczacego sie w punkcie (MapRoadKinds: trakt / Valyria / szlak) - granice klas wymuszone jako wezly; mosty Valyrii
-            // (przerwy farby) jako krawedzie sieci przy kluczu MapValyrianRoads na starcie budowy. null = siec jak przed zmiana.
-            List<int> brA, brB;
-            byte[] pcls = MapRoadKinds.PointClasses(file, ids, out brA, out brB);
             int joins0;
             int lines = 0;
             for (int l = 0; l + 1 < ls.Count; l++)
@@ -889,12 +1201,14 @@ namespace Armoury
                 if (b <= a) continue;   // lamana z jednego punktu - bez odcinkow (jak MapRoads)
                 lines++;
                 keep[a] = true; keep[b] = true;
-                if (pcls != null) for (int i = a + 1; i < b; i++) if (pcls[i] != pcls[i + 1]) keep[i] = true;
+                for (int i = a + 1; i < b; i++) if (cls[i] != cls[i + 1]) keep[i] = true;
+                bool sideLine = a >= mainPts;   // 520: konce drogi bocznej - do dowolnej lamanej do JoinSideR; konce traktu - jak dotad tylko trakty do JoinR
+                float jr = sideLine ? JoinSideR : JoinR;
                 for (int e = 0; e < 2; e++)
                 {
                     int p = e == 0 ? a : b;
                     int cx = (int)((xs[p] - minX) / pc), cy = (int)((ys[p] - minY) / pc);
-                    int bestJ = -1; float bd = JoinR * JoinR;
+                    int bestJ = -1; float bd = jr * jr;
                     for (int yy = cy - 1; yy <= cy + 1; yy++)
                         for (int xx = cx - 1; xx <= cx + 1; xx++)
                         {
@@ -903,7 +1217,7 @@ namespace Armoury
                             for (int k = pstart[c]; k < pstart[c + 1]; k++)
                             {
                                 int j = plist[k];
-                                if (lineOf[j] == l) continue;
+                                if (lineOf[j] == l || (!sideLine && j >= mainPts)) continue;
                                 int lj = lineOf[j];
                                 if (ls[lj + 1] - 1 <= ls[lj]) continue;
                                 float dx = xs[j] - xs[p], dy = ys[j] - ys[p], d2 = dx * dx + dy * dy;
@@ -964,7 +1278,9 @@ namespace Armoury
             g.Nodes = nn; g.Points = np; g.Lines = lines; g.Joins = joinA.Count;
             g.Classes = pcls != null;   // m96-valyria (recenzja: AdjCls jest zawsze - "klasy" z pliku rodzajow)
             g.X = new float[nn]; g.Y = new float[nn]; g.Face = new PathFaceRecord[nn]; g.Ok = new bool[nn]; g.Island = new int[nn];
-            for (int i = 0; i < np; i++) if (nodeOf[i] >= 0) { g.X[nodeOf[i]] = xs[i]; g.Y[nodeOf[i]] = ys[i]; }
+            g.NodeTrakt = new bool[nn];
+            g.SideLines = sideLines;
+            for (int i = 0; i < np; i++) if (nodeOf[i] >= 0) { g.X[nodeOf[i]] = xs[i]; g.Y[nodeOf[i]] = ys[i]; g.NodeTrakt[nodeOf[i]] = i < mainPts; }
             // krawedzie: kolejne wezly lamanej + rozstaje
             var ea = new List<int>(nn * 2); var eb = new List<int>(nn * 2);
             var ec = new List<byte>(nn * 2);   // m96-valyria: klasa krawedzi (MapRoadKinds)
@@ -977,11 +1293,21 @@ namespace Armoury
                 for (int i = a; i <= b; i++)
                 {
                     if (nodeOf[i] < 0) continue;
-                    if (prev >= 0) { ea.Add(nodeOf[prev]); eb.Add(nodeOf[i]); ec.Add(pcls != null ? pcls[i] : MapRoadKinds.Trakt); length += Len(xs[i] - xs[prev], ys[i] - ys[prev]); }
+                    if (prev >= 0)
+                    {
+                        ea.Add(nodeOf[prev]); eb.Add(nodeOf[i]); ec.Add(cls[i]);
+                        double d = Len(xs[i] - xs[prev], ys[i] - ys[prev]);
+                        if (i < mainPts) length += d; else g.SideLength += d;   // 520: dlugosc traktow jak dotad, drogi boczne osobno
+                    }
                     prev = i;
                 }
             }
-            for (int k = 0; k < joinA.Count; k++) { ea.Add(nodeOf[joinA[k]]); eb.Add(nodeOf[joinB[k]]); ec.Add(k < joins0 ? MapRoadKinds.Trakt : MapRoadKinds.Bridge); }
+            for (int k = 0; k < joinA.Count; k++)
+            {
+                bool sj = joinA[k] >= mainPts || joinB[k] >= mainPts;   // 520: rozstaj z droga boczna - klasa drogi bocznej
+                if (k < joins0 && sj) g.SideJoins++;
+                ea.Add(nodeOf[joinA[k]]); eb.Add(nodeOf[joinB[k]]); ec.Add(k < joins0 ? (sj ? SideCls : MapRoadKinds.Trakt) : MapRoadKinds.Bridge);
+            }
             g.Bridges = joinA.Count - joins0;
             g.Length = length;
             // sciany siatki gry (raz): wezel bez sciany albo na scianie zakazanej dla marszu ladem = poza siecia
@@ -1071,6 +1397,10 @@ namespace Armoury
             int comps = 0;
             for (int i = 0; i < nn; i++) if (g.Ok[i] && Find(par, i) == i) comps++;
             g.Comps = comps;
+            // 520: skladowa kazdego wezla i czy zawiera trakt (pokrycie osad w logu); krawedzie drog bocznych (tylko log)
+            g.Comp = new int[nn]; g.CompTrakt = new bool[nn];
+            for (int i = 0; i < nn; i++) { int r = Find(par, i); g.Comp[i] = r; if (g.NodeTrakt[i] && g.Ok[i]) g.CompTrakt[r] = true; }
+            for (int k = 0; k < ne; k++) if (ec[k] == SideCls) { g.SideEdges++; if (elen[k] < 0f) g.SideEdgesCut++; }
             // siatka wezlow (komorka NodeCell)
             float nx0 = float.MaxValue, ny0 = float.MaxValue, nx1 = float.MinValue, ny1 = float.MinValue;
             for (int i = 0; i < nn; i++) { nx0 = Math.Min(nx0, g.X[i]); nx1 = Math.Max(nx1, g.X[i]); ny0 = Math.Min(ny0, g.Y[i]); ny1 = Math.Max(ny1, g.Y[i]); }
@@ -1101,6 +1431,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (_g == null || s == null || !s.MapRoadAiRoutes || Campaign.Current == null) return;
+            try { SideCheck(s); } catch (Exception e) { ParStumble(e); }   // 520: drogi boczne w sieci - przebudowa tylko przy zmianie planu (porownanie referencji)
             bool census = LogGate.Today;
             long t0 = Stopwatch.GetTimestamp();
             try
@@ -1113,20 +1444,28 @@ namespace Armoury
                     try
                     {
                         if (mp == null || !mp.IsActive || mp.IsMainParty) continue;
-                        int k = Cat(mp);
+                        int k = Cat(mp, s);
                         if (k < 0) continue;
                         int idx = mp.Party.Index, slot = idx & SlotMask;
                         if (Volatile.Read(ref _slotGrp[slot]) != 0) CheckArrival(mp, slot, idx, now);
                         if (!census || mp.AttachedTo != null || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || !mp.IsMoving) continue;
                         var p = mp.Position;
-                        bool on = MapRoads.KindAt(p.X, p.Y) == 2;   // trakt (2), jak "na drodze" w MapRoads.Hourly - droga boczna (1) nie liczy sie (siec objazdow to same trakty)
+                        int kind = MapRoads.KindAt(p.X, p.Y);
+                        bool on = kind == 2;                        // trakt (2), jak "na drodze" w MapRoads.Hourly
+                        bool any = kind == 2 || kind == 1;          // 520: trakt albo droga boczna (siec objazdow ma drogi boczne)
                         _hN[k]++;
                         if (on) _hOn[k]++;
+                        else if (kind == 1) _hSide[k]++;
+                        if (k == 0)
+                        {
+                            var db = mp.DefaultBehavior;
+                            if (db == AiBehavior.BesiegeSettlement || db == AiBehavior.RaidSettlement || db == AiBehavior.DefendSettlement) { _hWarN++; if (any) _hWarOn++; }
+                        }
                         long v = Volatile.Read(ref _slotKey[slot]);
                         if ((v & 3L) == StAccepted && (v & ~3L) == (((long)idx << 32) | (long)TargetHash(mp.MoveTargetPoint.ToVec2())))
                         {
                             _hDet[k]++;
-                            if (on) _hDetOn[k]++;
+                            if (any) _hDetOn[k]++;
                         }
                     }
                     catch (Exception e) { ParStumble(e); }
@@ -1163,7 +1502,7 @@ namespace Armoury
         private static void Line(Settings s, int day)
         {
             var ci = Inv;
-            long acc = _acc[0] + _acc[1] + _acc[2];
+            long acc = _acc[0] + _acc[1] + _acc[2] + _acc[3];
             long rej = _noRoad + _notWorth + _fewRoad + _tooLong + _navFail + _tooMany;
             var sb = new StringBuilder(1200);
             sb.Append(P).Append("dzien ").Append(day.ToString(ci))
@@ -1177,6 +1516,12 @@ namespace Armoury
               .Append(" | objazdy droga ").Append(acc.ToString(ci)).Append(" (").Append(Pct(acc, _planned)).Append("% planowanych; rody ").Append(_acc[0].ToString(ci))
               .Append(", karawany ").Append(_acc[1].ToString(ci)).Append(", wozy wsi ").Append(_acc[2].ToString(ci)).Append(')')
               .Append(" (z AI wylaczonym przez inny mod - uczta / majatek BK: ").Append(_aiOff.ToString(ci)).Append(')')
+              .Append(" | 520: patrole / milicja ").Append(_acc[3].ToString(ci)).Append(", marsz wojenny (oblezenie / najazd / obrona) ").Append(_accWar.ToString(ci))
+              .Append(" z ").Append(_planWar.ToString(ci)).Append(" planowanych, z odcinkiem drogi bocznej ").Append(_accSide.ToString(ci))
+              .Append(" | siec: ").Append(_sideNote)
+              .Append(" | punkty patrolu (latka ").Append(_patrolNote).Append("): nowe ").Append(_patSeen.ToString(ci)).Append(", na droge ").Append(_patSnap.ToString(ci))
+              .Append(" (").Append(Pct(_patSnap, _patSeen)).Append("%), bez drogi do ").Append(SnapR.ToString("0", ci)).Append(" jedn. ").Append(_patFar.ToString(ci))
+              .Append(", z ucieczki bez zmiany ").Append(_patFlee.ToString(ci))
               .Append(" | odrzucone ").Append(rej.ToString(ci)).Append(": bez drogi w zasiegu ").Append(_noRoad.ToString(ci)).Append(", droga sie nie oplaca ").Append(_notWorth.ToString(ci))
               .Append(", malo drogi ").Append(_fewRoad.ToString(ci)).Append(", za dlugie ").Append(_tooLong.ToString(ci)).Append(", siatka gry (odcinek bez sciezki) ").Append(_navFail.ToString(ci))
               .Append(", ponad 128 punktow ").Append(_tooMany.ToString(ci))
@@ -1197,6 +1542,20 @@ namespace Armoury
               .Append("%), karawany ").Append(_hOn[1].ToString(ci)).Append('/').Append(_hN[1].ToString(ci)).Append(" (").Append(Pct(_hOn[1], _hN[1]))
               .Append("%), wozy wsi ").Append(_hOn[2].ToString(ci)).Append('/').Append(_hN[2].ToString(ci)).Append(" (").Append(Pct(_hOn[2], _hN[2])).Append("%))")
               .Append(", na objezdzie ").Append(det.ToString(ci)).Append(", z tego na drodze ").Append(deton.ToString(ci)).Append(" (").Append(Pct(deton, det)).Append("%)");
+            // 520: spis z droga boczna i patrolami - na jakiejkolwiek drodze (trakt + boczna) / poza droga, wedlug typu
+            sb.Append(" | 520 spis na jakiejkolwiek drodze (trakt + boczna) / w marszu:");
+            string[] lab = { "rody", "karawany", "wozy wsi", "patrole / milicja" };
+            int nAll = 0, rAll = 0;
+            for (int k = 0; k < NCat; k++)
+            {
+                int r = _hOn[k] + _hSide[k];
+                nAll += _hN[k]; rAll += r;
+                sb.Append(k == 0 ? " " : ", ").Append(lab[k]).Append(" droga ").Append(r.ToString(ci)).Append(" (trakt ").Append(_hOn[k].ToString(ci)).Append(", boczna ")
+                  .Append(_hSide[k].ToString(ci)).Append(") / poza ").Append((_hN[k] - r).ToString(ci)).Append(" = ").Append(Pct(r, _hN[k])).Append("% na drodze");
+            }
+            sb.Append("; razem ").Append(rAll.ToString(ci)).Append('/').Append(nAll.ToString(ci)).Append(" (").Append(Pct(rAll, nAll)).Append("%)")
+              .Append("; marsz wojenny rodow ").Append(_hWarOn.ToString(ci)).Append('/').Append(_hWarN.ToString(ci)).Append(" (").Append(Pct(_hWarOn, _hWarN)).Append("%)")
+              .Append("; bandy bez zmian (linia Drogi (DR))");
             double planMs = _ticks * 1000.0 / Stopwatch.Frequency, censusMs = _censusTicks * 1000.0 / Stopwatch.Frequency;
             sb.Append(" | koszt: planowanie ").Append(planMs.ToString("0.00", ci)).Append(" ms/dobe (sr. ")
               .Append(_planned > 0 ? (planMs * 1000.0 / _planned).ToString("0.0", ci) : "-").Append(" us/plan, odcinkow siatki gry ").Append(_legCalls.ToString(ci))

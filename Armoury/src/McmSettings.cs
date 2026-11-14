@@ -3039,9 +3039,9 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool MapRoadSpeedBonus { get; set; } = true;
 
-        [SettingPropertyInteger("Map Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a road, in percent of its speed (15 = +15%; at most 50)", RequireRestart = false)]
+        [SettingPropertyInteger("Map Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a road, in percent of its speed (30 = +30%; at most 50)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public int MapRoadSpeedPercent { get; set; } = 15;
+        public int MapRoadSpeedPercent { get; set; } = 30;
 
         [SettingPropertyBool("Map Road Bonus Above Floor", HintText = "with Map Road Speed Bonus: the road bonus is applied to the party's speed after the game's minimum speed floor, so a very slow party on a road still moves faster than off it. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
@@ -3063,17 +3063,17 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool MapSideRoadSpeedBonus { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Map Side Road Speed Percent", 0.00f, 50.00f, "0.0", HintText = "how much faster a land party travels on a village lane, in percent of its speed (7.5 = +7.5%; at most 50)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Map Side Road Speed Percent", 0.00f, 50.00f, "0.0", HintText = "how much faster a land party travels on a village lane, in percent of its speed (15 = +15%; at most 50)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public float MapSideRoadSpeedPercent { get; set; } = 7.5f;
+        public float MapSideRoadSpeedPercent { get; set; } = 15f;
 
         [SettingPropertyBool("Map Valyrian Roads", HintText = "the old Valyrian roads of Essos - the demon road from Volantis through Mantarys to Meereen with its branch to Tolos, and the road from Pentos through Ghoyan Drohe and Norvos to Qohor - are fused stone that never turns to mud: every land party travels on them faster than on an ordinary road, by Map Valyrian Road Speed Percent (never less than the ordinary road bonus); the speed tooltip shows a 'Valyrian road' line. Off: they count as ordinary roads", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool MapValyrianRoads { get; set; } = true;
 
-        [SettingPropertyInteger("Map Valyrian Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a Valyrian road, in percent of its speed (25 = +25%; at most 50; never less than Map Road Speed Percent)", RequireRestart = false)]
+        [SettingPropertyInteger("Map Valyrian Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a Valyrian road, in percent of its speed (50 = +50%; at most 50; never less than Map Road Speed Percent)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public int MapValyrianRoadSpeedPercent { get; set; } = 25;
+        public int MapValyrianRoadSpeedPercent { get; set; } = 50;
 
         [SettingPropertyBool("Map Essos Caravan Trails", HintText = "in deep Essos (the Dothraki sea, Sarnor, Ibben, Yi Ti, Qarth) the lore knows no real roads: the painted tracks there are caravan trails and speed a land party up only like a village lane (Map Side Road Speed Percent, 'Caravan trail' line). Off: they count as ordinary roads", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
@@ -3111,17 +3111,29 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SeaStormWinterCarts { get; set; } = true;
 
-        [SettingPropertyBool("Map Road Ai Routes", HintText = "lords, caravans and villagers choose the painted roads: on a march over land to a settlement or a spot at least Map Road Ai Min Distance away, the party rides to the nearest good stretch of main road, follows it and leaves it near its goal - whenever that way is at most Map Road Ai Detour Percent longer than the game's own route, the road makes up at least half of it and, with the road bonus (Map Road Speed Percent), the ride takes no longer than the game's own route. Lords riding to a feast or to their estate count too. Not for your party, bandits, a chase, a flight, a siege or a battle. Needs Map Road Speed Bonus. Off = the game's own routes, as before", RequireRestart = false)]
+        [SettingPropertyBool("Map Road Ai Routes", HintText = "lords, caravans, villagers and patrols choose the roads: on a march over land to a settlement or a spot at least Map Road Ai Min Distance away, the party rides to the nearest good stretch of road (a painted main road, or a village lane with Map Road Ai Side Roads), follows it and leaves it near its goal - whenever that way is at most Map Road Ai Detour Percent longer than the game's own route, the road makes up at least half of it and, with the road bonus (Map Road Speed Percent), the ride takes no longer than the game's own route. Lords riding to a feast or to their estate count too. Not for your party, bandits, a chase, a flight, a battle or the siege itself. Needs Map Road Speed Bonus. Off = the game's own routes, as before", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool MapRoadAiRoutes { get; set; } = true;
 
-        [SettingPropertyInteger("Map Road Ai Min Distance", 10, 200, "0", HintText = "the shortest march (in map units, along the game's own route) for which lords, caravans and villagers look for a road (30 = about 140 km; half of the villagers' trips to their town and nearly every caravan hop between towns)", RequireRestart = false)]
+        [SettingPropertyInteger("Map Road Ai Min Distance", 10, 200, "0", HintText = "the shortest march (in map units, along the game's own route) for which lords, caravans, villagers and patrols look for a road (15 = about 70 km; most trips between a village and its town)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public int MapRoadAiMinDistance { get; set; } = 30;
+        public int MapRoadAiMinDistance { get; set; } = 15;
 
-        [SettingPropertyInteger("Map Road Ai Detour Percent", 0, 50, "0", HintText = "how much longer than the game's own route a way along the road may be, in percent (15 = up to 15% longer; a longer way is taken only when the road bonus still makes it no slower; at most 50)", RequireRestart = false)]
+        [SettingPropertyInteger("Map Road Ai Detour Percent", 0, 50, "0", HintText = "how much longer than the game's own route a way along the road may be, in percent (30 = up to 30% longer; a longer way is taken only when the road bonus still makes it no slower; at most 50)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public int MapRoadAiDetourPercent { get; set; } = 15;
+        public int MapRoadAiDetourPercent { get; set; } = 30;
+
+        [SettingPropertyBool("Map Road Ai Side Roads", HintText = "with Map Road Ai Routes: the village lanes drawn on the map (Map Side Roads, with Map Side Road Speed Bonus) join the main roads in the network the AI plans its marches on, so caravans, villagers, patrols and lords take the lanes to the villages and castles as well. Off = only the painted main roads, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadAiSideRoads { get; set; } = true;
+
+        [SettingPropertyBool("Map Road Ai Patrols", HintText = "with Map Road Ai Routes: patrols, militia and lords patrolling their lands keep to the roads - each new patrol point the game picks is moved onto the nearest road within a short ride, and their longer marches use the roads like a caravan. Not for bandits. Off = patrols roam the fields as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadAiPatrols { get; set; } = true;
+
+        [SettingPropertyBool("Map Road Ai War March", HintText = "with Map Road Ai Routes: a lord or army marching to besiege, raid or relieve a settlement also takes the roads while the road is no slower; the last stretch to the walls, the siege, the raid, a chase and a battle stay off the road. Off = war marches use the game's own routes, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadAiWarMarch { get; set; } = true;
 
         [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
@@ -14459,6 +14471,9 @@ namespace Armoury
             s.MapRoadAiRoutes = MapRoadAiRoutes;
             s.MapRoadAiMinDistance = MapRoadAiMinDistance;
             s.MapRoadAiDetourPercent = MapRoadAiDetourPercent;
+            s.MapRoadAiSideRoads = MapRoadAiSideRoads;   // 520
+            s.MapRoadAiPatrols = MapRoadAiPatrols;
+            s.MapRoadAiWarMarch = MapRoadAiWarMarch;
             s.MaterialLawEnabled = MaterialLawEnabled;
             s.RealRefiningEnabled = RealRefiningEnabled;
             s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;
