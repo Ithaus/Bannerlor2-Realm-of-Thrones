@@ -5,6 +5,9 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.MountAndBlade;
 
 namespace Armoury
@@ -90,6 +93,8 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki misji (pod Gate; _calls i _patchErr przez Interlocked)
         private static int _calls, _patchErr;
         private static int _callsFire, _callsNoState, _sit, _sitFire, _sitSure;
+        private static int _sitBandit;   // 494: Charge AI wroga gracza w bitwie z bandytami - RBM oddaje Charge grze (OverrideBehaviorCharge: IsBandit -> return true)
+        private static bool _bandit;     // 494: bitwa gracza ze strona-bandyta (ten sam warunek co RBM PrefixCalculateCurrentOrder)
         private static int _toWall, _toLoose, _reactN, _keep, _hold10, _keep10, _waitShields, _horse;
         private static double _ratioWall, _ratioLoose, _react;
         private static int _backContact, _backQuiet, _backHorse, _backOther, _restored, _oursLost, _playerTook, _outside;
@@ -391,6 +396,7 @@ namespace Armoury
             _s4 = ShieldsUp.On;
             _field = false;
             try { _field = m.IsFieldBattle; } catch { }
+            _bandit = BanditBattle();
             if (_key) EnsurePatched();
             if (_any) EnsureGuard();
             _rbmAdv = RbmPrefix(typeof(BehaviorAdvance), "TickOccasionally");
@@ -478,7 +484,7 @@ namespace Armoury
             {
                 Forms.Clear();
                 FireForms.Clear(); PlayerSideForms.Clear(); PlayerOrderForms.Clear(); DecidedForms.Clear();
-                _callsFire = _callsNoState = _sit = _sitFire = _sitSure = 0;
+                _callsFire = _callsNoState = _sit = _sitFire = _sitSure = _sitBandit = 0;
                 _toWall = _toLoose = _reactN = _keep = _hold10 = _keep10 = _waitShields = _horse = 0;
                 _ratioWall = _ratioLoose = _react = 0;
                 _backContact = _backQuiet = _backHorse = _backOther = _restored = _oursLost = _playerTook = _outside = 0;
@@ -536,6 +542,55 @@ namespace Armoury
             catch (Exception e) { PatchError("CloseRanks.Q446Restored", e); }
         }
 
+        /// <summary>494: bitwa gracza na mapie ze strona-bandyta - ten sam warunek co RBM OverrideBehaviorCharge.PrefixCalculateCurrentOrder.</summary>
+        private static bool BanditBattle()
+        {
+            try
+            {
+                if (Campaign.Current == null || MobileParty.MainParty == null || MobileParty.MainParty.MapEvent == null) return false;
+                var pe = MapEvent.PlayerMapEvent;
+                if (pe == null) return false;
+                var d = pe.DefenderSide != null && pe.DefenderSide.LeaderParty != null ? pe.DefenderSide.LeaderParty.MobileParty : null;
+                var a = pe.AttackerSide != null && pe.AttackerSide.LeaderParty != null ? pe.AttackerSide.LeaderParty.MobileParty : null;
+                if (d == null || a == null) return false;
+                return d.IsBandit || a.IsBandit;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>494: druzyna gracza albo sojusznik (RBM: Team.IsPlayerTeam / IsPlayerAlly - warunek bandytow ich nie dotyczy).</summary>
+        private static bool PlayerSide(Team t)
+        {
+            try { return t != null && (t.IsPlayerTeam || t.IsPlayerAlly); }
+            catch { return false; }
+        }
+
+        /// <summary>494: odstep (od krawedzi szykow) do najblizszego szyku wroga piechoty albo strzelcow (IsInfantryFormation / IsRangedFormation).</summary>
+        private static float InfRangedGap(Team team, Formation f)
+        {
+            float best = float.MaxValue;
+            var my = f.CachedMedianPosition.AsVec2;
+            var teams = team.Mission != null ? team.Mission.Teams : null;
+            int n = teams != null ? teams.Count : 0;
+            for (int i = 0; i < n; i++)
+            {
+                var t = teams[i];
+                if (!MissionTeams.Enemies(team, t)) continue;
+                var fl = t.FormationsIncludingSpecialAndEmpty;
+                int nf = fl != null ? fl.Count : 0;
+                for (int j = 0; j < nf; j++)
+                {
+                    var e = fl[j];
+                    if (e == null || e.CountOfUnits <= 0) continue;
+                    var eq = e.QuerySystem;
+                    if (eq == null || !(eq.IsInfantryFormation || eq.IsRangedFormation)) continue;
+                    float d = my.Distance(e.CachedMedianPosition.AsVec2) - 0.5f * (f.Depth + e.Depth);
+                    if (d < best) best = d;
+                }
+            }
+            return best < 0f ? 0f : best;
+        }
+
         private static void One(Mission m, Team t, Formation f, Team pt)
         {
             if (Doctrine.Q446Holds(f)) return;   // 446: szyk w czworoboku przed jazda - jeden wlasciciel ustawienia (stan 146 / 310 bez zmian do wyjscia)
@@ -567,7 +622,20 @@ namespace Armoury
                 // recenzja 146: RBM wola decyzje z Advance tylko przy pieszym wrogu w 150 m (OverrideBehaviorAdvance:398-404), z Charge tylko z celem
                 // (FindSignificantEnemy != null, OverrideBehaviorCharge:296) - "pewna" sytuacja do UWAGI o inline JIT: Advance z pieszym wrogiem blizej niz
                 // SureAdvanceGap, Charge z jakimkolwiek pieszym szykiem wroga
-                sure = sit && (b is BehaviorCharge ? gap < float.MaxValue : gap < SureAdvanceGap);
+                // 494: "pewna" tylko tam, gdzie RBM naprawde wchodzi w swoja galaz - Charge szyku wroga gracza w bitwie z bandytami RBM oddaje grze
+                // (OverrideBehaviorCharge: IsBandit -> return true), a cel liczymy tylko z wroga piechoty albo strzelcow (FindSignificantEnemy
+                // includeInfantry/includeRanged, bez konnicy - samotny konny gracz nie robi pewnej sytuacji); Advance tak samo z piechoty albo strzelcow
+                if (sit)
+                {
+                    bool charge = b is BehaviorCharge;
+                    if (charge && _bandit && !PlayerSide(t)) _sitBandit++;
+                    else
+                    {
+                        float ir = InfRangedGap(t, f);
+                        if (charge) sure = ir < float.MaxValue && q != null && q.ClosestSignificantlyLargeEnemyFormation != null;
+                        else sure = ir < SureAdvanceGap;
+                    }
+                }
             }
             bool contact = st.Contact ? gap <= ContactOff : gap <= Doctrine.S1ContactGap;
             // spis ludzi tylko pod ostrzalem przed zwarciem (szyk AI piechoty): w rece / w ekwipunku / umarli, bez PANIKI (przelacznik 139)
@@ -738,7 +806,9 @@ namespace Armoury
                   .Append(_rbmAdv).Append(", BehaviorCharge ").Append(_rbmCharge).Append("; wywolan latki ").Append(calls).Append(" (pod ostrzalem przed zwarciem ")
                   .Append(_callsFire).Append(", bez stanu ").Append(_callsNoState).Append("), sytuacji decyzji RBM (szyk AI piechoty od ").Append(MinMen)
                   .Append(", Advance / Charge) w passach co ").Append(PassEvery.ToString("0.0", Inv)).Append(" s: ").Append(_sit).Append(" (pod ostrzalem ").Append(_sitFire).Append(", pewnych - Advance z pieszym wrogiem w ")
-                  .Append(SureAdvanceGap.ToString("0", Inv)).Append(" m / Charge z pieszym celem: ").Append(_sitSure).Append(')');
+                  .Append(SureAdvanceGap.ToString("0", Inv)).Append(" m / Charge z pieszym celem: ").Append(_sitSure)
+                  .Append("; Advance / Charge liczone tylko z wrogiem piechoty albo strzelcow, Charge wroga gracza w bitwie z bandytami (RBM oddaje grze) pominiete: ")
+                  .Append(_sitBandit).Append(_bandit ? ", bitwa z bandytami" : "").Append(')');
                 // recenzja 146: UWAGA tylko przy "pewnych" sytuacjach (RBM na pewno wolal decyzje) - bitwa bez podejscia piechoty na 150 m nie daje falszywej UWAGI
                 if (Patched && calls == 0 && _sitSure > 0 && (_rbmAdv == "TAK" || _rbmCharge == "TAK")) sb.Append("; UWAGA: 0 wywolan przy pewnych sytuacjach RBM - latka nie biegnie (JIT wstawil metode do prefiksu RBM?)");
                 sb.Append(" | szyki pod ostrzalem: ").Append(FireForms.Count).Append(" (AI strony gracza ").Append(PlayerSideForms.Count)
