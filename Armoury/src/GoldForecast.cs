@@ -101,6 +101,9 @@ namespace Armoury
         private static long _purseAtPay = long.MinValue;  // kiesa tuz po ostatniej wyplacie; MinValue - nieznana (od wczytania nie bylo wyplaty)
         // 361b: wyplata rodu gracza od poczatku ostatniego taktu doby (pusta kolejka podatku warsztatow = zero do pobrania, a nie "wyplata jeszcze przed nami")
         private static bool _paySinceTick;
+        // 495 (przeglad 14.11: rozjazd prognozy -42..-65% w dobach bez wyplaty): migawka kolejki podatku warsztatow na POCZATKU taktu doby (po wyplacie poprzedniej
+        // doby) - to wlasnie pobierze OwnerTaxDaily w tym takcie; -1 - brak (D11-3 nieczynne albo takt bez kampanii). Tylko do prognozy TickEnd (linia dobowa).
+        private static int _otSnap = -1, _otSnapN;
         // 361e: podglad warsztatow i wsi gracza tuz PO ostatniej wyplacie (NaN godziny - nieznany: od wczytania nie bylo wyplaty)
         private static long _postW, _postV;
         private static double _postH = double.NaN;
@@ -122,7 +125,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _sumTick = _sumWorks = 0; _sumTickSeen = false; _purseAtPay = long.MinValue; _paySinceTick = false;
+            _sumTick = _sumWorks = 0; _sumTickSeen = false; _purseAtPay = long.MinValue; _paySinceTick = false; _otSnap = -1; _otSnapN = 0;
             _postW = _postV = 0; _postH = double.NaN; _postSet = null; _diag361 = _fc361 = null;
             _hist.Clear(); _cur = null; _purse0 = 0; _lapGold = 0; _inTick = false; _stamp++;
             _fcHave = false; _fcTotal = _fcModel = _fcCorr = 0; _fcParts = null; _clanDiag = null; _fcKng = null; _fcKngDays = _fcCrownKeys = 0; _cacheKng = null;
@@ -160,9 +163,13 @@ namespace Armoury
         /// <summary>Poczatek naszego taktu doby: zamkniecie poprzedniej doby (linia), nowa doba ksiegi. Nie rzuca.</summary>
         internal static void TickBegin()
         {
+            _otSnap = -1; _otSnapN = 0;   // 495
             try
             {
                 if (Campaign.Current == null || Hero.MainHero == null) { _inTick = false; return; }
+                // 495: kolejka podatku warsztatow przed taktem (OwnerTaxDaily pobierze ja w tym takcie) - do prognozy tej doby w TickEnd
+                try { _otSnap = Seal31B.PendingOwnerTax(Hero.MainHero, out _otSnapN); }
+                catch (Exception e) { _otSnap = -1; _otSnapN = 0; Stumble("TickBegin(495)", e); }
                 long g = Gold();
                 if (_cur != null)
                 {
@@ -679,7 +686,18 @@ namespace Armoury
                     int otN; int pend = Seal31B.PendingOwnerTax(Hero.MainHero, out otN);
                     if (pend >= 0)
                     {
-                        if (otN > 0)
+                        if (_inTickEnd && _otSnap >= 0)
+                        {
+                            // 495 (przeglad 14.11, log 108730: prognoza -345 = 28.8% x dzisiejsza wyplata 1197, a takt pobral -679 = podatek od WCZORAJSZEJ wyplaty;
+                            // rozjazd -42..-65% przy malejacej wyplacie): prognoza tej doby = wyplata tej doby + takt tej doby, a takt pobiera kolejke sprzed taktu
+                            // (podatek od wyplaty poprzedniej doby). Podatek od dzisiejszej wyplaty pobierze takt jutrzejszy - wejdzie do jutrzejszej prognozy.
+                            // Podpowiedz w panelu (poza TickEnd) bez zmian: kolejka po wyplacie albo udzial x przewidywana wyplata.
+                            otDone = true;
+                            if (_otSnapN > 0 && _otSnap > 0)
+                                res.Add(new Corr { Amt = -_otSnap, Log = "podatek warsztatow 495 (kolejka przed taktem " + _otSnapN + ")", Txt = new TextObject("{=!}Workshop owner tax to the towns (on the previous workshop payout)") });
+                            diag.Append("; podatek warsztatow 495 z kolejki przed taktem ").Append(-_otSnap).Append(" (").Append(_otSnapN).Append(" migawek)");
+                        }
+                        else if (otN > 0)
                         {
                             otDone = true;
                             res.Add(new Corr { Amt = -pend, Log = "podatek warsztatow 361b (kolejka " + otN + ")", Txt = new TextObject("{=!}Workshop owner tax to the towns (on the last workshop payout)") });
@@ -1078,8 +1096,8 @@ namespace Armoury
                     if (ks.Count > 20) sb.Append(", ... (").Append(ks.Count - 20).Append(" wiecej)");
                 }
                 sb.Append(" | ").Append(_clanDiag ?? "rozliczenie: brak w tej dobie");
-                // 361: przewidywane vs naprawde dla nowych pozycji (podatek warsztatow: prognoza z TickEnd dotyczy wyplaty TEJ doby - porownac z kolejka teraz,
-                // ktora pobierze nastepny takt; w takcie tej doby pobrano podatek od wyplaty poprzedniej doby)
+                // 361: przewidywane vs naprawde dla nowych pozycji (podatek warsztatow: 495 - prognoza z TickEnd bierze kolejke sprzed taktu tej doby, czyli to,
+                // co pobrano w takcie tej doby - porownac z "podatek warsztatow w takcie tej doby"; kolejka teraz pobierze nastepny takt)
                 try
                 {
                     long otNow, hoard; d.Laps.TryGetValue(OtKey, out otNow); d.Laps.TryGetValue(HoardKey, out hoard);
