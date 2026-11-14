@@ -19,8 +19,9 @@ namespace Armoury
     /// Skutki:
     ///  (a) predkosc partii gracza x LitterSpeedPercent (50), a gdy chirurg partii (rola Surgeon, bez chirurga przywodca - EffectiveSurgeon, jak perk
     ///      w modelu gry) ma Medicine.Sledges - x LitterSpeedPercentSledges (75). Gra: Sledges "-50% party speed penalty from the wounded"
-    ///      (DefaultPartySpeedCalculatingModel.GetWoundedModifier) - ta sama regula, polowa kary noszy (50% -> 25% ciecia). Kara gry za rannych dziala
-    ///      dopiero przy > 1/4 skladu rannych i liczy tylko szeregowych - wodz na noszach sie z nia nie dubluje. Wpis "Carrying the wounded lord on
+    ///      (DefaultPartySpeedCalculatingModel.GetWoundedModifier) - ta sama regula, polowa kary noszy (50% -> 25% ciecia). Kara gry za rannych liczy
+    ///      takze rannych bohaterow (TroopRoster.TotalWounded = szeregowi + bohaterowie, wiec gracz tez), ale dziala dopiero przy > 1/4 skladu rannych
+    ///      i daje -5% x udzial rannych - nakladanie sie z noszami jest pomijalne (recenzja 501). Wpis "Carrying the wounded lord on
     ///      a litter" w rozpisce predkosci. Wolane z NightRest.SpeedPostfix (Priority.Last, PO MarchPace), na KONCU (po premii karczmy / karze snu),
     ///      raz na lancuch modeli (SpeedDepth.OutermostFinal), wzorem CampCart.Speed: procent WYNIKU przez Add (dzielone przez 1 + suma czynnikow),
     ///      a gdy wynik trzyma sam sufit LimitMax (kolumna MarchPace - recenzja 16.10 TownInns: Add ginal pod sufitem) - sufit obnizony do celu.
@@ -49,12 +50,14 @@ namespace Armoury
         private static float _spdBefore, _spdAfter;   // ostatnie wywolanie z cieciem (rownolegle - zapis float atomowy, tylko log)
         private static string _why = "";
 
+        private static Hero _hero;        // bohater, dla ktorego liczono stan (zmiana Hero.MainHero - dziedzic - zeruje stan bez komunikatu)
+
         private static TextObject _txt;   // tworzony leniwie (w kampanii), nie w konstruktorze statycznym
         private static TextObject Txt { get { return _txt ?? (_txt = new TextObject("{=!}Carrying the wounded lord on a litter")); } }
 
         internal static void Reset()
         {
-            _carried = false; _sledges = false; _onKey = false;
+            _carried = false; _sledges = false; _onKey = false; _hero = null;
             _day = -1; _hMove = 0; _hRest = 0; _hArmy = 0; _hSea = 0; _hp0 = -1; _hpMin = -1; _ups = 0; _downs = 0; _stumbles = 0; _parStumbles = 0;
             _spdBefore = 0f; _spdAfter = 0f; _why = "";
         }
@@ -75,11 +78,18 @@ namespace Armoury
             var h = Hero.MainHero;
             var mp = MobileParty.MainParty;
             if (s == null || h == null || mp == null) return;
+            if (_hero != h)
+            {
+                // recenzja 501: nowy bohater gracza (smierc - gra dziedzicem) albo pierwsze przeliczenie - stan poprzedniego nie przechodzi
+                if (_hero != null) Log.Info("Nosze (501): zmiana bohatera gracza - stan noszy wyzerowany bez komunikatu (" + src + ").");
+                if (_carried) { _carried = false; Touch(mp); }
+                _hero = h; _hp0 = h.HitPoints; _hpMin = h.HitPoints;
+            }
             bool key = s.LitterEnabled && LogGate.Mode != 1 && LogGate.Mode != 2;   // (e) autotest / profil - jak loze gracza (HeroWounds.cs:436)
             _onKey = key;
             if (!key)
             {
-                if (_carried) { _carried = false; _downs++; Log.Info("Nosze (501): stan zdjety - klucz LitterEnabled wylaczony albo DLL autotestu/profilu (" + src + ")."); }
+                if (_carried) { _carried = false; _downs++; Touch(mp); Log.Info("Nosze (501): stan zdjety - klucz LitterEnabled wylaczony albo DLL autotestu/profilu (" + src + ")."); }
                 return;
             }
             if (!h.IsAlive || h.IsPrisoner || !mp.IsActive) return;   // niewola / sluzba bez partii - stan zamrozony, po uwolnieniu liczony od nowa
@@ -88,9 +98,17 @@ namespace Armoury
             int on = Math.Max(1, s.LitterHpThreshold);
             int off = Math.Max(on, s.LitterHpRelease);
             bool now = _carried ? (hp <= off || grave) : (hp <= on || grave);
-            try { _sledges = mp.HasPerk(DefaultPerks.Medicine.Sledges); } catch { _sledges = false; }
-            if (now == _carried) return;
+            bool sl;
+            try { sl = mp.HasPerk(DefaultPerks.Medicine.Sledges); } catch { sl = false; }
+            bool slChanged = sl != _sledges;
+            _sledges = sl;
+            if (now == _carried)
+            {
+                if (now && slChanged) Touch(mp);   // na noszach zmienil sie chirurg / perk - inny procent
+                return;
+            }
             _carried = now;
+            Touch(mp);   // recenzja 501: gra trzyma _lastCalculatedSpeed - bez tego kara weszlaby / zeszla dopiero przy zmianie sciany, nocy albo rosteru
             if (now)
             {
                 _ups++;
@@ -110,9 +128,13 @@ namespace Armoury
 
         private static int Pct(Settings s)
         {
-            int p = _sledges ? s.LitterSpeedPercentSledges : s.LitterSpeedPercent;
+            // recenzja 501: Sledges nigdy wolniej niz bez perka (MCM pozwala ustawic odwrotnie)
+            int p = _sledges ? Math.Max(s.LitterSpeedPercentSledges, s.LitterSpeedPercent) : s.LitterSpeedPercent;
             return Math.Max(10, Math.Min(100, p));
         }
+
+        /// <summary>Uniewaznienie pamieci predkosci gry (MobileParty._lastCalculatedSpeed) - jak NightMarch.Touch. Tylko przy zmianie stanu, nie co klatke.</summary>
+        private static void Touch(MobileParty mp) { try { if (mp != null && mp.IsActive) mp.UpdateVersionNo(); } catch { } }
 
         private static bool InForeignArmy(MobileParty mp)
         {

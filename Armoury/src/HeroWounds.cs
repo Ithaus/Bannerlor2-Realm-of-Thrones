@@ -554,8 +554,15 @@ namespace Armoury
                 var s = Settings.Current;
                 if (h == null || s == null || !s.HeroWoundsEnabled) return;
                 if (h == Hero.MainHero)
-                    Log.Player((grade == Grave ? "You are gravely wounded." : "You have taken a serious wound.") + " You can ride, but you cannot fight for about " + days + " days."
+                {
+                    // recenzja 501: gracz na noszach (stan przeliczony tu - koniec bitwy) - bez "You can ride", ktore przeczyloby noszom
+                    bool litter = Litter501.PlayerCarried();
+                    string ride = !litter ? " You can ride, but you cannot fight for about " + days + " days."
+                                : grade == Grave ? " You cannot ride or fight for about " + days + " days - your men carry you on a litter."
+                                : " You cannot fight for about " + days + " days, and for now you are too weak to ride - your men carry you on a litter.";
+                    Log.Player((grade == Grave ? "You are gravely wounded." : "You have taken a serious wound.") + ride
                                + (s.HeroWoundsFortressRestDouble ? " Rest within castle or town walls mends you twice as fast." : ""), true);
+                }
                 else if (Concerns(h, grade == Grave))
                     Log.Player(grade == Grave
                         ? Nm(h) + " lies gravely wounded. The healers cannot say whether " + (h.IsFemale ? "she" : "he") + " will live."

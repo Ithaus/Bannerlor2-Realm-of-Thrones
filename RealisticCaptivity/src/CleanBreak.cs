@@ -63,6 +63,7 @@ namespace RealisticCaptivity
                     }
                 if (pursuer == null) return;
                 if (!EveryoneMounted(MobileParty.MainParty)) return;      // ktos u nas piechota - nie ma odskoku
+                if (ArmouryBridge.PlayerOnLitter) return;                 // 501 (Armoury, recenzja): gracz na noszach - bez galopu, odwrot wedlug gry
                 if (AnyoneMounted(pursuer)) return;                       // maja konie - moga gonic
 
                 _pursuerId = pursuer.StringId;
@@ -168,6 +169,7 @@ namespace RealisticCaptivity
                 if (mp == null) return true;                              // garnizon/osada - nie nasz przypadek
                 if (mp.BesiegedSettlement != null) return true;           // oblezenie - lapia normalnie
                 if (!EveryoneMounted(MobileParty.MainParty)) return true; // ktos u nas pieszo (albo kon polegl)
+                if (ArmouryBridge.PlayerOnLitter) return true;            // 501 (Armoury, recenzja): lezacy na noszach nie odjezdza - niewola wedlug gry
                 if (AnyoneMounted(mp)) return true;                       // maja konie - dogonili uczciwie
 
                 _pursuerId = mp.StringId;

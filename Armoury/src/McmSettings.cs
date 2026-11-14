@@ -840,7 +840,7 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int LitterSpeedPercent { get; set; } = 50;
 
-        [SettingPropertyInteger("Litter Speed Percent Sledges", 10, 100, "0", HintText = "how fast your party moves with you on a litter when your surgeon (or you, without a surgeon) has the Sledges perk: sledges halve the slowdown of carrying the wounded, as the perk does in the game (75 = a quarter slower instead of half). Only with Litter Enabled", RequireRestart = false)]
+        [SettingPropertyInteger("Litter Speed Percent Sledges", 10, 100, "0", HintText = "how fast your party moves with you on a litter when your surgeon (or you, without a surgeon) has the Sledges perk: sledges halve the slowdown of carrying the wounded, as the perk does in the game (75 = a quarter slower instead of half). Never below Litter Speed Percent. Only with Litter Enabled", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int LitterSpeedPercentSledges { get; set; } = 75;
 
