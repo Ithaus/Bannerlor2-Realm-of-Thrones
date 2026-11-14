@@ -1227,6 +1227,14 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsHostageDeath { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Prisoner Terms Force Ratio", 0.00f, 5.00f, "0.00", HintText = "With Prisoner Terms Field Parley: when the enemy lord you talk to in the field has the upper hand - the strength of his party (or of the army he rides with) is at least this many times yours - he does not need to bargain for what he can take by force: the hostage you offer and the captive lords you carry in your own party count for nothing to him, and a pact of peace costs him the victory he would win over you (your ransom and the worth of your men), so he refuses or asks far more. Between equal strength and this ratio the effect grows gradually; a lord of Valor leans on force more, a merciful lord less. Lords held in your dungeons, gold and land keep their full worth. 2.0 = the edge at which the game's own commanders stop weighing more strength as more advantage. 0 = off (strength is not weighed, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public float PrisonerTermsForceRatio { get; set; } = 2.0f;
+
+        [SettingPropertyBool("Prisoner Terms Defenders Keep Word", HintText = "With Prisoner Exchange For Terms: an enemy party that defends its town, castle or village does not ride out against you while it is bound not to attack you (terms agreed in the field and not yet carried out, the oath of peace, safe passage bought from the game's own talk) - the game sends defenders against the last party that attacked their land without asking whether they gave their word, so a lord who had just accepted your terms could fall on you seconds later. Raids and sieges of their land still bring the defenders on you. Off = defenders may attack you despite their word, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsDefendersKeepWord { get; set; } = true;
+
         [SettingPropertyBool("Prisoner Terms Field Parley", HintText = "With Prisoner Exchange For Terms: you can also talk terms with any enemy lord leading a party on the map, when you ride up to him (not when he attacks you) - a pact of peace for your lands and men from his house (from his whole realm, if he rules it), or the release of your people, for lords you hold, gold or land", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsFieldParley { get; set; } = true;
@@ -14047,6 +14055,8 @@ namespace Armoury
             s.PrisonerTermsOath = PrisonerTermsOath;
             s.PrisonerTermsHostage = PrisonerTermsHostage;
             s.PrisonerTermsHostageDeath = PrisonerTermsHostageDeath;
+            s.PrisonerTermsForceRatio = PrisonerTermsForceRatio;
+            s.PrisonerTermsDefendersKeepWord = PrisonerTermsDefendersKeepWord;
             s.PrisonerTermsFieldParley = PrisonerTermsFieldParley;
             s.PrisonerTermsRealmTruce = PrisonerTermsRealmTruce;
             s.SiegeArmouryAccess = SiegeArmouryAccess;
