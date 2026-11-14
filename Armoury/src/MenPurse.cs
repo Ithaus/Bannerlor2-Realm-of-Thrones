@@ -725,7 +725,8 @@ namespace Armoury
             if (pieces > 0)
             {
                 _dayGear += spent;
-                Log.Player("Your men bought " + pieces + " missing pieces of kit for " + spent + " denars from their own purse.");
+                // 532: bez slowa "missing" - to sztuki KUPIONE (wedlug listy kwatermistrza), nie liczba brakow; braki nastepnej bitwy - meldunek QM
+                Log.Player("Your men bought " + pieces + (pieces == 1 ? " piece of kit they lacked for " : " pieces of kit they lacked for ") + spent + " denars from their own purse.");
                 Log.Info("Sakiewka ludzi: gracz w " + st.Name + " - braki " + pieces + " szt. za " + spent + ".");
             }
         }
