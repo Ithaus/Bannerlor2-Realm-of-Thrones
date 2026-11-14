@@ -46,6 +46,19 @@ namespace Armoury
     ///    ksiega ludzi FDieHunger, komunikat dla lochu gracza; (c) ucieczek z glodu NIE ma (propozycja 509 pkt 4: praca i loch bez nowych ucieczek - mury
     ///    i straz te same; ucieczka przez mur GL dotyczy zalogi oblezonej twierdzy, nie jencow). Licznik dob glodu - stan sesji (slownik osad, czyszczony
     ///    przy nowej kampanii); po wczytaniu zapisu laska liczy sie od nowa (najwyzej tydzien zwloki, bez zapisu).
+    ///  - UCIECZKI PRZY PRACY (519, Jeff 14.11 "3. tak" na pytanie "praca jencow przy budowie zwieksza szanse ich ucieczki z lochu"): KTO LICZY UCIECZKI Z LOCHU
+    ///    (dekompilacja 1.4.8): tylko gra - PrisonerReleaseCampaignBehavior.DailyHeroTick, i tylko BOHATEROW (4%/dobe, x0.5 w lochu rodu gracza, zarzadca:
+    ///    SweetTalker / DungeonArchitect / MountedPatrols - SecondaryBonus jako AddFactor). Szeregowi w lochu twierdzy nie uciekaja wcale (HourlyPartyTick /
+    ///    ApplyEscapeChanceToExceededPrisoners - tylko partie ruchome ponad limit, bez zalog i milicji). DungeonFate (402) tylko liczy ucieczki bohaterow,
+    ///    RealisticCaptivity - niewola gracza, BK / ROT - brak. Robotnicy 509 to wylacznie szeregowi, wiec "wiecej ucieczek" = NOWA szansa tylko dla pracujacych
+    ///    (jency w celi dalej 0, jak w grze): kazdy robotnik tej doby (te same warunki co wypadki - prawdziwa praca) ucieka z szansa PrisonLaborEscapePercent
+    ///    (0.05%/dobe) x czynnik gry (x0.5 loch rodu gracza; 1 + SecondaryBonus perkow zarzadcy, jak DailyHeroTick, nie mniej niz 0). LICZBY: bohater w lochu 4%/dobe
+    ///    ma pomoc z zewnatrz (rod, kurier, przekupstwo); szeregowy przy budowie - tylko okazje przy pracy pod straza: 1/80 szansy lorda = 0.05%/dobe = 1 na 2000
+    ///    robotniko-dob; stala pula robotnikow traci przez rok Armoury (364 doby) ok. 17% (1 - 0.9995^364), 100 robotnikow - jeden zbieg co ok. 20 dob. Mniej niz rany
+    ///    przy pracy (0.2%), wiecej niz smierc (0.01%). Zbieg schodzi z lochu (zdrowy robotnik, wazony liczebnoscia - HitHealthy) i idzie ta sama droga co jency
+    ///    zbiegli ponad limit lochu partii (PeopleBook fixA EscapePost): przy PrisonEscapeGoHome - Take FEscape i LosersFlee.FreedHome (karczma / dom wedlug
+    ///    pochodzenia / pula regionu / nazwana nicosc), bez niego znika jak w grze (uzgodnienie doby ksiegi ludzi). Nic z niczego: ten sam czlowiek zmienia konto.
+    ///    Glod (D3) nie dodaje ucieczek (bez zmian); glodni robotnicy liczeni jak syci - ucieczka zalezy od wyjscia do pracy, nie od jej wydajnosci.
     /// Ekonomia: praca jencow to prawdziwa praca (wiecej punktow z tych samych pieniedzy pana), oplacona jedzeniem osady - nic z niczego, bez zlota.
     /// Potkniecia liczone (Interlocked), blad do logu raz na miejsce - bez globalnego wylacznika. Nic co klatke (postfiksy modeli - tylko petla po rosterze lochu).
     /// Linie: "Praca jencow (509): start sesji ..." i co dobe "Praca jencow (509): dzien N ...".
@@ -67,6 +80,8 @@ namespace Armoury
         private static readonly System.Collections.Generic.Dictionary<string, int> _hungerDays = new System.Collections.Generic.Dictionary<string, int>();
         private static Campaign _hungerCamp;
         private static int _dHungrySt, _dHungryGrace, _dHungryWork, _dHungerDead;
+        // 519: ucieczki robotnikow - zbiegli (do domu / do puli / do karczmy / znikneli)
+        private static int _dEsc, _dEscHome, _dEscPool, _dEscTavern, _dEscLost;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.PrisonLabor; } }
         internal static bool FoodOn { get { var s = Settings.Current; return s != null && s.DungeonPrisonersEat; } }
@@ -249,7 +264,8 @@ namespace Armoury
                 var inv = CultureInfo.InvariantCulture;
                 Log.Info(P + "start sesji | Prison Labor " + (s.PrisonLabor ? "tak" : "nie") + ": robotnik +" + s.PrisonLaborPercentPerPrisoner.ToString("0.###", inv) + "% punktow doby (ForcedLabor zarzadcy na miejscu +"
                          + s.PrisonLaborPercentForcedLabor.ToString("0.###", inv) + "%), najwyzej +" + s.PrisonLaborMaxPercent.ToString("0", inv) + "%; rana " + s.PrisonLaborInjuryPercent.ToString("0.###", inv)
-                         + "%/dobe, smierc " + s.PrisonLaborDeathPercent.ToString("0.####", inv) + "%/dobe na robotnika | Dungeon Prisoners Eat " + (s.DungeonPrisonersEat ? "tak" : "nie")
+                         + "%/dobe, smierc " + s.PrisonLaborDeathPercent.ToString("0.####", inv) + "%/dobe, ucieczka (519) " + s.PrisonLaborEscapePercent.ToString("0.####", inv)
+                         + "%/dobe na robotnika (x0.5 loch rodu gracza, perki zarzadcy jak w grze; jency w celi bez ucieczek jak w grze) | Dungeon Prisoners Eat " + (s.DungeonPrisonersEat ? "tak" : "nie")
                          + " (jeniec x" + s.DungeonPrisonerFoodShare.ToString("0.##", inv) + " porcji zalogi), postfiks jedzenia " + _note
                          + " | glod lochu (D3, przy Food 0): praca x" + HungerShareText(s) + ", po " + Math.Max(0, s.PrisonHungerGraceDays) + " dobach laski umiera "
                          + s.PrisonHungerDeathPercent.ToString("0.##", inv) + "%/dobe szeregowych jencow, ucieczek z glodu brak | perki budowy zarzadcy (Perk Build Speed On Paid Work) "
@@ -349,11 +365,68 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>519: czynnik szansy ucieczki jak w grze (PrisonerReleaseCampaignBehavior.DailyHeroTick dla lochu twierdzy): x0.5 w lochu rodu gracza,
+        /// zarzadca z SweetTalker / DungeonArchitect / MountedPatrols - 1 + suma SecondaryBonus (AddFactor), nie mniej niz 0. Czyste.</summary>
+        private static float EscapeFactor(Settlement st)
+        {
+            float f = st.OwnerClan == Clan.PlayerClan ? 0.5f : 1f;
+            float add = 0f;
+            var g = st.Town != null ? st.Town.Governor : null;
+            if (g != null)
+            {
+                if (DefaultPerks.Roguery.SweetTalker != null && g.GetPerkValue(DefaultPerks.Roguery.SweetTalker)) add += DefaultPerks.Roguery.SweetTalker.SecondaryBonus;
+                if (DefaultPerks.Engineering.DungeonArchitect != null && g.GetPerkValue(DefaultPerks.Engineering.DungeonArchitect)) add += DefaultPerks.Engineering.DungeonArchitect.SecondaryBonus;
+                if (DefaultPerks.Riding.MountedPatrols != null && g.GetPerkValue(DefaultPerks.Riding.MountedPatrols)) add += DefaultPerks.Riding.MountedPatrols.SecondaryBonus;
+            }
+            return Math.Max(0f, f * (1f + add));
+        }
+
+        /// <summary>519: ucieczki robotnikow twierdzy st tej doby (pool - zdrowi robotnicy po wypadkach). Zbieg zdjety z lochu (HitHealthy) i ta sama droga co
+        /// ucieczka ponad limit lochu partii (PeopleBook.EscapePost): przy PrisonEscapeGoHome - Take FEscape + LosersFlee.FreedHome, inaczej znika jak w grze.</summary>
+        private static void EscapeDay(Settlement st, TroopRoster pr, int pool, Settings s)
+        {
+            float pct = float.IsNaN(s.PrisonLaborEscapePercent) ? 0f : Math.Max(0f, Math.Min(100f, s.PrisonLaborEscapePercent));
+            if (pool <= 0 || !(pct > 0f)) return;
+            int esc = Math.Min(pool, MBRandom.RoundRandomized(pool * pct / 100f * EscapeFactor(st)));
+            if (esc <= 0) return;
+            Vec2 pos = st.GetPosition2D;
+            Settlement region = null; bool law = false;
+            if (s.PrisonEscapeGoHome)
+            {
+                region = OutlawLaw.PoolRegionAt(pos);
+                law = OutlawLaw.On && region != null;
+            }
+            int gone = 0;
+            for (int n = 0; n < esc; n++)
+            {
+                var ch = HitHealthy(pr, true);
+                if (ch == null) break;
+                gone++;
+                if (!s.PrisonEscapeGoHome) continue;
+                try
+                {
+                    PeopleBook.Shares org = null;
+                    try { if (PeopleBook.OriginLive && !PeopleBook.IsWight(ch)) org = PeopleBook.Take(pr, 1, PeopleBook.FEscape); } catch { org = null; }
+                    int vt, got, left;
+                    LosersFlee.BeginBattle();   // jak EscapePost: pamiec osad BK jest na jedna bitwe - ucieczka poza bitwa
+                    LosersFlee.FreedHome(ch, 1, pos, region, law, org, out vt, out got, out left);
+                    _dEscTavern += vt; _dEscHome += got;
+                    if (left > 0) { if (law) _dEscPool += left; else _dEscLost += left; }
+                }
+                catch (Exception e) { Stumble("EscapeDay(dom)", e); }
+            }
+            if (gone <= 0) return;
+            _dEsc += gone;
+            if (st.OwnerClan == Clan.PlayerClan)
+                Log.Player((gone == 1 ? "A prisoner" : gone + " prisoners") + " slipped away from the works at " + st.Name + " and escaped.", true);
+        }
+
         /// <summary>ArmouryBehavior, doba - po BuildFunding.Daily: wypadki przy pracy, liczniki i linia doby. Kazda osada we wlasnym try.</summary>
         internal static void Daily()
         {
             _dSt = _dStPerk = _dWorkers = _dInjured = _dDead = _dEaters = _dEatSt = 0; _dPctSum = _dFood = 0;
             _dHungrySt = _dHungryGrace = _dHungryWork = _dHungerDead = 0;
+            _dEsc = _dEscHome = _dEscPool = _dEscTavern = _dEscLost = 0;
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             if (!ReferenceEquals(_hungerCamp, Campaign.Current)) { _hungerDays.Clear(); _hungerCamp = Campaign.Current; }   // D3: stan jednej kampanii nie przecieka do drugiej
@@ -386,7 +459,8 @@ namespace Armoury
                     int die = Math.Min(w - hurt, MBRandom.RoundRandomized(w * Math.Max(0f, s.PrisonLaborDeathPercent) / 100f));
                     int dead = 0;
                     for (int n = 0; n < die; n++) if (HitHealthy(pr, true) != null) dead++;
-                    for (int n = 0; n < hurt; n++) { if (HitHealthy(pr, false) == null) break; _dInjured++; }
+                    int hurtDone = 0;
+                    for (int n = 0; n < hurt; n++) { if (HitHealthy(pr, false) == null) break; _dInjured++; hurtDone++; }
                     if (dead > 0)
                     {
                         try { PeopleBook.DieShares(PeopleBook.Take(pr, dead, PeopleBook.FDieWork), PeopleBook.FDieWork); } catch (Exception e) { Stumble("PeopleBook", e); }   // 509 recenzja: wlasna przyczyna FDieWork (FDieOthers = "Inni")
@@ -394,6 +468,8 @@ namespace Armoury
                         if (st.OwnerClan == Clan.PlayerClan)
                             Log.Player((dead == 1 ? "A prisoner" : dead + " prisoners") + " died in an accident at the works of " + st.Name + ".", true);
                     }
+                    // 519: ucieczki przy pracy - z robotnikow, ktorzy dotrwali doby zdrowi (po wypadkach)
+                    try { EscapeDay(st, pr, w - dead - hurtDone, s); } catch (Exception e) { Stumble("EscapeDay", e); }
                 }
                 catch (Exception e) { Stumble("Daily(osada)", e); }
             }
@@ -404,7 +480,10 @@ namespace Armoury
                 int err = Interlocked.Exchange(ref _stumbles, 0);
                 Log.Info(P + "dzien " + (int)CampaignTime.Now.ToDays + " | Prison Labor " + (s.PrisonLabor ? "tak" : "nie") + ": twierdz z budowa i pracujacymi jencami " + _dSt
                          + " (z ForcedLabor zarzadcy " + _dStPerk + "), robotnikow " + _dWorkers + ", srednia premia +" + (_dSt > 0 ? (100.0 * _dPctSum / _dSt).ToString("0.0", inv) : "0.0")
-                         + "% punktow doby; rannych przy pracy " + _dInjured + ", zmarlych " + _dDead + " | jedzenie lochow (Dungeon Prisoners Eat " + (s.DungeonPrisonersEat && _foodWired ? "tak" : "nie")
+                         + "% punktow doby; rannych przy pracy " + _dInjured + ", zmarlych " + _dDead
+                         + ", zbieglych przy pracy (519, " + s.PrisonLaborEscapePercent.ToString("0.###", inv) + "%/dobe) " + _dEsc
+                         + (s.PrisonEscapeGoHome ? " (do domu " + _dEscHome + ", do puli " + _dEscPool + ", do karczmy " + _dEscTavern + ", znikneli " + _dEscLost + ")" : " (znikaja - Prison Escape Go Home wylaczone)")
+                         + " | jedzenie lochow (Dungeon Prisoners Eat " + (s.DungeonPrisonersEat && _foodWired ? "tak" : "nie")
                          + "): twierdz " + _dEatSt + ", jencow " + _dEaters + ", zjadaja " + _dFood.ToString("0.0", inv) + " Food/dobe"
                          + " | glod lochu (D3): twierdz z Food 0 i jencami " + _dHungrySt + " (w tygodniu laski " + _dHungryGrace + "), z glodnymi robotnikami (praca x" + HungerShareText(s) + ") " + _dHungryWork
                          + ", zmarlych z glodu " + _dHungerDead + " | Perk509: " + Perk509.DayLine() + "; potkniecia " + err + ".");

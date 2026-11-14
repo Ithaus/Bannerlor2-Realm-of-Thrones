@@ -31,6 +31,9 @@ namespace Armoury
     ///     Dawne +20% sztab z niczego (IronMakerBloomBonus, 36 sztab = 18 kg z 15 kg) usuniete. Ruda (lupa) zuzywa sie dalej jedna na przepis.
     ///  41 PracticalSmith - D7 (Jeff 14.11 "o 25% krocej zrobmy, o polowe to za duzo"): stamina sztuki dalej x0.5 (perk gry), ale GODZINY lawy (stamina / 6 przy
     ///     ForgeLikeTownSmith = false) licza sie ze staminy x (1 - PracticalSmithTimeCutPercent / 100) = x0.75, nie x0.5 (HoursStamina).
+    ///     519 (D7b, Jeff 14.11 "2. tak o 25% krocej"): ta sama stawka dla BRONI z ekranu kowalstwa gry (ArmouryBehavior.OnNewItemCrafted, projekt "van"):
+    ///     godziny = stamina tej broni BEZ perka (SmithXpRule.WeaponStamina - wzor gry 10 + 5 x Tier, mnoznik klasy BK, zakres BK 15..max) x 0.75 (WeaponHoursStamina).
+    ///     Dotad godziny = koszt staminy gry Z perkiem / 6 (x0.5; przy dolnym progu BK 15 mniej). Stamina, ktora gra pobiera za bron, bez zmian (-50%).
     ///  42 ArtisanSmith (gra, PartyLeader): kara handlowa przy sprzedazy zbroi, luku i amunicji WYKUTYCH przez gracza - ten sam wzor co gra dla broni z ekranu
     ///     (AddFactor PrimaryBonus = -50% na czlonie 1.5 + 0.25 x (Tierf - 1)). Gra przyjmuje tylko ItemObject - co jest "nasze", mowi KSIEGA wykutych sztuk
     ///     (id przedmiotu -> sztuk; zapis arm_perk511): dopisuje Forge.Deliver/Finish/Smith, zdejmuje sprzedaz (PlayerInventoryExchangeEvent, isTrading) i doba (nie wiecej,
@@ -48,6 +51,7 @@ namespace Armoury
         private static int _errors, _dErrors;
         private static int _dPieces, _dStamRaw, _dStamNow, _dQualRolls, _dQualUp, _dPriced, _dSoldOurs, _dMade;
         private static int _dHoursAdj;   // D7: sztuki, ktorym godziny lawy policzono z ciecia czasu PracticalSmith (x0.75), nie ze staminy (x0.5)
+        private static int _dHoursAdjW, _dHoursW0, _dHoursW1;   // 519 (D7b): bron z ekranu gry - sztuki, stamina gry z perkiem (dawna miara godzin) -> stamina godzin
         private static readonly Dictionary<string, int> _made = new Dictionary<string, int>();
 
         private static bool _bkLooked, _bkOk;
@@ -219,6 +223,28 @@ namespace Armoury
                 return Math.Max(1, (int)Math.Round(spent * tf / sf));
             }
             catch (Exception e) { Stumble("HoursStamina", e); return spent; }
+        }
+
+        /// <summary>519 (D7b): stamina do GODZIN lawy dla broni z ekranu kowalstwa gry (ArmouryBehavior.OnNewItemCrafted przy ForgeOneClock). spent = koszt
+        /// staminy gry z perkiem (GetEnergyCostForSmithing - dotychczasowa miara). Z PracticalSmith: stamina tej broni bez perka (SmithXpRule.WeaponStamina,
+        /// ta sama funkcja co XP pracy 305d) x (1 - PracticalSmithTimeCutPercent / 100) - ta sama stawka co D7 dla zbroi, lukow i amunicji.
+        /// Bez perka / klucz PerkSmithStamina wylaczony - spent bez zmian.</summary>
+        internal static int WeaponHoursStamina(ItemObject item, Hero h, int spent)
+        {
+            if (spent <= 0 || item == null) return spent;
+            try
+            {
+                var s = S;
+                if (s == null || !s.PerkSmithStamina || h == null) return spent;
+                if (!Has(h, DefaultPerks.Crafting.PracticalSmith)) return spent;
+                int raw = SmithXpRule.WeaponStamina(item, h);                                               // stamina broni bez perka (wzor gry + BK)
+                if (raw <= 0) return spent;
+                float cut = float.IsNaN(s.PracticalSmithTimeCutPercent) ? 25f : Math.Max(0f, Math.Min(90f, s.PracticalSmithTimeCutPercent));
+                int r = Math.Max(1, (int)Math.Round(raw * (1f - cut / 100f)));                                 // x0.75 staminy bez perka
+                _dHoursAdjW++; _dHoursW0 += spent; _dHoursW1 += r;
+                return r;
+            }
+            catch (Exception e) { Stumble("WeaponHoursStamina", e); return spent; }
         }
 
         // ------------------------------------------------------------ 92: BK Craftsman w losowaniu jakosci
@@ -416,6 +442,7 @@ namespace Armoury
                      + ", stawka kuzni BK Smith " + (s != null && s.PerkSmithHireDiscount ? "TAK" : "NIE")
                      + ", przekucie lupy (D6): strata " + (s != null ? s.BloomForgeLossPercent.ToString("0", Inv) : "-") + "% masy, z IronMaker " + (s != null ? s.IronMakerBloomLossPercent.ToString("0", Inv) : "-") + "%"
                      + ", czas lawy z PracticalSmith (D7) -" + (s != null ? s.PracticalSmithTimeCutPercent.ToString("0", Inv) : "-") + "% (stamina dalej -50%)"
+                     + ", takze bron z ekranu kowalstwa gry (D7b, 519: godziny ze staminy broni bez perka x" + (s != null ? (1f - s.PracticalSmithTimeCutPercent / 100f).ToString("0.00", Inv) : "-") + ")"
                      + ", ArtisanSmith dla wlasnej roboty " + (s != null && s.PerkArtisanSmithOwnWork ? "TAK" : "NIE") + " (latka kary handlu " + price + ")"
                      + ", BK Craftsman w jakosci " + (s != null && s.PerkCraftsmanQuality ? "TAK" : "NIE") + ".");
         }
@@ -450,7 +477,7 @@ namespace Armoury
                     }
                 }
                 var hero = Hero.MainHero;
-                bool any = _dPieces + _dQualRolls + _dPriced + _dSoldOurs + _dMade + _dErrors > 0;
+                bool any = _dPieces + _dQualRolls + _dPriced + _dSoldOurs + _dMade + _dErrors + _dHoursAdjW > 0;
                 if (!any || hero == null) return;
                 int ours = 0; foreach (var v in _made.Values) ours += v;
                 Log.Info("Perki kuzni (511): doba | stamina x" + StaminaFactor(hero).ToString("0.00", Inv) + " (PracticalSmith " + (Has(hero, DefaultPerks.Crafting.PracticalSmith) ? "tak" : "nie")
@@ -458,12 +485,13 @@ namespace Armoury
                          + " | stawka kuzni x" + HireFactor().ToString("0.00", Inv)
                          + " | IronMaker " + (Has(hero, DefaultPerks.Crafting.IronMaker) ? "tak" : "nie") + " (przekucie lupy D6: strata " + BloomLossPct(hero).ToString("0", Inv) + "% masy)"
                          + " | czas lawy D7: sztuk z godzinami po PracticalSmith " + _dHoursAdj
+                         + ", bron z ekranu gry D7b " + _dHoursAdjW + " (stamina godzin " + _dHoursW0 + " -> " + _dHoursW1 + ")"
                          + " | ksiega wlasnej roboty: dopisane " + _dMade + ", sprzedane " + _dSoldOurs + ", w sakwach i na bohaterach " + ours + " (" + _made.Count + " wzorow), wyceny z ArtisanSmith " + _dPriced
                          + " | BK Craftsman: losowan " + _dQualRolls + ", w gore " + _dQualUp
                          + " | potkniecia " + _dErrors + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { _dPieces = _dStamRaw = _dStamNow = _dQualRolls = _dQualUp = _dPriced = _dSoldOurs = _dMade = _dErrors = _dHoursAdj = 0; }
+            finally { _dPieces = _dStamRaw = _dStamNow = _dQualRolls = _dQualUp = _dPriced = _dSoldOurs = _dMade = _dErrors = _dHoursAdj = _dHoursAdjW = _dHoursW0 = _dHoursW1 = 0; }
         }
     }
 }

@@ -47,6 +47,11 @@ namespace Armoury
     ///    sumuje sie z B (jeden mnoznik 1 + suma premii), najwyzej 100%. Bitwa gracza: Mission.IsNavalBattle (albo MapEvent.IsNavalMapEvent partii agenta);
     ///    bitwy AI: MapEvent.IsNavalMapEvent. Gdy NavalDeployAmmoFix TAK (perki daja znow dodatkowa amunicje) - odzysku z tych perkow NIE ma (jedna zasada,
     ///    bez podwojnej premii). Perki NavalDLC czytane odbiciem (NavalPerks+Boatswain), brak NavalDLC = nic. Klucz NavalAmmoPerksRecover.
+    /// G. 519 (D16b, Jeff 14.11 "1. tak"): ULEPSZENIA OKRETOW NavalDLC - dodatkowe kolczany (Ship.AdditionalArcherQuivers) i dodatkowe stosy broni miotanej
+    ///    (Ship.AdditionalThrowingWeaponStack) - przy NavalDeployAmmoFix NIE tez daja odzysk zamiast dodatkowej amunicji: po WYGRANEJ bitwie morskiej
+    ///    odzysk x (1 + NavalShipUpgradePercent x udzial okretow partii z tym ulepszeniem): kolczany - strzaly i belty (NavalDLC daje je tylko do IsAmmo),
+    ///    stosy - bron miotana (NavalDLC: IsConsumable i IsRangedWeapon). Udzial, bo NavalDLC daje premie tylko zalodze okretu z ulepszeniem; po bitwie
+    ///    partia liczy sie jako calosc (ten sam wzor dla bitwy gracza i AI). Sumuje sie z B i F w jednym mnozniku, najwyzej 100%. Tarcze okretow - NavalDeploy515.
     /// Bledy liczone (potkniecia), bez wylacznika. Stan: tylko liczniki doby. Linie: "Perki amunicji i zwierzat (512): start sesji" i "... dzien N".
     /// </summary>
     internal static class Perk512
@@ -64,6 +69,7 @@ namespace Armoury
         private static int _dEquipCalls, _dEquipReverted, _dEquipShots;
         private static int _dRecover, _dRecoverAi, _dXbowShots;
         private static int _dNavalRecover, _dNavalRecoverAi;   // D16: odzysk z perkiem NavalDLC (agenci bitwy gracza / pozycje AI)
+        private static int _dShipRecover, _dShipRecoverAi;     // 519 (D16b): odzysk z ulepszen okretow partii (agenci bitwy gracza / pozycje AI)
         private static int _dBreedTry, _dBreedSea, _dBreedHungry, _dBreedNoPair, _dBreedBirths, _dBreedEvents;
         private static int _dWhispTry, _dWhispFound;
         private static readonly Dictionary<string, int> _dBreedBy = new Dictionary<string, int>();
@@ -217,6 +223,29 @@ namespace Armoury
             return b;
         }
 
+        /// <summary>519 (D16b): premia odzysku z ulepszen okretow partii - tylko bitwa morska, klucz NavalShipUpgradesRecover TAK i NavalDeployAmmoFix NIE
+        /// (przy TAK NavalDLC daje znow dodatkowe kolczany / stosy - bez podwojenia). Premia = NavalShipUpgradePercent x udzial okretow partii z ulepszeniem
+        /// pasujacym do pocisku: strzaly i belty - AdditionalArcherQuivers, bron miotana - AdditionalThrowingWeaponStack (te same pola Ship co NavalDLC
+        /// NavalAgentStatCalculateModel.InitializeMissionEquipmentAfterDeploymentFinished; bez NavalDLC model kampanii zwraca 0 - premia 0).</summary>
+        private static float ShipBonus(PartyBase pb, ItemObject it, bool naval)
+        {
+            var s = S;
+            if (!naval || pb == null || it == null || s == null || !s.NavalShipUpgradesRecover || s.NavalDeployAmmoFix || s.NavalShipUpgradePercent <= 0f) return 0f;
+            bool thrown = it.ItemType == ItemObject.ItemTypeEnum.Thrown;
+            bool quiver = it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts;
+            if (!thrown && !quiver) return 0f;
+            var ships = pb.Ships;
+            if (ships == null || ships.Count == 0) return 0f;
+            int with = 0;
+            foreach (var sh in ships)
+            {
+                if (sh == null) continue;
+                if (thrown ? sh.AdditionalThrowingWeaponStack > 0 : sh.AdditionalArcherQuivers > 0) with++;
+            }
+            if (with == 0) return 0f;
+            return s.NavalShipUpgradePercent / 100f * with / ships.Count;
+        }
+
         /// <summary>Czy biezaca bitwa partii pb jest bitwa morska: misja (IsNavalBattle, bez wypadu z morza) albo MapEvent partii.</summary>
         private static bool NavalNow(PartyBase pb)
         {
@@ -237,12 +266,16 @@ namespace Armoury
                 var mp = pb != null && pb.IsMobile ? pb.MobileParty : null;
                 float b = PartyBonus(mp, it);
                 if (b > 0f) _dRecover++;
-                float nb = 0f;
-                try { nb = NavalBonus(mp, NavalNow(pb)); }
+                float nb = 0f, sb = 0f;
+                bool naval = false;
+                try { naval = NavalNow(pb); nb = NavalBonus(mp, naval); }
                 catch (Exception e) { Stumble("Recover.Naval", e); nb = 0f; }
                 if (nb > 0f) _dNavalRecover++;
-                if (b + nb <= 0f) return recover;
-                return Math.Min(1f, recover * (1f + b + nb));
+                try { sb = ShipBonus(pb, it, naval); }   // 519 (D16b): ulepszenia okretow partii
+                catch (Exception e) { Stumble("Recover.Ship", e); sb = 0f; }
+                if (sb > 0f) _dShipRecover++;
+                if (b + nb + sb <= 0f) return recover;
+                return Math.Min(1f, recover * (1f + b + nb + sb));
             }
             catch (Exception e) { Stumble("Recover", e); return recover; }
         }
@@ -255,12 +288,16 @@ namespace Armoury
                 if (!won || keep <= 0f) return f;
                 float b = PartyBonus(mp, it);
                 if (b > 0f) _dRecoverAi++;
-                float nb = 0f;
-                try { nb = NavalBonus(mp, me != null && me.IsNavalMapEvent); }   // D16: perki NavalDLC w bitwie morskiej AI
+                float nb = 0f, sb = 0f;
+                bool naval = me != null && me.IsNavalMapEvent;
+                try { nb = NavalBonus(mp, naval); }   // D16: perki NavalDLC w bitwie morskiej AI
                 catch (Exception e) { Stumble("AiLoss.Naval", e); nb = 0f; }
                 if (nb > 0f) _dNavalRecoverAi++;
-                if (b + nb <= 0f) return f;
-                return Math.Min(1f, intensity * (1f - Math.Min(1f, keep * (1f + b + nb))));
+                try { sb = ShipBonus(mp != null ? mp.Party : null, it, naval); }   // 519 (D16b): ulepszenia okretow partii
+                catch (Exception e) { Stumble("AiLoss.Ship", e); sb = 0f; }
+                if (sb > 0f) _dShipRecoverAi++;
+                if (b + nb + sb <= 0f) return f;
+                return Math.Min(1f, intensity * (1f - Math.Min(1f, keep * (1f + b + nb + sb))));
             }
             catch (Exception e) { Stumble("AiLoss", e); return f; }
         }
@@ -517,6 +554,8 @@ namespace Armoury
                      + " | D16 perki NavalDLC (WellStocked, ShipwrightsInsight) -> odzysk po wygranej bitwie morskiej " + (s != null && s.NavalAmmoPerksRecover ? "TAK" : "NIE")
                      + " +" + (s != null ? s.NavalAmmoPerkPercent.ToString("0.#", Inv) : "?") + "% za perk" + (s != null && s.NavalDeployAmmoFix ? " (NIECZYNNE: NavalDeployAmmoFix TAK - perki daja dodatkowa amunicje)" : "")
                      + " - perki " + NavalHookNow()
+                     + " | D16b ulepszenia okretow (kolczany, stosy broni miotanej) -> odzysk po wygranej bitwie morskiej " + (s != null && s.NavalShipUpgradesRecover ? "TAK" : "NIE")
+                     + " +" + (s != null ? s.NavalShipUpgradePercent.ToString("0.#", Inv) : "?") + "% x udzial okretow partii z ulepszeniem" + (s != null && s.NavalDeployAmmoFix ? " (NIECZYNNE: NavalDeployAmmoFix TAK - okrety daja dodatkowa amunicje)" : "")
                      + " | straz dawnej amunicji (Sandbox InitializeMissionEquipment) " + _ammoHook
                      + " | udzwig " + _capHook
                      + " | Breeder " + (s != null && s.BreederRealistic ? "TAK" : "NIE") + " - " + _breedHook
@@ -535,6 +574,7 @@ namespace Armoury
             _dEquipCalls = _dEquipReverted = _dEquipShots = 0;
             _dRecover = _dRecoverAi = _dXbowShots = 0;
             _dNavalRecover = _dNavalRecoverAi = 0;
+            _dShipRecover = _dShipRecoverAi = 0;
             _dBreedTry = _dBreedSea = _dBreedHungry = _dBreedNoPair = _dBreedBirths = _dBreedEvents = 0;
             _dWhispTry = _dWhispFound = 0;
             _dBreedBy.Clear();
@@ -551,6 +591,7 @@ namespace Armoury
                          + " | straz amunicji: wywolan metody gry " + _dEquipCalls + " (0 = ROT jej nie wola - dawna premia martwa), cofniete sloty " + _dEquipReverted + " (" + _dEquipShots + " szt.)"
                          + " | odzysk z perkiem wodza: agenci bitwy gracza " + _dRecover + ", pozycje AI " + _dRecoverAi
                          + " | D16 odzysk z perkami NavalDLC (bitwa morska): agenci bitwy gracza " + _dNavalRecover + ", pozycje AI " + _dNavalRecoverAi
+                         + " | D16b odzysk z ulepszen okretow: agenci bitwy gracza " + _dShipRecover + ", pozycje AI " + _dShipRecoverAi
                          + " | strzaly z kuszy z Fletcher " + _dXbowShots
                          + " | Breeder: proby " + _dBreedTry + ", morze " + _dBreedSea + ", glod " + _dBreedHungry + ", bez pary " + _dBreedNoPair
                          + ", porody " + _dBreedEvents + " (" + _dBreedBirths + " szt." + (by.Length > 0 ? ": " + by : "") + ")"

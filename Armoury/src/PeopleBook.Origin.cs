@@ -73,7 +73,7 @@ namespace Armoury
             "ulamek czlowieka bez DOM (E4/8)", "milicja bez walki do domu", "wedrowcy i konwoje BK u celu", "rozwiazane bez bitwy do domu (R6)",
             "z karczmy (WETERANI, E4/10)",
             "Straz z Muru (E4/9)", "Straz z pul wyrzutkow Westeros (E4/9)", "Straz z ludnosci Westeros (E4/9)", "Straz bez pokrycia (podloga, E4/9)", "pojmani z rabunku (E4/9)",
-            "polegli w oblezeniu (ostrzal)", "ucieczka ponad limit lochu",
+            "polegli w oblezeniu (ostrzal)", "ucieczka z lochu (ponad limit partii; przy pracy 519)",
             "rozbici pod choragiew (N7)", "wypadki przy pracy jencow (509)", "glod jencow lochu (D3)"
         };
 

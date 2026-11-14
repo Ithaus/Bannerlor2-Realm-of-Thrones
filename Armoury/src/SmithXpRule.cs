@@ -105,7 +105,7 @@ namespace Armoury
             return Recipes.For(item).Stamina;   // bez BK: nasz przepis (ta sama liczba, ktora daje latka TrueArmourCost.RangedStamina)
         }
 
-        private static int WeaponStamina(ItemObject item, Hero hero)
+        internal static int WeaponStamina(ItemObject item, Hero hero)   // 519 (D7b): takze godziny lawy broni z ekranu gry (Perk511.WeaponHoursStamina)
         {
             var m = Campaign.Current != null ? Campaign.Current.Models.SmithingModel : null;
             if (m == null) return 15;

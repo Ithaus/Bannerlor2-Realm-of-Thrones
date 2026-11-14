@@ -439,7 +439,7 @@ namespace Armoury
         public float IronMakerBloomLossPercent { get; set; } = 0f;
 
         // D7 (Jeff 14.11): PracticalSmith - czas lawy o 25% krocej
-        [SettingPropertyFloatingInteger("Practical Smith Time Cut Percent", 0f, 50f, "0", HintText = "with Smithing Perks Lighten Your Forge: Practical Smith makes armour, bows, crossbows and ammunition at your forge take this percent less time at the anvil (the stamina they cost still falls by half)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Practical Smith Time Cut Percent", 0f, 50f, "0", HintText = "with Smithing Perks Lighten Your Forge: Practical Smith makes armour, bows, crossbows and ammunition at your forge, and weapons from the game's smithing screen, take this percent less time at the anvil (the stamina they cost still falls by half)", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public float PracticalSmithTimeCutPercent { get; set; } = 25f;
 
@@ -3544,6 +3544,11 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public float PrisonLaborDeathPercent { get; set; } = 0.01f;
 
+        // 519 (Jeff 14.11)
+        [SettingPropertyFloatingInteger("Prison Labor Escape Percent", 0.000f, 1.000f, "0.000", HintText = "with Prison Labor: chance in percent each day that a working prisoner slips away from the works and escapes (half of it in your own clan's dungeons; a governor with Sweet Talker, Dungeon Architect or Mounted Patrols lowers it, as for lords in the base game). Prisoners who stay in their cells still never escape, as in the base game. With Prison Escape Go Home the runaway goes home like a freed captive. 0 = working prisoners never escape", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float PrisonLaborEscapePercent { get; set; } = 0.05f;
+
         [SettingPropertyBool("Dungeon Prisoners Eat", HintText = "prisoners held in the dungeon of a castle or town eat from its food stores, like the garrison (Dungeon Prisoner Food Share of a garrison man's ration). Off = prisoners in dungeons eat nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public bool DungeonPrisonersEat { get; set; } = true;
@@ -4448,6 +4453,15 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Naval Ammo Perk Percent", 0.00f, 50.00f, "0", HintText = "with Naval Ammo Perks Recover: how much more of its shot ammunition a party gathers back after a naval battle it wins, for each of Well Stocked and Shipwright's Insight its first mate has - a share of what it would gather anyway", RequireRestart = false)]
         [SettingPropertyGroup("Ammunition and animal perks")]
         public float NavalAmmoPerkPercent { get; set; } = 10f;
+
+        // 519 (D16b, Jeff 14.11)
+        [SettingPropertyBool("Naval Ship Upgrades Recover", HintText = "War Sails ship upgrades with extra quivers or extra stacks of throwing weapons give no extra ammunition at sea (see Naval Deploy Ammo Fix). Instead: after a naval battle it wins, a party gathers back more of its shot arrows and bolts (extra quivers) or thrown weapons (extra stacks) - Naval Ship Upgrade Percent times the share of its ships that carry the upgrade, added to the ammunition perks. Does nothing while Naval Deploy Ammo Fix is on (the ships then give their extra ammunition instead). Off = no effect from these upgrades", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public bool NavalShipUpgradesRecover { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Naval Ship Upgrade Percent", 0.00f, 50.00f, "0", HintText = "with Naval Ship Upgrades Recover: how much more of its shot ammunition a party gathers back after a naval battle it wins when all its ships carry the matching upgrade (half its ships = half of it) - a share of what it would gather anyway", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public float NavalShipUpgradePercent { get; set; } = 10f;
 
         [SettingPropertyFloatingInteger("Ammo Perk Own Percent", 0.00f, 90.00f, "0", HintText = "with Ammo Perks Rework: how much less your own crossbow (or a companion's) wears with every shot when the one shooting has Fletcher", RequireRestart = false)]
         [SettingPropertyGroup("Ammunition and animal perks")]
@@ -9517,6 +9531,11 @@ namespace Armoury
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool NavalDeployAmmoFix { get; set; } = false;
 
+        // 519 (D16b, Jeff 14.11)
+        [SettingPropertyBool("Naval Ship Shields Fix", HintText = "The shield strength upgrades of War Sails ships (and the Turtle figurehead) work in naval battles even while Naval Deploy Ammo Fix is off: the first shield of every man aboard such a ship gets its extra hit points, exactly as War Sails gives them. No extra ammunition comes with it. With Naval Deploy Ammo Fix on, War Sails does this itself. Off = no shield bonus from ships while Naval Deploy Ammo Fix is off, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool NavalShipShieldsFix { get; set; } = true;
+
         [SettingPropertyBool("Patch Target Guard", HintText = "Fix hooks aimed at an inherited rule: when Armoury, CrashScribe, Realistic Captivity, Grand Tourney or ForgeView hooks a game rule by hand after Armoury has loaded, through a mod's model that only inherits that rule (like the Banner Kings smithing cost), the hook and its later removal are moved onto the class that really holds the rule, and a hook already in place there is not added a second time. Without it the game's patching tool refuses such a hook, the Banner Kings - Realm of Thrones patch hides the refusal, and the feature silently does nothing (this is how wood at the anvil failed). Hooks of other mods are only counted in the log, never changed. Off = only report such hooks in the log", RequireRestart = false)]
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool PatchTargetGuard { get; set; } = false;
@@ -14546,6 +14565,7 @@ namespace Armoury
             s.PrisonLaborMaxPercent = PrisonLaborMaxPercent;
             s.PrisonLaborInjuryPercent = PrisonLaborInjuryPercent;
             s.PrisonLaborDeathPercent = PrisonLaborDeathPercent;
+            s.PrisonLaborEscapePercent = PrisonLaborEscapePercent;   // 519
             s.DungeonPrisonersEat = DungeonPrisonersEat;
             s.DungeonPrisonerFoodShare = DungeonPrisonerFoodShare;
             s.PrisonLaborHungryWorkPercent = PrisonLaborHungryWorkPercent;   // D3
@@ -14772,6 +14792,7 @@ namespace Armoury
             s.AmmoPerkPartyPercent = AmmoPerkPartyPercent;
             s.AmmoPerkOwnPercent = AmmoPerkOwnPercent;
             s.NavalAmmoPerksRecover = NavalAmmoPerksRecover; s.NavalAmmoPerkPercent = NavalAmmoPerkPercent;   // D16
+            s.NavalShipUpgradesRecover = NavalShipUpgradesRecover; s.NavalShipUpgradePercent = NavalShipUpgradePercent; s.NavalShipShieldsFix = NavalShipShieldsFix;   // 519 (D16b)
             s.SaddlebagsCarryPercent = SaddlebagsCarryPercent;
             s.BreederRealistic = BreederRealistic;
             s.BeastWhispererPlainMounts = BeastWhispererPlainMounts;

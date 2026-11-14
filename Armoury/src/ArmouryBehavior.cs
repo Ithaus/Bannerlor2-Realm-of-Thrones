@@ -3626,10 +3626,16 @@ namespace Armoury
                 int tier = Recipes.Grade(item);
                 float days = MathF.Max(0.1f, tier * s.WeaponDaysPerTier);   // minimum 0.1 dnia (Jeff 16.09: -80%)
                 // wpis 83: godziny z ekranu BK - koszt staminy tej sztuki / 6
+                float oldDays = days;   // "dawne" godziny (miara BK: stamina pobrana / 6) - licznik odsiadki BK (NoteQueued), bez zmian
                 if (ForgeClock.On)
-                    try { days = ForgeClock.HoursOf(Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(item, Hero.MainHero)) / 24f; } catch { }
+                    try
+                    {
+                        int cost = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(item, Hero.MainHero);
+                        oldDays = ForgeClock.HoursOf(cost) / 24f;
+                        days = ForgeClock.HoursOf(Perk511.WeaponHoursStamina(item, Hero.MainHero, cost)) / 24f;   // 519 (D7b): PracticalSmith - czas o 25% krocej (nie o polowe jak stamina)
+                    }
+                    catch { }
                 // C5 (Jeff 14.10 "jak u kowali AI"): bron kuta po vanillowemu - tyle dni pracy kowala, ile liczy warsztat AI (wylaczone - jak wyzej)
-                float oldDays = days;
                 days = ForgeClock.WorkHours(item, 1, days * 24f) / 24f;
 
                 var roster = MobileParty.MainParty.ItemRoster;

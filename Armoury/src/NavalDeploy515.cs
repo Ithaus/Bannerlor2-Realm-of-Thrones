@@ -40,6 +40,14 @@ namespace Armoury
     /// _loggedMission zerowany w linii doby. (3) Commodore + Hawk/Boar na okrecie flagowym i na okrecie agenta = drugi Add tego samego klucza w JEDNYM wywolaniu
     /// (:46 i :56) - ArgumentException, agent tracil premie zalogi (:59). Prefiks na ApplyFigureheadBonuses (DeclaredMethod, tylko Hawk/Boar przy kluczu juz
     /// w slowniku) pomija drugi wpis (zostaje pierwszy - galion flagowca, jak by bylo bez wyjatku); liczone osobno ("duplikat Commodore"), nie jako potkniecie.
+    ///
+    /// 519 (D16b, Jeff 14.11 "1. tak" na pytanie "czy wlaczyc same tarcze okretu"): przy NavalDeployAmmoFix NIE wytrzymalosc tarcz wedlug okretu
+    /// (Ship.CrewShieldHitPointsFactor: czesci okretu CrewShieldHitPointsBonusMultiplier + galion Turtle) dziala sama, bez dodatkowej amunicji. Kod NavalDLC
+    /// (NavalAgentStatCalculateModel.InitializeMissionEquipmentAfterDeploymentFinished, druga petla) odtworzony 1:1 tylko dla tarczy: pierwszy okret, na ktorym
+    /// stoi agent (MissionShip.GetIsAgentOnShip z bypassSteppedShipCheck, jak NavalDLC), nie w wypadzie z morza (IsNavalRaidBattle), pierwsza tarcza w slotach
+    /// broni -> SetHitPointsOfSlot(ModifiedMaxHitPoints x (1 + czynnik), z podniesieniem maksimum). Odbicie: NavalShipsLogic.AllShips, MissionShip.GetIsAgentOnShip,
+    /// MissionShip.ShipOrigin (szukane raz). Ten sam warunek co reszta (czynny model trafil w pusta metode bazowa, w lancuchu jest NavalDLC) - przy TAK
+    /// tarcze robi sam NavalDLC (bez podwojenia). Klucz NavalShipShieldsFix. Liczniki w linii doby (agenci z tarcza podniesiona, suma punktow).
     /// </summary>
     internal static class NavalDeploy515
     {
@@ -62,6 +70,14 @@ namespace Armoury
         // liczniki doby
         private static int _dStats, _dEquip, _dMissions, _dAmmoBefore, _dAmmoAfter, _dHpAdd, _stumbles, _dStumbles;
         private static int _dEquipDry, _dDup, _dCleared;
+        private static int _dShieldAgents, _dShieldHpAdd;   // 519: tarcze okretu przy kluczu amunicji NIE (agenci, dodane punkty wytrzymalosci)
+
+        // 519: odbicie NavalDLC dla tarcz okretu (szukane raz na proces)
+        private static bool _shTried;
+        private static Type _logicT;
+        private static PropertyInfo _pAllShips, _pShipOrigin;
+        private static MethodInfo _mOnShip;
+        private static string _shHook = "nie szukano";
         private static readonly HashSet<string> _errSites = new HashSet<string>();
 
         internal static void Reset()
@@ -73,7 +89,7 @@ namespace Armoury
             _errSites.Clear();
         }
 
-        private static void ResetDay() { _dStats = 0; _dEquip = 0; _dMissions = 0; _dAmmoBefore = 0; _dAmmoAfter = 0; _dHpAdd = 0; _dStumbles = 0; _dEquipDry = 0; _dDup = 0; _dCleared = 0; }
+        private static void ResetDay() { _dStats = 0; _dEquip = 0; _dMissions = 0; _dAmmoBefore = 0; _dAmmoAfter = 0; _dHpAdd = 0; _dStumbles = 0; _dEquipDry = 0; _dDup = 0; _dCleared = 0; _dShieldAgents = 0; _dShieldHpAdd = 0; }
 
         /// <summary>Czysci slownik galionow modelu NavalDLC (wpisy z poprzednich misji); liczy wyczyszczone wpisy do linii doby.</summary>
         private static void ClearMap(object nav)
@@ -145,6 +161,7 @@ namespace Armoury
                          + " | NavalDLC " + (navalDll ? "jest" : "BRAK - nic do naprawy")
                          + " | klucze: statystyki (galiony, Commodore, zaloga) " + (s != null && s.NavalDeployStatsFix ? "TAK" : "NIE")
                          + ", amunicja i tarcze (WellStocked, ShipwrightsInsight, kolczany okretu) " + (s != null && s.NavalDeployAmmoFix ? "TAK" : "NIE (pomiar na sucho)")
+                         + ", same tarcze okretu przy NIE (519) " + (s != null && s.NavalShipShieldsFix ? (s.NavalDeployAmmoFix ? "TAK (nieczynne - robi je NavalDLC)" : "TAK") : "NIE") + " - odbicie " + ShieldHookNow()
                          + " | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { _hook = "wyjatek " + e.GetType().Name; Stumble("EnsureHooks", e); }
@@ -248,7 +265,13 @@ namespace Armoury
                 bool dry;
                 var nav = Target(__instance, false, out dry);
                 if (nav == null) return;
-                if (dry) { _dEquipDry++; return; }
+                if (dry)
+                {
+                    _dEquipDry++;
+                    var s = Settings.Current;
+                    if (s != null && s.NavalShipShieldsFix) ShipShield(__0);   // 519 (D16b): same tarcze okretu przy kluczu amunicji NIE
+                    return;
+                }
                 int before = Ammo(__0);
                 _in = true;
                 try { nav.InitializeMissionEquipmentAfterDeploymentFinished(__0); }
@@ -260,6 +283,68 @@ namespace Armoury
             catch (Exception e) { Stumble("EquipPostfix", e); }
         }
 
+        private static string ShieldHookNow()
+        {
+            try { ShieldFind(); } catch (Exception e) { Stumble("ShieldFind", e); }
+            return _shHook;
+        }
+
+        /// <summary>519: typy NavalDLC dla tarcz okretu - raz na proces.</summary>
+        private static void ShieldFind()
+        {
+            if (_shTried) return;
+            _shTried = true;
+            _logicT = AccessTools.TypeByName("NavalDLC.Missions.MissionLogics.NavalShipsLogic");
+            var shipT = AccessTools.TypeByName("NavalDLC.Missions.Objects.MissionShip");
+            _pAllShips = _logicT != null ? AccessTools.Property(_logicT, "AllShips") : null;
+            _pShipOrigin = shipT != null ? AccessTools.Property(shipT, "ShipOrigin") : null;
+            _mOnShip = shipT != null ? AccessTools.Method(shipT, "GetIsAgentOnShip", new[] { typeof(Agent), typeof(bool) }) : null;
+            _shHook = _logicT == null ? "brak NavalDLC" : (_pAllShips != null && _pShipOrigin != null && _mOnShip != null ? "znalezione"
+                : "BRAK (" + (_pAllShips == null ? "AllShips " : "") + (_pShipOrigin == null ? "ShipOrigin " : "") + (_mOnShip == null ? "GetIsAgentOnShip" : "") + ")");
+        }
+
+        /// <summary>519 (D16b): tarcza agenta wedlug okretu, na ktorym stoi - kod NavalDLC (druga petla InitializeMissionEquipmentAfterDeploymentFinished)
+        /// tylko dla tarczy. Wolane w EquipPostfix przy kluczu amunicji NIE (czynny model w bitwie morskiej, NavalDLC w lancuchu).</summary>
+        private static void ShipShield(Agent a)
+        {
+            try
+            {
+                var mi = Mission.Current;
+                if (mi == null || mi.IsNavalRaidBattle) return;   // NavalDLC: w wypadzie z morza bez premii okretu
+                ShieldFind();
+                if (_logicT == null || _pAllShips == null || _pShipOrigin == null || _mOnShip == null) return;
+                object logic = null;
+                foreach (var b in mi.MissionBehaviors) if (b != null && _logicT.IsInstanceOfType(b)) { logic = b; break; }
+                if (logic == null) return;
+                var all = _pAllShips.GetValue(logic, null) as System.Collections.IEnumerable;
+                if (all == null) return;
+                var args = new object[] { a, true };
+                foreach (var ms in all)
+                {
+                    if (ms == null || !(bool)_mOnShip.Invoke(ms, args)) continue;
+                    var ship = _pShipOrigin.GetValue(ms, null) as Ship;   // w kampanii ShipOrigin to Ship (bitwa wlasna gry - inny typ, pomijamy)
+                    if (ship == null) return;
+                    float f = ship.CrewShieldHitPointsFactor;
+                    if (Math.Abs(f) <= 1E-05f) return;   // ten sam prog co NavalDLC
+                    var eq = a.Equipment;
+                    for (var i = EquipmentIndex.WeaponItemBeginSlot; i < EquipmentIndex.ExtraWeaponSlot; i++)
+                    {
+                        var w = eq[i];
+                        if (w.IsEmpty) continue;
+                        var wc = w.GetWeaponComponentDataForUsage(0);
+                        if (wc == null || !wc.IsShield) continue;
+                        short before = w.HitPoints;
+                        eq.SetHitPointsOfSlot(i, (short)(w.ModifiedMaxHitPoints * (1f + f)), true);   // jak NavalDLC: z podniesieniem maksimum
+                        _dShieldAgents++;
+                        _dShieldHpAdd += eq[i].HitPoints - before;
+                        return;   // NavalDLC: tylko pierwsza tarcza
+                    }
+                    return;   // NavalDLC: tylko pierwszy okret agenta
+                }
+            }
+            catch (Exception e) { Stumble("ShipShield", e); }
+        }
+
         internal static void Daily(int day)
         {
             try
@@ -269,10 +354,11 @@ namespace Armoury
                     ClearMap(_naval);          // slownik galionow NavalDLC - po misji juz niepotrzebny
                     _loggedMission = null;     // bez trzymania ostatniej Mission
                 }
-                if (_dMissions == 0 && _dStumbles == 0 && _dCleared == 0) { ResetDay(); return; }
+                if (_dMissions == 0 && _dStumbles == 0 && _dCleared == 0 && _dShieldAgents == 0) { ResetDay(); return; }
                 Log.Info(P + "dzien " + day + " | bitew morskich " + _dMissions + " | lancuch: " + _walk + " | przekazane: statystyki " + _dStats + " agentow (Oxen +HP "
                          + _dHpAdd + "), ekwipunek " + _dEquip + " agentow - amunicja " + _dAmmoBefore + " -> " + _dAmmoAfter + " szt. (WellStocked, ShipwrightsInsight, kolczany okretu)"
                          + ", klucz amunicji NIE - pominietych (dostaliby amunicje NavalDLC) " + _dEquipDry + " agentow"
+                         + " | tarcze okretu przy NIE (519): agentow " + _dShieldAgents + ", +" + _dShieldHpAdd + " pkt wytrzymalosci"
                          + " | duplikat Commodore (Hawk/Boar na dwoch okretach, blad NavalDLC - pominiety drugi wpis) " + _dDup
                          + " | slownik galionow NavalDLC: wyczyszczono " + _dCleared + " wpisow"
                          + " | potkniecia doby " + _dStumbles + " (od startu " + _stumbles + ").");
