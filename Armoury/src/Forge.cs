@@ -100,6 +100,7 @@ namespace Armoury
                     if (roll <= qp.P) { quality = qp.Q; break; }
                     roll -= qp.P;
                 }
+                quality = Perk511.Craftsman(quality, smith);   // 511 (perki): BK Craftsman - 5% szansy na stopien wyzej (przed sufitem tieru)
                 quality = CapQualityByTier(quality, Recipes.Grade(item));
                 // zbroja z kuzni jak bron: modyfikator z drabinki cen grupy zbroi (w grupie chain etykiety jakosci sa pomieszane)
                 if (item.HasArmorComponent && ArmourQuality.CraftOn) return ArmourQuality.Grade(group, quality);
@@ -282,7 +283,8 @@ namespace Armoury
                 if (!Recipes.HasMaterials(r))
                 { Log.Player(ForgeBill.On ? ForgeBill.ShortText(ForgeBill.Of(item, r), false) : "You lack the materials.", true); return false; }   // m109-kuznia: napis z rachunku - czego i ile brakuje
                 float reliefPre = Helper.Relief(Helper.Find());
-                int staminaNeed = MathF.Max(1, (int)(r.Stamina * (1f - reliefPre * s.HelperStaminaRelief)));
+                int stamPerk = Perk511.Stamina(r.Stamina, Hero.MainHero);   // 511 (perki): PracticalSmith i BK Smith
+                int staminaNeed = MathF.Max(1, (int)(stamPerk * (1f - reliefPre * s.HelperStaminaRelief)));
                 if (Stamina() < staminaNeed)
                 { Log.Player("You are too spent to start such work. Rest first.", true); return false; }
 
@@ -305,7 +307,8 @@ namespace Armoury
                 float relief = Helper.Relief(helper);
 
                 TakeFor(item, r);   // m97-surowce: surowiec luku schodzi na starcie roboty, jak reszta materialow (m109-kuznia: jedna funkcja zdjecia - ta sama w tescie rachunku)
-                SpendStamina(MathF.Max(1, (int)(r.Stamina * (1f - relief * s.HelperStaminaRelief))));
+                int stamSpent = MathF.Max(1, (int)(stamPerk * (1f - relief * s.HelperStaminaRelief)));
+                SpendStamina(stamSpent); Perk511.NoteSpent(MathF.Max(1, (int)(r.Stamina * (1f - relief * s.HelperStaminaRelief))), stamSpent);   // 511: licznik doby
                 days = s.ForgeTakesTime ? MathF.Max(0.5f, r.Tier * s.DaysPerTier * Project.TimeFactor(tempo)) * ForgeClock.TimeMult : 0f;   // m109-czas: x ForgeTimeMult
                 // C5 (Jeff 14.10 "jak u kowali AI"): podstawa = dni kowala z warsztatu AI x godziny dnia kowala (tempo i pomocnik jak dotad)
                 if (s.ForgeTakesTime && ForgeClock.LikeTown) days = MathF.Max(0.25f / 24f, ForgeClock.WorkHours(item, 1, 24f * r.Tier * s.DaysPerTier) / 24f * Project.TimeFactor(tempo));
@@ -380,7 +383,7 @@ namespace Armoury
             // Jeff 07.10: "koszt kuzni to koszt kuzni, a co ja kuje to moja sprawa" - przy ForgeHireHistorical jedna cena dnia kuzni w
             // tym miescie (DayRentFee), bez wzgledu na to, co kujesz; wylaczone - dawna oplata wedle tieru
             if (s.ForgeHireHistorical) return DayRentFee(TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement);
-            return s.ForgeFeeBase + s.ForgeFeePerTier * r.Tier;
+            return (int)Math.Round((s.ForgeFeeBase + s.ForgeFeePerTier * r.Tier) * Perk511.HireFactor());   // 511 (perki): BK Smith -15% stawki kuzni
         }
 
         // ------------------------------------------------------------ kuznia za kazdy dzien roboty (Jeff 07.10: "za kazdy dzien kuznia")
@@ -426,7 +429,7 @@ namespace Armoury
         internal static float ForgeDayRent(TaleWorlds.CampaignSystem.Settlements.Settlement st)
         {
             var s = Settings.Current;
-            return Math.Max(1f, Math.Max(0, s.ForgeFeeBase) * TownWage.Index(st));
+            return Math.Max(1f, Math.Max(0, s.ForgeFeeBase) * TownWage.Index(st) * Perk511.HireFactor());   // 511 (perki): BK Smith -15% (dzien gracza: karnet, projekt, stawka godzinowa)
         }
 
         /// <summary>
@@ -446,6 +449,7 @@ namespace Armoury
                     try { mod = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(modifierId); } catch { }
                 count = Math.Max(1, count);
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, mod), count);
+                Perk511.Made(item, count);   // 511 (perki): ksiega wlasnej roboty (bron z ekranu gry pomija - gra ma ja jako IsCraftedWeapon)
                 // nazwa ze stanem jak w ekwipunku ("Rusty Brigandine"): sam tekst modyfikatora niesie {ITEMNAME} ostatniej ogladanej
                 // sztuki; bron kuta po vanillowemu (IsCraftedByPlayer) gra nazywa bez stanu - tam zostaje stary napis
                 string named = (mod != null ? mod.Name + " " : "") + item.Name;
@@ -492,6 +496,7 @@ namespace Armoury
                 int made = (item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)
                     ? MathF.Max(1, Settings.Current.AmmoBatchStacks) : 1;
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, quality), made);
+                Perk511.Made(item, made);   // 511 (perki): ksiega wlasnej roboty
                 CraftPopup.Show(item, quality, made);
                 // czeladnik uczy sie przez caly projekt, nie tylko przy
                 // rozpaleniu: podloga 15% (terminator ze skillem 0 tez cos
@@ -635,10 +640,11 @@ namespace Armoury
                     Log.Player("You lack the materials for it" + (miss != null && miss.Count > 0 ? ": " + string.Join(", ", miss.ToArray()) : "") + ".", true);
                     return;
                 }
-                if (Stamina(hero) < r.Stamina)
+                int stamPerk = Perk511.Stamina(r.Stamina, hero);   // 511 (perki): PracticalSmith i BK Smith - zmeczenie i godziny lawy; XP z przepisu (305d)
+                if (Stamina(hero) < stamPerk)
                 { Log.Player("You are too spent to work the forge. Rest first.", true); return; }
 
-                SpendStamina(r.Stamina, hero);
+                SpendStamina(stamPerk, hero); Perk511.NoteSpent(r.Stamina, stamPerk);
 
                 if (MBRandom.RandomFloat < FailureChance(r, 1, hero))
                 {
@@ -660,9 +666,9 @@ namespace Armoury
                 if (ForgeClock.On && TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement != null)
                 {
                     // wpis 83: na lawe kowala, wydanie po godzinach z ekranu BK (stamina / 6)
-                    float fh = ForgeClock.WorkHours(item, made, ForgeClock.HoursOf(r.Stamina));   // C5: dni kowala z warsztatu AI x sztuk serii (wylaczone - stamina / 6)
+                    float fh = ForgeClock.WorkHours(item, made, ForgeClock.HoursOf(stamPerk));   // C5: dni kowala z warsztatu AI x sztuk serii (wylaczone - stamina / 6; 511: stamina po perkach, jak zakladka BK)
                     ForgeClock.Queue(item, quality, made, fh);
-                    ForgeClock.NoteQueued(item, made, fh, ForgeClock.HoursOf(r.Stamina));
+                    ForgeClock.NoteQueued(item, made, fh, ForgeClock.HoursOf(stamPerk));
                     if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId)) ArmouryBehavior.Legends.Add(item.StringId);
                     RangedLore.OnCrafted(item, hero);   // m96-wzory: losowanie wedlug reki kowala przy kowadle
                     SmithXp.Tag(SmithXpRule.SourceOf(item));   // 305d
@@ -673,6 +679,7 @@ namespace Armoury
                     return;
                 }
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, quality), made);
+                Perk511.Made(item, made);   // 511 (perki): ksiega wlasnej roboty (ArtisanSmith przy sprzedazy)
                 // okno wyniku jak przy mieczach (Jeff 29.08: "wykulem luk i nie
                 // pojawilo sie okienko!") - amunicja bez popupu, bo seryjna
                 if (item.ItemType != ItemObject.ItemTypeEnum.Arrows

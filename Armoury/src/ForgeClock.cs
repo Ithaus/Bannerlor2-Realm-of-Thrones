@@ -188,6 +188,7 @@ namespace Armoury
             if (b == null || here == null)
             {
                 MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(item, mod), Math.Max(1, count));
+                Perk511.Made(item, Math.Max(1, count));   // 511 recenzja: awaryjne wydanie tez do ksiegi wlasnej roboty (zwykla droga: StartProject -> Deliver)
                 return;
             }
             b.StartProject(item, 1, hours / 24f, here, "bk", mod != null ? mod.StringId : "", Math.Max(1, count));

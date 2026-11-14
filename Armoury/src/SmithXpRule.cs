@@ -99,7 +99,8 @@ namespace Armoury
             {
                 var cfg = _bkInst.GetValue(null, null);
                 var model = cfg != null ? _bkModel.GetValue(cfg, null) : null;
-                if (model != null) return (int)_bkStam.Invoke(model, new object[] { item, hero });
+                Perk511.NoPerk++;   // 511 (perki): XP pracy ze staminy przepisu - perki kuzni (latka RangedStamina) nie tna nauki
+                try { if (model != null) return (int)_bkStam.Invoke(model, new object[] { item, hero }); } finally { Perk511.NoPerk--; }
             }
             return Recipes.For(item).Stamina;   // bez BK: nasz przepis (ta sama liczba, ktora daje latka TrueArmourCost.RangedStamina)
         }

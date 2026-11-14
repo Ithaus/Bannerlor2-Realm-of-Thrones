@@ -2831,7 +2831,7 @@ namespace Armoury
                     var r = Recipes.For(item);
                     bool locked = r.SkillNeeded > skill;
                     bool hasMats = Recipes.HasMaterials(r);
-                    bool hasStamina = Forge.Stamina() >= r.Stamina;
+                    bool hasStamina = Forge.Stamina() >= Perk511.Stamina(r.Stamina, Hero.MainHero);   // 511 (perki)
                     bool legend = Recipes.IsLegendary(item);
                     string legendWhy = null;
                     bool rare = PatternGate.RareStuff(item);   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - szary, z powodem
@@ -2860,7 +2860,7 @@ namespace Armoury
                                   (unknown && !rare ? (PatternGate.IsForgeUnique(item) ? "A famed piece - seize the original and melt it down, or take it apart (200 Smithing).\n"
                                                               : "Pattern NOT yet discovered - the craft itself will teach you (keep making bows and crossbows).\n") : "") +
                                   (ForgeBill.On ? ForgeBill.Describe(ForgeBill.Of(item, r)) : Recipes.Describe(r)) + stats +   // m109-kuznia: ten sam rachunek co rzad na ekranie kucia
-                                  "\nStamina " + r.Stamina + " (you have " + Forge.Stamina() + ")" +
+                                  "\nStamina " + Perk511.Stamina(r.Stamina, Hero.MainHero) + " (you have " + Forge.Stamina() + ")" +   // 511 (perki)
                                   "\nSmithing " + r.SkillNeeded + " required (yours: " + skill + ")" +
                                   (locked ? "\nBeyond your hand for now." : "\nRisk of ruining it: " + fail + "%") +
                                   (hasMats ? "" : "\nYou lack materials.") +

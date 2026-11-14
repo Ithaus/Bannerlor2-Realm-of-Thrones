@@ -90,6 +90,7 @@ namespace Armoury
                 try { A16Signals.ApplyAll(_harmony); } catch (Exception e) { Log.Error("A16Signals.ApplyAll", e); }   // A16: premia pokoju RBL po 30 dobach spokoju, dubel warstwy dobrobytu BK, pomiar ludnosci BK (latki pomiaru zawsze)
                 SellByCondition.ApplyAll(_harmony);  // cena sprzedazy sprzetu (B): ksiega skupu (tylko log) - kto sprzedaje: ekran handlu gracza, SellItemsAction
                 TrueArmourCost.ApplyAll(_harmony);
+                try { Perk511.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Perk511.ApplyAll", e); }   // 511 (perki kuzni): postfiks kary handlu Default (Priority.First) - ArtisanSmith dla wlasnej roboty gracza
                 // m110-animacje: latka HP sprzetu na Agent.InitializeSpawnEquipment - TU, nie w PatchAll z OnSubModuleLoad (tam psula indeksy akcji: postac lezy w ekwipunku)
                 try { HeroHp.Install(_harmony); } catch (Exception e) { Log.Error("HeroHp.Install", e); }
                 // 379: celnosc machin wedlug Engineering operatora, losowy czlowiek szyku i losowy cel sposrod podobnych (prefiksy ShootProjectile / AddCustomMissile, postfiksy celu); wlasny try
