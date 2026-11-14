@@ -31,7 +31,7 @@ namespace Armoury
     ///  - postfiks na BKCompanionPrices.GetHeroWage (metoda zadeklarowana w BK; BK woluje ja dla bohatera poza wodzem): wynik = zold z tabeli (z PaidInPromise
     ///    wodza) MINUS to, co BK juz policzyl w (1) od TroopWage x BaseWage - razem dokladnie zold z tabeli (przy BaseWage 1.25 linia z imieniem w opisie
     ///    zoldu jest lekko ujemna: czesc (1) jest wieksza);
-    ///  - postfiks na BKPartyWageModel.GetTotalWage (zadeklarowana w BK, ogniwo lancucha BKROT -> ROT -> NavalDLC -> BEE -> BK): wodz z rodu gracza (GetHeroWage
+    ///  - postfiks na BKPartyWageModel.GetTotalWage (zadeklarowana w BK, ogniwo lancucha BKROT -> ROT -> BEE -> BK, od 515 przy NavalModelsUnderBk z NavalDLC miedzy BEE a BK): wodz z rodu gracza (GetHeroWage
     ///    mu BK nie liczy) - korekta (tabela - czesc (1)) jedna linia z jego imieniem; Priority.High - przed postfiksem MountedWage na tej samej metodzie;
     ///  - SoldierPay.Route (partia rodu, czesc zaplacona): czesc tych bohaterow (tabela x czynniki partii x odsetek zaplaconego zoldu partii) do ich Hero.Gold,
     ///    reszta do sakiewki ludzi jak dotad (PayFromWage). Zold oddany do obiegu - MoneyLedger.NoteWageRouted, jak sakiewki. Limity sakiewki ludzi
@@ -358,7 +358,7 @@ namespace Armoury
             _fBw = AccessTools.DeclaredField(bkT, "baseWage");
             var seen = new List<object>();
             var q = new Queue<object>();
-            // BKROT (czynny) dziedziczy po BK, ale jego wywolanie bazowe GetTotalWage idzie lancuchem BkrotChains (ROT -> NavalDLC -> BEE -> BK) - najpierw glowa
+            // BKROT (czynny) dziedziczy po BK, ale jego wywolanie bazowe GetTotalWage idzie lancuchem BkrotChains (ROT -> BEE -> BK; od 515 przy NavalModelsUnderBk: ROT -> BEE -> NavalDLC -> BK) - najpierw glowa
             // lancucha i obiekt DOKLADNIE typu BK na jego dnie; obiekt pochodny (BKROT) tylko w zapasie
             var active = Campaign.Current.Models.PartyWageModel;
             object head = null;

@@ -814,6 +814,9 @@ namespace Armoury
         // 513 (perki leczenia): okna i liczniki linii doby od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak 501)
         private readonly bool _p513Reset = P513Reset();
         private static bool P513Reset() { try { Perk513.Reset(); } catch (Exception e) { Log.Error("P513Reset", e); } return true; }
+        // 515 (perki 43/46/100/102): liczniki i pamiec kampanii od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak 501)
+        private readonly bool _p515Reset = P515Reset();
+        private static bool P515Reset() { try { ScoutPace515.Reset(); NavalDeploy515.Reset(); NavalSplice515.Reset(); } catch (Exception e) { Log.Error("P515Reset", e); } return true; }
         // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
         private readonly bool _p6a7Reset = P6a7Reset();
         private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
@@ -2728,6 +2731,7 @@ namespace Armoury
             try { PerfD2.EnsureHooks(); } catch (Exception e) { Log.Error("PerfD2.EnsureHooks", e); }   // perf-d2d3: straznik i prefiks podatku miast BK (PerfTownTaxSkipBk) - PO PopulationLaw (SubModule), CouncilWages35 i Seal31B; linia startowa "Szybkosc doby (perf-d2d3)"   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { KingdomTreasury.OptimStartLine(); } catch (Exception e) { Log.Error("KingdomTreasury.OptimStartLine", e); }   // m99-optym: linia startu "Optym (m99): start" (wlaczone optymalizacje)
             try { FiefGrants.EnsureHooks(); } catch (Exception e) { Log.Error("FiefGrants.EnsureHooks", e); }   // PROJEKT-LENNA (14.10): regula N nadan zdobytych twierdz - latki na model BK / BKROT i decyzje gry w kampanii (raz na proces), linia "Nadania lenn (N)"
+            try { NavalSplice515.EnsureHooks(); } catch (Exception e) { Log.Error("NavalSplice515.EnsureHooks", e); } try { NavalDeploy515.EnsureHooks(); } catch (Exception e) { Log.Error("NavalDeploy515.EnsureHooks", e); } try { ScoutPace515.SessionStart(); } catch (Exception e) { Log.Error("ScoutPace515.SessionStart", e); }   // 515 (perki 102/100/43): modele NavalDLC pod BK (przed linia P4 - lancuch zoldu z NavalDLC), NavalDLC po rozstawieniu, perki zwiadu a kolumna - linie startu "(515)"
             try { BkrotChains.EnsureHooks(); } catch (Exception e) { Log.Error("BkrotChains.EnsureHooks", e); }   // P4 audytu (AM-13, AM-09, AM-19): lancuchy modeli pod BKROT (predkosc, mapa, morale w bitwie, zold) - latki raz na proces, linia "Lancuchy modeli BKROT (P4): start"
             try { Perk514.EnsureHooks(); } catch (Exception e) { Log.Error("Perk514.EnsureHooks", e); }   // 514 (perki 70-98): polowki perkow BK z opisow - latki kampanii (raz na proces), linia "Perki BK (514): start sesji"
             try { ShipsToPort181.Reset(); } catch (Exception e) { Log.Error("ShipsToPort181.Reset", e); }   // 3.1/3.3 (33) 181: statki do portu - stan dzienny i konteksty od zera w kazdej kampanii (latki wpiete przy starcie gry)
@@ -3065,6 +3069,7 @@ namespace Armoury
             try { FoodChain.Daily(); } catch (Exception e) { Log.Error("FoodChain.Daily", e); } DayProfile.Lap("FoodChain.Daily");   // E4/6a: raz na kampanie linia "Lancuch modelu jedzenia (E4/6a)"
             try { BkrotChains.Daily(); } catch (Exception e) { Log.Error("BkrotChains.Daily", e); } DayProfile.Lap("BkrotChains.Daily");   // P4 audytu: linia "Lancuchy modeli BKROT (P4): dzien N" (predkosc na morzu, zold Innych / Nieskalanych / na morzu, wzrok)
             try { Perk514.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Perk514.Daily", e); } DayProfile.Lap("Perk514.Daily");   // 514: Lithurgy (kaplani), Helmsman (morale), linia "Perki BK (514): dzien N"
+            try { int d515 = (int)CampaignTime.Now.ToDays - 1; NavalSplice515.Daily(d515); NavalDeploy515.Daily(d515); ScoutPace515.Daily(d515); } catch (Exception e) { Log.Error("515.Daily", e); } DayProfile.Lap("515.Daily");   // 515 (perki): linie "Modele NavalDLC pod BK (515)", "NavalDLC po rozstawieniu (515)", "Perki zwiadu a kolumna (515)": dzien N
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); } DayProfile.Lap("WinterBite.OnDaily");
             try { HarvestYear.Daily(); } catch (Exception e) { Log.Error("HarvestYear.Daily", e); } try { HerdCull.Daily(); } catch (Exception e) { Log.Error("HerdCull.Daily", e); } DayProfile.Lap("HarvestYear/HerdCull");   // R3-05e/f: rok urodzaju (losowanie w oknie zniw), okno uboju jesiennego i splata stad
             var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 146: ksiega towarow - zboze z furazu armii (tylko licznik)

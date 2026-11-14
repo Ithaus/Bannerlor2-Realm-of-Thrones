@@ -12,7 +12,7 @@ namespace Armoury
 {
     /// <summary>
     /// 338 grupa 1 - ZOLD ZALOG (Barracks miasta -5/-10/-15%, Barracks zamku -10/-20/-30%, Castellan's Office -10/-20/-30%, projekt Slacken Garrison -5%).
-    /// Gra czyta GarrisonWageReduction tylko w DefaultPartyWageModel.GetTotalWage:147; czynny lancuch BKROT -> ROT -> NavalDLC -> BEE -> BK tej metody nie wola,
+    /// Gra czyta GarrisonWageReduction tylko w DefaultPartyWageModel.GetTotalWage:147; czynny lancuch BKROT -> ROT -> BEE -> BK (od 515 przy NavalModelsUnderBk: ROT -> BEE -> NavalDLC -> BK) tej metody nie wola,
     /// a kopia BK (BKPartyWageModel:208-214) bierze tylko wartosci > 0 (w grze sa ujemne) - efekt martwy (at337: 213 twierdz, ok. 31 400 zl/d).
     /// Naprawa: w zewnetrznym GetTotalWage zalogi (MountedWage.TotalPostfix - ten sam licznik "wywolanie wewnetrzne tej samej partii" co WW-J/288/289)
     /// town.AddEffectOfBuildings(GarrisonWageReduction) - jak czysta gra: AddFactor do tego samego wyniku, projekt dzienny tylko biezacy, bez dzielenia przez 100.
