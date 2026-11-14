@@ -60,7 +60,7 @@ namespace Armoury
     /// Ciche logi (recenzja, uwaga 2): liczniki predkosci i potkniec zerowane takze w dobie bez linii - linia mowi o tej samej dobie co spis godzinny.
     /// Podloga gry (recenzja, uwaga 3): partia na LimitMin (MinimumSpeed 1, np. dlug snu 3 = -90% w NightRest po nas) traci premie i w modelu, i u nas -
     /// audyt liczy ja osobno ("na podlodze LimitMin"), poza srednia premii i "zjedzona przez sufit".
-    /// Klucze: MapRoadSpeedBonus (TAK), MapRoadSpeedPercent (15), MapRoadMargin (0.4; od n20-drogi tylko przy MapRoadWideField NIE). Wylaczony klucz = sciezka sprzed zmiany (SpeedRoad i postfiks
+    /// Klucze: MapRoadSpeedBonus (TAK), MapRoadSpeedPercent (od 520: 30; wartosc - Settings.cs), MapRoadMargin (0.4; od n20-drogi tylko przy MapRoadWideField NIE). Wylaczony klucz = sciezka sprzed zmiany (SpeedRoad i postfiks
     /// pamieci wychodza od razu; plik nie jest wczytywany).
     ///
     /// n20-drogi (noc 19/20.10, Jeff: "rozszerz nieco pole +15% do predkosci na drodze glownej i daj +7.5% na drogach pobocznych ... bo teraz te drogi nic
@@ -72,11 +72,11 @@ namespace Armoury
     ///  - DROGI BOCZNE: drogi do wiosek z planu MapSideRoads (te same lamane, ktore widac na mapie - MapSideRoadsView po skonczonym planie wola SidePublish)
     ///    dokladane do siatki jako odcinki co ok. 1 jedn. (os planu co 0.25 - blad cieciwy ok. 0.06), pol-szerokosc = szerokosc pasa planu / 2.
     ///    Siatka wspolna: w kazdej komorce najpierw odcinki traktow, potem bocznych (indeksy rosnace) - Kind() zwraca 2 trakt, 1 boczna, 0 nic; trakt
-    ///    wygrywa. Partia na bocznej dostaje +MapSideRoadSpeedPercent% (domyslnie 7.5) jako wpis "Side road" i sufit kolumny w gore o ten sam procent.
+    ///    wygrywa. Partia na bocznej dostaje +MapSideRoadSpeedPercent% (domyslnie od 520: 15) jako wpis "Side road" i sufit kolumny w gore o ten sam procent.
     ///    Siatke wspolna buduje watek z puli (raz na plan), publikacja jedna referencja pod blokada (_pubLock - tylko watek glowny i watek budowy;
     ///    sciezka predkosci czyta bez blokad). Drogi boczne wylaczone na mapie / plan od nowa / koniec mapy -> SideClear (wraca siatka samych traktow).
     ///    Pamiec partii: stan 1 poza droga, 2 trakt, 3 boczna - zmiana rodzaju drogi = przeliczenie predkosci (postfiks pamieci).
-    ///    Klucze nowe: MapSideRoadSpeedBonus (TAK), MapSideRoadSpeedPercent (7.5); oba wymagaja MapRoadSpeedBonus i widocznych drog bocznych (MapSideRoads).
+    ///    Klucze nowe: MapSideRoadSpeedBonus (TAK), MapSideRoadSpeedPercent (od 520: 15); oba wymagaja MapRoadSpeedBonus i widocznych drog bocznych (MapSideRoads).
     /// </summary>
     internal static class MapRoads
     {

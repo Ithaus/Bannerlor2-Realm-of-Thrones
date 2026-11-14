@@ -28,8 +28,8 @@ namespace Armoury
     ///
     /// GRA: MapRoads.Build pyta Order o kolejnosc odcinkow siatki - V, mosty, trakty, szlaki (w komorce wygrywa pierwszy trafiony odcinek, wiec droga Valyrii
     /// wygrywa na rozstajach). Klasa odcinka w Grid.Cls; rodzaj czynny liczy Eff z kluczy (wylaczony klucz = trakt, most = nic - jak przed zmiana).
-    ///  - droga Valyrii: +max(MapValyrianRoadSpeedPercent (25), MapRoadSpeedPercent)% jako wpis "Valyrian road" (co najmniej jak trakt);
-    ///  - szlak karawan: +MapSideRoadSpeedPercent (7.5)% jako wpis "Caravan trail" (jak droga boczna; klucz MapEssosCaravanTrails);
+    ///  - droga Valyrii: +max(MapValyrianRoadSpeedPercent (od 520: 50), MapRoadSpeedPercent)% jako wpis "Valyrian road" (co najmniej jak trakt);
+    ///  - szlak karawan: +MapSideRoadSpeedPercent (od 520: 15)% jako wpis "Caravan trail" (jak droga boczna; klucz MapEssosCaravanTrails);
     ///  - KindAt bez zmian (2 dla kazdej farby i mostu Valyrii) - bloto (MapMud), audyty i "na trakcie" w AI drog licza je jak dotad; AiRoadRoutes bierze
     ///    koszt z KindClassAt / ClassOfPoint (te same procenty), mosty Valyrii sa krawedziami sieci AI (przy wlaczonym kluczu na starcie budowy sieci).
     ///  - pola (p6-pola, RectHit) i szubienice (rozstaje z pliku) bez zmian - most to nie farba.

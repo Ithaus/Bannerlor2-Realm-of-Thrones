@@ -1473,7 +1473,7 @@ Uzycie (Python 3, tylko odczyt):
 --grupa ndrogi    : (noc 17/18.10, Jeff 16.10 lista pkt 4 i 17.10 "szybsze poruszanie po drogach"; galaz w-toku/sw-drogi, Armoury/src/MapRoads.cs, plik
                     Armoury/ModuleData/arm_map_roads_geo.tsv) python -I tools/sprawdz_logi.py --grupa ndrogi <Armoury-*.log> (strumieniowo). NDR-0 start sesji: plik drog
                     wczytany (lamanych >= 300, punktow >= 10 000, zle wiersze 0, mapa ROT zgodna), premia CZYNNA; NDR-1 latka pamieci predkosci MobileParty.IsLastSpeedCacheInvalid
-                    wpieta; NDR-2 linie "Drogi (DR): dzien N" rozpoznane; NDR-3 udzial partio-godzin AI w ruchu na drodze 1-25% (symulacja tras AI sondy: 4.9%); NDR-4 premia
+                    wpieta; NDR-2 linie "Drogi (DR): dzien N" rozpoznane; NDR-3 udzial partio-godzin AI w ruchu na drodze >= 1% (od 520 bez gornej granicy - cel 520 to wiecej jazdy droga); NDR-4 premia
                     liczona i przeliczenia wymuszone zmiana drogi > 0; NDR-5 audyt AI na drodze: premia rzeczywista = premia +-1.5 pp, wpis Road, zjedzona przez sufit <= 5%,
                     pamiec gry zgodna >= 80%; NDR-6 gracz na drodze: premia w calosci i wynik <= LimitMax, "Audyt predkosci" z Road bez "Maximum" < -0.01; NDR-7 koszt (spis
                     <= 5 ms/dobe, postfiks pamieci <= 2 us/wywolanie); NDR-8 potkniecia i ERROR 0; NDR-9 rozbicie wedlug rodzaju (INFO). Log bez paczki: INFO, bez wyjatku.
@@ -36501,7 +36501,7 @@ def ndrogi_main(logp):
     MapRoadSpeedPercent / MapRoadMargin): partia ladowa na drodze ROT (plik ModuleData/arm_map_roads_geo.tsv) +15% predkosci w latce MarchPace (wpis "Road", sufit kolumny
     w gore o ten sam procent), postfiks pamieci predkosci gry. Wejscie: log Armoury (strumieniowo).
     NDR-0 start sesji: plik wczytany (lamanych >= 300, punktow >= 10 000, zle wiersze 0, mapa zgodna), premia CZYNNA; NDR-1 latka pamieci predkosci wpieta (linia przy starcie
-    gry i w linii sesji); NDR-2 linie doby rozpoznane; NDR-3 udzial partio-godzin AI w ruchu na drodze 1-25% (symulacja na trasach AI sondy przy marginesie 0.4: 4.9%);
+    gry i w linii sesji); NDR-2 linie doby rozpoznane; NDR-3 udzial partio-godzin AI w ruchu na drodze >= 1% (od 520-fix bez gornej granicy 25%: cel 520 - AI droga, w strone 60%);
     NDR-4 premia naprawde liczona (liczenia z premia > 0, gdy partio-godziny na drodze > 0) i przeliczenia wymuszone zmiana drogi > 0 (latka pamieci dziala);
     NDR-5 audyt AI na drodze: premia rzeczywista sr. = premia +-1.5 pp, bez wpisu Road 0, zjedzona przez sufit <= 5% probek, pamiec gry zgodna >= 80%;
     NDR-6 gracz na drodze: z premia / bez premii = 1 + premia +-1.5 pp i wynik <= LimitMax; linie "Audyt predkosci" z wpisem Road bez linii "Maximum" < -0.01 (premia
@@ -36625,8 +36625,8 @@ def ndrogi_main(logp):
     t_all, t_on = tot("tot"), tot("on")
     share = 100.0 * t_on / t_all if t_all else None
     rep.add("NDR-3: udzial partio-godzin AI w ruchu na drodze (suma dob)", f"{t_on}/{t_all} = " + (f"{share:.2f}%" if share is not None else "-")
-            + f" (godzin spisu {tot('h')}, dob {len(days)})", "1-25% (symulacja tras AI sondy: 4.9% przy marginesie 0.4, 9.2% przy 1.0)",
-            (1.0 <= share <= 25.0) if share is not None else None)
+            + f" (godzin spisu {tot('h')}, dob {len(days)})", ">= 1% (od 520-fix bez gornej granicy 25% - wpis 520: AI jezdzi droga, cel w strone 60%)",
+            (1.0 <= share) if share is not None else None)
     # NDR-4
     sc, so, flips = tot("sc"), tot("so"), tot("flips")
     ok4 = None
@@ -37045,7 +37045,7 @@ def p6drogi_main(logp):
     trasy gry wg predkosci bazowej z planu): objazdy sr. <= proba porownawcza (trasa gry, choc droga w zasiegu) + 5 pp, po >= 30 dojazdow w obu grupach;
     AD-6 partie na objezdzie: na drodze >= 30% partio-godzin (bez objazdu WGRANIE 91: 7-10%); AD-7 udzial na drodze rodow,
     karawan i wozow wsi (INFO, porownanie z linia Drogi (DR) WGRANIA 91: rody 7.3%, karawany 9.8%, wozy wsi 8.4%); AD-8 koszt: planowanie mediana <= 50 ms/dobe,
-    spis <= 5 ms/dobe; AD-9 potkniecia i ERROR in AiRoadRoutes.* 0; AD-10 odrzucone wedlug powodu (INFO). Log bez paczki: INFO, bez wyjatku."""
+    spis <= 8 ms/dobe (od 520-fix: spis obejmuje patrole / milicje i rozbicie trakt / boczna; przed 520 4.96); AD-9 potkniecia i ERROR in AiRoadRoutes.* 0; AD-10 odrzucone wedlug powodu (INFO). Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("AD-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -37167,8 +37167,8 @@ def p6drogi_main(logp):
     sp = [g["spis"] for g in parsed if g["spis"] is not None]
     if pl:
         pm, sm = st.median(pl), (st.median(sp) if sp else 0.0)
-        rep.add("AD-8: koszt (mediana dob)", f"planowanie {pm:.2f} ms/dobe (maks. {max(pl):.2f}), spis {sm:.3f} ms/dobe", "planowanie <= 50, spis <= 5 ms/dobe",
-                pm <= 50.0 and sm <= 5.0)
+        rep.add("AD-8: koszt (mediana dob)", f"planowanie {pm:.2f} ms/dobe (maks. {max(pl):.2f}), spis {sm:.3f} ms/dobe", "planowanie <= 50, spis <= 8 ms/dobe (520-fix: spis z patrolami)",
+                pm <= 50.0 and sm <= 8.0)
     stum = sum(g["stum"] for g in parsed)
     stall = max(g["stall"] for g in parsed)
     rep.add("AD-9: potkniecia i bledy", f"potkniecia w dobach linii {stum} (od wczytania maks. {stall}), ERROR in AiRoadRoutes.* {n_err}", "0", stum == 0 and stall == 0 and n_err == 0)

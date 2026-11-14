@@ -36,14 +36,14 @@ namespace Armoury
     ///  - zachowanie: GoToSettlement / GoToPoint / PatrolAroundPoint (krotkoterminowe takze None); bez pogoni (EngageParty, GoAroundParty, EscortParty),
     ///    ucieczki (IsFleeing, a RecalculateLongTermPath z liczenia ucieczki - prefiks/finalizer), oblezen (BesiegeSettlement, AssaultSettlement, SiegeEvent,
     ///    BesiegedSettlement), najazdow (RaidSettlement), obrony (DefendSettlement) i bitwy (MapEvent);
-    ///  - trasa gry co najmniej MapRoadAiMinDistance (30 jedn.) dlugosci.
+    ///  - trasa gry co najmniej MapRoadAiMinDistance (od 520: 15 jedn.; wartosc - Settings.cs) dlugosci.
     /// SIEC: plik drog ROT (ModuleData/arm_map_roads_geo.tsv, ten sam co premia drogi) -> graf raz na sesje (watek glowny): lamane uproszczone Douglas-Peucker
     /// 0.5 jedn. (cieciwa najwyzej 0.5 od osi drogi - w polu premii: pol-szerokosc >= 0.15 + margines 1.0 / 0.4), konce lamanych laczone z najblizszym
     /// wierzcholkiem innej lamanej do 0.6 jedn. (rozstaje), sciana siatki gry kazdego wezla policzona raz (wezel na scianie zakazanej / bez sciany = poza siecia).
     /// WYBOR: Dijkstra z wielu zrodel po wezlach w promieniu R (1/4 trasy gry, 3..40 jedn.) od startu; koszt = odcinek poza droga x 1 + droga x 1/(1 + premia),
     /// premia = czynna premia traktu (MapRoadSpeedPercent, jak MapRoads.PctOf; recenzja p6-drogi: nie klucz nadkladu); wyjscie w promieniu R od celu.
     /// Najtanszy wariant "start -> wejscie na trakt -> trakt -> zejscie -> cel" przyjety, gdy (po policzeniu trasy przez silnik):
-    ///  - CZAS: koszt przejazdu objazdu <= koszt przejazdu trasy gry, OBA z probek co 1 jedn. ta sama miara co premia (MapRoads.KindAt: trakt 1/(1 + premia),
+    ///  - CZAS: koszt przejazdu objazdu <= koszt przejazdu trasy gry (od 520-fix x WorthMargin 0.95 - zapas na blad szacunku), OBA z probek co 1 jedn. ta sama miara co premia (MapRoads.KindAt: trakt 1/(1 + premia),
     ///    droga boczna 1/(1 + premia boczna), reszta 1) - trasa gry tez bywa czesciowo na drodze; teren (las, snieg) i bloto poza szacunkiem - czas
     ///    zmierzony osobno (dojazd do celu, nizej);
     ///  - droga (trakt z probek) >= polowa trasy, dlugosc <= trasa gry x (1 + MapRoadAiDetourPercent/100) - nadklad to tylko sufit dlugosci.
@@ -67,7 +67,7 @@ namespace Armoury
     /// POMIAR (tylko log): linia "AI drogi (AD): start sesji" i "AI drogi (AD): dzien N" (liczone / przyjete / odrzucone z powodem, sredni nadklad, udzial drogi,
     /// spis partio-godzin w marszu - ta sama miara co MapRoads: MapRoads.KindAt == 2 (trakt) w punkcie partii - osobno partie na objezdzie, koszt ms/dobe). Nic w zapisie
     /// gry: trasa liczy sie od nowa po wczytaniu (ComputePathAfterLoad / nowy cel), stary zapis bez zmian; Reset przy nowej kampanii i przed wczytaniem.
-    /// Klucze NOWE: MapRoadAiRoutes (TAK), MapRoadAiMinDistance (30), MapRoadAiDetourPercent (15). Wylaczony klucz albo MapRoadSpeedBonus = trasy gry.
+    /// Klucze NOWE: MapRoadAiRoutes (TAK), MapRoadAiMinDistance (p6: 30, od 520: 15), MapRoadAiDetourPercent (p6: 15, od 520: 30). Wylaczony klucz albo MapRoadSpeedBonus = trasy gry.
     ///
     /// 520 (Jeff 14.11 "karawany kupcy ludzie jezdza drogami lub drogami pobocznymi i po tych drogach tez poruszaja sie patrole i armie ... tylko w wyjatkowych
     /// momentach podrozowano polami i lasami"; domyslne MapRoadAiMinDistance 30 -> 15, MapRoadAiDetourPercent 15 -> 30 - przy premii traktu 30%):
@@ -110,6 +110,11 @@ namespace Armoury
         private const float JoinSideR = 1.2f;     // 520: koniec drogi bocznej do wierzcholka innej lamanej (wlot planu lezy w polu traktu / drogi)
         private const float SnapR = 3f;           // 520: punkt patrolu na droge - najblizszy wezel do 3 jedn. (ok. 14 km)
         private const int NCat = 4;               // 520: 0 rody, 1 karawany, 2 wozy wsi, 3 patrole / milicja
+        // 520-fix (recenzja): objazd przyjety, gdy szacowany koszt <= 0.95 x koszt trasy gry. Dojazd zmierzony 14.11 (WGRANIE 234, nadklad 15%): objazdy sr. 138.2%,
+        // proba (trasa gry) 133.6% - szacunek obiecywal 97.3%, czyli mylil sie o ok. 6 pp na korzysc objazdu. Przy nadkladzie do 30% i progu 15 jedn. bez zapasu
+        // przybyloby objazdow, na ktorych szacunek sie myli (wolniejsze dostawy karawan i wozow wsi).
+        private const float WorthMargin = 0.95f;
+        private const float CoverTownR = 3.5f;    // 520-fix: pokrycie miast / zamkow od srodka osady (pierscien drog bocznych ObstR 2.2 .. 3.2 + zapas); wsie - 2.5 od bramy
 
         // ------------------------------------------------------------------ graf (niezmienny po budowie)
         private sealed class Graph
@@ -129,6 +134,7 @@ namespace Armoury
             public bool Classes;       // m96-valyria: rodzaje drog wczytane (PointClasses != null) - bez nich wszystkie krawedzie to Trakt (tylko log)
             public double ValLength, CarLength;   // m96-valyria: dlugosc krawedzi Valyrii (z mostami) i szlakow karawan (tylko log)
             public int SideLines, SideJoins, SideEdgesCut, SideEdges;   // 520: drogi boczne w sieci (tylko log)
+            public int SideSegJoins, SideLoose;   // 520-fix: konce drog bocznych dolaczone rzutem na odcinek traktu / bez zadnego rozstaju (tylko log)
             public double SideLength;
             public bool[] NodeTrakt;   // 520: wezel lezy na trakcie (klasa punktu < SideCls) - skladowe z traktem (tylko log)
             public int[] Comp;         // 520: korzen skladowej wezla (krawedzie ze sciezka) - tylko log pokrycia osad
@@ -239,7 +245,7 @@ namespace Armoury
         private static int _stumbles, _stumblesAll;
         private static Exception _first;
         // spis partio-godzin (watek glowny): 0 rody, 1 karawany, 2 wozy wsi, 3 patrole / milicja (520); _hSide - na drodze bocznej (520), _hWar* - marsz wojenny rodow
-        private static readonly int[] _hN = new int[NCat], _hOn = new int[NCat], _hSide = new int[NCat], _hDet = new int[NCat], _hDetOn = new int[NCat];
+        private static readonly int[] _hN = new int[NCat], _hOn = new int[NCat], _hSide = new int[NCat], _hDet = new int[NCat], _hDetOn = new int[NCat], _hDetAny = new int[NCat];
         private static int _hWarN, _hWarOn;
         private static int _hours;
         private static long _censusTicks;
@@ -811,7 +817,7 @@ namespace Armoury
             float costDet = RideCost(S, scr.Out, scr.Size, total, pct, spct, vpct, cpct, out detTrakt);
             float costGame = RideCost(S, path.PathPoints, path.Size, L, pct, spct, vpct, cpct, out gameTrakt);
             if (detTrakt < MinRoadShare * total) { Interlocked.Increment(ref _fewRoad); return RouteCtl; }
-            if (!(costDet <= costGame)) { Interlocked.Increment(ref _notWorth); return RouteCtl; }
+            if (!(costDet <= costGame * WorthMargin)) { Interlocked.Increment(ref _notWorth); return RouteCtl; }   // 520-fix: zapas na blad szacunku
 
             // zapis trasy do NavigationPath partii (PathBegin = 0 ustawil ComputePath)
             var pp = path.PathPoints;
@@ -937,7 +943,7 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            for (int i = 0; i < NCat; i++) { _hN[i] = 0; _hOn[i] = 0; _hSide[i] = 0; _hDet[i] = 0; _hDetOn[i] = 0; }
+            for (int i = 0; i < NCat; i++) { _hN[i] = 0; _hOn[i] = 0; _hSide[i] = 0; _hDet[i] = 0; _hDetOn[i] = 0; _hDetAny[i] = 0; }
             _hWarN = 0; _hWarOn = 0;
             _hours = 0; _censusTicks = 0;
             ZeroCounters();
@@ -971,7 +977,7 @@ namespace Armoury
             Log.Info(P + "start sesji - klucz MapRoadAiRoutes tak, marsz od " + MinDist(s).ToString("0", Inv) + " jedn., nadklad do " + (Detour(s) * 100f).ToString("0", Inv)
                      + "% (sufit dlugosci), premia traktu w koszcie " + (RoadPct(s) * 100f).ToString("0", Inv) + "% (MapRoadSpeedPercent; droga boczna "
                      + (SidePct(s) * 100f).ToString("0.0", Inv) + "%, Valyria " + (MapRoads.ValPctNow(s) * 100f).ToString("0", Inv) + "%), droga >= " + (MinRoadShare * 100f).ToString("0", Inv)
-                     + "% trasy | 520: rody, karawany, wozy wsi" + (s.MapRoadAiPatrols ? ", patrole / milicja (MapRoadAiPatrols tak; punkty patrolu na droge - latka " + _patrolNote + ")" : " (MapRoadAiPatrols nie - bez patroli)")
+                     + "% trasy, objazd szac. <= " + (WorthMargin * 100f).ToString("0", Inv) + "% kosztu trasy gry (zapas 520-fix) | 520: rody, karawany, wozy wsi" + (s.MapRoadAiPatrols ? ", patrole / milicja (MapRoadAiPatrols tak; punkty patrolu na droge - latka " + _patrolNote + ")" : " (MapRoadAiPatrols nie - bez patroli)")
                      + ", marsz wojenny " + (s.MapRoadAiWarMarch ? "tak" : "nie") + " (MapRoadAiWarMarch), drogi boczne w sieci "
                      + (s.MapRoadAiSideRoads && s.MapSideRoadSpeedBonus ? "tak - dolaczane po planie drog bocznych (osobna linia)" : "NIE (MapRoadAiSideRoads / MapSideRoadSpeedBonus)")
                      + ", bandy bez zmian | " + _note
@@ -1055,15 +1061,17 @@ namespace Armoury
                      + " - wezlow " + g.Nodes + " (poza siatka gry " + g.BadNodes + "), polaczen " + (g.AdjCount / 2) + ", skladowych " + g.Comps
                      + ", trakty " + g.Length.ToString("0", Inv) + " jedn., drogi boczne: lamanych " + g.SideLines + ", " + g.SideLength.ToString("0", Inv) + " jedn., krawedzi "
                      + g.SideEdges + " (wyciete - bez sciezki po siatce gry " + g.SideEdgesCut + "), rozstajow z droga boczna " + g.SideJoins
+                     + " (konce dolaczone rzutem na odcinek traktu " + g.SideSegJoins + ", konce bez rozstaju " + g.SideLoose + ")"
                      + "; krawedzie po siatce gry: proste " + g.EdgesDirect + ", z objazdem " + g.EdgesBent + ", wyciete " + g.EdgesCut
                      + " | " + cov + " | budowa " + ms.ToString("0.0", Inv) + " ms (watek glowny, raz na plan drog bocznych).");
         }
 
-        /// <summary>520 (tylko log): osady (miasta, zamki, wsie) z wezlem sieci do 2.5 jedn. od bramy ("w sieci") i z polaczeniem z traktem (skladowa z traktem).
+        /// <summary>520 (tylko log): osady z wezlem sieci (miasta, zamki - do CoverTownR 3.5 jedn. od srodka osady, bo drogi do bramy koncza sie na pierscieniu
+        /// ObstR wokol srodka; wsie - do 2.5 jedn. od bramy) ("w sieci") i z polaczeniem z traktem (skladowa z traktem).
         /// Miasta / zamki bez polaczenia z traktem - z nazwy (do 12). Watek glowny, raz na budowe grafu.</summary>
         private static string Coverage(Graph g)
         {
-            const float R = 2.5f;
+            const float CoverVillR = 2.5f;
             int[] n = new int[3], inNet = new int[3], linked = new int[3];
             var lonely = new List<string>();
             int lonelyAll = 0;
@@ -1075,7 +1083,8 @@ namespace Armoury
                     int t = st.IsTown ? 0 : st.IsCastle ? 1 : st.IsVillage ? 2 : -1;
                     if (t < 0) continue;
                     n[t]++;
-                    Vec2 p = st.GatePosition.ToVec2();
+                    float R = t < 2 ? CoverTownR : CoverVillR;   // 520-fix (recenzja): miasto / zamek od srodka (pierscien drog ObstR), wies od bramy
+                    Vec2 p = t < 2 ? st.GetPosition2D : st.GatePosition.ToVec2();   // srodek jak przeszkoda w MapSideRoads.cs
                     int best = -1; float bd = R * R;
                     int gx0 = (int)((p.x - R - g.GX0) * g.GInv), gx1 = (int)((p.x + R - g.GX0) * g.GInv);
                     int gy0 = (int)((p.y - R - g.GY0) * g.GInv), gy1 = (int)((p.y + R - g.GY0) * g.GInv);
@@ -1102,7 +1111,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _stumblesAll++; return "pokrycie osad: blad (" + e.GetType().Name + ")"; }
-            return "osady w sieci (wezel do " + R.ToString("0.0", Inv) + " jedn. od bramy) / polaczone z traktem: miasta " + inNet[0] + "/" + linked[0] + " z " + n[0]
+            return "osady w sieci (wezel do " + CoverTownR.ToString("0.0", Inv) + " jedn. od srodka miasta / zamku, " + CoverVillR.ToString("0.0", Inv) + " od bramy wsi) / polaczone z traktem: miasta " + inNet[0] + "/" + linked[0] + " z " + n[0]
                    + ", zamki " + inNet[1] + "/" + linked[1] + " z " + n[1] + ", wsie " + inNet[2] + "/" + linked[2] + " z " + n[2]
                    + "; miasta i zamki bez polaczenia z traktem " + lonelyAll + (lonely.Count > 0 ? " (" + string.Join(", ", lonely.ToArray()) + (lonelyAll > lonely.Count ? ", ..." : "") + ")" : "")
                    + " - sciezki dla nich: osobny krok (plan C2 wpisu 520)";
@@ -1194,6 +1203,13 @@ namespace Armoury
             for (int i = 0; i < np; i++) { int c = (int)((ys[i] - minY) / pc) * pnx + (int)((xs[i] - minX) / pc); plist[pstart[c] + pfill[c]++] = i; }
             var joinA = new List<int>(); var joinB = new List<int>();
             int joins0;
+            // 520-fix (recenzja): najdluzszy odcinek traktu - promien szukania odcinka dla konca drogi bocznej bez wierzcholka w JoinSideR (wlot planu lezy
+            // na osi traktu, czesto w srodku dlugiego odcinka - do ok. 13 jedn. w pliku; 9.4% dlugosci traktow dalej niz 1.2 od wierzcholka)
+            float maxSeg = 0f;
+            for (int i = 1; i < mainPts; i++)
+                if (ids[i] == ids[i - 1]) { float d = Len(xs[i] - xs[i - 1], ys[i] - ys[i - 1]); if (d > maxSeg) maxSeg = d; }
+            int segCells = (int)Math.Ceiling((maxSeg * 0.5f + JoinSideR) / pc);
+            int segJoins = 0, loose = 0;
             int lines = 0;
             for (int l = 0; l + 1 < ls.Count; l++)
             {
@@ -1225,6 +1241,43 @@ namespace Armoury
                             }
                         }
                     if (bestJ >= 0) { keep[bestJ] = true; joinA.Add(p); joinB.Add(bestJ); }
+                    else if (sideLine)
+                    {
+                        // 520-fix: rzut konca drogi bocznej na najblizszy ODCINEK traktu do JoinSideR - rozstaj z oboma koncami odcinka (dwie krawedzie klasy
+                        // drogi bocznej; nowego punktu w trakcie nie wstawiamy - indeksy traktow i klasy z pliku rodzajow bez zmian). Odcinek ma koniec blizej
+                        // niz polowa najdluzszego odcinka + JoinSideR, wiec sprawdzane sa oba odcinki przy kazdym wierzcholku traktu z segCells komorek.
+                        int sa = -1, sb = -1; float sd = JoinSideR * JoinSideR;
+                        for (int yy = cy - segCells; yy <= cy + segCells; yy++)
+                            for (int xx = cx - segCells; xx <= cx + segCells; xx++)
+                            {
+                                if (xx < 0 || yy < 0 || xx >= pnx || yy >= pny) continue;
+                                int c = yy * pnx + xx;
+                                for (int k = pstart[c]; k < pstart[c + 1]; k++)
+                                {
+                                    int j = plist[k];
+                                    if (j >= mainPts) continue;
+                                    int lj = lineOf[j];
+                                    for (int e2 = 0; e2 < 2; e2++)
+                                    {
+                                        int u = e2 == 0 ? j - 1 : j, w = u + 1;
+                                        if (u < ls[lj] || w >= ls[lj + 1]) continue;
+                                        float ax = xs[u], ay = ys[u], dx = xs[w] - ax, dy = ys[w] - ay, l2 = dx * dx + dy * dy;
+                                        float qx = xs[p] - ax, qy = ys[p] - ay;
+                                        float t = l2 > 1e-9f ? (qx * dx + qy * dy) / l2 : 0f;
+                                        if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
+                                        float ex = qx - t * dx, ey = qy - t * dy, d2 = ex * ex + ey * ey;
+                                        if (d2 <= sd) { sd = d2; sa = u; sb = w; }
+                                    }
+                                }
+                            }
+                        if (sa >= 0)
+                        {
+                            keep[sa] = true; keep[sb] = true;
+                            joinA.Add(p); joinB.Add(sa); joinA.Add(p); joinB.Add(sb);
+                            segJoins++;
+                        }
+                        else loose++;
+                    }
                 }
             }
             joins0 = joinA.Count;   // m96-valyria: dalej mosty Valyrii (klasa Bridge)
@@ -1280,6 +1333,7 @@ namespace Armoury
             g.X = new float[nn]; g.Y = new float[nn]; g.Face = new PathFaceRecord[nn]; g.Ok = new bool[nn]; g.Island = new int[nn];
             g.NodeTrakt = new bool[nn];
             g.SideLines = sideLines;
+            g.SideSegJoins = segJoins; g.SideLoose = loose;
             for (int i = 0; i < np; i++) if (nodeOf[i] >= 0) { g.X[nodeOf[i]] = xs[i]; g.Y[nodeOf[i]] = ys[i]; g.NodeTrakt[nodeOf[i]] = i < mainPts; }
             // krawedzie: kolejne wezly lamanej + rozstaje
             var ea = new List<int>(nn * 2); var eb = new List<int>(nn * 2);
@@ -1465,7 +1519,8 @@ namespace Armoury
                         if ((v & 3L) == StAccepted && (v & ~3L) == (((long)idx << 32) | (long)TargetHash(mp.MoveTargetPoint.ToVec2())))
                         {
                             _hDet[k]++;
-                            if (any) _hDetOn[k]++;
+                            if (on) _hDetOn[k]++;     // 520-fix: jak przed 520 sam trakt (pole AD-6 'z tego na drodze' bez zmiany znaczenia)
+                            if (any) _hDetAny[k]++;   // 520: trakt + boczna - osobno w bloku '520 spis'
                         }
                     }
                     catch (Exception e) { ParStumble(e); }
@@ -1554,6 +1609,7 @@ namespace Armoury
                   .Append(_hSide[k].ToString(ci)).Append(") / poza ").Append((_hN[k] - r).ToString(ci)).Append(" = ").Append(Pct(r, _hN[k])).Append("% na drodze");
             }
             sb.Append("; razem ").Append(rAll.ToString(ci)).Append('/').Append(nAll.ToString(ci)).Append(" (").Append(Pct(rAll, nAll)).Append("%)")
+              .Append("; na objezdzie na jakiejkolwiek drodze ").Append((_hDetAny[0] + _hDetAny[1] + _hDetAny[2] + _hDetAny[3]).ToString(ci)).Append('/').Append((_hDet[0] + _hDet[1] + _hDet[2] + _hDet[3]).ToString(ci))
               .Append("; marsz wojenny rodow ").Append(_hWarOn.ToString(ci)).Append('/').Append(_hWarN.ToString(ci)).Append(" (").Append(Pct(_hWarOn, _hWarN)).Append("%)")
               .Append("; bandy bez zmian (linia Drogi (DR))");
             double planMs = _ticks * 1000.0 / Stopwatch.Frequency, censusMs = _censusTicks * 1000.0 / Stopwatch.Frequency;
