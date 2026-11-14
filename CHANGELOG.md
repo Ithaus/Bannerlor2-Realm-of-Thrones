@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 526: D10 - premia predkosci konia z perkow zawsze do +10% predkosci samego konia (bez wzgledu na sufit RBM) - Armoury
+
+**Problem:** Jeff, czat 14.11, po raporcie logu 237: "D10 - tak" (pytanie: "perk ma dawac do +10% predkosci samego konia (dzis dla szybkich koni daje 0, bo RBM juz ustawia je ponad limit)?"). Log Armoury-2026-11-14_19-28-01.log: wszystkie linie doby 507 z premia konia mowia "+0.00", np. `przeliczen koni z premia 16 (ponad sufit RBM 16, srednio +0.00 m/s - D10) | per perk (trafienia/przeliczenia): SweepingWind 16` (21:46:51, dzien 108879).
+
+**Przyczyna:** Perk507Strike.cs HorsePostfix (D10 korekta): predkosc z premia przycinana do max(spd0, sufit x 1.10), gdzie sufit RBM = 10 m/s (8 przy koniu ponad 500 kg). Kon, ktoremu RBM juz dal predkosc >= sufit x 1.1 (szybkie konie ROT), dostawal spd0, czyli premie 0.
+
+**Zmiana:** Armoury/src/Perk507Strike.cs:
+- premie predkosci perkow (SweepingWind gry przy RBM, BK JawwalCamelMaster 8%, KheshigOutrider 5%) SUMOWANE (dotad mnozone), wynik = min(spd0 x (1 + suma), spd0 x 1.10) - spd0 = predkosc konia wedlug RBM; sufit RBM nie gra roli (klucz PerkMountOverCap). Np. kon RBM 12 m/s + SweepingWind 5% = 12.60 m/s (dotad 12.00); CamelMaster + Outrider = 13% -> 10% = 13.20.
+- klucz wylaczony: jak 507 - przy RBM ponad sufit przyciecie do max(spd0, sufit).
+- licznik doby: `przeliczen koni z premia N (premia predkosci K, srednio +X m/s = +Y%, premia przebila sufit RBM Z - D10)` (po recenzji: Z = tylko przypadki spd0 <= sufit < v).
+- Settings.cs / McmSettings.cs: opis PerkMountOverCap (po angielsku) wedlug nowej reguly; wartosc domyslna bez zmian (true).
+
+**Ryzyko / co sprawdzic (zasada 0; CHANGELOG 49595 -> 49617 linii):**
+- HorseWind (136): postfiks Last na UpdateAgentStats bierze MountSpeed po tym postfiksie jako Vbase, a drenaz liczy z u = v / Vbase - szybszy kon w pelnym galopie ma u ok. 1 jak kazdy inny, wiec nie meczy sie szybciej; kara m mnozy Vbase z premia. Probki odrzucane przy v > 1.5 Vbase - +10% nie zbliza sie do progu.
+- Mnozenie idempotentne: wynik modelu swiezy przy kazdym wolaniu UpdateHorseStats, postfiks ustawia v od spd0 (nie mnozy biezacej wartosci) - kolejne przeliczenia nie kumuluja premii.
+- Zmiana mnozenia na sume: SweepingWind + Outrider = 10% (dotad 10.25%), CamelMaster + Outrider 13% -> limit 10%. Szarza (Equites) i zwrotnosc (AdaptiveTactics) bez zmian.
+- Bez RBM (gra liczy SweepingWind sama): tylko perki BK, przy wlaczonym kluczu tez do +10%. MarchToContact (RBM wpisuje MountSpeed konnicy jako limit szyku) - szyk z koniem z perkiem moze isc o te kilka % szybciej, jak dotad ponad sufit.
+- W logu sprawdzic: linia "Sila ciosu perkow (507): dzien N" - "premia predkosci K, srednio +0.4..1.2 m/s = +5..10%" zamiast "+0.00".
+- Build Armoury 0 bledow. NIE WGRANE (gra Jeffa moze byc wlaczona).
+
+**Status:** DO SPRAWDZENIA (galaz noc/526-kon-d10, na noc/scal-perki 4f0c93c3).
+
+**Recenzja 526:**
+- (low, PRAWDZIWE - poprawione) licznik "ponad sufit RBM" liczyl kazde przeliczenie z v > sufit, takze konie, ktore RBM juz ustawil ponad sufitem (log 237: 16 na 16) - nic nie mowil o tym, kiedy to premia perka przebija sufit. Teraz `if (rbm && v > cap && spd0 <= cap) _dOverCap++`, etykieta linii doby "premia przebila sufit RBM Z". Tylko log, dzialanie gry bez zmian. Build Armoury 0 bledow.
+- Reszta recenzji (HorsePostfix wedlug decyzji Jeffa, idempotencja od spd0, klucz wylaczony jak 507, HorseWind, liczniki zerowane w ResetDay) - bez uwag, nic do zmiany.
 ## 525: meldunek QM, okno "Review the army" i zbrojownia licza puste sloty jedna regula - rozbicie wedlug rodzaju sumuje sie do liczby pustych, "ilu ludzi bez czego" - Armoury (133c)
 
 **Problem:** Jeff, czat 14.11 (zrzut): "jakis blad jest tu mi pokazuje ze empty do battle a w armoury pokazuje co innego sprawdz logi". Czerwony meldunek `QM: 41 kit slots empty for the next battle - see Review the army in camp.`, a raport zbrojowni ("Muster the men's kit", ksiega zamowien) pokazuje prawie komplet. Log Armoury-2026-11-14_19-28-01.log, 22:27:27 (ok. linii 94355-94376): `Sprzet ludzi (133c): kwatermistrz (...) pustych 41 (bron biala 19, bron boczna (biala) 26, tarcza 16, helm 3, nogi 2)` - suma rodzajow 66, a pustych 41; tuz wyzej papier kwatermistrza dla 31 ludzi: `OneHandedWeapon potrzeba 31, polka 31, bez sztuki 0`, `Shield 22/28`, `HeadArmor 28/31`, `HandArmor 28/31`, `Cape 28/31`. Podglad zgadza sie z bitwa (linie bitwy `podglad w misji (133c ...) ZGODNE`, np. 22:14-22:18: podglad 33, bitwa 34, `bron zastapiona innym rodzajem 24`, `bez broni po strazach 4`).

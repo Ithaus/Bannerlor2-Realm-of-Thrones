@@ -39,7 +39,8 @@ namespace Armoury
     ///    +8%), JawwalCamelMaster (predkosc +8%), KheshigOutrider (predkosc +5%) BK mnozy na agencie JEZDZCA (VanillaModelTweakPatches.UpdateAgentStats),
     ///    a gra czyta je tylko z agenta konia - martwe. Postfiks na UpdateHorseStats (Priority.Low, po RBM): na koniu, tymi samymi wartosciami.
     ///    SweepingWind tylko gdy postfiks RBM jest na celu (inaczej liczy gra). Wynik modelu jest swiezy przy kazdym wolaniu - mnozenie idempotentne;
-    ///    HorseWind (136, postfiks Last na UpdateAgentStats) bierze juz predkosc z premia jako Vbase.
+    ///    HorseWind (136, postfiks Last na UpdateAgentStats) bierze juz predkosc z premia jako Vbase. 526 (D10): premie predkosci sumowane,
+    ///    najwyzej +10% predkosci konia wedlug RBM (bez wzgledu na sufit RBM; klucz PerkMountOverCap).
     /// Kto: gracz i AI jednakowo (perki osobiste bohatera, kapitana formacji; BK: wyksztalcenie bohatera albo kapitana jego formacji).
     /// Klucze: PerkStrikeAfterRbm (A, B), PerkLifestyleDamage (C), PerkMountAfterRbm (D). Bledy liczone (potkniecia), bez wylacznika. Bez stanu w zapisie.
     /// Linie: "Sila ciosu perkow (507): start sesji ..." (OnSessionLaunched) i "Sila ciosu perkow (507): dzien N ..." (doba z bitwami).
@@ -74,7 +75,7 @@ namespace Armoury
             IHigh = 10, IFennid = 11, IDrengr = 12, IKlibT = 13, IKlibD = 14, ISweep = 15, IEquites = 16, IAdapt = 17, ICamel = 18, IOutrider = 19;
         private static readonly int[] _dHit = new int[20];
         private static int _dMelee, _dMeleeUp, _dMissileUp, _dHorse;
-        private static int _dOverCap; private static float _dOverCapGain;   // D10: przeliczenia konia ponad sufit RBM (i suma nadwyzki m/s ponad sufit albo predkosc RBM)
+        private static int _dSpdN, _dOverCap; private static float _dSpdGain, _dSpdPct;   // D10 (526): przeliczenia konia z premia predkosci (suma m/s i % ponad predkosc RBM), z tego premia przebila sufit RBM (spd0 <= sufit < v)
         private static double _dMeleeRatio, _dMissileRatio;
 
         // ---- BK (odbiciem, leniwie)
@@ -114,7 +115,7 @@ namespace Armoury
         private static void ResetDay()
         {
             Array.Clear(_dHit, 0, _dHit.Length);
-            _dMelee = _dMeleeUp = _dMissileUp = _dHorse = 0; _dOverCap = 0; _dOverCapGain = 0f; _dMeleeRatio = _dMissileRatio = 0; _dStumbles = 0;
+            _dMelee = _dMeleeUp = _dMissileUp = _dHorse = 0; _dSpdN = _dOverCap = 0; _dSpdGain = _dSpdPct = 0f; _dMeleeRatio = _dMissileRatio = 0; _dStumbles = 0;
         }
 
         // ============================================================ wpiecie
@@ -450,37 +451,43 @@ namespace Armoury
                 var ch = rider.Character as CharacterObject;
                 bool rbm = RbmHorse();
                 float spd0 = agentDrivenProperties.MountSpeed;   // po RBM (z jego sufitem)
+                float add = 0f;   // 526: suma premii predkosci perkow (dodawana, nie mnozona)
                 if (ch != null && ch.IsHero && rbm)
                 {
                     var en = new ExplainedNumber(1f, false, null);
                     PerkHelper.AddPerkBonusForCharacter(DefaultPerks.Riding.SweepingWind, ch, true, ref en, false);
-                    if (en.ResultNumber > 1.0001f) { agentDrivenProperties.MountSpeed *= en.ResultNumber; _dHit[ISweep]++; any = true; }
+                    if (en.ResultNumber > 1.0001f) { add += en.ResultNumber - 1f; _dHit[ISweep]++; any = true; }
                 }
                 if (!_bkOnHorse && BkResolve())
                 {
                     int m = Mask(HeroOf(rider)) | Mask(HeroOf(CaptainOf(rider)));
                     if ((m & BEquites) != 0) { agentDrivenProperties.MountChargeDamage *= 1.1f; _dHit[IEquites]++; any = true; }
                     if ((m & BAdapt) != 0) { agentDrivenProperties.MountManeuver *= 1.08f; _dHit[IAdapt]++; any = true; }
-                    if ((m & BCamel) != 0) { agentDrivenProperties.MountSpeed *= 1.08f; _dHit[ICamel]++; any = true; }
-                    if ((m & BOutrider) != 0) { agentDrivenProperties.MountSpeed *= 1.05f; _dHit[IOutrider]++; any = true; }
+                    if ((m & BCamel) != 0) { add += 0.08f; _dHit[ICamel]++; any = true; }
+                    if ((m & BOutrider) != 0) { add += 0.05f; _dHit[IOutrider]++; any = true; }
                 }
-                // RBM sciaga predkosc ponad sufit (10 m/s, 8 przy koniu ponad 500 kg; HorseChanges) - recenzja 507: premia nie przebijala sufitu, kon juz ponad
-                // nim zostawal jak u RBM. D10 (Jeff 14.11 "nie sa wystarczajaco szybkie", klucz PerkMountOverCap): premia liczona od predkosci RBM PRZEBIJA sufit -
-                // przyciecie tylko przy wylaczonym kluczu; licznik doby mowi, ile przeliczen poszlo ponad sufit
-                if (rbm && agentDrivenProperties.MountSpeed > spd0)
+                // Predkosc: wynik = spd0 x (1 + suma premii), wynik modelu swiezy przy kazdym wolaniu - idempotentnie.
+                // 526 (D10, Jeff 14.11 "D10 - tak"): premia perkow to zawsze najwyzej +10% predkosci SAMEGO konia wedlug RBM (spd0), bez wzgledu na sufit
+                // RBM (10 m/s, 8 przy koniu ponad 500 kg; HorseChanges): min(spd0 x (1 + suma), spd0 x 1.10). Wczesniej (D10 korekta) przycinanie do
+                // max(spd0, sufit x 1.10) dawalo +0.00 koniom, ktorym RBM juz dal predkosc ponad sufit x 1.1 (log 237: 11/11 linii "srednio +0.00 m/s").
+                // Klucz PerkMountOverCap wylaczony = jak 507: przy RBM premia konczy sie na suficie (kon juz ponad nim - bez zmian).
+                // HorseWind (136) liczy zmeczenie od v / Vbase, a Vbase = MountSpeed z tego postfiksu (z premia) - szybszy kon nie meczy sie szybciej w galopie.
+                if (add > 0f && spd0 > 0f)
                 {
-                    var hw = agent.SpawnEquipment != null ? agent.SpawnEquipment[EquipmentIndex.Horse] : EquipmentElement.Invalid;
-                    float cap = !hw.IsEmpty && hw.Weight > 500f ? 8f : 10f;
-                    if (agentDrivenProperties.MountSpeed > cap)
+                    float v = spd0 * (1f + add);
+                    if (s.PerkMountOverCap) v = Math.Min(v, spd0 * 1.10f);
+                    float cap = 10f;
+                    if (rbm)
                     {
-                        // D10 korekta (Jeff 14.11 "moga ale max o 10% limitu RBM"): ponad sufit najwyzej do sufit x 1.10 (kon RBM juz ponad nim - bez zmian)
-                        float top = Math.Max(spd0, cap * 1.10f);
-                        if (s.PerkMountOverCap)
-                        {
-                            if (agentDrivenProperties.MountSpeed > top) agentDrivenProperties.MountSpeed = top;
-                            if (agentDrivenProperties.MountSpeed > cap) { _dOverCap++; _dOverCapGain += agentDrivenProperties.MountSpeed - Math.Max(spd0, cap); }
-                        }
-                        else agentDrivenProperties.MountSpeed = Math.Max(spd0, cap);
+                        var hw = agent.SpawnEquipment != null ? agent.SpawnEquipment[EquipmentIndex.Horse] : EquipmentElement.Invalid;
+                        cap = !hw.IsEmpty && hw.Weight > 500f ? 8f : 10f;
+                        if (!s.PerkMountOverCap && v > cap) v = Math.Max(spd0, cap);
+                    }
+                    agentDrivenProperties.MountSpeed = v;
+                    if (v > spd0)
+                    {
+                        _dSpdN++; _dSpdGain += v - spd0; _dSpdPct += 100f * (v / spd0 - 1f);
+                        if (rbm && v > cap && spd0 <= cap) _dOverCap++;   // recenzja 526: tylko gdy to premia przebila sufit (kon RBM juz ponad sufitem - nie liczony)
                     }
                 }
                 if (any) _dHorse++;
@@ -608,7 +615,7 @@ namespace Armoury
                     Log.Info(P + "dzien " + day + " | wolan ciosu wrecz po RBM " + _dMelee + ", z premia predkosci " + _dMeleeUp
                              + (_dMeleeUp > 0 ? " (sila x" + F2(_dMeleeRatio / _dMeleeUp) + " srednio)" : "")
                              + " | pociski z RunningThrow " + _dMissileUp + (_dMissileUp > 0 ? " (x" + F2(_dMissileRatio / _dMissileUp) + ")" : "")
-                             + " | przeliczen koni z premia " + _dHorse + (_dOverCap > 0 ? " (ponad sufit RBM " + _dOverCap + ", srednio +" + F2(_dOverCapGain / _dOverCap) + " m/s - D10)" : "")
+                             + " | przeliczen koni z premia " + _dHorse + (_dSpdN > 0 ? " (premia predkosci " + _dSpdN + ", srednio +" + F2(_dSpdGain / _dSpdN) + " m/s = +" + F2(_dSpdPct / _dSpdN) + "%, premia przebila sufit RBM " + _dOverCap + " - D10)" : "")
                              + " | per perk (trafienia/przeliczenia): " + (parts.Count > 0 ? string.Join(", ", parts) : "-")
                              + " | potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
                 }

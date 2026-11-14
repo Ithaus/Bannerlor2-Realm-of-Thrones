@@ -2165,7 +2165,7 @@ namespace Armoury
         public bool PerkMountAfterRbm { get; set; } = true;
 
         // D10 (perki)
-        [SettingPropertyBool("Perk Mount Over Cap", HintText = "the horse speed bonus of perks (Sweeping Wind, Camel Master, Outrider) is added on top of RBM's horse speed even above RBM's top speed limit (10 m/s, 8 for a horse over 500 kg), but at most 10% above it - a perk horse can outrun every other horse. Off = the bonus stops at that limit", RequireRestart = false)]
+        [SettingPropertyBool("Perk Mount Over Cap", HintText = "the horse speed bonuses of perks (Sweeping Wind, Camel Master, Outrider) are added together on top of the horse's own speed as RBM sets it, at most +10% of that speed in total, even above RBM's top speed limit (10 m/s, 8 for a horse over 500 kg) - a perk horse is always up to 10% faster than the same horse without the perks. Off = the bonus stops at RBM's limit", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool PerkMountOverCap { get; set; } = true;
 
