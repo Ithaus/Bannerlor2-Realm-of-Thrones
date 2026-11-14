@@ -39,8 +39,9 @@ namespace Armoury
 
         private static string _defHook = "nie wpinana";
         private static AccessTools.FieldRef<MobilePartyAi, MobileParty> _defParty;
-        private static MethodInfo _mRethink;
-        private static int _fDef, _fDefStumbles, _fRethink, _fRefresh;
+        private static MethodInfo _mRethink, _mUntilSet;
+        private static int _fDef, _fDefStumbles, _fRethink, _fRefresh, _fBroken;
+        private const double FieldWordDays = 1.0;   // Recenzja 528: slowo z pola odswiezane najwyzej dobe od zgody (gracz w miescie nie trzyma wodza w nietykalnosci w nieskonczonosc)
 
         /// <summary>528: stosunek sil wodza do gracza w polu twarza w twarz; wypelnia e.K, e.R, e.Es, e.Ps, e.MenE, e.MenP, e.Incl. Bez rzutow.</summary>
         private static void Force(Hero lord, Ev e, int valor, int mercy)
@@ -83,12 +84,33 @@ namespace Armoury
             try { return h != null && h.IsPrisoner && h.PartyBelongedToAsPrisoner == PartyBase.MainParty; } catch { return false; }
         }
 
-        /// <summary>528: przy zgodzie w polu - partia rozmowcy scigajaca gracza mysli od nowa w najblizszym takcie (MobilePartyAi.ForceDefaultBehaviorUpdate, internal).</summary>
+        /// <summary>528: partia, ktora naprawde prowadzi druzyne wodza - on sam albo wodz armii, w ktorej szyku stoi (partia w szyku nie mysli sama -
+        /// MobilePartyAi.TickInternal pomija dolaczonych; Recenzja 528).</summary>
+        private static MobileParty Mover(MobileParty lp)
+        {
+            if (lp == null) return null;
+            if (lp.AttachedTo != null && lp.Army != null && lp.Army.LeaderParty != null && lp.Army.LeaderParty != MobileParty.MainParty) return lp.Army.LeaderParty;
+            return lp;
+        }
+
+        /// <summary>528: slowo z pola - partia wodza (i wodz jego armii, gdy stoi w szyku) nie atakuje gracza przez h godzin.</summary>
+        private static void Bind(MobileParty lp, int hours)
+        {
+            if (lp == null) return;
+            if (lp.Ai != null) lp.Ai.SetDoNotAttackMainParty(hours);
+            var m = Mover(lp);
+            if (m != lp && m != null && m.Ai != null) m.Ai.SetDoNotAttackMainParty(hours);
+        }
+
+        /// <summary>528: przy zgodzie w polu - partia rozmowcy scigajaca gracza mysli od nowa w najblizszym takcie (MobilePartyAi.ForceDefaultBehaviorUpdate, internal).
+        /// Recenzja 528: dlugi rozkaz EngageParty na gracza (DefaultBehavior) mysl odtworzylaby bez pytania o slowo - jak ClearOrders paktu: Hold + przemyslenie.</summary>
         private static void Rethink(MobileParty lp)
         {
             try
             {
-                if (lp == null || lp.Ai == null || !KKeep) return;
+                lp = Mover(lp);
+                if (lp == null || lp.Ai == null || !KKeep || lp.MapEvent != null) return;
+                if (lp.DefaultBehavior == AiBehavior.EngageParty && lp.TargetParty == MobileParty.MainParty) { lp.SetMoveModeHold(); lp.Ai.RethinkAtNextHourlyTick = true; _fRethink++; return; }
                 if (lp.ShortTermBehavior != AiBehavior.EngageParty || lp.ShortTermTargetParty != MobileParty.MainParty) return;
                 if (_mRethink == null) _mRethink = AccessTools.DeclaredMethod(typeof(MobilePartyAi), "ForceDefaultBehaviorUpdate");
                 if (_mRethink == null) return;
@@ -98,19 +120,45 @@ namespace Armoury
             catch (Exception e) { Stumble("Rethink", e); }
         }
 
-        /// <summary>528: takt kampanii - dopoki umowa z pola (nie przez poslanca) czeka w kolejce, partia rozmowcy nie atakuje gracza (3 h, odswiezane).</summary>
+        /// <summary>Recenzja 528: gracz pierwszy dobyl miecza na frakcje rozmowcy (FieldFight, atak gracza) - slowo wodza zdjete od razu, nie po 3 h
+        /// (DoNotAttackMainPartyUntil = teraz; setter internal - odbiciem). Takze wodz armii, w ktorej szyku stoi.</summary>
+        private static void Unbind(Hero lord)
+        {
+            try
+            {
+                var lp = lord != null ? lord.PartyBelongedTo : null;
+                if (lp == null) return;
+                if (_mUntilSet == null) _mUntilSet = AccessTools.PropertySetter(typeof(MobilePartyAi), "DoNotAttackMainPartyUntil");
+                if (_mUntilSet == null) return;
+                var now = new object[] { CampaignTime.Now };
+                if (lp.Ai != null && lp.Ai.DoNotAttackMainPartyUntil.IsFuture) { _mUntilSet.Invoke(lp.Ai, now); _fBroken++; }
+                var m = Mover(lp);
+                if (m != lp && m != null && m.Ai != null && m.Ai.DoNotAttackMainPartyUntil.IsFuture) _mUntilSet.Invoke(m.Ai, now);
+            }
+            catch (Exception e) { Stumble("Unbind", e); }
+        }
+
+        /// <summary>528: takt kampanii - dopoki umowa z pola (nie przez poslanca) czeka w kolejce, partia rozmowcy nie atakuje gracza (3 h, odswiezane;
+        /// Recenzja 528: najwyzej FieldWordDays od zgody, takze wodz armii, w ktorej szyku stoi; przy odswiezeniu nowa mysl, gdy nadal sciga gracza).</summary>
         private static void KeepFieldWord()
         {
             try
             {
+                if (Campaign.Current == null) return;
+                double today = Today;
                 for (int i = 0; i < _queue.Count; i++)
                 {
                     var d = _queue[i];
-                    if (!d.Field || d.Envoy) continue;
+                    if (!d.Field || d.Envoy || today - d.Day > FieldWordDays) continue;
                     var h = Hero.Find(d.Lord);
                     var lp = h != null ? h.PartyBelongedTo : null;
                     if (lp == null || lp.Ai == null || !lp.IsActive) continue;
-                    if (lp.Ai.DoNotAttackMainPartyUntil.RemainingHoursFromNow < 2f) { lp.Ai.SetDoNotAttackMainParty(3); _fRefresh++; }
+                    var m = Mover(lp);
+                    if (lp.Ai.DoNotAttackMainPartyUntil.RemainingHoursFromNow < 2f || (m != null && m.Ai != null && m.Ai.DoNotAttackMainPartyUntil.RemainingHoursFromNow < 2f))
+                    {
+                        Bind(lp, 3); _fRefresh++;
+                        Rethink(lp);
+                    }
                 }
             }
             catch (Exception e) { Stumble("KeepFieldWord", e); }
@@ -137,6 +185,9 @@ namespace Armoury
             try
             {
                 if (__1 != AiBehavior.EngageParty || __3 == null || __3 != MobileParty.MainParty || __0 == null || !KKeep) return;
+                // Recenzja 528: oblezenie albo bitwa / najazd na te osade (galaz SiegeEvent / MapEvent tez daje EngageParty na LastAttackerParty) oraz gracz w bitwie,
+                // najezdzie albo oblezeniu (galaz "IsRaid z druzyna gracza") - to gracz lamie spokoj; obroncy ida na niego jak w grze
+                if (__0.SiegeEvent != null || (__0.Party != null && __0.Party.MapEvent != null) || __3.MapEvent != null || __3.SiegeEvent != null) return;
                 var mp = _defParty != null ? _defParty(__instance) : null;
                 if (mp == null || mp.Ai == null || !mp.Ai.DoNotAttackMainPartyUntil.IsFuture) return;
                 __1 = AiBehavior.GoToPoint;
@@ -151,7 +202,7 @@ namespace Armoury
         private static string ForceLine()
         {
             return " | 528 sila w polu (prog X " + ForceX.ToString("0.0", Inv) + ", 0 = wyl.), obroncy (klucz " + (KKeep ? "TAK" : "NIE") + ", latka " + _defHook + "): ataki obrony osady na gracza zdjete "
-                   + _fDef + " (potkniecia watkow " + _fDefStumbles + "), nowa mysl przy zgodzie " + _fRethink + ", odswiezenia slowa w kolejce " + _fRefresh;
+                   + _fDef + " (potkniecia watkow " + _fDefStumbles + "), nowa mysl przy zgodzie " + _fRethink + ", odswiezenia slowa w kolejce " + _fRefresh + ", slowo zdjete (gracz zaatakowal) " + _fBroken;
         }
     }
 }

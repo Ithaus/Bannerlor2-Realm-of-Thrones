@@ -192,7 +192,7 @@ namespace Armoury
         {
             _realmKeys = NoKeys; _dRealmBlock = 0; _dPick = 0;
             _pact = null; PactZero(); _pThreadStumbles = 0;   // 386
-            _fDef = 0; _fDefStumbles = 0; _fRethink = 0; _fRefresh = 0;   // 528
+            _fDef = 0; _fDefStumbles = 0; _fRethink = 0; _fRefresh = 0; _fBroken = 0;   // 528
             HostReset();   // 385c
             EnvoyReset();  // 385d
             _queue.Clear(); _entries.Clear(); _cool.Clear(); _relift.Clear(); _dRelift = 0; _dReliftFail = 0; _offer = null; _armed = false; _stumbles = 0; _dZero = 0; _dNoAttack = 0; _dZeroMine = 0; _err.Clear();
@@ -994,7 +994,7 @@ namespace Armoury
             e.C = Math.Max(1000, c);
             e.Thr = calc > 0 ? 1.0 : calc < 0 ? 0.9 : 0.95;
             e.Lo = calc > 0 ? 0.8 : 0.7;
-            e.Why = !siege ? (e.K >= 0.5 ? 'F' : 'T') : e.PTake >= 0.8 ? 'S' : (mercy < 0 || valor > 0) ? 'C' : 'T';   // 528: F - wezmie sila
+            e.Why = !siege ? (e.K >= 0.5 && e.Grab + e.Prize > 0 ? 'F' : 'T') : e.PTake >= 0.8 ? 'S' : (mercy < 0 || valor > 0) ? 'C' : 'T';   // 528: F - wezmie sila
             e.Parts = pp + " | oferta: jency " + N(e.Vp) + " (" + (want == 'T' ? _pris.Count : _sel.Count) + ", Mercy " + mercy + "), zloto " + N(e.Vg) + ", ziemia " + N(e.Vf) + " (" + _selF.Count + ")" + (e.Vo > 0 ? ", przysiega " + N(e.Vo) + (surety ? " (z poreczeniem)" : "") : "") + (surety ? ", zakladnik " + N(e.Vh) + " (" + Name(_host) + ", k " + F(_hostK.ContainsKey(_host) ? _hostK[_host] : 1.0) + ")" : "") + ", Honor " + honor
                       + " -> V " + N(e.V) + " | koszt: " + cp + ", relacja " + rel + " -> C " + N(e.C) + " | prog " + e.Thr.ToString("0.00", Inv) + " (Calc " + calc + "), kontroferta od " + e.Lo.ToString("0.00", Inv) + ", Valor " + valor + ForceParts(e);
             return e;
@@ -1133,7 +1133,7 @@ namespace Armoury
                     if (!siege && !_envTalk)
                     {
                         // 385: w polu - druzyna rozmowcy nie rzuca sie na gracza, zanim umowa wykona sie po wyjsciu ze spotkania
-                        try { var lp = h.PartyBelongedTo; if (lp != null && lp.Ai != null) { lp.Ai.SetDoNotAttackMainParty(3); Rethink(lp); } } catch (Exception e) { Stumble("YesCons.NoAttack", e); }   // 528: Rethink - poscig zdjety w najblizszym takcie
+                        try { var lp = h.PartyBelongedTo; if (lp != null && lp.Ai != null) { Bind(lp, 3); Rethink(lp); } } catch (Exception e) { Stumble("YesCons.NoAttack", e); }   // 528: Rethink - poscig zdjety w najblizszym takcie; Recenzja 528: Bind - takze wodz armii, w ktorej szyku stoi
                     }
                     foreach (var s in _selF) if (s.StringId != null) d.Fiefs.Add(s.StringId);
                     if (_want == 'P')
@@ -1716,6 +1716,7 @@ namespace Armoury
                     // 385d-p: umowa poslanca czeka do 10 dob w stanie wojny z cala frakcja - napasc ICH druzyny na gracza jej nie kasuje (tylko atak gracza)
                     if (q.Envoy && a != PartyBase.MainParty) { _dEnvKept++; continue; }
                     _queue.RemoveAt(i); _armed = false;
+                    if (a == PartyBase.MainParty) Unbind(lord);   // Recenzja 528: gracz zlamal - koniec slowa wodza od razu
                     Drop(q, null, "Steel is drawn before the terms agreed with " + Name(lord) + " were kept. They are void.", "walka z " + other.Name + " przed wykonaniem (" + (a == PartyBase.MainParty ? "atak gracza" : "atak na gracza") + ") - nic nie oddane");
                 }
             }
@@ -2539,17 +2540,17 @@ namespace Armoury
                 foreach (var kv in _cool) if (kv.Value.End <= Today) dead.Add(kv.Key);
                 foreach (var k in dead) _cool.Remove(k);
                 if (_entries.Count > 0 && On) { NoAttack(); ScanViolations(); }
-                if (_entries.Count > 0 || before > 0 || _dZero + _dZeroMine > 0 || _queue.Count > 0 || _dRelift + _dReliftFail > 0 || _dRealmBlock > 0 || _dPick > 0 || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite + _pGoAi + _pGoMy > 0 || _fDef + _fDefStumbles + _fRethink + _fRefresh > 0)
+                if (_entries.Count > 0 || before > 0 || _dZero + _dZeroMine > 0 || _queue.Count > 0 || _dRelift + _dReliftFail > 0 || _dRealmBlock > 0 || _dPick > 0 || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite + _pGoAi + _pGoMy > 0 || _fDef + _fDefStumbles + _fRethink + _fRefresh + _fBroken > 0)
                 {
                     int pact = 0, st = 0, bet = 0, realm = 0;
                     foreach (var e in _entries) { if (e.Betray) bet++; else if (e.Scope == "*") pact++; else if (e.Scope == "K") realm++; else st++; }
                     Log.Info(Tag + ": doba " + today + " | wpisy umow " + _entries.Count + " (pakt ziem " + pact + ", rozejm osady " + st + ", rozejm krolestw " + realm + ", pilnowane zdrady " + bet + "; wygaslo " + (before - _entries.Count) + ")"
                              + " | 385: wojny AI zatrzymane rozejmem krolestw " + _dRealmBlock + ", okna wyboru " + _dPick
-                             + " | cele AI wyzerowane paktem " + _dZero + " (cele druzyn rodu na ich osadach " + _dZeroMine + ") | druzyny bez ataku na gracza " + _dNoAttack + " | kolejka " + _queue.Count + " | oblezenia wbrew umowie zwiniete " + _dRelift + " (nieudane " + _dReliftFail + ", czeka " + _relift.Count + ")" + (_pact != null || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite + _pGoAi + _pGoMy > 0 ? PactLine() : "") + (_fDef + _fDefStumbles + _fRethink + _fRefresh > 0 ? ForceLine() : "") + " | potkniecia " + _stumbles + ".");
+                             + " | cele AI wyzerowane paktem " + _dZero + " (cele druzyn rodu na ich osadach " + _dZeroMine + ") | druzyny bez ataku na gracza " + _dNoAttack + " | kolejka " + _queue.Count + " | oblezenia wbrew umowie zwiniete " + _dRelift + " (nieudane " + _dReliftFail + ", czeka " + _relift.Count + ")" + (_pact != null || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite + _pGoAi + _pGoMy > 0 ? PactLine() : "") + (_fDef + _fDefStumbles + _fRethink + _fRefresh + _fBroken > 0 ? ForceLine() : "") + " | potkniecia " + _stumbles + ".");
                 }
                 _dZero = 0; _dZeroMine = 0; _dNoAttack = 0; _dRelift = 0; _dReliftFail = 0; _dRealmBlock = 0; _dPick = 0;
                 PactZero();   // 386
-                _fDef = 0; _fDefStumbles = 0; _fRethink = 0; _fRefresh = 0;   // 528
+                _fDef = 0; _fDefStumbles = 0; _fRethink = 0; _fRefresh = 0; _fBroken = 0;   // 528
             }
             catch (Exception e) { Stumble("Daily", e); }
             try { EnvoyDaily(); } catch (Exception e) { Stumble("EnvoyDaily", e); }   // 385d
