@@ -53,10 +53,10 @@ namespace Armoury
     /// (F) ARMIE - bramki ArmsFirst (CanLordCreateArmy gry i BK, filtr kandydatow, wezwania BK, okno armii gracza) pytaja ArmsFirst.ArmyOut =
     ///     Unready || AiWounded500b.ArmyOut: c &gt;= ArmyGate% albo Stand / Fort. Czlonek juz w armii zostaje.
     /// (G) DECYZJE JEFFA 14.11 (E1-E4): E1 obrona zagrozonej osady RODU z postoju / drogi do twierdzy tylko z szansa wygranej - DefendOk: zdrowi partii
-    ///     (Party.EstimatedStrength, ta sama miara co Unsafe) + obroncy osady (strona osady w bitwie albo GetInvolvedPartiesForEventType przy oblezeniu) &gt;=
-    ///     AiWoundedDefendEdgePercent (120) x napastnicy (druga strona bitwy albo obozu oblegajacych). W postoju: przy szansie mysl wolna (bez DoNotChangeBehavior),
+    ///     (Party.EstimatedStrength, ta sama miara co Unsafe) + partie polowe strony osady w bitwie (bez garnizonu i milicji - jak localAdvantage gry) &gt;=
+    ///     AiWoundedDefendEdgePercent (120) x napastnicy (druga strona bitwy albo obozu oblegajacych), i sens: osada do AiWoundedDefendMaxHours (12) h jazdy. W postoju: przy szansie mysl wolna (bez DoNotChangeBehavior),
     ///     a postfiks 55 zostawia tylko obrone z szansa (reszta -1); HoldOnce nie przerywa jazdy na obrone z szansa. Bez szansy obrona -1 (55 i 408). Inicjatywa
-    ///     (postoj / Fort): atak na napastnika osady rodu tylko przy localAdvantage gry &gt;= ten sam prog. E2 twierdza sojusznika (HeroWounds.AiFort).
+    ///     (postoj / Fort / wodz na lozu w drodze 408 - Snap.Road): atak na napastnika osady rodu tylko przy localAdvantage gry &gt;= ten sam prog. E2 twierdza sojusznika (HeroWounds.AiFort).
     ///     E3 wlasne progi HP AI 20/30. E4 wodz ARMII: tylko ostroznosc w inicjatywie (migawka C, stan None) - bez rozwiazywania armii, bez mysli, bez bramek.
     /// Bez namiotow i wizerunkow; nic co klatke; bledy liczone na miejsce i partie (5 potkniec partii = poza migawka do konca doby), bez globalnego wylacznika.
     /// </summary>
@@ -74,7 +74,7 @@ namespace Armoury
         private const double CoolHours = 24.0;     // po wyjsciu bez wyleczenia (brak twierdzy, limit Fort) - tyle godzin bez ponownego wejscia
         private const float AdvPerCaution = 2f;    // inicjatywa: atak tylko przy przewadze sil >= 1 + 2 K c (pelna ostroznosc, K 75%: 2.5 x sila wroga)
 
-        internal struct Snap { internal float C; internal byte St; }
+        internal struct Snap { internal float C; internal byte St; internal bool Road; }   // Road: wodz na lozu, ktorego regula 408 prowadzi do twierdzy (E1 w inicjatywie)
 
         private sealed class Row
         {
@@ -100,7 +100,7 @@ namespace Armoury
         private static int _dStand, _dStandFort, _dFortDirect, _dFortFromStand, _dStandEnd, _dFortEnd, _dHold, _dReHold, _dYield, _dThreat, _dHunger, _dMaxDays, _dFortMax, _dUnsafe;
         private static int _dThinkStand, _dArmyOff, _dCut, _dBoost, _dThinkC, _dSkipStory;
         private static int _dNoFort, _dCool, _dThinkFree, _dStandBattleOff;
-        private static int _dDefThink, _dDefOff, _dDefOnly, _dDefRide;   // E1: mysli wolne dla obrony z szansa, obrony bez szansy -1, inne opcje -1 przy obronie, godziny jazdy na obrone
+        private static int _dDefThink, _dDefOff, _dDefOnly, _dDefRide, _dDefFar;   // E1: mysli wolne dla obrony z szansa, obrony bez szansy -1, inne opcje -1 przy obronie, godziny jazdy na obrone
         private static int _iDefOff, _iArmyLead;                          // E1 inicjatywa: atak na napastnika osady rodu bez szansy zgaszony; E4: inicjatywa wodza armii przycieta
         private static int _cArmy;                                        // E4: ostatni przeglad - wodzowie armii z c > 0
         private static int _iCut, _iCap, _iZero, _iZeroFort, _iAvoid, _iKeep, _gArmy;
@@ -122,7 +122,7 @@ namespace Armoury
             _dStand = _dStandFort = _dFortDirect = _dFortFromStand = _dStandEnd = _dFortEnd = _dHold = _dReHold = _dYield = _dThreat = _dHunger = _dMaxDays = _dFortMax = _dUnsafe = 0;
             _dThinkStand = _dArmyOff = _dCut = _dBoost = _dThinkC = _dSkipStory = 0;
             _dNoFort = _dCool = _dThinkFree = _dStandBattleOff = 0;
-            _dDefThink = _dDefOff = _dDefOnly = _dDefRide = 0;
+            _dDefThink = _dDefOff = _dDefOnly = _dDefRide = _dDefFar = 0;
             Interlocked.Exchange(ref _iDefOff, 0); Interlocked.Exchange(ref _iArmyLead, 0);
             Interlocked.Exchange(ref _iCap, 0); Interlocked.Exchange(ref _iZeroFort, 0);
             Interlocked.Exchange(ref _iCut, 0); Interlocked.Exchange(ref _iZero, 0); Interlocked.Exchange(ref _iAvoid, 0); Interlocked.Exchange(ref _iKeep, 0);
@@ -213,11 +213,13 @@ namespace Armoury
                         float c;
                         byte st = Step(mp, ref row, s, rest, now, out c);
                         if (row != null && row.St != None) cState++;
-                        if (c <= 0f && st == None) continue;
+                        // recenzja E1: wodz na lozu HW w drodze do twierdzy (regula 408, stan None) - ta sama bramka szansy w inicjatywie co postoj / Fort
+                        bool road = st == None && rest && mp.Army == null && HeroWounds.RestingParty(mp);
+                        if (c <= 0f && st == None && !road) continue;
                         if (c > 0f) { cSome++; if (c >= 0.5f) cHalf++; if (mp.Army != null) cArmy++; }
                         if (st == Fort) anyFort = true;
                         if (neu == null) neu = new Dictionary<MobileParty, Snap>();
-                        neu[mp] = new Snap { C = caution ? c : 0f, St = st };
+                        neu[mp] = new Snap { C = caution ? c : 0f, St = st, Road = road };
                     }
                     catch (Exception e)
                     {
@@ -517,10 +519,7 @@ namespace Armoury
             var best = HeroWounds.AiRestFort(mp, out tier, out road);
             if (best == null) return null;
             if (road < 0f) road = mp.GetPosition2D.Distance(best.GetPosition2D) * 1.1f;
-            float sp = 0f;
-            try { sp = mp.Speed; } catch { }
-            if (sp <= 0f) sp = 2.4f;
-            hours = road / Math.Max(0.05f, sp / 1.2f);   // jedn./h jak NightMarch.UnitsPerHour
+            hours = RideHours(mp, road);
             return best;
         }
 
@@ -529,9 +528,11 @@ namespace Armoury
         // ------------------------------------------------------------ (G) E1 - obrona osady rodu tylko z szansa
         private static float Edge(Settings s) { return Math.Max(100, Math.Min(300, s.AiWoundedDefendEdgePercent)) / 100f; }
 
-        /// <summary>E1: stosunek sil przy obronie zagrozonej osady - (zdrowi partii + obroncy osady) / napastnicy; EstimatedStrength jak Unsafe (liczy tylko
-        /// zdrowych). Bitwa o osade (rabunek, szturm): strona osady vs druga strona; oblezenie bez bitwy: GetInvolvedPartiesForEventType osady vs oboz oblegajacych
-        /// (ta sama lista co gra w DefaultMobilePartyAIModel). Bez zagrozenia - 0. Partia juz w bitwie / wsrod obroncow nie liczona drugi raz. Watek glowny.</summary>
+        /// <summary>E1: stosunek sil przy obronie zagrozonej osady - (zdrowi partii + polowe partie po stronie osady) / napastnicy; EstimatedStrength jak Unsafe
+        /// (liczy tylko zdrowych). Bitwa o osade (rabunek, szturm): strona osady vs druga strona; oblezenie bez bitwy: sama partia vs oboz oblegajacych.
+        /// Recenzja: garnizonu, milicji, samej osady i partii zamknietych w oblezonej osadzie NIE liczymy - gra (DefaultMobilePartyAIModel, localAdvantage
+        /// inicjatywy) tez ich pomija (IsGarrison / IsMilitia / CurrentSettlement.SiegeEvent), a to ona przy podejsciu decyduje atak albo ucieczke; z garnizonem
+        /// mysl wysylalaby lorda na obrone, ktorej inicjatywa (i nasza bramka E1 w InitPostfix) nie stoczy. Bez zagrozenia - 0. Watek glowny.</summary>
         internal static float DefendOdds(MobileParty mp, Settlement st)
         {
             if (mp == null || st == null || mp.Party == null) return 0f;
@@ -550,26 +551,43 @@ namespace Armoury
                     {
                         var pb = ps[i] != null ? ps[i].Party : null;
                         if (pb == null || pb == mp.Party) continue;
-                        if (ms == side) def += pb.EstimatedStrength; else att += pb.EstimatedStrength;
+                        if (ms != side) { att += pb.EstimatedStrength; continue; }
+                        var m = pb.MobileParty;   // strona osady: tylko partie polowe (bez osady, garnizonu, milicji) - jak localAdvantage gry
+                        if (m == null || m.IsGarrison || m.IsMilitia) continue;
+                        def += pb.EstimatedStrength;
                     }
                 }
             }
             else if (st.SiegeEvent != null && st.SiegeEvent.BesiegerCamp != null)
             {
+                // obroncow za murami gra w inicjatywie nie liczy (CurrentSettlement.SiegeEvent != null) - tylko sama partia vs oboz
                 foreach (var pb in st.SiegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType()) if (pb != null && pb != mp.Party) att += pb.EstimatedStrength;
-                foreach (var pb in st.GetInvolvedPartiesForEventType()) if (pb != null && pb != mp.Party) def += pb.EstimatedStrength;
             }
             else return 0f;
             if (att <= 0f) return 99f;
             return (ours + def) / att;
         }
 
-        /// <summary>E1: obrona osady rodu ma sens - szansa wygranej &gt;= AiWoundedDefendEdgePercent. Nie rzuca (blad = bez szansy, licznik).</summary>
+        /// <summary>E1 (Jeff: "tylko gdy ma to sens i jest szansa ze wygra"): obrona osady rodu - sens: osada w zasiegu AiWoundedDefendMaxHours jazdy
+        /// (godziny jak NearFort: odleglosc x 1.1 / (predkosc / 1.2)), szansa: DefendOdds &gt;= AiWoundedDefendEdgePercent. Nie rzuca (blad = bez szansy, licznik).</summary>
         internal static bool DefendOk(MobileParty mp, Settlement st, Settings s)
         {
-            if (s == null || st == null) return false;
-            try { return DefendOdds(mp, st) >= Edge(s); }
+            if (s == null || st == null || mp == null) return false;
+            try
+            {
+                if (RideHours(mp, mp.GetPosition2D.Distance(st.GetPosition2D) * 1.1f) > Math.Max(1, s.AiWoundedDefendMaxHours)) { _dDefFar++; return false; }
+                return DefendOdds(mp, st) >= Edge(s);
+            }
             catch (Exception e) { Stumble(ref _sThink, "DefendOk", e); return false; }
+        }
+
+        /// <summary>Godziny jazdy po drodze road (jedn. mapy) - ta sama rachuba co NearFort (jedn./h jak NightMarch.UnitsPerHour).</summary>
+        private static float RideHours(MobileParty mp, float road)
+        {
+            float sp = 0f;
+            try { sp = mp.Speed; } catch { }
+            if (sp <= 0f) sp = 2.4f;
+            return road / Math.Max(0.05f, sp / 1.2f);
         }
 
         /// <summary>E1: w ocenach jest obrona zagrozonej osady rodu (bez zwolania armii, ocena &gt; 0) z szansa wygranej.</summary>
@@ -726,13 +744,14 @@ namespace Armoury
                 if (s == null) return;
                 bool stand = !lead && x.St == Stand && s.AiWoundedRestEnabled;
                 bool fort = !lead && x.St == Fort && s.AiWoundedRestEnabled;   // recenzja: jazda do twierdzy jak postoj - bez zaczepek po drodze
+                bool road = !lead && x.Road;   // recenzja E1: wodz na lozu w drodze do twierdzy 408 - ta sama bramka szansy co postoj / Fort
                 float c = stand || fort ? 1f : (s.AiWoundedCaution ? x.C : 0f);
-                if (c <= 0f) return;
+                if (c <= 0f && !road) return;
                 if (__3 > 0f)
                 {
                     bool own = ArmsFirst.DefendsOwn(__0, __1);
                     // E1: z postoju / drogi do twierdzy napastnika osady rodu atakujemy tylko z szansa (localAdvantage gry >= prog)
-                    if (own && (stand || fort) && __4 < Edge(s)) { __3 = 0f; Interlocked.Increment(ref _iDefOff); }
+                    if (own && (stand || fort || road) && __4 < Edge(s)) { __3 = 0f; Interlocked.Increment(ref _iDefOff); }
                     else if (own || LordEscort.GuardAllowsAttack(__0, __1)) Interlocked.Increment(ref _iKeep);
                     else if (stand) { __3 = 0f; Interlocked.Increment(ref _iZero); }
                     else if (fort) { __3 = 0f; Interlocked.Increment(ref _iZeroFort); }
@@ -748,7 +767,7 @@ namespace Armoury
                         }
                     }
                 }
-                if (__2 > 0f) { __2 *= 1f + c; Interlocked.Increment(ref _iAvoid); }
+                if (__2 > 0f && c > 0f) { __2 *= 1f + c; Interlocked.Increment(ref _iAvoid); }
             }
             catch (Exception e) { Stumble(ref _sInit, "InitPostfix", e); }
         }
@@ -798,7 +817,7 @@ namespace Armoury
                 Log.Info(Tag + "postoj " + (s.AiWoundedRestEnabled ? "TAK" : "NIE") + " (wejscie: HP wodza <= " + s.AiWoundedRestHp + " albo loze Grave, albo ranni >= "
                          + s.AiWoundedRestSharePercent + "%; wyjscie: HP > " + Math.Max(s.AiWoundedRestHp, s.AiWoundedRestReleaseHp) + " i ranni <= " + s.AiWoundedRestExitSharePercent + "%, najdluzej "
                          + s.AiWoundedRestMaxDays + " dob; twierdza blizej niz " + s.AiWoundedRestSkipHours + " h - od razu do niej; potem twierdza regula 408: rod, frakcja, sojusznik;"
-                         + " obrona osady rodu tylko z szansa >= " + Edge(s).ToString("F2", Inv) + " x napastnicy)"
+                         + " obrona osady rodu tylko do " + Math.Max(1, s.AiWoundedDefendMaxHours) + " h jazdy i z szansa >= " + Edge(s).ToString("F2", Inv) + " x napastnicy, bez garnizonu)"
                          + " | ostroznosc " + (s.AiWoundedCaution ? "TAK" : "NIE") + " (sila " + s.AiWoundedCautionPercent + "%, od HP < " + s.AiWoundedCautionHpStartPercent
                          + "% albo rannych > " + s.AiWoundedCautionShareStartPercent + "%; armia zamknieta od " + s.AiWoundedArmyGatePercent + "%; wodz armii - tylko inicjatywa)"
                          + " | latki: postoj " + _hStand + ", mysl " + _hCaution + ", inicjatywa (CalculateInitiativeScoresForEnemy) " + _hInit
@@ -824,7 +843,7 @@ namespace Armoury
                          + " | postoj: Hold " + _dHold + ", Hold ponownie po cudzym rozkazie " + _dReHold + ", mysli z DoNotChangeBehavior " + _dThinkStand
                          + ", mysli bez flagi (rozkaz szukajacy bitwy) " + _dThinkFree + ", opcje bitwy -1 " + _dStandBattleOff + ", opcje zwolania armii -1 " + _dArmyOff
                          + " | obrona osady rodu (E1): mysli wolne z szansa " + _dDefThink + ", obrony bez szansy -1 " + _dDefOff + ", inne opcje -1 przy obronie " + _dDefOnly
-                         + ", godziny jazdy na obrone bez Hold " + _dDefRide + ", inicjatywa bez szansy zgaszona " + Volatile.Read(ref _iDefOff)
+                         + ", godziny jazdy na obrone bez Hold " + _dDefRide + ", obrony za daleko " + _dDefFar + ", inicjatywa bez szansy zgaszona " + Volatile.Read(ref _iDefOff)
                          + " | ostroznosc: partie c>0 " + _cSome + " (c>=0.5 " + _cHalf + "), mysli z cieciem " + _dThinkC + ", opcje bitwy przyciete " + _dCut + ", twierdze podbite " + _dBoost
                          + ", lordowie fabuly pominieci " + _dSkipStory
                          + " | inicjatywa: ataki bez przewagi ponizej progu " + Volatile.Read(ref _iCap) + ", z przewaga przyciete " + Volatile.Read(ref _iCut)

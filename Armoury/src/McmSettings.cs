@@ -896,9 +896,13 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int AiWoundedArmyGatePercent { get; set; } = 50;
 
-        [SettingPropertyInteger("Ai Wounded Defend Edge Percent", 100, 300, "0", HintText = "a resting AI lord, or one riding to a fortress to heal, rides out to defend his clan's own besieged or attacked fief only when his healthy men together with the fief's defenders are at least this percent of the attackers' strength (120 = a fifth stronger, a fair chance of winning); otherwise he keeps resting. On sight he attacks the fief's attackers only with the same edge. Only with Ai Wounded Rest Enabled", RequireRestart = false)]
+        [SettingPropertyInteger("Ai Wounded Defend Edge Percent", 100, 300, "0", HintText = "a resting AI lord, or one riding to a fortress to heal, rides out to defend his clan's own besieged or attacked fief only when his healthy men together with friendly field parties already fighting there are at least this percent of the attackers' strength (120 = a fifth stronger, a fair chance of winning; garrison and militia are not counted, as the game's own decision to attack or flee does not count them); otherwise he keeps resting. On sight he attacks the fief's attackers only with the same edge. Only with Ai Wounded Rest Enabled", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int AiWoundedDefendEdgePercent { get; set; } = 120;
+
+        [SettingPropertyInteger("Ai Wounded Defend Max Hours", 1, 72, "0", HintText = "a resting AI lord, or one riding to a fortress to heal, rides out to defend his clan's own fief only when it is at most this many hours of riding away (12 = half a day); farther fiefs are left to healthy lords. Only with Ai Wounded Rest Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int AiWoundedDefendMaxHours { get; set; } = 12;
 
         [SettingPropertyBool("Ai Wounded Log", HintText = "writes to Armoury.log when a battered AI party starts resting, rides to a fortress or recovers, and a daily summary of AI wounded decisions", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
@@ -13536,6 +13540,7 @@ namespace Armoury
             s.AiWoundedCautionShareStartPercent = AiWoundedCautionShareStartPercent;
             s.AiWoundedArmyGatePercent = AiWoundedArmyGatePercent;
             s.AiWoundedDefendEdgePercent = AiWoundedDefendEdgePercent;
+            s.AiWoundedDefendMaxHours = AiWoundedDefendMaxHours;
             s.AiWoundedLog = AiWoundedLog;
             s.PrisonerCareXp = PrisonerCareXp;
             s.PrisonersHealLikeYourMen = PrisonersHealLikeYourMen;

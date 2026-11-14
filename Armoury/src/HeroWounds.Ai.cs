@@ -14,7 +14,8 @@ namespace Armoury
     ///
     /// Dotyczy: partia lorda AI (nie gracz, nie rod gracza), ktorej WODZ ma czynny wpis w ksiedze ran (Serious albo Grave).
     /// 500-b E1 (Jeff 14.11 "tak ale tylko gdy ma to sens i jest szansa ze wygra"): obrona zagrozonej osady rodu tylko z szansa wygranej
-    /// (AiWounded500b.DefendOk: zdrowi partii + obroncy osady >= AiWoundedDefendEdgePercent x napastnicy); bez szansy ta opcja -1 i partia jedzie do twierdzy.
+    /// (AiWounded500b.DefendOk: osada do AiWoundedDefendMaxHours h jazdy i zdrowi partii + partie polowe strony osady, bez garnizonu, >= AiWoundedDefendEdgePercent
+    /// x napastnicy); bez tego ta opcja -1 i partia jedzie do twierdzy. Inicjatywa takiej partii: Snap.Road - ta sama bramka szansy co postoj.
     /// 500-b E2 (Jeff "tak"): po twierdzach rodu i frakcji - najblizsza twierdza krolestwa SOJUSZNICZEGO (Kingdom.AlliedKingdoms gry 1.4.8; BK MakeAlliance pusty).
     /// Pomija (zadnej zmiany ocen): armia, bitwa, oblezenie (oblega albo stoi w oblezonej osadzie), DoNotChangeBehavior, morze, glod, wodz czynnego
     /// oblezenia fabuly ROT (SiegePhantomLift.StoryLeaderOf), wodz potrzebny fabule (StoryGuard.Needed) na mniej niz 14 dni przed jego wydarzeniem.
