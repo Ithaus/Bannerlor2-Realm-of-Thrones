@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 241 (529 panika kompanii + 529-a ostrzal, 530 atak AI z przewaga, 531 rekruci rodu we wsiach pobocznych, 532 jedna liczba brakow sprzetu), bez autotestu
+
+- Armoury.dll 88b8242a = noc/scal-perki. Kopie: .bak-2026-11-14-przed-wgranie241, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie241 i -przed).
+- Do sprawdzenia: linia konca bitwy 529 (rzuty, 529-a ostrzal), 530 linia doby (wstrzymane ataki; prog AiAttackEdgePercent 130 - czy wojny nie stoja), 531 (szlachetni tier 1 we wsiach pobocznych), 532 napisy. 'missing 6' Jeffa = pasek gotowosci DTE na mapie (inna regula: bez broni bocznej, z rannymi, jeden rodzaj) - do decyzji/poprawki 532-a.
+
 ## STAN 14.11 - WGRANIE 240 (528 uklady w polu a stosunek sil, obroncy dotrzymuja slowa), bez autotestu
 
 - Armoury.dll 7334fff5 = noc/scal-perki (239 + 528). Kopie: .bak-2026-11-14-przed-wgranie240, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie240 i -przed).
