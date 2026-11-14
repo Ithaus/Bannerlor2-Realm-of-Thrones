@@ -73,3 +73,4 @@ D10: "nie sa wystarczajaco szybkie" - premie predkosci konia z perkow moga przek
 D11: wersja realna - po przegranej wlasne perki (PreventiveMedicine, WalkItOff) daja najwyzej 10 HP (albo inny efekt).
 D15: Lithurgy trwala u wszystkich - jedna zasada.
 D10 korekta (Jeff 14.11): "moga ale max o 10% limitu RBM" - premia perkow moze podniesc predkosc konia najwyzej do sufitu RBM x 1.10 (nadpisuje wersje bez sufitu z workflow d-reszta - poprawic po jego zakonczeniu).
+500-b decyzje (Jeff 14.11): E1 lord w postoju broni wlasnej osady tylko gdy ma sens i jest szansa wygrac; E2 skrot moze prowadzic do twierdzy sojusznika - tak; E3 postoj AI od progu rannego gry ok. 20 HP (nie 10); E4 wodz armii ranny - tylko ostroznosc w ataku (bez rozwiazywania armii).
