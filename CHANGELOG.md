@@ -25,6 +25,7 @@
 - Napis moze byc dlugi (3 linie dymka) przy dlugich nazwach rodzajow - patrzec w grze.
 - CHANGELOG: 49881 -> 49909 linii (wpis dopisany na gorze, reszta bez zmian).
 - Build Armoury 0 bledow. Gra Jeffa wlaczona - NIE wgrane, w grze nie sprawdzone (linia startu `Pasek DTE na mapie (533)` i `podpowiedz paska (1) -> ...` do sprawdzenia w logu).
+- Recenzja 533: sprawdzone w zainstalowanym DTE (`DynamicTroopEquipmentReupload.v1.4.7.dll`, v1.4.7.2, md5 ac3115e9...): typ `MapArmoryReadinessMixin`, pola `_armoryReadinessHint` / `_isArmoryReadinessVisible`, `set_ArmoryReadinessHint` obecne; `OnRefresh` to override deklarowany w mixinie (UIExtenderEx wola go wirtualnie) - postfiks trafia. Getter nie ruszany (DTE trzyma obiekt w polu) - w klatce UI zero naszej pracy; wyjatki postfiksu i settera lapane i liczone. Poprawka: gdy DTE przebudowal podpowiedz (zmiana zbrojowni / skladu) w mniej niz 1 s po naszej probie, nastepna proba czekala do 5 s, a do tego czasu podpowiedz pokazywala wynik sprzed zmiany (`KitPreview.Last` ze starym kluczem) - teraz flaga `_pending`: proba zaraz po uplywie 1 s. CHANGELOG +1 linia.
 
 **Status:** DO SPRAWDZENIA (galaz noc/533-dte-pasek, nie wgrane).
 

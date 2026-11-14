@@ -37,6 +37,7 @@ namespace Armoury
         private static int _lastTry = int.MinValue / 2;
         private static int _stumbles, _shown;
         private static bool _blocked;            // ostatnia proba podgladu bez wyniku - pamieci KitPreview.Last nie bierzemy do nastepnej udanej proby
+        private static bool _pending;            // recenzja 533: DTE przebudowal podpowiedz (zbrojownia / sklad) w mniej niz 1 s po probie - proba zaraz po uplywie 1 s, nie dopiero po 5 s
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.DteMapBarShowsKitPreview; } }
         /// <summary>Wpiete i wlaczone - napisy KitPreview mowia wtedy, ze podpowiedz paska ma ta sama liczbe.</summary>
@@ -86,7 +87,7 @@ namespace Armoury
         }
 
         /// <summary>Nowa kampania / wczytanie - bez starych obiektow UI i wyniku podgladu.</summary>
-        internal static void Reset() { _mine = null; _dteSeen = null; _used = null; _lastText = null; _lastTry = Environment.TickCount - 10000; _blocked = false; }
+        internal static void Reset() { _mine = null; _dteSeen = null; _used = null; _lastText = null; _lastTry = Environment.TickCount - 10000; _blocked = false; _pending = false; }
 
         /// <summary>Postfiks DTE MapArmoryReadinessMixin.OnRefresh (co 0.2 s na mapie). Tanio: porownanie referencji; podglad najwyzej raz na 1 s.</summary>
         public static void RefreshPostfix(object __instance, HintViewModel ____armoryReadinessHint, bool ____isArmoryReadinessVisible)
@@ -101,15 +102,14 @@ namespace Armoury
                     if (oursShown && _dteSeen != null) Put(__instance, _dteSeen, null, null);   // wylaczone w trakcie - wraca tekst DTE
                     return;
                 }
-                bool dteFresh = false;
-                if (!oursShown && !ReferenceEquals(cur, _dteSeen)) { _dteSeen = cur; dteFresh = true; }   // DTE przebudowal podpowiedz (albo nowy mixin)
+                if (!oursShown && !ReferenceEquals(cur, _dteSeen)) { _dteSeen = cur; _pending = true; }   // DTE przebudowal podpowiedz (albo nowy mixin)
                 int now = Environment.TickCount;
                 int since = unchecked(now - _lastTry);
                 KitPreview.Result r;
                 bool tried = false;
-                if (since >= 1000 && (dteFresh || since >= 5000))
+                if (since >= 1000 && (_pending || since >= 5000))
                 {
-                    _lastTry = now; tried = true;
+                    _lastTry = now; tried = true; _pending = false;
                     r = KitPreview.ForArmoury();   // Get(false): z pamieci po kluczu; od nowa tylko po zmianie wersji zbrojowni / skladu / sakw / dnia
                     _blocked = r == null;          // np. zbrojownia otwarta: Get zwraca wynik bez Ok, a KitPreview.Last zostaje stary - bez migania tekstow
                 }
