@@ -33,7 +33,7 @@ namespace Armoury
     ///    dopoki stoi; zaden roster nie dostaje sztuki - DTE pomija IsBannerItem). Formacja ze sztandarem, ktora ma mniej chorazych niz chce model (postfiks
     ///    BannerKit.DesiredPostfix: k = liczba kompanii), dostaje ponowne SetFormationBanner (przeliczenie - OOB gracza przelicza tylko przy progu 2 ludzi).
     ///  C (OnDeploymentFinished po B; klucz BannerCompaniesEnabled): kazda formacja 0-7 dzielona na k kompanii (CompaniesFor: ponizej 0.6 x Size - jedna,
-    ///    inaczej round(n / Size), najwyzej 6) wedlug rzutu pozycji na wektor w prawo formacji - rowne liczebnie od lewej. Czlonkowie: ludzie (bez umarlych),
+    ///    inaczej round(n / Size), najwyzej MaxCompanies 40 - 529: Size 10, chorazych osobno StandardsFor - BannerStandardSize 50, najwyzej 6) wedlug rzutu pozycji na wektor w prawo formacji - rowne liczebnie od lewej. Czlonkowie: ludzie (bez umarlych),
     ///    bohaterowie i gracz tez (moga dowodzic), ale nie lamia sie (jak BrokenMen). Chorazy kompanii: chorazy gry stojacy w jej przedziale (zajety - najblizsza
     ///    kompania bez chorazego). Dowodca: kapitan formacji w swojej kompanii, inni bohaterowie - kompania bez bohatera najblizej; reszta - najwyzszy tier
     ///    (nie chorazy; remis: zdrowie, potem Index) - "sierzant".
@@ -60,21 +60,35 @@ namespace Armoury
     /// </summary>
     internal static partial class BannerCompanies
     {
-        internal const int MaxPerFormation = 6;          // tyle miejsc na sztandar ma DefaultFormationArrangementModel (linia, kolo, klin, kwadrat)
+        internal const int MaxPerFormation = 6;          // tyle miejsc na sztandar ma DefaultFormationArrangementModel (linia, kolo, klin, kwadrat) - limit CHORAZYCH
+        // 529 (Jeff 14.11 "10 ludzi"): limit KOMPANII na formacje - kompania (BannerCompanySize, 10) to jednostka zalamania i dowodztwa, nie sztandar; sztandarow
+        // jest tyle co dotad (BannerStandardSize 50, najwyzej MaxPerFormation). 40 x 10 = formacja 400 ludzi w kompaniach po 10, wieksza - po wiecej
+        internal const int MaxCompanies = 40;
         internal const float SmallShare = 0.6f;          // ponizej 0.6 x Size ludzi - jedna kompania
         internal const float TickEvery = 0.5f, ReviewEvery = 3f, MsgGap = 2f, CheerRange = 60f, WaveGap = 0.5f;
         internal const int Waves = 4;
         internal const float RollBelow = 50f, PMax = 0.9f;
+        internal const float StateHigh = 1.25f;          // 529 (Jeff 14.11 "tak"): najwyzszy mnoznik stanu bitwy B (307e) - dotad 1.5
 
-        /// <summary>Liczba kompanii dla n szeregowych (wspolna dla podzialu i dla liczby chorazych - BannerKit.DesiredPostfix).</summary>
-        internal static int CompaniesFor(int n, int size)
+        /// <summary>Liczba grup dla n szeregowych: ponizej 0.6 x size - jedna, inaczej round(n / size), najwyzej max. 529: podzial na kompanie wola z
+        /// BannerCompanySize i MaxCompanies, liczba chorazych (BannerKit.DesiredPostfix) - z BannerStandardSize i MaxPerFormation (jak dotad przy 50).</summary>
+        internal static int CompaniesFor(int n, int size, int max = MaxPerFormation)
         {
             if (size < 1) size = 50;
+            if (max < 1) max = 1;
             if (n < SmallShare * size) return 1;
             int k = (int)Math.Floor(n / (double)size + 0.5);
             if (k < 1) k = 1;
-            if (k > MaxPerFormation) k = MaxPerFormation;
+            if (k > max) k = max;
             return k;
+        }
+
+        /// <summary>529: liczba chorazych formacji dla n szeregowych - jedna regula dla BannerKit.DesiredPostfix (BannerStandardSize, najwyzej 6).</summary>
+        internal static int StandardsFor(int n, Settings c)
+        {
+            int size = c != null ? c.BannerStandardSize : 50;
+            if (size < 10) size = 10;
+            return CompaniesFor(n, size, MaxPerFormation);
         }
 
         // recenzja: licznik szeregowych dla BannerKit.DesiredPostfix (glowny watek, bez alokacji na wolanie)
@@ -107,7 +121,7 @@ namespace Armoury
         internal static int ShareRolls, ShareBreaks;
         internal static float ShareLostSum, SharePSum;
         internal static readonly int[] ShareStep = new int[7];
-        // 307e (klucz BannerBreakBattleState): mnoznik stanu bitwy B = clamp(sila wroga / sila naszych, 0.3, 1.5) w rzucie - liczba, suma, najmniej, najwiecej;
+        // 307e (klucz BannerBreakBattleState): mnoznik stanu bitwy B = clamp(sila wroga / sila naszych, 0.3, 1.25 - 529, dotad 1.5) w rzucie - liczba, suma, najmniej, najwiecej;
         // zalamania wedlug zrodla rzutu (0 inne, 1 sztandar, 2 dowodca, 3 udzial strat 307b, 4 straty 305c / polowa skladu)
         internal static int StateRolls; internal static float StateSum, StateMin = 9f, StateMax;
         // 309: indeks 5 = rzut przy 1/6 strat (klucz BannerBreakEarly) - poza licznikami 307b (B307-2: rzutow = suma 2/6..5/6)
@@ -118,6 +132,9 @@ namespace Armoury
         internal static int EarlyRolls, EarlyBreaks, EmptyBroken, RanksPanicSkip, RanksWithdrawSkip, ShareNoRoll, EmptyWait;
         internal static float EarlyPSum, BreakShareSum;
         internal static int BreakShareN;   // 309: zalamania z rzutu udzialu strat (1/6 i 307b) - suma utraconej czesci przy zalamaniu
+        // 529 (klucz BannerFirstRollNeedsMelee): rzut 1/6 odlozony - kompanie (pierwszy powod: prowadzi bohater / bez zwarcia), takty odlozenia, odlozone, ktore
+        // jednak rzucily przy 1/6; kompanie, ktore doszly do zwarcia
+        internal static int EarlyHeldLord, EarlyHeldNoMelee, EarlyHeldTicks, EarlyHeldRolled, MeleeCompanies;
         // 309 (klucz BannerEventRollByLoss): rzuty zdarzen (sztandar, dowodca) bez bramki morale gry - liczba, suma udzialu strat, suma p, zalamania
         internal static int EventRolls, EventBreaks;
         internal static float EventShareSum, EventPSum;
@@ -137,6 +154,7 @@ namespace Armoury
             StateRolls = 0; StateSum = 0f; StateMin = 9f; StateMax = 0f; Array.Clear(BreakBySrc, 0, BreakBySrc.Length);
             EarlyRolls = EarlyBreaks = EmptyBroken = RanksPanicSkip = RanksWithdrawSkip = ShareNoRoll = EmptyWait = BreakShareN = 0; EarlyPSum = BreakShareSum = 0f;
             EventRolls = EventBreaks = 0; EventShareSum = EventPSum = 0f;
+            EarlyHeldLord = EarlyHeldNoMelee = EarlyHeldTicks = EarlyHeldRolled = MeleeCompanies = 0;
             Reset318();
             Reset448();
         }
@@ -192,6 +210,8 @@ namespace Armoury
             public float NextWave;
             public int TierIx = 1;
             public Dir448 D;                               // 448: wynik ciosow z tylu / z boku i przerwy (null do pierwszego trafienia z boku / tylu)
+            public bool Melee;                             // 529: kompania doszla do zwarcia (cios wrecz z obrazeniami zadany albo przyjety przez jej czlowieka - OneHit)
+            public int EarlyHeld;                          // 529: rzut 1/6 odlozony - 0 nie, 1 prowadzi bohater, 2 bez zwarcia (pierwszy powod, licznik kompanii raz)
         }
 
         private BannerBearerLogic _bbl;
@@ -437,7 +457,9 @@ namespace Armoury
             }
             _buf.Clear();
             if (soldiers == 0) return false;                   // sami bohaterowie - bez kompanii
-            int k = BannerCompanies.CompaniesFor(soldiers, c.BannerCompanySize);
+            // 529: kompanie po BannerCompanySize (10), najwyzej MaxCompanies - chorazych gry jest mniej (StandardsFor); kompania bez chorazego nie ma sztandaru
+            int size = c.BannerCompanySize < 10 ? 10 : c.BannerCompanySize;
+            int k = BannerCompanies.CompaniesFor(soldiers, size, BannerCompanies.MaxCompanies);
             if (k > men.Count) k = men.Count;
             // rzut pozycji na wektor w prawo formacji - kompanie rowne liczebnie od lewej
             Vec2 dir = f.Direction;
@@ -724,7 +746,23 @@ namespace Armoury
                     int k = (int)(lost * 6f + 0.0001f);
                     if (k > 5) k = 5;
                     int first = early ? 1 : 2;
-                    if (k >= first && k > co.LossStep)
+                    // 529 (klucz BannerFirstRollNeedsMelee; log 14.11 22:40:59 - kompania Gylberta z wlasnym dowodca-bohaterem zlamana rzutem 1/6 przed zwarciem):
+                    // rzut przy pierwszej 1/6 strat czeka, dopoki prowadzi ja bohater strony (Leadership: wlasny dowodca albo bohater w szyku / w 60 m) albo
+                    // dopoki nie doszla do zwarcia - krok nie zapisany, rzut w pierwszym takcie bez obu warunkow, jesli strata nadal 1/6; od 2/6 bez zmian
+                    bool held = false;
+                    if (early && k == 1 && k > co.LossStep && c.BannerFirstRollNeedsMelee)
+                    {
+                        int hb;
+                        Leadership(co, out hb);
+                        int why = hb <= 1 ? 1 : (!co.Melee ? 2 : 0);
+                        if (why > 0)
+                        {
+                            held = true;
+                            BannerCompanies.EarlyHeldTicks++;
+                            if (co.EarlyHeld == 0) { co.EarlyHeld = why; if (why == 1) BannerCompanies.EarlyHeldLord++; else BannerCompanies.EarlyHeldNoMelee++; }
+                        }
+                    }
+                    if (!held && k >= first && k > co.LossStep)
                     {
                         if (!early) co.LossStep = k;   // klucz NIE: krok zapisany przed rzutem jak dotad (bez rzutu - krok stracony)
                         if (early) InRanksLive(co, true);   // pominieci w szeregu - licznik linii tylko przy rzucie
@@ -733,6 +771,7 @@ namespace Armoury
                         bool rolled = Roll(co, factor, c, now, true, lost, src);
                         if (rolled)
                         {
+                            if (src == 5 && co.EarlyHeld > 0) BannerCompanies.EarlyHeldRolled++;   // 529: odlozony rzut 1/6 jednak sie odbyl (raz - krok zapisany nizej)
                             co.LossStep = k;
                             if (k >= 2 && !co.ThirdDone) { co.ThirdDone = true; if (k == 2) BannerCompanies.Third++; }
                             if (k >= 3 && !co.HalfDone) { co.HalfDone = true; BannerCompanies.Half++; }
@@ -1150,7 +1189,7 @@ namespace Armoury
             }
             float bmul = 1f;
             // 307e (143a bitwa 4: kompania T5 Swordmasterow zalamala sie przy 32 zywych gracza na 7 wroga - rzut z upadku sierzanta): zywy czlowiek widzi, jak
-            // idzie bitwa - p x B, B = clamp(sila walczacych wroga / sila walczacych naszych, 0.3, 1.5); jedna regula dla obu stron (klucz BannerBreakBattleState)
+            // idzie bitwa - p x B, B = clamp(sila walczacych wroga / sila walczacych naszych, 0.3, StateHigh 1.25 - 529, dotad 1.5); jedna regula dla obu stron (klucz BannerBreakBattleState)
             if (c.BannerBreakBattleState)
             {
                 float b = BattleState(co);
@@ -1200,7 +1239,7 @@ namespace Armoury
         }
 
         /// <summary>307e: stan bitwy wobec kompanii - sila walczacych wroga / sila walczacych jej strony (CharacterPowerCached ludzi czynnych, nie w ucieczce
-        /// ani w zbiorze zlamanych RoutHold), clamp 0.3..1.5; bez danych - 1 (rzut jak dotad). Rzuty sa rzadkie (zdarzenia kompanii) - pelny przeglad Mission.Agents.</summary>
+        /// ani w zbiorze zlamanych RoutHold), clamp 0.3..1.25 (529, dotad 1.5); bez danych - 1 (rzut jak dotad). Rzuty sa rzadkie (zdarzenia kompanii) - pelny przeglad Mission.Agents.</summary>
         private readonly Dictionary<Team, float> _bs = new Dictionary<Team, float>();
         private float _bsAt = -100f;
 
@@ -1238,10 +1277,11 @@ namespace Armoury
                     if (a.Team.Side == side) ours += pw; else if (a.Team.IsEnemyOf(co.T)) foe += pw;
                 }
                 ok = true;
-                if (!(ours > 0f)) return 1.5f;
+                // 529: gora StateHigh 1.25 (dotad 1.5) - log 14.11: kazde z 9 zalaman wroga przy B x1.50
+                if (!(ours > 0f)) return BannerCompanies.StateHigh;
                 float q = foe / ours;
                 if (q < 0.3f) q = 0.3f;
-                if (q > 1.5f) q = 1.5f;
+                if (q > BannerCompanies.StateHigh) q = BannerCompanies.StateHigh;
                 return q;
             }
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.BattleState", e); return 1f; }
@@ -1367,7 +1407,7 @@ namespace Armoury
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             sb.Append("Choragwie (CH) start: misja ").Append(MissionTeams.Kind(m))
               .Append(" | klucze: kompanie ").Append(c.BannerCompaniesEnabled ? "TAK" : "NIE").Append(" (po ").Append(c.BannerCompanySize)
-              .Append("), sztandary polowe ").Append(c.FieldStandards ? "TAK" : "NIE").Append(", zwrot sprzetu chorazego ").Append(c.StandardBearerKitSafe ? "TAK" : "NIE")
+              .Append(", sztandar na ").Append(c.BannerStandardSize).Append(" ludzi - 529), sztandary polowe ").Append(c.FieldStandards ? "TAK" : "NIE").Append(", zwrot sprzetu chorazego ").Append(c.StandardBearerKitSafe ? "TAK" : "NIE")
               .Append(" (A czynne ").Append(BannerKit.KitReady ? "TAK" : "NIE").Append(", wielu chorazych ").Append(BannerKit.MoreAllowed(c) && BannerKit.CountHooked ? "TAK" : "NIE")
               .Append(") | sztandary: ").Append(_deployNote).Append(", bohatera ").Append(BannerCompanies.StdHero).Append(" formacji, polowe ").Append(BannerCompanies.StdField)
               .Append(" (pominiete - bandyci i umarli ").Append(BannerCompanies.StdSkipped).Append(", brak campaign_banner_small ").Append(BannerCompanies.StdNoItem)
@@ -1460,6 +1500,11 @@ namespace Armoury
               .Append(", zalaman ").Append(BannerCompanies.EarlyBreaks).Append("), rozbite bez rzutu ").Append(BannerCompanies.EmptyBroken)
               .Append(", poza szeregiem przy rzutach: panika ").Append(BannerCompanies.RanksPanicSkip).Append(", ranni w odwrocie ").Append(BannerCompanies.RanksWithdrawSkip)
               .Append(", rzutow udzialu bez rzutu (klucz NIE) ").Append(BannerCompanies.ShareNoRoll)
+              .Append(" | pierwszy rzut 1/6 czeka (529) ").Append(c305 != null && c305.BannerFirstRollNeedsMelee ? "TAK" : "NIE")
+              .Append(": kompanii odlozonych ").Append(BannerCompanies.EarlyHeldLord + BannerCompanies.EarlyHeldNoMelee).Append(" (prowadzi bohater ").Append(BannerCompanies.EarlyHeldLord)
+              .Append(", bez zwarcia ").Append(BannerCompanies.EarlyHeldNoMelee).Append("), taktow odlozenia ").Append(BannerCompanies.EarlyHeldTicks)
+              .Append(", odlozone, ktore rzucily przy 1/6 ").Append(BannerCompanies.EarlyHeldRolled).Append(", kompanii w zwarciu ").Append(BannerCompanies.MeleeCompanies)
+              .Append(" z ").Append(BannerCompanies.Companies).Append(", stan bitwy najwyzej x").Append(BannerCompanies.StateHigh.ToString("0.00", inv305))
               .Append(" | rzuty zdarzen wedlug strat (309) ").Append(c305 != null && c305.BannerEventRollByLoss ? "TAK" : "NIE")
               .Append(": rzutow ").Append(ev).Append(" (sr. udzial strat ").Append(ev > 0 ? (BannerCompanies.EventShareSum / ev).ToString("0.00", inv305) : "-")
               .Append(", sr. szansa ").Append(ev > 0 ? (BannerCompanies.EventPSum / ev).ToString("0.000", inv305) : "-")

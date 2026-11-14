@@ -1240,11 +1240,12 @@ namespace Armoury
             OpenBanner(idx);
         }
 
-        /// <summary>Druga i dalsza choragiew rodzaju: tyle ludzi co kompania choragwi w bitwie (BannerCompanySize), najwyzej polowa zdrowych.</summary>
+        /// <summary>Druga i dalsza choragiew rodzaju: tyle ludzi, ile przypada na jeden sztandar w bitwie (BannerStandardSize - 529; dotad BannerCompanySize,
+        /// ktora teraz jest 10 - choragiew po 10 ludzi w przegladzie armii bylaby za mala), najwyzej polowa zdrowych.</summary>
         private static int DefaultMen(int fit)
         {
             var c = Settings.Current;
-            int size = c != null ? Math.Max(10, c.BannerCompanySize) : 50;
+            int size = c != null ? Math.Max(10, c.BannerStandardSize) : 50;
             if (fit <= 1) return TheRest;
             return Math.Max(1, Math.Min(size, fit / 2));
         }

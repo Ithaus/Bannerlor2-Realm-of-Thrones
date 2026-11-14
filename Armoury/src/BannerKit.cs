@@ -399,8 +399,10 @@ namespace Armoury
                 // recenzja: ta sama populacja co podzial na kompanie (BannerCompaniesMission.Split - czynni ludzie bez bohaterow i umarlych); CountOfUnits liczy
                 // takze bohaterow i umarlych (74 szeregowych + 3 bohaterow = 2 chorazych przy 1 kompanii). Najpierw tani prog: szeregowych nie wiecej niz
                 // CountOfUnits, a CompaniesFor nie maleje - gdy wszyscy daja 1 kompanie, szeregowi tez (bez przegladu formacji; wolane tez przy kazdym spawnie posilkow)
-                if (BannerCompanies.CompaniesFor(__0.CountOfUnits, c.BannerCompanySize) <= 1) return;
-                int k = BannerCompanies.CompaniesFor(BannerCompanies.SoldiersOf(__0), c.BannerCompanySize);
+                // 529: chorazych liczy BannerStandardSize (50, najwyzej 6) - nie wielkosc kompanii (10); kompania bez chorazego nie ma sztandaru, wiec 10 ludzi
+                // nie daje 5x wiecej sztandarow, podmian sprzetu chorazych (DTE) ani odlozonych do taborow - liczba jak dotad przy kompanii 50
+                if (BannerCompanies.StandardsFor(__0.CountOfUnits, c) <= 1) return;
+                int k = BannerCompanies.StandardsFor(BannerCompanies.SoldiersOf(__0), c);
                 if (k > 1) { __result = k; _raised.Add(__0); }
             }
             catch (Exception e) { Stumble("BannerKit.DesiredPostfix", e); }

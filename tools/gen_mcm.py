@@ -748,7 +748,9 @@ RANGES = {
     # P2 dzwiek: glosnosc 1..3
     'BattleSoundsLoudness': (1, 3, "0"),
     # P3 choragwie: wielkosc kompanii 20..150, wstrzasy 0..40, szansa zalamania 0..1
-    'BannerCompanySize': (20, 150, "0"),
+    # 529: kompania od 10 ludzi; sztandar na BannerStandardSize ludzi (20..150)
+    'BannerCompanySize': (10, 150, "0"),
+    'BannerStandardSize': (20, 150, "0"),
     'BannerShockStandardLost': (0.0, 40.0, "0.0"),
     'BannerShockCommanderLost': (0.0, 40.0, "0.0"),
     'BannerBreakChance': (0.0, 1.0, "0.00"),

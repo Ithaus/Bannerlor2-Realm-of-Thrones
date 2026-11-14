@@ -191,6 +191,18 @@ namespace Armoury
         {
             var v = h.V;
             Company co;
+            // 529 (klucz BannerFirstRollNeedsMelee): cios wrecz od wroga z obrazeniami - zwarcie kompanii ofiary i kompanii napastnika (przed odsiewem 448,
+            // ktory pomija bohaterow, zlamanych i panike - zwarcie to fakt pola, nie rzut); tylko odczyt _mem, glowny watek
+            if (!h.Missile && v != null && h.A != null)
+            {
+                var hit = h.A.IsMount && h.A.RiderAgent != null ? h.A.RiderAgent : h.A;
+                if (MissionTeams.Enemies(hit.Team, v.Team))
+                {
+                    Company cv, ca;
+                    if (_mem.TryGetValue(v, out cv) && !cv.Melee) { cv.Melee = true; BannerCompanies.MeleeCompanies++; }
+                    if (_mem.TryGetValue(hit, out ca) && !ca.Melee) { ca.Melee = true; BannerCompanies.MeleeCompanies++; }
+                }
+            }
             if (v == null || !v.IsActive() || !_mem.TryGetValue(v, out co) || co.Broken || v.IsHero || v.IsRunningAway || SurvivalMode.InPanic(v))
             { BannerCompanies.HitSkip448++; return; }
             var k = RoutHold.Live;

@@ -12584,9 +12584,13 @@ namespace Armoury
         [SettingPropertyGroup("Banner companies")]
         public bool BannerCompaniesEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Banner Company Size", 20, 150, "0", HintText = "with Banner Companies: men per company, at most 6 companies per formation", RequireRestart = false)]
+        [SettingPropertyInteger("Banner Company Size", 10, 150, "0", HintText = "with Banner Companies: men per company - the men who stand or break together under one commander (a hero, or their best veteran); a formation splits into at most 40 companies. Standards are counted apart, by Banner Standard Size", RequireRestart = false)]
         [SettingPropertyGroup("Banner companies")]
-        public int BannerCompanySize { get; set; } = 50;
+        public int BannerCompanySize { get; set; } = 10;
+
+        [SettingPropertyInteger("Banner Standard Size", 20, 150, "0", HintText = "with Banner Companies: a formation carries one standard for about this many men (at most 6), and a company without a standard of its own has none to lose. 50 = as many standards as before", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public int BannerStandardSize { get; set; } = 50;
 
         [SettingPropertyBool("Field Standards", HintText = "formations whose captain carries no banner, or that have no hero captain, still march under a plain campaign banner bearing their lord's coat of arms (10% less morale shock from casualties while it stands). Bandits carry none. Nothing is taken from any armoury", RequireRestart = false)]
         [SettingPropertyGroup("Banner companies")]
@@ -12964,7 +12968,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
         public float RoutedWinnersReturnShare { get; set; } = 0.9f;
 
-        [SettingPropertyBool("Banner Break Battle State", HintText = "With Banner Companies: how the battle stands weighs on whether a shaken company breaks - the chance is multiplied by the strength still fighting against it divided by its own side's (no less than x0.3, no more than x1.5), so a company that sees the day being won rarely runs and one facing a stronger foe breaks sooner. The same rule for both sides", RequireRestart = false)]
+        [SettingPropertyBool("Banner Break Battle State", HintText = "With Banner Companies: how the battle stands weighs on whether a shaken company breaks - the chance is multiplied by the strength still fighting against it divided by its own side's (no less than x0.3, no more than x1.25), so a company that sees the day being won rarely runs and one facing a stronger foe breaks sooner. The same rule for both sides", RequireRestart = false)]
         [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
         public bool BannerBreakBattleState { get; set; } = true;
 
@@ -13459,6 +13463,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Banner Break Early Chance", 0.00f, 3.20f, "0.00", HintText = "With Banner Break Early: base chance a company breaks when it rolls for its losses (without Banner Tier Steadiness and Banner Leader Hold: a tier 4 company that has lost half its men breaks about 6 times in 10 by then, if the battle stands even)", RequireRestart = false)]
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
         public float BannerBreakEarlyChance { get; set; } = 0.8f;
+
+        [SettingPropertyBool("Banner First Roll Needs Melee", HintText = "With Banner Break Early: a company does not roll to break at its first sixth of losses while a lord leads it (its own commander, or a lord in its formation or within 60 m) or before it has come to blows - arrows alone do not break a lord's host. The roll waits, it is not lost; from a third of losses on, as before. Off = the first roll at a sixth, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
+        public bool BannerFirstRollNeedsMelee { get; set; } = true;
 
         [SettingPropertyBool("Banner Event Roll By Loss", HintText = "With Banner Companies: when a company's standard or its commander falls, its men weigh how many of them have already fallen, not the game's morale - the roll is no longer skipped while morale stays above 50. How the battle stands still counts, so a winning company rarely breaks. Off = the roll only below morale 50, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
@@ -16888,6 +16896,7 @@ namespace Armoury
             s.StandardBearerKitSafe = StandardBearerKitSafe;
             s.BannerCompaniesEnabled = BannerCompaniesEnabled;
             s.BannerCompanySize = BannerCompanySize;
+            s.BannerStandardSize = BannerStandardSize;
             s.FieldStandards = FieldStandards;
             s.BannerShockStandardLost = BannerShockStandardLost;
             s.BannerShockCommanderLost = BannerShockCommanderLost;
@@ -17106,6 +17115,7 @@ namespace Armoury
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;
             s.BannerBreakEarlyChance = BannerBreakEarlyChance;
+            s.BannerFirstRollNeedsMelee = BannerFirstRollNeedsMelee;
             s.BannerEventRollByLoss = BannerEventRollByLoss;
             s.PursuitDelegatedFormations = PursuitDelegatedFormations;
             s.PursuitStartNearVictims = PursuitStartNearVictims;
