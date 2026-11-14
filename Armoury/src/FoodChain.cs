@@ -27,8 +27,11 @@ namespace Armoury
     ///     zamieci (pol) - CalculateAnimalFoodNeed; DoesPartyConsumeFood = false dla partii z komponentem BK (wedrowcy, majatki, wolne kompanie,
     ///     zalogi i milicje BK, orszaki), reszta przez Default; ludzi na 1 jedzenie 20 + SlowerParties x 20 (u Jeffa SlowerParties 0 = 20);
     ///  3. BEE BEE_MobilePartyFoodConsumptionModel(_baseModel = BK): tylko oslona wyjatkow (wlasnej reguly brak);
-    ///  4. NavalDLC NavalDLCMobilePartyFoodConsumptionModel (BaseModel = BEE): -20% na morzu + perk Smooth Operator;
-    ///  5. ROT ROTMobilePartyFoodConsumptionModel(_previousModel = NavalDLC): Inni (klan kultury whitewalker) - baza 0, zuzycie 0, nie jedza;
+    ///  4. NavalDLC NavalDLCMobilePartyFoodConsumptionModel: -20% na morzu + perk Smooth Operator. POPRAWKA 515 (audyt perkow 14.11, log 14.11 13:09
+    ///     linia 1217 "teraz: RealisticFoodConsumptionModel -> ROT... -> BEE... -> BKPartyConsumptionModel"): NavalDLC laduje sie PRZED BK, wiec jego
+    ///     BaseModel = Default, a BK i BEE nad nim go nie wolaja - do 515 nie biegl wcale (ten punkt opisywal lancuch, ktorego nie bylo). Od 515
+    ///     (NavalSplice515, klucz NavalModelsUnderBk) BEE._baseModel = NavalDLC, NavalDLC.BaseModel = BK;
+    ///  5. ROT ROTMobilePartyFoodConsumptionModel(_previousModel = BEE): Inni (klan kultury whitewalker) - baza 0, zuzycie 0, nie jedza;
     ///     zaciagniety gracz (ROT enlistment) - baza 0;
     ///  6. RBL RealisticFoodConsumptionModel (po Default, BaseModel = ROT, ale go NIE uzywa): base.CalculateDailyFoodConsumptionf (perki Default)
     ///     + pora roku (lato SummerFoodBonus, zima WinterFoodPenalty - u Jeffa -0.1 i 0, zima jest nasza: WinterSource) + pogoda RBL
@@ -41,7 +44,7 @@ namespace Armoury
     ///
     /// NAPRAWA (wylacznik FoodModelChain, domyslnie wlaczony; stan ustalany raz na kampanie): RBL liczy swoje, a pod nim biegnie caly lancuch.
     ///  - CalculateDailyFoodConsumptionf: transpiler w RBL podmienia JEDYNE wywolanie base (call Default::CalculateDailyFoodConsumptionf)
-    ///    na InnerDaily - model wewnetrzny RBL (BaseModel = ROT -> NavalDLC -> BEE -> BK). Perki vanilli licza sie raz (kopia BK; Default nie
+    ///    na InnerDaily - model wewnetrzny RBL (BaseModel = ROT -> BEE -> BK; od 515 ROT -> BEE -> NavalDLC -> BK). Perki vanilli licza sie raz (kopia BK; Default nie
     ///    biegnie), na wynik lancucha RBL naklada pore roku i pogode. Transpiler, nie prefiks na Default: wywolanie base jest niewirtualne,
     ///    a mala metoda Default moglaby byc wklejona przez JIT w RBL (prefiks by wtedy nie zadzialal).
     ///  - CalculateDailyBaseFoodConsumptionf i DoesPartyConsumeFood: RBL ich nie deklaruje (dziedziczy z Default) - prefiks na metodach

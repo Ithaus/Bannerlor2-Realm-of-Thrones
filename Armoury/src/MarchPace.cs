@@ -277,6 +277,8 @@ namespace Armoury
                 // (Jeff 27.08: "cos jest nie tak z mechanika predkosci").
                 // Ujemny wpis z nazwana przyczyna + LimitMax jako pas bezpieczenstwa.
                 float current = __result.ResultNumber;
+                float capKind = cap;   // 515: sufit samej kolumny (opis jazdy na drugiego liczy procent od niego, nie od sufitu podniesionego perkami)
+                if (current > cap) cap = ScoutPace515.Lift(mp, cap, current, __result.SumOfFactors);   // 515 (perki 43/46): perki predkosci zwiadowcy / CallToArms podnosza sufit o swoja premie (ScoutPace515.cs)
                 // Add() doklada do BAZY, ktora jest potem mnozona przez (1 + suma
                 // wspolczynnikow) - wiec zeby zdjac X jednostek MAPY, trzeba wpisac
                 // X podzielone przez ten mnoznik. Bez tego wpis w rozpisce klamal
@@ -295,7 +297,7 @@ namespace Armoury
                                    : kind == 2 ? new TextObject("{=!}Marching column: {N} footmen on spare horses").SetTextVariable("N", n)
                                    : kind == 3 ? new TextObject("{=!}Marching column: baggage train")
                                    : kind == 4 ? new TextObject("{=!}Marching column: riding double - {N} footmen behind riders (-{P}%)").SetTextVariable("N", n)
-                                                 .SetTextVariable("P", RideDoubleCut(c, cap / scale, mulR).ToString("0", System.Globalization.CultureInfo.InvariantCulture))
+                                                 .SetTextVariable("P", RideDoubleCut(c, capKind / scale, mulR).ToString("0", System.Globalization.CultureInfo.InvariantCulture))
                                    : new TextObject("{=!}Marching column: all riders");
                     float f = 1f + __result.SumOfFactors;
                     __result.Add(f > 0.01f ? (cap - current) / f : (cap - current), why);

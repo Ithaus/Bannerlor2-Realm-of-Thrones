@@ -2776,6 +2776,11 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MarchPackAllowance { get; set; } = 0.25f;
 
+        // 515 (perki 43/46)
+        [SettingPropertyBool("Scout Perks Lift March Cap", HintText = "A good scout leads the marching column faster: when the column cap holds your party (or a lord's) back, the scout's speed perks (Pathfinder, Desert Born, Night Runner, Day Traveler, Uncanny Insight, Forced March, the Tracker chase bonus) and the army leader's Call to Arms raise the cap by the same share they add to speed - never above the party's own speed. Unburdened is left out (the cap does not depend on cargo). Off = the cap cuts the perks away, as before (the log still measures how much)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool ScoutPerksLiftMarchCap { get; set; } = true;
+
         [SettingPropertyBool("Map Road Speed Bonus", HintText = "on the painted roads of the Realm of Thrones map every land party - yours, the lords', caravans, villagers, bandits - travels faster by Map Road Speed Percent: the speed tooltip shows a 'Road' line and the marching-column cap is raised by the same share, so the bonus is not lost under it; ships at sea are not affected. The roads come from the map's own road paint (file arm_map_roads_geo.tsv in the module's ModuleData folder). Off = no road bonus, as before", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool MapRoadSpeedBonus { get; set; } = true;
@@ -9112,6 +9117,19 @@ namespace Armoury
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool FixPrincelyArbiterWage { get; set; } = true;
 
+        // 515 (perki 100/102)
+        [SettingPropertyBool("Naval Models Under Bk", HintText = "The War Sails rules for wages, food, militia and battle experience run again beneath Banner Kings (War Sails loads before Banner Kings, whose models never called it): a company at sea pays a fifth less and a caravan at sea far less, the boatswain wage and hiring perks count, a party at sea eats a fifth less (Smooth Operator too), port governors' militia perks and the Bolster the Fyrd policy count, and the Arr and Pirate Hunter perks add battle experience. Takes effect when a save is loaded. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool NavalModelsUnderBk { get; set; } = true;
+
+        [SettingPropertyBool("Naval Deploy Stats Fix", HintText = "In naval battles the ship figureheads, the Commodore perk (the flagship's figurehead for the whole army) and the crew's melee bonus of each ship work again (the battle-animation and elephant models of other mods swallowed them). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool NavalDeployStatsFix { get; set; } = true;
+
+        [SettingPropertyBool("Naval Deploy Ammo Fix", HintText = "In naval battles the extra ammunition and shields of War Sails work again: the captain's Well Stocked and Shipwright's Insight perks and each ship's extra quivers, throwing weapons and shield strength. Off = no extra ammunition at sea, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool NavalDeployAmmoFix { get; set; } = true;
+
         [SettingPropertyBool("Patch Target Guard", HintText = "Fix hooks aimed at an inherited rule: when Armoury, CrashScribe, Realistic Captivity, Grand Tourney or ForgeView hooks a game rule by hand after Armoury has loaded, through a mod's model that only inherits that rule (like the Banner Kings smithing cost), the hook and its later removal are moved onto the class that really holds the rule, and a hook already in place there is not added a second time. Without it the game's patching tool refuses such a hook, the Banner Kings - Realm of Thrones patch hides the refusal, and the feature silently does nothing (this is how wood at the anvil failed). Hooks of other mods are only counted in the log, never changed. Off = only report such hooks in the log", RequireRestart = false)]
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool PatchTargetGuard { get; set; } = false;
@@ -13949,6 +13967,7 @@ namespace Armoury
             s.MarchFootRiderPace = MarchFootRiderPace;
             s.MarchRiderPace = MarchRiderPace;
             s.MarchPackAllowance = MarchPackAllowance;
+            s.ScoutPerksLiftMarchCap = ScoutPerksLiftMarchCap;   // 515 (perki)
             s.MapRoadSpeedBonus = MapRoadSpeedBonus;
             s.MapRoadSpeedPercent = MapRoadSpeedPercent;
             s.MapRoadBonusAboveFloor = MapRoadBonusAboveFloor;
@@ -15533,6 +15552,7 @@ namespace Armoury
             s.FixBkrotWageChain = FixBkrotWageChain;
             s.FixBkrotWageSeaCut = FixBkrotWageSeaCut;
             s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
+            s.NavalModelsUnderBk = NavalModelsUnderBk; s.NavalDeployStatsFix = NavalDeployStatsFix; s.NavalDeployAmmoFix = NavalDeployAmmoFix;   // 515 (perki)
             s.PatchTargetGuard = PatchTargetGuard;
             s.GentryNamesFallback = GentryNamesFallback;
             s.CombatAiRealistic = CombatAiRealistic;

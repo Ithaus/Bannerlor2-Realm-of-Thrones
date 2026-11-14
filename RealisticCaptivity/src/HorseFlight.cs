@@ -3,7 +3,11 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.Library;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -23,9 +27,56 @@ namespace RealisticCaptivity
     /// odjedziesz bez straty ludzi (juki i tak zostawiasz - to vanilla).
     /// Przed jazda bedziesz musial kogos poswiecic tak jak dotad, a jesli nie
     /// masz kogo - zostajesz i bijesz sie. Piechota bez koni: zasady vanilli.
+    ///
+    /// 515 (perk 101 audytu perkow 14.11, Shipmaster.GhostShip): model jest dodawany przez AddModel&lt;T&gt;, wiec gra wpisuje mu poprzedni model
+    /// (BaseModel) - u Jeffa NavalDLCTroopSacrificeModel. Dotad wszystko poza nasza regula szlo do DefaultTroopSacrificeModel (base), z pominieciem
+    /// NavalDLC: na morzu ucieczka nie wymagala 2 statkow i nie kosztowala statkow (Default nie oddaje zadnego do poswiecenia), GhostShip (-50% szkod
+    /// statkow przy ucieczce, mniej strat przy wejsciu / wyjsciu z oblezonego portu) nie dzialal. Teraz kazde "zasady gry" (na morzu zawsze - AllMounted
+    /// zwraca tam false, nosze 501, piechota) oddaje poprzedniemu modelowi (Prev), a gdy go brak - Default jak dotad. Linia instalacji podaje poprzedni model.
     /// </summary>
     internal sealed class HorseFlightModel : DefaultTroopSacrificeModel
     {
+        /// <summary>515: poprzedni model lancucha (NavalDLC przy wlaczonym DLC) - null = Default (base) jak dotad.</summary>
+        private TroopSacrificeModel Prev
+        {
+            get { var b = BaseModel; return b != null && !ReferenceEquals(b, this) && !(b is HorseFlightModel) ? b : null; }
+        }
+
+        public override int BreakOutArmyLeaderRelationPenalty { get { var p = Prev; return p != null ? p.BreakOutArmyLeaderRelationPenalty : base.BreakOutArmyLeaderRelationPenalty; } }
+
+        public override int BreakOutArmyMemberRelationPenalty { get { var p = Prev; return p != null ? p.BreakOutArmyMemberRelationPenalty : base.BreakOutArmyMemberRelationPenalty; } }
+
+        public override ExplainedNumber GetLostTroopCountForBreakingInBesiegedSettlement(MobileParty party, SiegeEvent siegeEvent)
+        {
+            var p = Prev;
+            return p != null ? p.GetLostTroopCountForBreakingInBesiegedSettlement(party, siegeEvent) : base.GetLostTroopCountForBreakingInBesiegedSettlement(party, siegeEvent);
+        }
+
+        public override ExplainedNumber GetLostTroopCountForBreakingOutOfBesiegedSettlement(MobileParty party, SiegeEvent siegeEvent, bool isBreakingOutFromPort)
+        {
+            var p = Prev;
+            return p != null ? p.GetLostTroopCountForBreakingOutOfBesiegedSettlement(party, siegeEvent, isBreakingOutFromPort)
+                             : base.GetLostTroopCountForBreakingOutOfBesiegedSettlement(party, siegeEvent, isBreakingOutFromPort);
+        }
+
+        public override void GetShipsToSacrificeForTryingToGetAway(BattleSideEnum playerBattleSide, MapEvent mapEvent, out MBList<Ship> shipsToCapture, out Ship shipToTakeDamage, out float damageToApplyForLastShip)
+        {
+            var p = Prev;
+            if (p != null) p.GetShipsToSacrificeForTryingToGetAway(playerBattleSide, mapEvent, out shipsToCapture, out shipToTakeDamage, out damageToApplyForLastShip);
+            else base.GetShipsToSacrificeForTryingToGetAway(playerBattleSide, mapEvent, out shipsToCapture, out shipToTakeDamage, out damageToApplyForLastShip);
+        }
+
+        private bool PrevCanGetAway(out TextObject explanation)
+        {
+            var p = Prev;
+            return p != null ? p.CanPlayerGetAwayFromEncounter(out explanation) : base.CanPlayerGetAwayFromEncounter(out explanation);
+        }
+
+        private int PrevSacrificed(BattleSideEnum side, MapEvent mapEvent)
+        {
+            var p = Prev;
+            return p != null ? p.GetNumberOfTroopsSacrificedForTryingToGetAway(side, mapEvent) : base.GetNumberOfTroopsSacrificedForTryingToGetAway(side, mapEvent);
+        }
         /// <summary>Ilu ludzi w oddziale gracza ma pod soba konia (wliczajac luzaki z jukow).</summary>
         private static bool AllMounted()
         {
@@ -102,7 +153,7 @@ namespace RealisticCaptivity
                     // 501 (Armoury, nosze): lezacy gracz nie odjezdza galopem - zasady gry (straz tylna); odmowa gry z czytelnym powodem
                     if (ArmouryBridge.PlayerOnLitter)
                     {
-                        if (base.CanPlayerGetAwayFromEncounter(out explanation)) return true;
+                        if (PrevCanGetAway(out explanation)) return true;   // 515: zasady poprzedniego modelu (NavalDLC), nie samego Default
                         explanation = new TextObject("{=!}You lie on a litter - you cannot gallop away, and you have too few men to leave a rear guard.");
                         return false;
                     }
@@ -117,7 +168,7 @@ namespace RealisticCaptivity
                 }
             }
             catch { }
-            return base.CanPlayerGetAwayFromEncounter(out explanation);
+            return PrevCanGetAway(out explanation);   // 515: na morzu NavalDLC (2 statki, GhostShip), na ladzie przez NavalDLC do Default - jak gra
         }
 
         public override int GetNumberOfTroopsSacrificedForTryingToGetAway(BattleSideEnum playerBattleSide, MapEvent mapEvent)
@@ -132,7 +183,7 @@ namespace RealisticCaptivity
                 }
             }
             catch { }
-            return base.GetNumberOfTroopsSacrificedForTryingToGetAway(playerBattleSide, mapEvent);
+            return PrevSacrificed(playerBattleSide, mapEvent);   // 515: poprzedni model, nie sam Default
         }
 
         internal static void Install(IGameStarter starter)
@@ -142,8 +193,11 @@ namespace RealisticCaptivity
                 var c = Settings.Current;
                 if (c == null || !c.MountedEncounterFlight) return;
                 if (starter == null) return;
-                starter.AddModel(new HorseFlightModel());
-                Log.Info("Ucieczka konno ze spotkania wlaczona (straz tylna tylko przeciw jezdzie wroga).");
+                var m = new HorseFlightModel();
+                starter.AddModel(m);
+                var prev = m.Prev;
+                Log.Info("Ucieczka konno ze spotkania wlaczona (straz tylna tylko przeciw jezdzie wroga); poza nasza regula - poprzedni model (515): "
+                         + (prev != null ? prev.GetType().FullName : "brak - DefaultTroopSacrificeModel jak dotad") + ".");
             }
             catch (Exception e) { Log.Error("HorseFlightModel.Install", e); }
         }

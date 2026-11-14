@@ -40,10 +40,12 @@ namespace Armoury
     ///    Dlatego regula ogolna: idac w dol listy od BKROT pomijamy modele "samotne" (klasa NIE dziedziczy wprost po abstrakcyjnym typie modelu,
     ///    tylko po konkretnym Default* - wolaja base, nie BaseModel); one zostaja martwe, jak sa dzis. Glowa = pierwszy owijajacy (wprost
     ///    po typie abstrakcyjnym, z polem / BaseModel na nastepny model).
-    ///  - ZOLD (AM-09): Default -> BK BKPartyWageModel -> BEE_PartyWageModel(_baseModel = BK) -> NavalDLC (BaseModel = BEE) -> ROTPartyWageModel
-    ///    (_previousModel = NavalDLC) -> BKROTPartyWageModel : BKPartyWageModel (czynny). Ginie ROT (Nieskalani 0, jednostki kultury whitewalker
-    ///    = tier, partie i zalogi rodu kultury whitewalker 0), NavalDLC (na morzu -20%, konwoj -80%, perki bosmana, PopularCaptain) i oslona
-    ///    wyjatkow BEE. BKROT nie deklaruje GetCharacterWage (Default) ani GetTroopRecruitmentCost (BK) - prefiks tylko dla obiektu typu
+    ///  - ZOLD (AM-09): Default -> BK BKPartyWageModel -> BEE_PartyWageModel(_baseModel = BK) -> ROTPartyWageModel(_previousModel = BEE)
+    ///    -> BKROTPartyWageModel : BKPartyWageModel (czynny). POPRAWKA 515 (audyt perkow 14.11; log 14.11 13:09 linia 665 "zold: BKROTPartyWageModel ->
+    ///    ROTPartyWageModel -> BEE_PartyWageModel -> BKPartyWageModel", linia 1218 "bez obnizki morskiej ... roznica 0"): NavalDLC laduje sie PRZED BK
+    ///    (BaseModel = Default) i nie lezy w tym lancuchu - ta naprawa sama go nie przywracala. Od 515 NavalSplice515 (klucz NavalModelsUnderBk) wpina
+    ///    go miedzy BEE a BK: ROT -> BEE -> NavalDLC -> BK. Ginelo ROT (Nieskalani 0, jednostki kultury whitewalker = tier, partie i zalogi rodu kultury
+    ///    whitewalker 0), NavalDLC (na morzu -20%, konwoj -80%, perki bosmana, PopularCaptain - wraca dopiero z 515) i oslona wyjatkow BEE. BKROT nie deklaruje GetCharacterWage (Default) ani GetTroopRecruitmentCost (BK) - prefiks tylko dla obiektu typu
     ///    DOKLADNIE BKROTPartyWageModel (na dnie lancucha jest obiekt BK - prefiks go przepuszcza, bez rekursji).
     ///  - AM-19: BKROT "Princely Arbiter" AddFactor(-0.15 x MemberRoster.Count) - Count to liczba POZYCJI rostera (IL: callvirt TroopRoster::get_Count,
     ///    jedno w metodzie); od ok. 7 pozycji zold ujemny (dochod rodu). BK GetVanillaWage nie stawia LimitMin(0) (gra stawia).
@@ -383,7 +385,7 @@ namespace Armoury
             return _fBattle(self, agent, baseMorale);
         }
 
-        /// <summary>Zold partii: lancuch ROT -> NavalDLC -> BEE -> BK. Roster null (BKROT ma domyslny null; BK go nie czyta) - roster partii (NavalDLC
+        /// <summary>Zold partii: lancuch ROT -> BEE -> BK (od 515 przy NavalModelsUnderBk: ROT -> BEE -> NavalDLC -> BK). Roster null (BKROT ma domyslny null; BK go nie czyta) - roster partii (NavalDLC
         /// liczy z niego perki). Wynik ponizej 0 przyciety do 0: BK nie stawia LimitMin (gra stawia), a NavalDLC na morzu -0.2 i konwoj -0.8 obok
         /// "Caravan" -0.25 BK zrobilby zold ujemny (zloto z niczego).
         /// Recenzja P4: wynik nieliczbowy (NaN / nieskonczonosc) - stara droga (BK, jak dotad) + licznik. Dowod: BK GetTotalWage oddaje
@@ -453,7 +455,7 @@ namespace Armoury
             finally { Exit(K.Wage); }
         }
 
-        /// <summary>BK GetTroopRecruitmentCost dla obiektu BKROTPartyWageModel: koszt z lancucha (NavalDLC PopularCaptain). RecruitCost (postfiks,
+        /// <summary>BK GetTroopRecruitmentCost dla obiektu BKROTPartyWageModel: koszt z lancucha (ROT -> BEE -> BK; NavalDLC PopularCaptain dopiero od 515). RecruitCost (postfiks,
         /// licznik zagniezdzenia) liczy cene raz, na zewnatrz.</summary>
         public static bool RecruitPrefix(object __instance, CharacterObject __0, Hero __1, bool __2, ref ExplainedNumber __result)
         {
