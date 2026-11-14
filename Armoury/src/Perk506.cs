@@ -46,7 +46,7 @@ namespace Armoury
     /// Pavise dziala na pociski zatrzymane tarcza na plecach (RBM przepisuje je na blok). Cios wrecz w plecy i pocisk przebijajacy / Impale
     /// RBM liczy obok tej metody (DamageRework.cs:538-553: prefiks ComputeBlowDamage wola RBMComputeBlowDamageOnShield wprost, absorbedByArmor = 0,
     /// wynik idzie jako obrazenia ciosu - to, co przeszlo przez tarcze na plecach).
-    /// D9 (Jeff 14.11 "D9 tak"): Pavise takze przed ciosami WRECZ w tarcze na plecach - postfiks na RBMCombat.DamageRework.RBMComputeBlowDamageOnShield
+    /// D9 (Jeff 14.11 "D9 tak"): Pavise takze przed ciosami WRECZ w tarcze na plecach - postfiks na RBMCombat.DamageRework+OverrideDamageCalc.RBMComputeBlowDamageOnShield
     /// (DeclaredMethod), tylko gdy CollidedWithShieldOnBack, NIE pocisk i NIE AttackBlockedWithShield (droga bloku idzie przez ComputeBlowDamageOnShield
     /// i ShieldPostfix - bez podwojenia). Obrazenia / (1 + PaviseBackShieldDurability), sam Pavise ofiary (bez ArrowCatcher - D9 dotyczy Pavise).
     /// Zuzycie: cios wrecz w plecy FieldCraft liczy jako pancerz (nie AttackBlockedWithShield) - ciecie zuzycia Pavise tu nie dotyczy. Pocisk
@@ -70,7 +70,7 @@ namespace Armoury
         private static MethodBase _shieldM;                  // MissionCombatMechanicsHelper.ComputeBlowDamageOnShield
         private static bool _rbmShield;                      // recenzja 506: prefiks RBMCombat na ComputeBlowDamageOnShield (bez RBM gra daje ArrowCatcher jako oslone - 506 nic)
         private static bool _guard414;                       // recenzja 506: postfiks ShieldGuard 414 na tej metodzie (tnie pociski po nas)
-        private static bool _paviseMeleePatched;             // D9: postfiks na RBMCombat.DamageRework.RBMComputeBlowDamageOnShield
+        private static bool _paviseMeleePatched;             // D9: postfiks na RBMCombat.DamageRework+OverrideDamageCalc.RBMComputeBlowDamageOnShield
 
         // recenzja 506: ostatni cios w tarcze z ulga perka (ShieldPostfix -> FieldCraft w tym samym ciosie). Zwrot zuzycia liczony z tego,
         // co NAPRAWDE przeszlo przez 414 (obciecie do int): T(was) / T(now). Czyszczone na poczatku kazdego ShieldPostfix i po odczycie.
@@ -142,15 +142,19 @@ namespace Armoury
                 catch (Exception e) { miss += " tarcza BLAD " + e.GetType().Name + ";"; Log.Error("Perk506.Patch(shield)", e); }
             }
 
-            // D9: Pavise - cios wrecz w tarcze na plecach (RBM liczy go wprost RBMComputeBlowDamageOnShield, obok ComputeBlowDamageOnShield)
-            Type tDmg = null;
+            // D9: Pavise - cios wrecz w tarcze na plecach (RBM liczy go wprost RBMComputeBlowDamageOnShield, obok ComputeBlowDamageOnShield).
+            // 523: metoda jest zadeklarowana w klasie ZAGNIEZDZONEJ RBMCombat.DamageRework+OverrideDamageCalc (public static, dekompilacja
+            // RBMCombat.dll), nie w samym DamageRework - DeclaredMethod na DamageRework zwracal null (WGRANIE 237: "3/4", latka NIE wpieta).
+            Type tDmg = null, tCalc = null;
             try { tDmg = AccessTools.TypeByName("RBMCombat.DamageRework"); } catch { }
             if (tDmg != null)
             {
                 _wanted++;
+                try { tCalc = AccessTools.Inner(tDmg, "OverrideDamageCalc"); } catch { }
                 MethodInfo direct = null;
-                try { direct = AccessTools.DeclaredMethod(tDmg, "RBMComputeBlowDamageOnShield"); } catch { }
-                if (direct == null || !direct.IsStatic) miss += " brak DamageRework.RBMComputeBlowDamageOnShield (Pavise wrecz);";
+                try { if (tCalc != null) direct = AccessTools.DeclaredMethod(tCalc, "RBMComputeBlowDamageOnShield"); } catch { }
+                if (tCalc == null) miss += " brak DamageRework+OverrideDamageCalc (Pavise wrecz);";
+                else if (direct == null || !direct.IsStatic) miss += " brak DamageRework+OverrideDamageCalc.RBMComputeBlowDamageOnShield (Pavise wrecz);";
                 else
                 {
                     try
@@ -403,7 +407,7 @@ namespace Armoury
             catch (Exception e) { Count("Perk506.ShieldPostfix", e); }
         }
 
-        /// <summary>D9: postfiks na RBMCombat.DamageRework.RBMComputeBlowDamageOnShield - tylko cios WRECZ w tarcze na plecach (RBM wola te metode wprost
+        /// <summary>D9: postfiks na RBMCombat.DamageRework+OverrideDamageCalc.RBMComputeBlowDamageOnShield - tylko cios WRECZ w tarcze na plecach (RBM wola te metode wprost
         /// z prefiksu ComputeBlowDamage, DamageRework.cs:538-553); wynik to obrazenia, ktore przeszly przez tarcze. Pavise ofiary: / (1 + PaviseBackShieldDurability).
         /// Blok (AttackBlockedWithShield) i pociski pominiete - te liczy ShieldPostfix (blok) albo zostaja bez ulgi (przebijajace / Impale), jak w 506.</summary>
         private static void PaviseMeleePostfix(ref AttackInformation attackInformation, ref AttackCollisionData attackCollisionData, ref int inflictedDamage)

@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 523: D9 Pavise wrecz - latka trafia w RBM DamageRework+OverrideDamageCalc
+
+**Problem:** Jeff, czat 14.11: "sprawdz logi" (decyzja D9 "tak" - Pavise chroni tarcze na plecach takze przed ciosami wrecz, wpis 516). Log sesji WGRANIA 237 (Armoury-2026-11-14_19-28-01.log:725): "Perki pancerza i tarcz (506): ... pancerz i tarcze z perkow 3/4 | brak DamageRework.RBMComputeBlowDamageOnShield (Pavise wrecz); ... ciosy wrecz w tarcze na plecach (D9) TAK (latka NIE wpieta)". Linie konca misji (:1807, :5151, :12448): "Pavise wrecz w tarcze na plecach (D9): ciosow 0" - D9 w grze nie dzialal.
+
+**Przyczyna:** Armoury/src/Perk506.cs:145-166 szukal metody AccessTools.DeclaredMethod(RBMCombat.DamageRework, "RBMComputeBlowDamageOnShield"). Dekompilacja zainstalowanego Modules/RBM/bin/Win64_Shipping_Client/RBMCombat.dll (21.08, 125 952 B): metoda jest `public static void RBMComputeBlowDamageOnShield(ref AttackInformation, ref AttackCollisionData, WeaponComponentData attackerWeapon, float blowMagnitude, out int inflictedDamage)` zadeklarowana w klasie ZAGNIEZDZONEJ `public class OverrideDamageCalc` wewnatrz `internal class DamageRework` (RBMCombat.DamageRework+OverrideDamageCalc) - DeclaredMethod na klasie zewnetrznej zwraca null.
+
+**Zmiana:**
+- Perk506.cs:145-160 - typ celu przez AccessTools.Inner(DamageRework, "OverrideDamageCalc"), metoda AccessTools.DeclaredMethod na klasie deklarujacej (pulapka CLAUDE.md). Osobny komunikat, gdy brak klasy zagniezdzonej ("brak DamageRework+OverrideDamageCalc") albo metody ("brak DamageRework+OverrideDamageCalc.RBMComputeBlowDamageOnShield"). Reszta zakladania bez zmian (postfiks PaviseMeleePostfix Priority.Low, Owned() potwierdza wpiecie, licznik 506 x/y).
+- Komentarze (:49, :73, :410) - pelna nazwa RBMCombat.DamageRework+OverrideDamageCalc.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Sygnatura postfiksu wzgledem metody RBM (dekompilacja): `ref AttackInformation attackInformation, ref AttackCollisionData attackCollisionData, ref int inflictedDamage` - nazwy zgodne z oryginalem, `out int` przyjety jako `ref` (Harmony pozwala); attackerWeapon i blowMagnitude nieuzywane. Metoda statyczna, okolo 200 linii IL - JIT jej nie wkleja w miejsce wywolania, wiec latka dziala tez dla wywolan wprost z RBM.
+- Kod dotad martwy (latka nie wchodzila) teraz zywy: wywolania w RBM (dekompilacja z DLL): prefiks OverrideDamageCalcShield na ComputeBlowDamageOnShield (blok, AttackBlockedWithShield = true -> postfiks wychodzi, ShieldPostfix liczy blok jak dotad - bez podwojenia) i prefiks OverrideDamageCalc na ComputeBlowDamage przy CollidedWithShieldOnBack (tu dziala D9; pociski IsMissile wychodza). Koszt: kilka porownan flag na cios w tarcze; perk czytany tylko przy trafieniu w plecy z tarcza.
+- Cudze latki na tej metodzie: brak w naszym kodzie (grep RBMComputeBlowDamageOnShield - Perk506 i komentarz RotData418). Unpatch w Perk506 nie ma (latka raz na proces).
+- Zuzycie: bez zmian wzgledem opisu 516 (FieldCraft liczy cios wrecz w plecy jako pancerz; mniejsze InflictedDamage = mniejsze zuzycie pancerza, ciecie -25% Pavise tu nie dziala).
+- Jesli RBM zmieni uklad klas - linia startu powie dokladnie, czego brak (klasa albo metoda), licznik 3/4.
+
+**Linie logu:** start "Perki pancerza i tarcz (506): latka raz na proces - pancerz i tarcze z perkow 4/4. Klucz PerkArmourAfterRbm TAK: ... ciosy wrecz w tarcze na plecach (D9) TAK (latka wpieta); ShieldWall ..." (bez "| brak ..."); koniec misji "Pavise wrecz w tarcze na plecach (D9): ciosow N, obrazenia A -> B" - po trafieniu wrecz w plecy bohatera z Pavise i tarcza na plecach N > 0, B ~ A / 1.3.
+
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane - gra Jeffa wlaczona).
+
 ## 522: zloto w sakiewce wedlug strony Waskiego Morza - Westeros wiecej srebra (10/70/20), Essos wiecej zlota (10/45/45) - Armoury (klucze MoneyEssosPennyPercent / MoneyEssosGroatPercent / MoneyEssosNoblePercent, nowe domyslne Westeros MoneyGroatPercent 70 / MoneyNoblePercent 20)
 
 **Problem:** Jeff, czat 14.11, odpowiedz na pytania po 521 (pytanie 4: udzial zlota w sakiewce zalezny od Essos / Westeros): "4. tak". W 521 sklad sakiewki byl jeden dla calego swiata (10/60/30 -> 179 000 zl = 135.0 kg).
