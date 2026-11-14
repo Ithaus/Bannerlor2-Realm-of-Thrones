@@ -6,7 +6,7 @@
 **Przyczyna:** dwie niezalezne naprawy tej samej padajacej latki BK (BKBattleRewardTweakPatches, parametr 'party' w 1.4.8): Mends.BkRewardPerks (decyzja 4, 12.10, klucz BkBattleRewardPerks) i BkBattlePerks (B10b, klucz BkBattlePerksFix). Kazda sprawdza tylko postfiks wlasciciela "BannerKings", nie siebie nawzajem - obie wpiete na DefaultBattleRewardModel.CalculateInfluenceGain/CalculateRenownGain.
 **Zmiana:** Mends.BkRewardPerks wychodzi przy Config.BkBattlePerksFix = true (linia w logu "pominiete, dziala BK atuty bitew (B10b) ... (P1)"). Zostaje B10b (ma liczniki doby w logu). Przy BkBattlePerksFix = false dziala jak dotad droga Mends (jedna).
 **Ryzyko / co sprawdzic:** kontrola calosci: BkRewardPerks wolany tylko z OnSessionLaunched (Mends.cs:6799), B10b z wlasnego EnsureHooks - kolejnosc bez znaczenia, bo warunek to klucz, nie stan latek. Inne miejsca czytajace CalculateInfluenceGain/RenownGain w naszych modach: brak (grep). W logu: jedna linia "BK atuty bitew (B10b): wpiete 2/2" i linia Mends "pominiete ... (P1)"; liczniki B10b w linii doby bez zmian. Wplyw/slawa lordow z tymi atutami spadnie do wartosci z opisu BK.
-**Status:** DO SPRAWDZENIA (galaz noc/p1-podwojne-perki-bk z b7be8169; CrashScribe.dll 564070b5).
+**Status:** WGRANE 232 (14.11 ~16:20, po autotescie at-502: 20/20 dob, 21.7 s/dobe, bitwy 3/5, 23 bledy cudze, 0 potkniec; latka AI ok. 2 ms/dobe; Armoury cbe0cc9a, RealisticCaptivity d38000dd, CrashScribe 8de73f55 - CrashScribe P1 autotest nie sprawdza, bo podmienia CrashScribe na testowy).
 
 ## 500-a: Armoury - leczenie w spoczynku takze dla partii AI i jencow (gracza i AI); morze = spoczynek (klucz AiHealOnlyAtRest, stawka marszu wspolna MovingHealPercent)
 
@@ -48,7 +48,7 @@ Do sprawdzenia w grze: linia startu 500/500-a, linia doby AI (wywolania ok. 16 x
 6. PRAWDA, poprawione (drobne) - nieaktualne komentarze: SlowHealing.cs blok 500 ("nie jency", "Morze w ruchu = marsz") i Settings.cs komentarz HealOnlyAtRest ("takze na morzu", "AI bez zmian") - przepisane na regule 500-a. Opisy MCM (angielskie) bez zmian.
 Odrzuconych uwag brak. Nowa linia doby AI: "Leczenie w spoczynku (500-a): doba N - AI: wywolania modelu X (nic do leczenia Y) | probki (wywolania) z rannymi/bohaterami: marsz (ciete) M, spoczynek R (w tym morze S) - nie liczba partii (...) | sciete: szeregowi a stawki dobowej (ok. a/4 rannych mniej wyleczonych), bohaterowie stawka nominalna b HP (takze zdrowi), realnie ok. c HP (k probek, bohaterow bez pelnego HP h) | ranni bohaterowie (HP<=20) w druzynach AI, srednio w dobie: w marszu X, w spoczynku Y | jency AI ciec j, gracz jencem bez ciecia g | czas latki AI t ms | marsz 10% | potkniecia 0". Linia startu i linia doby gracza bez zmian tekstu (morze gracza bez portu).
 
-**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+**Status:** WGRANE 232 (14.11 ~16:20, po autotescie at-502: 20/20 dob, 21.7 s/dobe, bitwy 3/5, 23 bledy cudze, 0 potkniec; latka AI ok. 2 ms/dobe; Armoury cbe0cc9a, RealisticCaptivity d38000dd, CrashScribe 8de73f55 - CrashScribe P1 autotest nie sprawdza, bo podmienia CrashScribe na testowy).
 
 ## 501: Armoury + RealisticCaptivity - nosze: gracz przy HP <= 10 albo z rana Grave lezy, ludzie go niosa (predkosc partii x50%, Sledges x75%), bez konnej ucieczki ze spotkania (klucze LitterEnabled, LitterHpThreshold, LitterHpRelease, LitterSpeedPercent, LitterSpeedPercentSledges)
 
@@ -91,7 +91,7 @@ Do sprawdzenia w grze: HP <= 10 po bitwie -> komunikat i wpis "Carrying the woun
 - PRZYJETA (drobna) - Sledges nie moze byc wolniej niz bez perka: Pct = max(LitterSpeedPercentSledges, LitterSpeedPercent) przy Sledges; hint MCM i Settings.cs "Never below Litter Speed Percent".
 - Odrzuconych uwag brak.
 
-**Status:** DO SPRAWDZENIA (zbudowane z poprawkami recenzji, nie wgrane).
+**Status:** WGRANE 232 (14.11 ~16:20, po autotescie at-502: 20/20 dob, 21.7 s/dobe, bitwy 3/5, 23 bledy cudze, 0 potkniec; latka AI ok. 2 ms/dobe; Armoury cbe0cc9a, RealisticCaptivity d38000dd, CrashScribe 8de73f55 - CrashScribe P1 autotest nie sprawdza, bo podmienia CrashScribe na testowy).
 
 ## 500: Armoury - druzyna gracza leczy sie pelna stawka tylko w spoczynku (postoj, oboz, sen, osada); w marszu 10% stawki (klucze HealOnlyAtRest, MovingHealPercent)
 
@@ -143,7 +143,7 @@ Do sprawdzenia w grze: tooltip leczenia w ekranie partii w ruchu (linia "Marchin
 - Odrzuconych: brak. Numery linii po poprawce: SlowHealing.cs - wpiecie 50-59, PlayerMarching 93-104, RestCut 109-126, Hourly 130-160.
 - Do testu dopisane: gracz w cudzej armii - marsz armii (linia doby: godziny marszu), postoj / oboz nocny armii i oblezenie prowadzone przez innego lorda (godziny spoczynku, pelna stawka).
 
-**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+**Status:** WGRANE 232 (14.11 ~16:20, po autotescie at-502: 20/20 dob, 21.7 s/dobe, bitwy 3/5, 23 bledy cudze, 0 potkniec; latka AI ok. 2 ms/dobe; Armoury cbe0cc9a, RealisticCaptivity d38000dd, CrashScribe 8de73f55 - CrashScribe P1 autotest nie sprawdza, bo podmienia CrashScribe na testowy).
 
 ## 499: Armoury - na turnieju zuzywa sie wlasna zbroja i wlasna bron biala gracza (mniej niz w bitwie; klucze TourneyGearWear, TourneyArmourWearPercent, TourneyWeaponWearPercent)
 
