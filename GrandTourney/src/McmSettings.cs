@@ -180,6 +180,10 @@ namespace GrandTourney
         [SettingPropertyGroup("The lists themselves")]
         public float TourneyRansomShare { get; set; } = 1f;
 
+        [SettingPropertyBool("Tourney Own Melee Weapon", HintText = "in the lists your main weapon stays what the games hand you (lance, bow, spear, shield), but your sidearm is always your own melee weapon from your battle gear - carry a two-handed sword and you fight with your own two-handed sword, with its quality. A kit without a one- or two-handed weapon gets yours in a free slot. Only you, never the AI; your own gear is not touched or worn. Off = the games choose every weapon as before (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("The lists themselves")]
+        public bool TourneyOwnMeleeWeapon { get; set; } = true;
+
         [SettingPropertyBool("Tourney Wounds Carry", HintText = "blows taken in the lists stay with the fighter: each fight starts from the health left after the last one plus a short rest (ended at 10% -> start at 50%, 50% -> 75%, 75% -> 90%; knocked down -> 40%), more athletics heals faster, and you and the AI leave the tourney with the health of your last fight - the more battered, the weaker in the next. Off = everyone starts every fight at full health as before (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Wounds of the lists")]
         public bool TourneyWoundsCarry { get; set; } = true;
@@ -260,6 +264,7 @@ namespace GrandTourney
             s.TourneyRansom = TourneyRansom;
             s.TourneyRansomKnockerOnly = TourneyRansomKnockerOnly;
             s.TourneyRansomShare = TourneyRansomShare;
+            s.TourneyOwnMeleeWeapon = TourneyOwnMeleeWeapon;
             s.TourneyWoundsCarry = TourneyWoundsCarry;
             s.TourneyRecoveryAthleticsBonus = TourneyRecoveryAthleticsBonus;
             s.TourneyKnockoutStartPct = TourneyKnockoutStartPct;

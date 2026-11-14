@@ -56,6 +56,7 @@ namespace GrandTourney
                 NoblesFightPatch.ApplyAll(_harmony);
                 TourneyRansom.ApplyAll(_harmony);   // R3-04a: wykup konia i zbroi pokonanego
                 TourneyWounds.ApplyAll(_harmony);   // 491: rany szranek miedzy walkami i po turnieju
+                TourneyOwnWeapon.ApplyAll(_harmony);   // 498: wlasna bron biala gracza jako drugorzedna w turnieju (po RBM)
             }
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
         }

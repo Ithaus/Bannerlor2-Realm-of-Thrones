@@ -65,6 +65,9 @@ namespace GrandTourney
         // Jeff 20.10 ok. 12:00: "nie musisz sztucznie zmniejszac ... jak nie maja kasy, to ich zbroje, bo nie moga placic z czego czego nie maja" -> domyslnie 1 (pelna wartosc)
         public float TourneyRansomShare = 1f;              // with Tourney Ransom: the ransom of the lists as a share of the worth of the horse and armour in their present state (1 = the full worth); the vanquished pays only from what he and his house really have, and yields the pieces he cannot pay for
 
+        // 498 (Jeff 14.11): w turnieju bron "drugorzedna" (jednoreczna / dwureczna) gracza to jego wlasna bron biala z ekwipunku bojowego; reszta zestawu jak daje gra / RBM
+        public bool TourneyOwnMeleeWeapon = true;          // in the lists your main weapon stays what the games hand you (lance, bow, spear, shield), but your sidearm is always your own melee weapon from your battle gear - your own two-handed sword, with its quality; only you, never the AI; your gear is not touched. Off = the games choose every weapon as before
+
         // --- Wounds of the lists ---
         // 491 (Jeff 14.11): rany przechodza miedzy walkami i po turnieju; krzywa odpoczynku 10->50, 50->75, 75->90%, powalony 40%, atletyka; smierc domyslnie wylaczona ("AI bohaterowie nie gina")
         public bool TourneyWoundsCarry = true;             // blows taken in the lists stay with the fighter: each fight starts from the health left after the last one plus a short rest (ended at 10% -> start at 50%, 50% -> 75%, 75% -> 90%; knocked down -> 40%), and you and the AI leave the tourney with the health of your last fight. Off = everyone starts every fight at full health as before
