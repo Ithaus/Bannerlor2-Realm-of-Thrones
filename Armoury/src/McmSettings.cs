@@ -3256,6 +3256,47 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool EngineeringOnPaidWork { get; set; } = true;
 
+        // 509 (perki)
+        [SettingPropertyBool("Perk Build Speed On Paid Work", HintText = "with Engineering On Paid Work: the governor's Confidence (+30% to military works) and Self-made Man (+30% to the marketplace and the aqueduct) speed up the works his lord pays for, as in the base game. Off = these two perks do nothing on paid works, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool PerkBuildSpeedOnPaidWork { get; set; } = true;
+
+        [SettingPropertyBool("Prison Labor", HintText = "healthy common prisoners in the dungeon of a castle or town work on its buildings whenever a building is under way: each one adds Prison Labor Percent Per Prisoner to the day's construction (the lord's paid works and gold paid to the craftsmen); they can be hurt or die at work. Off = prisoners do not work, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool PrisonLabor { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Prison Labor Percent Per Prisoner", 0.00f, 2.00f, "0.00", HintText = "with Prison Labor: percent of the day's construction added by each working prisoner (0.1 = 100 prisoners add 10%)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float PrisonLaborPercentPerPrisoner { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("Prison Labor Percent Forced Labor", 0.00f, 2.00f, "0.00", HintText = "with Prison Labor: the same when the governor is in the settlement and has the Forced Labor perk", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float PrisonLaborPercentForcedLabor { get; set; } = 0.2f;
+
+        [SettingPropertyFloatingInteger("Prison Labor Max Percent", 0.00f, 300.00f, "0", HintText = "with Prison Labor: the prisoners never add more than this percent to the day's construction", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float PrisonLaborMaxPercent { get; set; } = 100f;
+
+        [SettingPropertyFloatingInteger("Prison Labor Injury Percent", 0.00f, 5.00f, "0.00", HintText = "with Prison Labor: chance in percent each day that a working prisoner is hurt at work (he rests wounded until healed)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float PrisonLaborInjuryPercent { get; set; } = 0.2f;
+
+        [SettingPropertyFloatingInteger("Prison Labor Death Percent", 0.000f, 1.000f, "0.000", HintText = "with Prison Labor: chance in percent each day that a working prisoner dies in an accident at work", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float PrisonLaborDeathPercent { get; set; } = 0.01f;
+
+        [SettingPropertyBool("Dungeon Prisoners Eat", HintText = "prisoners held in the dungeon of a castle or town eat from its food stores, like the garrison (Dungeon Prisoner Food Share of a garrison man's ration). Off = prisoners in dungeons eat nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool DungeonPrisonersEat { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Dungeon Prisoner Food Share", 0.00f, 1.50f, "0.00", HintText = "with Dungeon Prisoners Eat: a prisoner eats this share of a garrison man's ration (0.5 = as prisoners in a party in the base game)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float DungeonPrisonerFoodShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Architectural Commissions Town Pays", HintText = "the 20 denars a day of the governor's Architectural Commissions perk are paid out of the settlement's treasury; when it has less, the clan gets only what it has. Off = the clan gets the money from nowhere, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool ArchitecturalCommissionsTownPays { get; set; } = true;
+
         [SettingPropertyBool("Wall Works Historical", HintText = "walls rise as slowly and dearly as in the Middle Ages: a point of wall works costs more than other military works (Wall Castle / Town Point Price Factor) and no stage of the walls can be finished faster than Wall Min Years (the lord, the townsfolk, the mason, the governor and gold paid to the craftsmen together put in at most the cost of the stage divided by those years each day; the lord pays only for what can be built that day, the rest of his allowance goes to his next work or stays in his purse). Works already started keep their progress. Needs Paid Construction. Off = walls cost and rise as before", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public bool WallWorksHistorical { get; set; } = true;
@@ -14069,6 +14110,17 @@ namespace Armoury
             s.FolkWorksLevelDays = FolkWorksLevelDays;
             s.BuildWagesByTown = BuildWagesByTown;
             s.EngineeringOnPaidWork = EngineeringOnPaidWork;
+            // 509 (perki)
+            s.PerkBuildSpeedOnPaidWork = PerkBuildSpeedOnPaidWork;
+            s.PrisonLabor = PrisonLabor;
+            s.PrisonLaborPercentPerPrisoner = PrisonLaborPercentPerPrisoner;
+            s.PrisonLaborPercentForcedLabor = PrisonLaborPercentForcedLabor;
+            s.PrisonLaborMaxPercent = PrisonLaborMaxPercent;
+            s.PrisonLaborInjuryPercent = PrisonLaborInjuryPercent;
+            s.PrisonLaborDeathPercent = PrisonLaborDeathPercent;
+            s.DungeonPrisonersEat = DungeonPrisonersEat;
+            s.DungeonPrisonerFoodShare = DungeonPrisonerFoodShare;
+            s.ArchitecturalCommissionsTownPays = ArchitecturalCommissionsTownPays;
             s.WallWorksHistorical = WallWorksHistorical;
             s.WallCastlePointPriceFactor = WallCastlePointPriceFactor;
             s.WallTownPointPriceFactor = WallTownPointPriceFactor;

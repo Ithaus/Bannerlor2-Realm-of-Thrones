@@ -2707,6 +2707,7 @@ namespace Armoury
             try { IndebtedSpan.EnsureHooks(); } catch (Exception e) { Log.Error("IndebtedSpan.EnsureHooks", e); }   // 314b: kara Indebted Lord 5 x 84 dob, nie 5 lat po 364 dni
             try { SideVillageFief.EnsureHooks(); } catch (Exception e) { Log.Error("SideVillageFief.EnsureHooks", e); }   // n20-wioska: start BK "Indebted Lord" (TitleManager.GiveLordshipOnKingdomJoin) i linia podpowiedzi zlota - latki w kampanii (CLAUDE.md 7)   // 3.1/3.3 (31b) E3/2: majatki BK bez dochodu z produkcji (latki w kampanii), srednie i liczniki od zera
             try { VillageTaxToLand354.EnsureHooks(); } catch (Exception e) { Log.Error("VillageTaxToLand354.EnsureHooks", e); }   // 354: podatek wsi do pana ziemi, nie do wrogiego / niezywego / zadnego posiadacza tytulu (transpiler BK VillageIncomePrefix w kampanii - CLAUDE.md 7), linia startu
+            try { Perk509.EnsureHooks(); PrisonLabor509.EnsureHooks(); } catch (Exception e) { Log.Error("Perk509/PrisonLabor509.EnsureHooks", e); }   // 509: postfiks BK VillageIncomePrefix (Architectural Commissions z kasy osady) i jedzenie jencow lochu - w kampanii, raz na proces; linia "Praca jencow (509): start sesji"
             try { Seal31B.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31B.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { CaravanSettle.EnsureHooks(); } catch (Exception e) { Log.Error("CaravanSettle.EnsureHooks", e); }   // 259: rozliczenie karawan rodow - latki gry i BK w kampanii (raz na proces), PO Seal31B (E3/9 ProfitPre czyta Settled)
             try { PerfD2.EnsureHooks(); } catch (Exception e) { Log.Error("PerfD2.EnsureHooks", e); }   // perf-d2d3: straznik i prefiks podatku miast BK (PerfTownTaxSkipBk) - PO PopulationLaw (SubModule), CouncilWages35 i Seal31B; linia startowa "Szybkosc doby (perf-d2d3)"   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
@@ -3154,6 +3155,7 @@ namespace Armoury
             try { TownFolk.OrderDayOpenEarly(); } catch (Exception e) { Log.Error("TownFolk.OrderDayOpenEarly", e); }   // 478-S2: sztuki doby wytworcow 363 przed budowami pana (pan -> lud -> wies)
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
             finally { GoodsLedger.End(gfBuild); } DayProfile.Lap("BuildFunding.Daily");
+            try { PrisonLabor509.Daily(); } catch (Exception e) { Log.Error("PrisonLabor509.Daily", e); } DayProfile.Lap("PrisonLabor509.Daily");   // 509: wypadki przy pracy jencow lochu, linia "Praca jencow (509)" (z licznikami perkow budowy i Architectural Commissions)
             try { MoneyLedger.Probe169("BuildFunding.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // ds-akumulator (DsWorksRealMaterial): zlecenia robot gminy wsi i budowy septow - prawdziwy material z polek PO budowach pana i ludu tej doby (wlasne ramki FBuild
             // z osada targu), przed migawka MBuild (kiesy wsi i ludu -> kasy targow i lud targow); klucz wylaczony - kolejka pusta, nic

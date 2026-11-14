@@ -163,6 +163,7 @@ namespace Armoury
                 if (!Covered(town))
                 {
                     if (WallOn) WallScaleGame(town, ref __result);   // 472: mury - moc gry przez czynnik ceny punktu murow (klucz wylaczony - nic)
+                    PrisonLabor509.AddGame(town, ref __result);   // 509: praca jencow lochu do mocy gry (lenno gracza bez rozliczenia; klucz wylaczony - nic)
                     if (fl > 0f) __result.Add(fl, _folkTxt);
                     if (WallOn) WallLimit(town, ref __result);       // 472: najkrotszy czas poziomu murow - granica mocy doby
                     return;
@@ -188,6 +189,7 @@ namespace Armoury
             if (!Covered(town))
             {
                 if (WallOn) __result = WallScaleGameInt(town, __result);   // 472: mury - moc gry przez czynnik ceny punktu murow
+                __result = PrisonLabor509.AddGameInt(town, __result);   // 509: praca jencow lochu (jak dymek)
                 if (fl > 0f) __result += (int)fl;
                 if (WallOn) __result = WallLimitInt(town, __result);      // 472: granica mocy doby murow
                 return;
