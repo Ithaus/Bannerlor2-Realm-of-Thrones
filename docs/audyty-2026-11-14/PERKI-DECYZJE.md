@@ -52,3 +52,9 @@ Nowe efekty 16, 20, 21, 23, 25a, 25b: zaakceptowane.
 -> NOWY SYSTEM "praca jencow przy budowie" (osobna zmiana w serii perkow): jency w lochu osady z budowa w toku pracuja zawsze: +0.1% punktow budowy doby za jenca (ForcedLabor zarzadcy: 0.2%); codziennie mala szansa rany przy pracy, znikoma szansa smierci (PeopleBook); jency jedza z zapasow osady (sprawdzic, czy loch juz je - DungeonFate 402/404 liczy choroby, karmienia nie widac). Kolizje: DungeonFate, BuildFunding, BK, okupy, ucieczki z lochu.
 
 ## Propozycje 60-77 (medycyna, Lordship, Scholarship) wyslane 14.11 - czekaja.
+
+## Szosta runda 14.11 (medycyna, Lordship, Scholarship)
+69 Resilience (NavalDLC): Jeff "co zamiast tego skoro zostawic martwe" -> propozycja: +30% do opatrunku chirurga po wygranej bitwie MORSKIEJ (mnoznik tego samego opatrunku 503, bez drugiego opatrunku). Czeka.
+Lordship: Jeff chce dokladnego wyjasnienia (wasale, grace, najemnicy) zanim zdecyduje - wyjasnione 14.11. Czeka.
+76 ScholarshipTutor (naprawic + poprawic docs/pytania-2026-10-14/ROZWOJ-POSTACI.md:168), 77 PeerReview / Polyglot (dopisac drugie polowy): ok.
+60-68 (medycyna poza 69): brak odpowiedzi - dopytac.
