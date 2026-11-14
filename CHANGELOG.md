@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 495: prognoza zlota gracza (345/361b) - podatek warsztatow z kolejki po wyplacie poprzedniej doby
+
+**Problem:** przeglad sesji Jeffa 14.11 (Armoury-2026-11-14_00-24-57.log): linia dobowa "Prognoza zlota gracza (345)" myli sie stale o -42..-65% w dobach bez innych pozycji. :37043 dzien 108730: "prognoza wczoraj 852 (... podatek warsztatow 361b (udzial 28.8% x 1197) -345) | naprawde dzis 496 = rozliczenie 1175 + takt doby -679 | rozjazd -356 (-41.8%)"; dalej 108731 -42.7%, 108732 -44.3%, 108735 -64.9%, 108737 -41.5%. W kazdej z tych dob takt pobral dokladnie kolejke wypisana dobe wczesniej (108730 kolejka -339 -> 108731 takt -339, 108735 -9 -> 108736 -9).
+
+**Przyczyna:** GoldForecast.Corrections w TickEnd (prognoza na te dobe = wyplata tej doby + takt tej doby): po takcie kolejka Seal31B jest juz pusta, a _paySinceTick = false, wiec szla galaz "udzial x przewidywana wyplata TEJ doby" - czyli podatek, ktory pobierze dopiero JUTRZEJSZY takt. Takt tej doby pobiera podatek od wyplaty POPRZEDNIEJ doby. Przy malejacej wyplacie warsztatow (1175, 585, 290, 143...) prognoza zanizala podatek mniej wiecej o polowe.
+
+**Zmiana:** (tylko diagnostyka / prognoza, bez klucza) GoldForecast.cs: TickBegin robi migawke Seal31B.PendingOwnerTax gracza przed modulami taktu (_otSnap/_otSnapN, -1 = brak; wlasny try z potknieciem TickBegin(495); czyszczone w Reset i na poczatku kazdego TickBegin). W Corrections, tylko gdy _inTickEnd i migawka >= 0: pozycja "podatek warsztatow 495 (kolejka przed taktem N)" = -migawka (0 migawek - brak pozycji, otDone = true, wiec srednia 3 dob dalej go nie liczy). Podpowiedz w panelu Finance (poza TickEnd) bez zmian: kolejka po wyplacie albo udzial x przewidywana wyplata. Komentarz przy linii 361 w Line poprawiony.
+
+**Ryzyko / co sprawdzic:** kontrola calosci: PendingOwnerTax tylko czyta _otPay (bez zmiany stanu); kolejke zapelnia tylko ClanPayPost (wyplata), nie moduly taktu - migawka z TickBegin to dokladnie to, co pobierze OwnerTaxDaily (ArmouryBehavior:3090) w tym takcie, najwyzej mniej przy pustej kiesie (OwnerTaxDaily bierze najwyzej kiese). Kolejnosc wyplata/takt zalezna od godziny wczytania - migawka przed taktem jest poprawna w obu ukladach. Po wczytaniu kolejka nie jest zapisywana: migawka 0 = prognoza 0, takt tez 0. OtKey dalej w _fcKeys (otDone) - podatek nie wpada do "nieregularne". Pary udzialu (historia) bez zmian - galaz udzialu dziala dalej w podpowiedzi. Rozgrywka bez zmian (zadne zloto nie plynie inaczej). W grze: linia dobowa "poprawki 345 ... podatek warsztatow 495 (kolejka przed taktem 1) -X" z X rownym "podatek warsztatow w takcie tej doby" i rozjazd w dobach bez wyplat innych niz warsztaty bliski 0 (zostaje tylko blad "warsztaty do wyplaty").
+
+**Status:** DO SPRAWDZENIA
+
 ## 493: wsie poboczne - werbunek wedlug reputacji wsi glownej
 
 **Problem:** Jeff 14.11: "czemu w wioskach pobocznych nie moge rekrutowac, a w glownej moge, przeciez jak zabijam bandytow, to reputacja tez powinna pozwalac rekrutowac w wioskach pobocznych". Log Armoury-2026-11-14_00-24-57.log: :44521 wjazd do Tumblestone (wies glowna, werbunek gry dziala), :45198 wjazd do Littlecross (wioska poboczna okregu Tumblestone), :45703 linia doby m113 "werbunki 0 ... odmowy: zaufanie 1" - jedyna odmowa w sesji.
