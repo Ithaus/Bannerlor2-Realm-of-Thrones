@@ -27,3 +27,9 @@ Pytanie Jeffa: ProjectileDeflection dziala? Kod: tak (flaga agenta 0x4000000 z S
 Propozycje (czekaja na potwierdzenie): 16 odzysk +30% wlasnych strzal po wygranej / lucznicy +10%; 20 kusza i belty -30% zuzycia, kusznicy odzysk +10%; 21 tarcza na plecach +30% wytrzymalosci, -25% zuzycia (balista gubernatora zostaje); 23 (osobisty) odzysk +30% wlasnej broni rzucanej; 25a WellPrepared bron rzucana -30% zuzycia, druzyna odzysk +10%; 25b Saddlebags udzwig partii +5% (XP piechoty zostaje).
 
 ## Riding / Athletics / Smithing - propozycje 26-42 wyslane 14.11, czekaja.
+
+## Potwierdzenia 14.11 (trzecia runda)
+Nowe efekty 16, 20, 21, 23, 25a, 25b: zaakceptowane.
+26 ToughSteed, 27 DauntlessSteed (pancerz po RBM): ok. 28 NomadicTraditions: ok, sprawdzic HorsePace (podwojne liczenie). 29 SweepingWind: ok. 31 WellStraped: ok. 32 ThunderousCharge/AnnoyingBuzz zostawic: ok. 33 Breeder urealnic (lad, para tego samego gatunku, bez smokow, zwierzeta jedza): tak.
+34 IgnorePain, 35 SurgingBlow, 36 FormFittingArmor, 37 WalkItOff (lekko ranny HP > 20 leczy sie w marszu w polowie tempa), 38 SharpenedEdge, 39 SharpenedTip, 40 IronMaker (+20% sztab z tej samej rudy), 41 PracticalSmith (cala kuznia), 42 ArtisanSmith (nasze zbroje i luki): ok.
+30 CavalryTactics: Jeff pyta, o co chodzi - wyjasnione 14.11 (DefaultVolunteerModel.GetDailyVolunteerProductionProbability: +30% szansy dziennej na ochotnika w slocie z konnym, w miastach i wsiach przy miastach rodu gracza; BKVolunteerModel ma wlasna formule i perk przepada). Czeka.
