@@ -1510,6 +1510,19 @@ namespace Armoury
                 if (armory == null) return;
                 var needs = QuartermasterLaw.CountNeeds();
                 var sb = new System.Text.StringBuilder();
+                // 525 (Jeff 14.11: meldunek QM "41 kit slots empty", a raport zbrojowni "31 on hand / 31 needed" - dwie reguly): potrzeby i puste sloty
+                // z podgladu bitwy (KitPreview - wzorzec po SkillsDecide, rozdzielacz DTE, straze wystawienia, tylko zdrowi), ta sama liczba co meldunek
+                // i okno "Review the army"; konie i uprzaz oraz podglad niedostepny - papier kwatermistrza jak dotad
+                KitPreview.Result pv = null;
+                pv = KitPreview.ForArmoury();
+                bool pvOk = pv != null;
+                if (pvOk)
+                {
+                    sb.Append("Next battle (").Append(pv.Men).Append(pv.Men == 1 ? " fit man" : " fit men").Append("): ");
+                    if (pv.Missing <= 0) sb.Append("no kit slot empty.");
+                    else sb.Append(pv.Missing).Append(pv.Missing == 1 ? " kit slot empty - " : " kit slots empty - ").Append(KitPreview.EmptyDetail(pv, 4)).Append('.');
+                    sb.Append("\n\n");
+                }
                 foreach (var type in QuartermasterLaw.KitTypes)
                 {
                     int count = 0, worn = 0;
@@ -1532,10 +1545,21 @@ namespace Armoury
                             if (m != null && pm < 0.999f) worn += el.Amount;
                         }
                     }
-                    int need = QuartermasterLaw.WornFor(type, needs);
-                    if (count == 0 && need <= 0) continue;
-                    sb.Append(type).Append(": ").Append(count).Append(" on hand");
-                    if (need > 0) sb.Append(" / ").Append(need).Append(" needed").Append(count < need ? "  SHORT " + (need - count) : "");
+                    int pvNeed, pvEmpty;
+                    if (pvOk && KitPreview.ByType(pv, type, out pvNeed, out pvEmpty))
+                    {
+                        // 525: sztuki wzorca bitwy i puste sloty tego typu z podgladu (suma EMPTY po typach == puste sloty meldunku)
+                        if (count == 0 && pvNeed <= 0) continue;
+                        sb.Append(type).Append(": ").Append(count).Append(" on hand");
+                        if (pvNeed > 0) sb.Append(" / ").Append(pvNeed).Append(" in the battle kit").Append(pvEmpty > 0 ? "  EMPTY " + pvEmpty : "");
+                    }
+                    else
+                    {
+                        int need = QuartermasterLaw.WornFor(type, needs);
+                        if (count == 0 && need <= 0) continue;
+                        sb.Append(type).Append(": ").Append(count).Append(" on hand");
+                        if (need > 0) sb.Append(" / ").Append(need).Append(" needed").Append(count < need ? "  SHORT " + (need - count) : "");
+                    }
                     if (count > 0)
                     {
                         sb.Append(", grade ").Append((tierSum / count).ToString("0.0"));
@@ -1597,7 +1621,24 @@ namespace Armoury
                 if (s == null || !s.TroopOrderEnabled) return false;
                 if (QuartermasterLaw.DteArmory() == null) return false;
                 if (PartyWords.NoTroops) return false;   // m110-sam: bez zolnierzy (sam / sami towarzysze) nie ma kogo uzbroic - opcja ukryta
-                var shortages = QuartermasterLaw.ShortageLines();
+                // 525: braki z podgladu bitwy (puste sloty wedlug typu - jak ksiega i meldunek QM); podglad niedostepny - papier jak dotad
+                List<string> shortages = null;
+                try
+                {
+                    var pv = KitPreview.ForArmoury();
+                    if (pv != null)
+                    {
+                        shortages = new List<string>();
+                        foreach (var type in QuartermasterLaw.KitTypes)
+                        {
+                            int pn, pe;
+                            if (KitPreview.ByType(pv, type, out pn, out pe) && pe > 0) shortages.Add(KitName(type) + " " + pe + " empty");
+                        }
+                        if (pv.Foot > 0) shortages.Add(pv.Foot + (pv.Foot == 1 ? " rider on foot" : " riders on foot"));
+                    }
+                }
+                catch { shortages = null; }
+                if (shortages == null) shortages = QuartermasterLaw.ShortageLines();
                 if (s.TroopOrderFromShelf)
                 {
                     // paczka 145: z polki TEGO miasta po cenie polki + chodzenie kowala
@@ -1625,21 +1666,32 @@ namespace Armoury
                 var armory = QuartermasterLaw.DteArmory();
                 if (armory == null) return;
                 var needs = QuartermasterLaw.CountNeeds();
+                // 525: potrzeba i brak z podgladu bitwy (ta sama regula co meldunek QM i "Review the army"); konie i podglad niedostepny - papier jak dotad
+                KitPreview.Result pv = null;
+                pv = KitPreview.ForArmoury();
+                bool pvOk = pv != null;
+                var lackOf = new Dictionary<ItemObject.ItemTypeEnum, int>();
                 var elements = new List<InquiryElement>();
                 foreach (var type in QuartermasterLaw.KitTypes)
                 {
-                    int need = QuartermasterLaw.WornFor(type, needs);
-                    if (need <= 0) continue;
                     int have = QuartermasterLaw.HaveFor(armory, type);
+                    int need = 0, lack, pvEmpty = 0;
+                    bool byPv = pvOk && KitPreview.ByType(pv, type, out need, out pvEmpty);
+                    if (byPv) lack = pvEmpty;
+                    else { need = QuartermasterLaw.WornFor(type, needs); lack = Math.Max(0, need - have); }
+                    if (need <= 0) continue;
+                    lackOf[type] = lack;
                     bool horse = type == ItemObject.ItemTypeEnum.Horse;
                     string label = KitName(type) + "   (racks " + have + " / need " + need + ")"
-                                 + (have < need ? "  - SHORT " + (need - have) : "");
+                                 + (lack > 0 ? "  - SHORT " + lack : "");
                     // n20-napisy: krotszy zapis stanu stojakow, pelne slowa w podpowiedzi
-                    label = ShortLabels.Pick(KitName(type) + ": " + have + " of " + need + (have < need ? " - short " + (need - have) : ""), label);
+                    label = ShortLabels.Pick(KitName(type) + ": " + have + " of " + need + (lack > 0 ? " - short " + lack : ""), label);
+                    string more = byPv
+                        ? (lack > 0 ? lack + " of these kit slots will go empty in the next battle (as in Review the army)." : "No slot of this kind goes empty in the next battle - spares never hurt.")
+                        : (lack > 0 ? "The men lack " + lack + " of these." : "Fully stocked - spares never hurt.");
                     elements.Add(new InquiryElement(type, label, null, !horse,
-                        ShortLabels.Hint("On the racks " + have + ", the men need " + need + ".",
-                        horse ? "The smith does not deal in horseflesh - see the stables."
-                              : (have < need ? "The men lack " + (need - have) + " of these." : "Fully stocked - spares never hurt."))));
+                        ShortLabels.Hint(byPv ? "On the racks " + have + ", the battle kit of your fit men holds " + need + "." : "On the racks " + have + ", the men need " + need + ".",
+                        horse ? "The smith does not deal in horseflesh - see the stables." : more)));
                 }
                 if (elements.Count == 0) { Log.Player("The men need nothing - there is no one to outfit.", true); return; }
 
@@ -1652,8 +1704,7 @@ namespace Armoury
                     {
                         if (sel == null || sel.Count == 0) return;
                         var type = (ItemObject.ItemTypeEnum)sel[0].Identifier;
-                        int shortage = Math.Max(0, QuartermasterLaw.WornFor(type, QuartermasterLaw.CountNeeds())
-                                                   - QuartermasterLaw.HaveFor(QuartermasterLaw.DteArmory(), type));
+                        int shortage; lackOf.TryGetValue(type, out shortage);   // 525: ta sama liczba co w wierszu ksiegi
                         OrderKitTiers(type, shortage);
                     },
                     delegate (List<InquiryElement> _) { }), true);

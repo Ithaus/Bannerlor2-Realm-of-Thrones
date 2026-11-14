@@ -40,6 +40,11 @@ namespace Armoury
         {
             internal readonly int[] Short = new int[Cats];   // braki wedlug rodzaju (bron - przed zastapieniem innym rodzajem)
             internal readonly int[] Need = new int[Cats];    // 133c: sztuki wzorca wedlug rodzaju (ile ich wzorzec ma)
+            // 525 (Jeff 14.11: "pokazuje ze empty do battle a w armoury pokazuje co innego"): puste sloty wedlug rodzaju PO zastapieniu - kazda sztuka
+            // czlowieka bez pary zapelnia jeden brak broni (najpierw tego samego ItemType, potem biala za biala, potem dowolny); suma Open == Missing,
+            // wiec rozbicie w meldunku i w oknie sumuje sie do liczby pustych slotow (dotad Short sumowal sie do Missing + Replaced - 41 wobec 66)
+            internal readonly int[] Open = new int[Cats];
+            internal List<ItemObject> OpenIt;                // 525 (detail): sztuki wzorca, ktorych slot zostal pusty (po zastapieniu) - liczenie wedlug ItemType
             internal int Armour, Weapons, Extra;             // pancerz 5-9 bez sztuki, sztuki broni wzorca bez pary, sztuki broni czlowieka bez pary
             internal List<KeyValuePair<int, ItemObject>> Lost;   // 133c (detail): sztuki wzorca bez pary - rodzaj i sztuka wzorca (do przyczyn w oknie)
             internal List<ItemObject> Spare;                     // 133c (detail): sztuki broni czlowieka bez pary (dodatki DTE, inny rodzaj)
@@ -55,23 +60,29 @@ namespace Armoury
         {
             var g = new Gaps();
             if (rf == null || eq == null) return g;
-            if (detail) { g.Lost = new List<KeyValuePair<int, ItemObject>>(); g.Spare = new List<ItemObject>(); }
+            if (detail) { g.Lost = new List<KeyValuePair<int, ItemObject>>(); g.Spare = new List<ItemObject>(); g.OpenIt = new List<ItemObject>(); }
             for (int i = 5; i <= 9; i++)
             {
                 var r = rf[(EquipmentIndex)i]; var e = eq[(EquipmentIndex)i];
                 if (r.IsEmpty || r.Item == null) continue;
                 g.Need[i - 5]++;
-                if (e.IsEmpty || e.Item == null) { g.Short[i - 5]++; g.Armour++; if (detail) g.Lost.Add(new KeyValuePair<int, ItemObject>(i - 5, r.Item)); }
+                if (e.IsEmpty || e.Item == null)
+                {
+                    g.Short[i - 5]++; g.Open[i - 5]++; g.Armour++;
+                    if (detail) { g.Lost.Add(new KeyValuePair<int, ItemObject>(i - 5, r.Item)); g.OpenIt.Add(r.Item); }
+                }
             }
             var held = new List<int>(4);
-            var heldIt = detail ? new List<ItemObject>(4) : null;
+            var heldIt = new List<ItemObject>(4);   // 525: zawsze - zastapienia przypisywane rodzajom (Open)
             for (int i = 0; i < 4; i++)
             {
                 var e = eq[(EquipmentIndex)i];
                 if (e.IsEmpty || e.Item == null) continue;
                 held.Add(Group(e.Item));
-                if (detail) heldIt.Add(e.Item);
+                heldIt.Add(e.Item);
             }
+            var lostCat = new List<int>(4);
+            var lostIt = new List<ItemObject>(4);
             bool primary = false;
             for (int i = 0; i < 4; i++)
             {
@@ -80,13 +91,35 @@ namespace Armoury
                 int cat = WeaponCat(it, ref primary);
                 g.Need[cat]++;
                 int k = held.IndexOf(Group(it));
-                if (k >= 0) { held.RemoveAt(k); if (detail) heldIt.RemoveAt(k); continue; }
+                if (k >= 0) { held.RemoveAt(k); heldIt.RemoveAt(k); continue; }
                 g.Short[cat]++; g.Weapons++;
+                lostCat.Add(cat); lostIt.Add(it);
                 if (detail) g.Lost.Add(new KeyValuePair<int, ItemObject>(cat, it));
             }
             g.Extra = held.Count;
             if (detail) g.Spare.AddRange(heldIt);
+            // 525: kazda sztuka bez pary zapelnia jeden brak broni - zapelnionych min(Weapons, Extra) == Replaced, reszta to puste sloty (Open)
+            foreach (var sp in heldIt)
+            {
+                if (lostIt.Count == 0) break;
+                int k = Fill(sp, lostIt);
+                lostIt.RemoveAt(k); lostCat.RemoveAt(k);
+            }
+            for (int i = 0; i < lostCat.Count; i++) { g.Open[lostCat[i]]++; if (detail) g.OpenIt.Add(lostIt[i]); }
             return g;
+        }
+
+        /// <summary>525: ktory brak broni zapelnia sztuka czlowieka bez pary - ten sam ItemType, potem biala za biala, potem pierwszy (lista niepusta).</summary>
+        private static int Fill(ItemObject sp, List<ItemObject> lost)
+        {
+            for (int i = 0; i < lost.Count; i++) if (lost[i].ItemType == sp.ItemType) return i;
+            if (Melee3(sp.ItemType)) for (int i = 0; i < lost.Count; i++) if (Melee3(lost[i].ItemType)) return i;
+            return 0;
+        }
+
+        private static bool Melee3(ItemObject.ItemTypeEnum t)
+        {
+            return t == ItemObject.ItemTypeEnum.OneHandedWeapon || t == ItemObject.ItemTypeEnum.TwoHandedWeapon || t == ItemObject.ItemTypeEnum.Polearm;
         }
 
         /// <summary>133c (K15): kopia biezacej bitwy wedlug typu (porownanie z podgladem w misji - KitPreview.BattleSegment, przed Close).</summary>
@@ -161,6 +194,7 @@ namespace Armoury
             internal string Id, Name;
             internal int Men, Missing, Armour, Weapons, Extra, Replaced, Foot, NoSaddle, Bare, Home, Civ, Hero;
             internal readonly int[] Short = new int[Cats];
+            internal readonly int[] Open = new int[Cats];   // 525: puste sloty wedlug rodzaju po zastapieniu (suma == Missing)
         }
 
         internal sealed class Battle
@@ -231,7 +265,7 @@ namespace Armoury
             r.Missing += Math.Max(0, miss);
             if (g != null)
             {
-                for (int c = 0; c < Cats; c++) r.Short[c] += g.Short[c];
+                for (int c = 0; c < Cats; c++) { r.Short[c] += g.Short[c]; r.Open[c] += g.Open[c]; }
                 r.Armour += g.Armour; r.Weapons += g.Weapons; r.Extra += g.Extra; r.Replaced += g.Replaced;
             }
             if (noSaddle) r.NoSaddle++;

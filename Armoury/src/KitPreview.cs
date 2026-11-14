@@ -61,6 +61,8 @@ namespace Armoury
             // - model 3D ekranu druzyny (PartyScreenKit); Rode / Harnessed - ilu wyjedzie na koniu / z uprzeza (linia koni z zapasu ludzi)
             internal Equipment Look; internal int LookScore, Rode, Harnessed;
             internal readonly int[] Short = new int[KitGaps.Cats], Need = new int[KitGaps.Cats], Bag = new int[KitGaps.Cats];
+            internal readonly int[] Open = new int[KitGaps.Cats];   // 525: puste sloty wedlug rodzaju po zastapieniu (suma == Missing)
+            internal int MenShort;                                   // 525: ilu ludzi tego typu ma choc jeden pusty slot
             internal readonly int[] StripWhy = new int[6];   // kody DragonUnmount.WouldStrip > 0
             internal readonly Dictionary<int, Dictionary<ItemObject, int>> Lost = new Dictionary<int, Dictionary<ItemObject, int>>();   // rodzaj -> sztuki wzorca bez pary
             internal readonly Dictionary<ItemObject, int> Kit = new Dictionary<ItemObject, int>();   // sztuki wzorcow (sloty 0-3, 5-11) -> ilu ludzi
@@ -79,6 +81,11 @@ namespace Armoury
             internal int Men, Wounded, Missing, Replaced, Extra, Riders, NoHorse, NoSaddle, Bare, Stripped, MoraleMen, Bad, Drift;
             internal float MoraleSum; internal long Ms;
             internal readonly int[] Short = new int[KitGaps.Cats], Need = new int[KitGaps.Cats];
+            internal readonly int[] Open = new int[KitGaps.Cats];   // 525: jak TypeRow.Open - rozbicie meldunku i okna sumuje sie do Missing
+            internal int MenShort;                                   // 525: ludzi z choc jednym pustym slotem
+            // 525: wedlug ItemType (sloty 0-3 i 5-9 wzorca zdrowych - bez konia i uprzezy): sztuki wzorca i puste sloty po zastapieniu - te same liczby
+            // co Missing, dla raportu zbrojowni ("Muster the men's kit") i ksiegi zamowien, zamiast drugiej reguly z szablonu XML (QuartermasterLaw.CountNeeds)
+            internal readonly Dictionary<ItemObject.ItemTypeEnum, int> NeedT = new Dictionary<ItemObject.ItemTypeEnum, int>(), OpenT = new Dictionary<ItemObject.ItemTypeEnum, int>();
             internal readonly List<TypeRow> Rows = new List<TypeRow>();
             internal readonly Dictionary<ItemObject, int> A = new Dictionary<ItemObject, int>(), Given = new Dictionary<ItemObject, int>(), Rem = new Dictionary<ItemObject, int>(),
                                                           Black = new Dictionary<ItemObject, int>(), Barred = new Dictionary<ItemObject, int>(), Spares = new Dictionary<ItemObject, int>();
@@ -538,8 +545,12 @@ namespace Armoury
                 int score = Math.Max(0, miss) + (foot || noSad ? 1 : 0);
                 if (row.Look == null || score < row.LookScore) { row.Look = e2; row.LookScore = score; }
                 row.Men++; row.Missing += Math.Max(0, miss);
+                if (miss > 0) row.MenShort++;
                 row.Armour += g.Armour; row.Weapons += g.Weapons; row.Extra += g.Extra; row.Replaced += g.Replaced;
-                for (int c = 0; c < KitGaps.Cats; c++) { row.Short[c] += g.Short[c]; row.Need[c] += g.Need[c]; }
+                for (int c = 0; c < KitGaps.Cats; c++) { row.Short[c] += g.Short[c]; row.Need[c] += g.Need[c]; row.Open[c] += g.Open[c]; }
+                // 525: wedlug ItemType - te same sloty co KitGaps.Compare (0-3, 5-9)
+                for (int s = 0; s < 10; s++) { if (s == 4) continue; var ri = rf[(EquipmentIndex)s].Item; if (ri != null) AddT(res.NeedT, ri.ItemType, 1); }
+                if (g.OpenIt != null) foreach (var oi in g.OpenIt) AddT(res.OpenT, oi.ItemType, 1);
                 foreach (var kv in g.Lost)
                 {
                     Dictionary<ItemObject, int> d;
@@ -569,9 +580,10 @@ namespace Armoury
             // sumy
             foreach (var t in res.Rows)
             {
+                res.MenShort += t.MenShort;   // 525
                 res.Men += t.Men; res.Missing += t.Missing; res.Replaced += t.Replaced; res.Extra += t.Extra - t.Replaced; res.Riders += t.Riders;
                 res.NoHorse += t.NoHorse; res.NoSaddle += t.NoSaddle; res.Bare += t.Bare; res.Stripped += t.Stripped; res.MoraleMen += t.MoraleMen; res.MoraleSum += t.MoraleSum;
-                for (int c = 0; c < KitGaps.Cats; c++) { res.Short[c] += t.Short[c]; res.Need[c] += t.Need[c]; }
+                for (int c = 0; c < KitGaps.Cats; c++) { res.Short[c] += t.Short[c]; res.Need[c] += t.Need[c]; res.Open[c] += t.Open[c]; }
             }
             res.Rows.RemoveAll(t => t.Men <= 0 && t.Wounded <= 0);
             res.Rows.Sort(ByGaps);
@@ -626,6 +638,37 @@ namespace Armoury
         }
 
         private static void Add(Dictionary<ItemObject, int> d, ItemObject it, int n) { int v; d.TryGetValue(it, out v); d[it] = v + n; }
+        private static void AddT(Dictionary<ItemObject.ItemTypeEnum, int> d, ItemObject.ItemTypeEnum t, int n) { int v; d.TryGetValue(t, out v); d[t] = v + n; }
+
+        /// <summary>525: raport zbrojowni i ksiega zamowien liczone z podgladu bitwy (ta sama regula co meldunek QM i okno armii). false - podglad niedostepny
+        /// albo typ spoza slotow porownania (kon, uprzaz) - wolajacy zostaje przy papierze kwatermistrza. need - sztuki wzorca zdrowych, empty - puste sloty
+        /// tego typu po zastapieniu. ForArmoury - podglad dla zbrojowni (null - papier).</summary>
+        internal static Result ForArmoury()
+        {
+            if (!CsQuiet) return null;   // jak ShoutLine: przy CrashScribe sprzed 133a meldunek zostaje przy papierze - zbrojownia tez
+            try { var r = Get(false); return r != null && r.Ok && r.Men > 0 ? r : null; }
+            catch (Exception e) { Stumble("ForArmoury", e); return null; }
+        }
+
+        internal static bool ByType(Result r, ItemObject.ItemTypeEnum type, out int need, out int empty)
+        {
+            need = 0; empty = 0;
+            if (r == null || !r.Ok) return false;
+            if (type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) return false;
+            r.NeedT.TryGetValue(type, out need);
+            r.OpenT.TryGetValue(type, out empty);
+            return true;
+        }
+
+        /// <summary>525: kto i bez czego (meldunek QM, raport zbrojowni): "23 of 31 fit men lack: side-arm (melee) 20, shield 12, melee weapon 4 and more; 4 men get
+        /// no weapon from the armoury". Rodzaje po zastapieniu (Open) - sumuja sie do liczby pustych slotow (Missing).</summary>
+        internal static string EmptyDetail(Result r, int kinds)
+        {
+            string k = KitGaps.TopKinds(r.Open, kinds, true, true, true);
+            string s = r.MenShort + " of " + r.Men + (r.Men == 1 ? " fit man lacks" : " fit men lack") + (k.Length > 0 ? ": " + k : "");
+            if (r.Bare > 0) s += "; " + r.Bare + (r.Bare == 1 ? " man gets no weapon from the armoury" : " men get no weapon from the armoury");
+            return s;
+        }
 
         private static bool Take(Dictionary<ItemObject, int> d, ItemObject it)
         {
@@ -1054,7 +1097,7 @@ namespace Armoury
             if (r.Men <= 0) return "Kit for the next battle: no fit soldiers in your party";
             if (r.Missing <= 0 && r.Foot <= 0) return "Kit for the next battle: full kit (" + r.Men + (r.Men == 1 ? " man)" : " men)");
             if (r.Missing <= 0) return "Kit for the next battle: no slot empty, " + r.Foot + (r.Foot == 1 ? " rider on foot" : " riders on foot");
-            string k = KitGaps.TopKinds(r.Short, 2, true, false, r.Replaced <= 0);
+            string k = KitGaps.TopKinds(r.Open, 2, true, false, true);   // 525: rodzaje po zastapieniu - liczby zawsze (suma == Missing)
             return "Kit for the next battle: " + r.Missing + (r.Missing == 1 ? " slot empty" : " slots empty") + (k.Length > 0 ? " - " + k : "");
         }
 
@@ -1084,7 +1127,7 @@ namespace Armoury
             if (t.Men <= 0) return head + " - all wounded";
             if (t.Missing <= 0 && t.Foot <= 0) return head + " - full kit";
             if (t.Missing <= 0) return head + ": " + t.Foot + (t.Foot == 1 ? " rider on foot" : " riders on foot");
-            string k = KitGaps.TopKinds(t.Short, 1, true, false, t.Replaced <= 0);
+            string k = KitGaps.TopKinds(t.Open, 1, true, false, true);   // 525: jak MainTitle
             return head + ": " + t.Missing + " empty" + (k.Length > 0 ? " - " + k : "");
         }
 
@@ -1094,7 +1137,7 @@ namespace Armoury
             if (t.Men <= 0) return "All men of this kind are wounded - they do not fight.";
             string foot = t.Missing > 0 && t.Foot > 0 ? "Also " + t.Foot + (t.Foot == 1 ? " rider on foot. " : " riders on foot. ") : "";
             int bc = -1;
-            foreach (int c in KitGaps.Order) if (t.Short[c] > 0 && (bc < 0 || t.Short[c] > t.Short[bc])) bc = c;
+            foreach (int c in KitGaps.Order) if (t.Open[c] > 0 && (bc < 0 || t.Open[c] > t.Open[bc])) bc = c;   // 525: najwiekszy pusty rodzaj
             if (bc >= 0 && t.Why[bc] != null && t.Why[bc].Count > 0) return foot + Cap(KitGaps.NameEn(bc)) + ": " + t.Why[bc][0].Text;
             if (t.NoHorse > 0 && t.HorseWhy.Count > 0) return foot + "Horses: " + t.HorseWhy[0].Text;
             if (t.NoSaddle > 0 && t.SaddleWhy.Count > 0) return foot + "Harness: " + t.SaddleWhy[0].Text;
@@ -1125,7 +1168,10 @@ namespace Armoury
             foreach (int c in KitGaps.Order)
             {
                 if (t.Short[c] <= 0) continue;
-                sb.Append("\n\n").Append(Cap(KitGaps.NameEn(c))).Append(": ").Append(t.Short[c]).Append(" of ").Append(t.Need[c]).Append(" missing.");
+                // 525: puste po zastapieniu (suma rodzajow == puste sloty typu); reszta braku tego rodzaju - zapelniona inna bronia
+                sb.Append("\n\n").Append(Cap(KitGaps.NameEn(c))).Append(": ").Append(t.Open[c]).Append(" of ").Append(t.Need[c]).Append(" empty");
+                if (t.Short[c] > t.Open[c]) sb.Append(" (").Append(t.Short[c] - t.Open[c]).Append(" more filled with another kind of weapon)");
+                sb.Append('.');
                 if (c == KitGaps.SideArm) sb.Append(" (The second weapon of the kit.)");
                 var why = t.Why[c];
                 if (why != null) { int n = 0; foreach (var w in why) { if (n++ >= 3) break; sb.Append("\n- ").Append(w.Text); } }
@@ -1247,7 +1293,8 @@ namespace Armoury
             int need = 0; foreach (var v in r.Need) need += v;
             var sb = new StringBuilder(P);
             sb.Append("podglad - typow ").Append(r.Rows.Count).Append(", zdrowych ").Append(r.Men).Append(" (rannych ").Append(r.Wounded).Append("), slotow wzorca ").Append(need)
-              .Append(", pustych ").Append(r.Missing).Append(" (").Append(KitGaps.KindsOf(r.Short, false)).Append("; zastapione innym rodzajem ").Append(r.Replaced)
+              .Append(", pustych ").Append(r.Missing).Append(" u ").Append(r.MenShort).Append(" ludzi (po zastapieniu: ").Append(KitGaps.KindsOf(r.Open, false))
+              .Append("; przed zastapieniem: ").Append(KitGaps.KindsOf(r.Short, false)).Append("; zastapione innym rodzajem ").Append(r.Replaced)
               .Append(", dodatki ponad wzorzec ").Append(r.Extra).Append("), jezdzcy ").Append(r.Riders).Append(" - pieszo bez konia ").Append(r.NoHorse).Append(", bez uprzezy ").Append(r.NoSaddle)
               .Append(", zdjete przy wystawieniu ").Append(r.Stripped).Append(", bez broni ").Append(r.Bare);
             sb.Append(" | przyczyny (typ x rodzaj, pierwsza): ").Append(WhyLine(r));
@@ -1309,14 +1356,18 @@ namespace Armoury
             missing = r.Missing; foot = r.Foot;
             if (any)
             {
+                // 525 (Jeff 14.11): ilu ludzi i bez czego - rodzaje po zastapieniu (sumuja sie do pustych slotow), bezbronni osobno
+                // poczatek "QM: N kit slots empty and M riders on foot" i koniec "for the next battle - see Review the army in camp." bez zmian (tools/sprawdz_logi.py Q316-3)
                 var parts = new List<string>();
                 if (r.Missing > 0) parts.Add(r.Missing + (r.Missing == 1 ? " kit slot empty" : " kit slots empty"));
                 if (r.Foot > 0) parts.Add(r.Foot + (r.Foot == 1 ? " rider on foot" : " riders on foot"));
-                line = "QM: " + string.Join(" and ", parts.ToArray()) + " for the next battle - see Review the army in camp.";
+                line = "QM: " + string.Join(" and ", parts.ToArray()) + (r.Missing > 0 ? " (" + EmptyDetail(r, 3) + ")" : "") + " for the next battle - see Review the army in camp.";
             }
             try
             {
-                Log.Info(P + "kwatermistrz (\"" + headline + "\") - na ekranie " + (any ? "jedna linia z podgladu: pustych " + r.Missing + " (" + KitGaps.KindsOf(r.Short, false) + "), pieszo " + r.Foot
+                Log.Info(P + "kwatermistrz (\"" + headline + "\") - na ekranie " + (any ? "jedna linia z podgladu: pustych " + r.Missing + " u " + r.MenShort + " z " + r.Men + " ludzi (po zastapieniu: "
+                                                                                        + KitGaps.KindsOf(r.Open, false) + "; przed zastapieniem: " + KitGaps.KindsOf(r.Short, false)
+                                                                                        + "; zastapione innym rodzajem " + r.Replaced + "), bez broni " + r.Bare + ", pieszo " + r.Foot
                                                                                         : "nic do meldowania (podglad: komplet)")
                          + "; papier (QM short) - typow z brakami " + paperShort + " (tylko log, linie 'Kwatermistrz: papier' wyzej); podglad "
                          + (fresh ? "liczony teraz " + r.Ms + " ms" + (r.Ms > 50 ? " - PONAD 50 ms (do decyzji jak K15: meldunek z podgladu w takcie doby)" : "")

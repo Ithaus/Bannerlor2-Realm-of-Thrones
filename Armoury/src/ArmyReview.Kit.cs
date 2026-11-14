@@ -138,12 +138,13 @@ namespace Armoury
             {
                 sb.Append(a.Missing).Append(a.Missing == 1 ? " kit slot went empty" : " kit slots went empty")
                   .Append(" - pieces of the kit their skill and rank call for that they fought without.");
-                string kinds = KitGaps.Kinds(a, true);
+                // 525: rodzaje po zastapieniu (Open) - sumuja sie do liczby pustych slotow
+                string kinds = KitGaps.KindsOf(a.Open, true);
                 if (kinds.Length > 0) sb.Append("\nBy kind: ").Append(kinds).Append('.');
                 if (a.Replaced > 0)
-                    sb.Append('\n').Append(a.Replaced).Append(a.Replaced == 1 ? " of these weapon gaps was" : " of these weapon gaps were")
+                    sb.Append('\n').Append(a.Replaced).Append(a.Replaced == 1 ? " more weapon gap was" : " more weapon gaps were")
                       .Append(" filled with another kind of weapon from the troops' armoury, so ").Append(a.Replaced == 1 ? "it is" : "they are").Append(" not counted as empty.");
-                if (a.Short[KitGaps.SideArm] > 0) sb.Append("\nA side-arm is the second weapon of the kit - the sword of a spearman or an archer.");
+                if (a.Open[KitGaps.SideArm] > 0) sb.Append("\nA side-arm is the second weapon of the kit - the sword of a spearman or an archer.");
             }
             int extra = a.Extra - a.Replaced;
             if (extra > 0) sb.Append('\n').Append(extra).Append(extra == 1 ? " weapon was" : " weapons were").Append(" handed out on top of the kit (spare kit in free slots).");
@@ -169,7 +170,7 @@ namespace Armoury
                     var bits = new List<string>();
                     if (r.Missing > 0 || KitGaps.ShortSum(r) > 0)
                     {
-                        string kinds = KitGaps.Kinds(r, true);
+                        string kinds = KitGaps.KindsOf(r.Open, true);   // 525: po zastapieniu - suma == r.Missing
                         bits.Add(r.Missing + " empty" + (kinds.Length > 0 ? " - " + kinds : "") + (r.Replaced > 0 ? " (" + r.Replaced + " filled with another kind)" : ""));
                     }
                     if (r.Foot > 0) bits.Add(r.Foot + (r.Foot == 1 ? " rider with no horse" : " riders with no horse"));
