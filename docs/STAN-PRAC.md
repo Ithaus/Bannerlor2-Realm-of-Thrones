@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 - WGRANIE 239 (527 drogi: siec AI w jedno, Coverage, objazd), bez autotestu
+
+- Armoury.dll 7094eed5 = noc/scal-perki (238 + 527). Kopie: .bak-2026-11-14-przed-wgranie239, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie239 i -przed).
+- Do sprawdzenia: udzial AI na drodze (cel ok. 60%, bylo 27%), skladowe sieci, koszt planowania (limit 3000 wezlow, bylo 54.73 ms/dobe), Coverage. W toku: 528 uklady a sila.
+
 ## STAN 14.11 ~23:00 - WGRANIE 238 (524 ranni AI a glod, 525 meldunek QM = zbrojownia, 526 D10 konie), bez autotestu
 
 - Armoury.dll deb58b7f = noc/scal-perki fb5c5dc3. Kopie: .bak-2026-11-14-przed-wgranie238, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie238 i -przed). 523 (D9) odrzucone - D9 dziala juz przez 506 (RBM przepisuje cios wrecz w tarcze na plecach na blok).
