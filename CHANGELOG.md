@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 533: pasek gotowosci zbrojowni DTE na mapie - podpowiedz z naszej liczby ("N kit slots empty" jak meldunek QM i Review the army) - Armoury (DteMapBar533, nowy klucz DteMapBarShowsKitPreview)
+
+**Problem:** Jeff, czat 14/15.11: "missing 6" przy ikonie ludzika w lewym dolnym rogu mapy, a meldunek QM mowi `QM: 31 kit slots empty (...)`. Po wyjasnieniu (wpis 532: to podpowiedz paska DTE, inna regula) i propozycji "moge podmienic, zeby pokazywala nasza liczbe" - Jeff 15.11: "tak zrob". Log `Armoury-2026-11-14_23-28-03.log` linia 9612 - nasz meldunek 31.
+
+**Przyczyna:** pasek to `DynamicTroopEquipmentReupload.GUIExtensions.MapArmoryReadinessMixin` (mixin UIExtenderEx na MapBarVM, dekompilacja DTE 1.4.7). Jego `OnRefresh` (wolany z `MapBarVM.Tick` co 0.2 s, przy szybkim czasie 0.1 s) buduje NOWY `HintViewModel` tylko przy zmianie wersji zbrojowni, skladu oddzialow, przelacznika PreferDefaultEquipmentThenClosest albo morza, z `PartyEquipmentDistributor.MeasureMainPartyArmoryReadiness`: jedna bron biala na czlowieka (bez broni bocznej), z rannymi, jeden rodzaj. `ArmoryReadinessHint` - `[DataSourceProperty]` z prywatnym setterem.
+
+**Zmiana:**
+- Nowy `Armoury/src/DteMapBar533.cs`: postfiks na `MapArmoryReadinessMixin.OnRefresh` (`AccessTools.DeclaredMethod` na klasie mixinu; pola `_armoryReadinessHint`, `_isArmoryReadinessVisible` wstrzykniete, zapis przez `DeclaredPropertySetter("ArmoryReadinessHint")` - UI dostaje OnPropertyChanged). Wpiecie w OnSessionLaunched (raz na proces), linia startu `Pasek DTE na mapie (533): latka TAK ...`.
+- Stary tekst (DTE, liczby przykladowe): `Army Armory readiness: 82% (140/170 required equipment slots filled)` / `Most needed equipment: Melee weapons (6 missing)`.
+- Nowy tekst: `Kit for the next battle: 31 kit slots empty - side-arm (melee) 24, shield 3, other 4; 25 of 34 fit men short` (+ `, 2 men get no weapon from the armoury`, gdy sa) / `Review the army in camp for details`. Ta sama funkcja co meldunek QM: `KitPreview.ForArmoury` -> `Get(false)`, `KitPreview.EmptyDetail(r, 2)` (rodzaje sumuja sie do N przez `KindsSum`). Bez pustych slotow - `KitPreview.MainTitle` (`full kit (34 men)` / `no kit slot empty, 2 riders on foot`).
+- Odswiezanie: co wywolanie OnRefresh tylko porownanie referencji. Podglad (`Get(false)` - z pamieci po kluczu wersja zbrojowni / skladu / sakw / dzien / przelaczniki, od nowa ok. 10 ms tylko po zmianie klucza) najwyzej raz na 1 s: gdy DTE przebudowal swoja podpowiedz albo co 5 s (dzien, sakwy - DTE ich nie sledzi). Miedzy probami - wynik z pamieci `KitPreview.Last` (nowa wlasciwosc), gdy przeliczyl go kto inny (meldunek QM, okno armii). Nowy obiekt podpowiedzi tylko przy zmianie tekstu albo wyniku; log `podpowiedz paska (n) -> "..."` przy zmianie tekstu (pierwsze 20, potem co 50).
+- Bez podgladu (klucz NIE, mixin nieobecny / inny, CrashScribe sprzed 133a - `CsQuiet`, Own Kit Only wylaczone, zbrojownia otwarta, brak zdrowych, blad Compute) - podpowiedz DTE bez zmian; byla nasza - przywracana podpowiedz DTE. Po nieudanej probie `KitPreview.Last` nie brany do nastepnej udanej (bez migania przy otwartej zbrojowni).
+- Wysokosc paska (`ArmoryReadinessFillHeight`) NIE ruszana - zostaje miara DTE (procent wypelnionych slotow wedlug jego reguly). Prosta podmiana bylaby niespojna: nasz podglad nie ma liczby wszystkich slotow kompletu w tej samej mierze co Missing (Need liczy sztuki wzorca po typach, bez koni) - nie zgadujemy.
+- Napisy KitPreview przy wpietej i wlaczonej latce (`DteMapBar533.Shows`): podpowiedz wiersza glownego `... the map's readiness bar counts another way.` -> `Same number as the QM report, the armoury and the map's readiness bar tooltip.`; akapit strony typu -> `The tooltip of the armoury readiness bar on the map shows this same count; only the height of the bar is Dynamic Troop Equipment's own measure: one melee weapon a man, no side-arm, no spare kit, the wounded too.` Bez latki - napisy 532 bez zmian.
+- `KitPreview.Reset` czysci tez stan DteMapBar533 (obiekty UI starej kampanii).
+- Klucz NOWY `DteMapBarShowsKitPreview` (TAK), recznie w Settings.cs (grupa przy TroopsFightWithOwnKitOnly) i McmSettings.cs ("DTE Map Bar Shows Kit Preview", grupa "The finished piece", Apply). W Armoury.json Jeffa go nie ma - domyslne TAK dziala.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: liczby i reguly podgladu bez zmian; jedyna nowa praca - `Get(false)` z UI mapy. Dotad podglad liczyl sie przy meldunku QM / oknie armii / zbrojowni; teraz takze po zmianie klucza (np. nowy dzien, zakup do sakw) najpozniej po 5 s na mapie - ok. 10 ms raz na zmiane, nie co klatke. `NoteMounts` (log koni z zapasu) pisze tylko przy anomalii - moze pojawiac sie czesciej (tyle ile przeliczen). `ShoutLine` pisze w logu "z pamieci" zamiast "liczony teraz", jesli pasek przeliczyl wczesniej - tylko log.
+- Kolizje: nikt inny nie patchuje mixinu DTE (grep `MapArmoryReadinessMixin` w src - tylko ten plik i komentarze). DTE nadal liczy swoj pomiar i wysokosc paska; my tylko zastepujemy obiekt podpowiedzi po nim. Jesli DTE przebuduje podpowiedz (zmiana zbrojowni) - nasza wraca w tym samym wywolaniu OnRefresh (postfiks), bez migniecia.
+- Watek: OnRefresh i KitPreview na watku glownym (UI mapy) - jak okno armii.
+- Gdy UIExtenderEx nie utworzy mixinu - postfiks nigdy nie wolany, nic sie nie dzieje.
+- Napis moze byc dlugi (3 linie dymka) przy dlugich nazwach rodzajow - patrzec w grze.
+- CHANGELOG: 49881 -> 49909 linii (wpis dopisany na gorze, reszta bez zmian).
+- Build Armoury 0 bledow. Gra Jeffa wlaczona - NIE wgrane, w grze nie sprawdzone (linia startu `Pasek DTE na mapie (533)` i `podpowiedz paska (1) -> ...` do sprawdzenia w logu).
+
+**Status:** DO SPRAWDZENIA (galaz noc/533-dte-pasek, nie wgrane).
+
 ## 532: braki sprzetu - jedna liczba "kit slots empty for the next battle" wszedzie, inne liczby z opisem, czego dotycza - Armoury (KitPreview, ArmyReview.Kit, SmithMenu, MenPurse; bez nowych kluczy)
 
 **Problem:** Jeff, czat 14.11: "pokazuje ze mam missing 6 rzeczy a potem na czerwono ze 20 pare, to w koncu ile?". Log `Modules/Armoury/Armoury-2026-11-14_23-28-03.log` linia 9612: `QM: 31 kit slots empty (25 of 34 fit men lack: side-arm (melee) 24, shield 3, melee weapon 2 and more; 2 men get no weapon from the armoury) for the next battle`. Wczesniej (linia 7814) `Your men bought 9 missing pieces of kit`, linia 7816 `Your men bought 6 better pieces`.

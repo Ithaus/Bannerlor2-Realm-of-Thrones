@@ -1267,6 +1267,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool TroopsFightWithOwnKitOnly { get; set; } = true;
 
+        [SettingPropertyBool("DTE Map Bar Shows Kit Preview", HintText = "the tooltip of the troop armoury readiness bar on the map (Dynamic Troop Equipment, bottom left) shows the same count as the quartermaster's report and Review the army: kit slots empty for the next battle, by kind, and how many fit men are short. The height of the bar stays Dynamic Troop Equipment's own measure. Off = the bar's own text (readiness % and the one kind it lacks most)", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool DteMapBarShowsKitPreview { get; set; } = true;
+
         [SettingPropertyBool("Bare Troops Wear Civilian Clothes", HintText = "in your battles a soldier who fights only with his party's stores (Troops Fight With Own Kit Only; garrisons with Garrison Fights With Armory Only) and gets no body armour or no boots from them wears plain civilian clothes instead of going bare: an undyed tunic in earth colours - grey, brown or natural linen - in the cut of his people (Andal, First Men or bandit; other peoples a plain linen or grey tunic), never one dyed red, gold, blue, green or purple and never one that takes the colours of the lord's house, and shoes picked at random from what his culture's tier 1 recruits, villagers and townsmen wear, likewise without dyed or house-coloured pairs. Each man gets his own random pick, though the tunics vary less than the shoes. Never armour: no gambesons or pieces named armour, and no piece protects (head, body, arms and legs together) more than the most protective clothes worn only by villagers or the most protective piece a tier 1 recruit wears (in Realm of Thrones 31 for a tunic, 32 for boots, so the recruit garbs with 33 body armour and the townsmen's long robes are left out). His own clothes from home, not armory gear: never taken from or returned to the stores, never looted, broken into scrap or sold. Only where his troop's template has a piece in that slot (troops bare-chested by design stay as they are) and only what his Athletics allows; head, hands, cape, weapons and horse are not affected, nor heroes and the dead (off = he fights bare, as before)", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool BareTroopsWearCivilianClothes { get; set; } = true;
@@ -14089,6 +14093,7 @@ namespace Armoury
             s.GarrisonFightsWithArmoryOnly = GarrisonFightsWithArmoryOnly;
             s.GarrisonArmoryMinFillPercent = GarrisonArmoryMinFillPercent;
             s.TroopsFightWithOwnKitOnly = TroopsFightWithOwnKitOnly;
+            s.DteMapBarShowsKitPreview = DteMapBarShowsKitPreview;
             s.BareTroopsWearCivilianClothes = BareTroopsWearCivilianClothes;
             s.BareTroopsTakeHomeWeapon = BareTroopsTakeHomeWeapon;
             s.LordBattleKitIsLent = LordBattleKitIsLent;

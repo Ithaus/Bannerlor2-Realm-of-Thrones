@@ -104,6 +104,8 @@ namespace Armoury
 
         // ---------------------------------------------------------------- stan
         private static Result _last;                      // ostatni podglad okna (pamiec po kluczu - K7)
+        /// <summary>533: ostatni wynik z pamieci, bez liczenia (podpowiedz paska DTE na mapie miedzy swoimi probami - DteMapBar533).</summary>
+        internal static Result Last { get { return _last; } }
         private static Result _mission;                   // K15: podglad tej misji
         private static string _missionNote;
         private static int _mMen, _mDiffMen, _mDiffSlots;
@@ -116,6 +118,7 @@ namespace Armoury
         {
             _last = null; ClearMission(); _stumbles = 0; _stumbleAt.Clear(); _wc = null; _same = null;
             _screen = null; _screenRoster = null; _prevMount = null; _prevName = null; _prevArmH = _prevArmS = -1; PartyScreenKit.Reset();   // 202
+            DteMapBar533.Reset();   // 533: podpowiedz paska DTE bez obiektow UI i wyniku starej kampanii
         }
 
         /// <summary>Nowa bitwa i koniec misji (GarrisonKit.ClearBattle).</summary>
@@ -1127,7 +1130,8 @@ namespace Armoury
             if (r == null || !r.Ok) return r != null && r.Why != null ? r.Why : "Not available now.";
             // 532: ta sama liczba co meldunek QM i zbrojownia; pasek DTE na mapie ("N missing") liczy inaczej - jedno zdanie, zeby nikt nie bral jego liczby za te
             return "Worked out as the battle hands kit out: armoury, skill, culture, saddle. " + r.Wounded + (r.Wounded == 1 ? " wounded man is" : " wounded are") + " not counted."
-                   + " Same number as the QM report and the armoury; the map's readiness bar counts another way.";
+                   + (DteMapBar533.Shows ? " Same number as the QM report, the armoury and the map's readiness bar tooltip."   // 533: podpowiedz paska z naszej liczby
+                                         : " Same number as the QM report and the armoury; the map's readiness bar counts another way.");
         }
 
         /// <summary>Opis okna listy typow (najwyzej ok. 5 linii - lekcja 109.1).</summary>
@@ -1234,9 +1238,14 @@ namespace Armoury
             if (more.Count > 0) sb.Append("\n\n").Append(string.Join("\n", more.ToArray()));
             sb.Append("\n\nThe men handed out last get the gaps; in a siege or a hideout every rider fights on foot.");
             // recenzja 133: zdania z podpowiedzi wiersza glownego (dymek za waski) - losowy pancerz wzorca (K7) i pasek DTE (decyzja (h)); osobny akapit (Paginate)
-            sb.Append("\n\nArmour of the kit is picked at random within the troop's band, so single pieces can differ from one look to the next."
-                      + " The armoury readiness bar on the map (\"Most needed equipment: TYPE (N missing)\") counts by its own rule: one melee weapon a man, no side-arm,"
-                      + " no spare kit, the wounded too, and only the one kind it lacks most - so its number is not the kit slots empty here.");
+            sb.Append("\n\nArmour of the kit is picked at random within the troop's band, so single pieces can differ from one look to the next.");
+            // 533: z latka paska (DteMapBar533.Shows) jego podpowiedz ma te liczbe; wysokosc paska dalej miara DTE (jedna bron biala na czlowieka, bez broni bocznej, z rannymi)
+            if (DteMapBar533.Shows)
+                sb.Append(" The tooltip of the armoury readiness bar on the map shows this same count; only the height of the bar is Dynamic Troop Equipment's own"
+                          + " measure: one melee weapon a man, no side-arm, no spare kit, the wounded too.");
+            else
+                sb.Append(" The armoury readiness bar on the map (\"Most needed equipment: TYPE (N missing)\") counts by its own rule: one melee weapon a man, no side-arm,"
+                          + " no spare kit, the wounded too, and only the one kind it lacks most - so its number is not the kit slots empty here.");
             return sb.ToString();
         }
 
