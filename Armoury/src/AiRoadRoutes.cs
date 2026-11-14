@@ -78,7 +78,7 @@ namespace Armoury
     ///    udzialu drogi (RideCost, "malo drogi"). Do czasu planu (kilka s po wczytaniu) - same trakty.
     ///  - PATROLE (MapRoadAiPatrols, TAK): Cat 3 = patrol (IsPatrolParty), milicja, patrol / garnizon BK (komponent z nazwa Patrol / Garrison) - daleki marsz
     ///    jak karawana; postfiks MobilePartyAi.GetLandPatrolBehavior: NOWY punkt patrolu (inny niz dotychczasowy cel, nie srodek, nie brama) przesuniety na
-    ///    najblizszy wezel sieci do SnapR (3 jedn.) - ta sama wyspa, nie dalej od srodka patrolu niz punkt gry + 1 jedn.; patrol, milicja i lord w PatrolAroundPoint
+    ///    najblizszy wezel sieci do SnapR (3 jedn.) - ta sama wyspa, nie dalej od srodka patrolu niz punkt gry + 1 jedn.; patrol i milicja w PatrolAroundPoint (520-a: lord bez)
     ///    (bez band, bez partii questa). Liczenie z ucieczki (GetFleeBehavior wola GetLandPatrolBehavior) - bez zmiany (licznik prefiks / finalizer).
     ///  - MARSZ WOJENNY (MapRoadAiWarMarch, TAK): rod / wodz armii z DefaultBehavior BesiegeSettlement / RaidSettlement / DefendSettlement w fazie dojscia
     ///    (krotkoterminowe GoToSettlement / GoToPoint, najazd - RaidSettlement) - te same warunki (nie wolniej, droga >= polowa). Oblezenie, szturm, najazd
@@ -420,7 +420,7 @@ namespace Armoury
                 var mp = f(__instance);
                 if (mp == null || mp.IsMainParty || mp.IsBandit || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress || mp.IsCurrentlyUsedByAQuest) return;
                 if (mp.Army != null && mp.Army.LeaderParty != mp) return;
-                if (!mp.IsLordParty && !IsGuard(mp)) return;
+                if (!IsGuard(mp)) return;   // 520-a (Jeff 14.11 "patrole i milicja, bo bandyci poluja na kupcow i karawany"): lord patrolujacy ziemie - bez punktow na drodze
                 CampaignVec2 pt = __1;
                 if (!pt.IsOnLand || !pt.IsNonZero()) return;
                 Vec2 p = pt.ToVec2(), c = __2.ToVec2();

@@ -47,6 +47,8 @@ Do sprawdzenia w grze: (1) linia DR - premia traktu 30% / boczna 15% (po poprawc
 - Odrzuconych uwag: brak.
 Build po poprawkach: 0 bledow, 0 ostrzezen (dotnet build Armoury.csproj -c Release). Nie testowane w grze.
 
+**520-a (Jeff 14.11):** "Droga valyrii tez +30%" - MapValyrianRoadSpeedPercent 50 -> 30 (Settings + MCM, nie ma go w JSON Jeffa); "patrole i milicja bo bandyci poluja przeciez na kupcow i karawany" - punkty patrolu na drodze (PatrolPostfix) tylko patrole i milicja, lord patrolujacy ziemie bez wymuszania drogi; odsiecz drogami gdy nie wolniej - bez zmian (tak juz jest). Przy wgraniu: Armoury.json MapRoadSpeedPercent 15 -> 30 (kopia .bak).
+
 **Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane; WARUNEK wgrania: `"MapRoadSpeedPercent": 15` -> 30 w Armoury.json). CHANGELOG 49424 -> 49460 linii (bez uciecia), po recenzji 49460 -> 49473.
 
 ## 519: decyzje Jeffa po WGRANIU 234 - D16b (ulepszenia okretow NavalDLC: odzysk kolczanow / broni miotanej, tarcze okretu), D7b (bron z ekranu kowalstwa gry -25% czasu z PracticalSmith), praca jencow zwieksza ucieczki - Armoury (klucze NavalShipUpgradesRecover, NavalShipUpgradePercent, NavalShipShieldsFix, PrisonLaborEscapePercent)

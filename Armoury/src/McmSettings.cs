@@ -3071,9 +3071,9 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool MapValyrianRoads { get; set; } = true;
 
-        [SettingPropertyInteger("Map Valyrian Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a Valyrian road, in percent of its speed (50 = +50%; at most 50; never less than Map Road Speed Percent)", RequireRestart = false)]
+        [SettingPropertyInteger("Map Valyrian Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a Valyrian road, in percent of its speed (30 = +30%, as a main road; at most 50; never less than Map Road Speed Percent)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public int MapValyrianRoadSpeedPercent { get; set; } = 50;
+        public int MapValyrianRoadSpeedPercent { get; set; } = 30;
 
         [SettingPropertyBool("Map Essos Caravan Trails", HintText = "in deep Essos (the Dothraki sea, Sarnor, Ibben, Yi Ti, Qarth) the lore knows no real roads: the painted tracks there are caravan trails and speed a land party up only like a village lane (Map Side Road Speed Percent, 'Caravan trail' line). Off: they count as ordinary roads", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
