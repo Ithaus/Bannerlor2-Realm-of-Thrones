@@ -107,8 +107,10 @@ namespace Armoury
                 Hero ah = HeroOf(a), cap = CaptainHero(a);
                 if (!collisionData.IsMissile)
                 {
-                    if (Has(ah, BShieldwall) || (Infantry(a) && Has(cap, BShieldwall))) { mul *= 1.08f; Interlocked.Increment(ref bShieldOut); }
-                    if (ah != null && a.HealthLimit > 0f && a.Health < a.HealthLimit * 0.5f && Has(ah, BFury)) { mul *= 1.12f; Interlocked.Increment(ref bFury); }
+                    // premie ZADANE tylko z broni (bez kopniec / uderzen tarcza - jak 507 Perk507Strike); oslony przyjete - kazdy cios wrecz
+                    bool weaponHit = !collisionData.IsAlternativeAttack;
+                    if (weaponHit && (Has(ah, BShieldwall) || (Infantry(a) && Has(cap, BShieldwall)))) { mul *= 1.08f; Interlocked.Increment(ref bShieldOut); }
+                    if (weaponHit && ah != null && a.HealthLimit > 0f && a.Health < a.HealthLimit * 0.5f && Has(ah, BFury)) { mul *= 1.12f; Interlocked.Increment(ref bFury); }
                     if (v.IsHuman)
                     {
                         if (Has(HeroOf(v), BShieldwall) || (Infantry(v) && Has(CaptainHero(v), BShieldwall))) { mul *= 0.95f; Interlocked.Increment(ref bShieldIn); }

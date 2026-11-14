@@ -173,6 +173,17 @@ namespace Armoury
             try { return h != null && p != null && h.GetPerkValue(p); } catch { return false; }
         }
 
+        /// <summary>Zmiana KONCOWEGO wyniku o delta (recenzja 514): Add trafia do bazy, ktora gra mnozy przez (1 + suma czynnikow) -
+        /// dlatego delta dzielona przez (1 + SumOfFactors). Inaczej czynnik BK (np. -0.8 "Contract due date") zjada 4/5 efektu perka.
+        /// Gdy suma czynnikow ~ -1 (wynik 0) - nic. Zwraca, czy dodano.</summary>
+        private static bool AddToResult(ref ExplainedNumber en, float delta, TextObject name)
+        {
+            float f = 1f + en.SumOfFactors;
+            if (Math.Abs(f) < 1e-3f || delta == 0f) return false;
+            en.Add(delta / f, name);
+            return true;
+        }
+
         private static bool IsRuler(Hero h)
         {
             var k = h != null && h.Clan != null ? h.Clan.Kingdom : null;
@@ -338,8 +349,7 @@ namespace Armoury
             {
                 float v = __result.ResultNumber;
                 if (v == 0f) return;
-                __result.Add(Math.Abs(v) * 0.1f, PRogue.Name);
-                Interlocked.Increment(ref dMercJoin);
+                if (AddToResult(ref __result, Math.Abs(v) * 0.1f, PRogue.Name)) Interlocked.Increment(ref dMercJoin);
             }
             catch (Exception e) { Stumble("MercJoinPost", e); }
         }
@@ -352,8 +362,7 @@ namespace Armoury
             {
                 float v = __result.ResultNumber;
                 if (v == 0f) return;
-                __result.Add(-Math.Abs(v) * 0.1f, PRogue.Name);
-                Interlocked.Increment(ref dMercLeave);
+                if (AddToResult(ref __result, -Math.Abs(v) * 0.1f, PRogue.Name)) Interlocked.Increment(ref dMercLeave);
             }
             catch (Exception e) { Stumble("MercLeavePost", e); }
         }
@@ -362,40 +371,52 @@ namespace Armoury
         public static void MercDownPost(Kingdom __1, ref ExplainedNumber __result)
         {
             if (!CourtOn || PRogue == null || !SkillPerk(RulerOf(__1), PRogue)) return;
-            try { __result.AddFactor(-0.05f, PRogue.Name); Interlocked.Increment(ref dMercDown); }
+            try { if (AddToResult(ref __result, -__result.ResultNumber * 0.05f, PRogue.Name)) Interlocked.Increment(ref dMercDown); }   // x0.95 wyniku (nie czynnik sumowany z reputacja / sekta BK)
             catch (Exception e) { Stumble("MercDownPost", e); }
         }
 
         // ============================================================ 73 Traditionalist / MilitaryAdministration
         /// <summary>BKVolunteerModel.GetMilitarism: BK dodaje perki jako czynnik (+1% / +2% WZGLEDNIE od bazy 0.1, czyli +0.001 / +0.002), opis mowi
-        /// o punktach (flat). Te same warunki co BK (pan osady, ta sama kultura): czynnik zdjety, punkt dodany (+0.01 / +0.02).</summary>
+        /// o punktach (flat). Czynnik BK zdjety tylko tam, gdzie BK go dodal (pan osady, ta sama kultura). Punkt: Traditionalist +0.01 tylko w osadach
+        /// tej samej kultury (opis "assimilated settlements"), MilitaryAdministration +0.02 w kazdej osadzie pana (opis bez warunku kultury - recenzja 514).</summary>
         public static void MilitarismPost(TaleWorlds.CampaignSystem.Settlements.Settlement __0, ref ExplainedNumber __result)
         {
             if (!CourtOn || __0 == null) return;
             try
             {
                 var lead = __0.OwnerClan != null ? __0.OwnerClan.Leader : null;
-                if (lead == null || __0.Culture != lead.Culture) return;
-                bool hit = false;
-                if (PTrad != null && SkillPerk(lead, PTrad)) { __result.AddFactor(-0.01f, PTrad.Name); __result.Add(0.01f, PTrad.Name); hit = true; }
-                if (PMilAdm != null && SkillPerk(lead, PMilAdm)) { __result.AddFactor(-0.02f, PMilAdm.Name); __result.Add(0.02f, PMilAdm.Name); hit = true; }
+                if (lead == null) return;
+                bool same = __0.Culture == lead.Culture, hit = false;
+                if (same && PTrad != null && SkillPerk(lead, PTrad)) { __result.AddFactor(-0.01f, PTrad.Name); __result.Add(0.01f, PTrad.Name); hit = true; }
+                if (PMilAdm != null && SkillPerk(lead, PMilAdm))
+                {
+                    if (same) __result.AddFactor(-0.02f, PMilAdm.Name);
+                    __result.Add(0.02f, PMilAdm.Name);
+                    hit = true;
+                }
                 if (hit) Interlocked.Increment(ref dMilit);
             }
             catch (Exception e) { Stumble("MilitarismPost", e); }
         }
 
         // ============================================================ 75 DiplomaticTies
-        /// <summary>BKRelationsModel.CalculateModifiers(relacje wladcy, cel): wladca krolestwa wobec obcego (spoza swojego krolestwa) z perkiem -
-        /// cel relacji +3 (BK przesuwa relacje do celu o 1 tygodniowo; BK nie przesuwa relacji z GRACZEM - u gracza perk nie zmienia nic).</summary>
+        /// <summary>BKRelationsModel.CalculateModifiers(relacje wlasciciela, cel): cel relacji +3 dla pary "obcy wladca - posiadacz perka" Z OBU STRON
+        /// (recenzja 514: relacja jest jedna na pare, a BK dryfuje ja z obu stron - z jednej strony +3 dawalo ok. +0.5, bo posiadacz perka sciagal ja
+        /// z powrotem do swojego celu; jego HeroRelations obejmuje przywodcow wszystkich krolestw). 1) wlasciciel = wladca, cel = obcy posiadacz perka;
+        /// 2) wlasciciel = posiadacz perka, cel = obcy wladca. BK nie przesuwa relacji z GRACZEM - u gracza perk nie zmienia nic.</summary>
         public static void RelModPost(object __0, Hero __1, object __result)
         {
             if (!CourtOn || PDipTies == null || __0 == null || __1 == null || _relHero == null || _relModCtor == null) return;
             try
             {
                 var hero = _relHero.GetValue(__0, null) as Hero;
-                if (hero == null || hero == __1 || !IsRuler(hero) || !SkillPerk(__1, PDipTies)) return;
-                var k = hero.Clan.Kingdom;
-                if (__1.Clan != null && __1.Clan.Kingdom == k) return;
+                if (hero == null || hero == __1) return;
+                Hero ruler, holder;
+                if (IsRuler(hero) && SkillPerk(__1, PDipTies)) { ruler = hero; holder = __1; }
+                else if (IsRuler(__1) && SkillPerk(hero, PDipTies)) { ruler = __1; holder = hero; }
+                else return;
+                var k = ruler.Clan.Kingdom;
+                if (holder.Clan != null && holder.Clan.Kingdom == k) return;
                 var list = __result as IList;
                 if (list == null) return;
                 list.Add(_relModCtor.Invoke(new object[] { 3, PDipTies.Name }));
@@ -441,7 +462,7 @@ namespace Armoury
         public static void LangPost(Hero __0, Hero __1, ref ExplainedNumber __result)
         {
             if (!CourtOn || PPoly == null || __1 == null || !SkillPerk(__0, PPoly)) return;
-            try { __result.AddFactor(0.5f, PPoly.Name); Interlocked.Increment(ref dPoly); }
+            try { if (AddToResult(ref __result, __result.ResultNumber * 0.5f, PPoly.Name)) Interlocked.Increment(ref dPoly); }   // x1.5 wyniku (nie czynnik sumowany z nauczycielem / AvidLearner; LimitMax BK zostaje)
             catch (Exception e) { Stumble("LangPost", e); }
         }
 
@@ -571,7 +592,9 @@ namespace Armoury
         }
 
         // ============================================================ doba: 79 Lithurgy, 97 Helmsman, linia
-        /// <summary>ArmouryBehavior.OnDailyTickBodyInner: losowe relacje z kaplanami (Lithurgy), szybsze odrabianie morale (Helmsman), linia doby.</summary>
+        /// <summary>ArmouryBehavior.OnDailyTickBodyInner: losowe relacje z kaplanami (Lithurgy), szybsze odrabianie morale (Helmsman), linia doby.
+        /// Lithurgy (recenzja 514): u lordow AI +1 jest CHWILOWE - kaplan ma wlasne HeroRelations (BK GetHeroesToUpdate notabla = bohaterowie rodu pana osady)
+        /// i co kilka tygodni sciaga relacje do swojego celu (w nim BK juz ma druga premie Lithurgy). Trwale tylko u gracza (BK pomija MainHero).</summary>
         internal static void Daily(int day)
         {
             if (CourtOn && PLith != null)

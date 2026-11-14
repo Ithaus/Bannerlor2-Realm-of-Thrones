@@ -3047,7 +3047,7 @@ namespace Armoury
             try { StateHygiene.Daily(); } catch (Exception e) { Log.Error("StateHygiene.Daily", e); } DayProfile.Lap("StateHygiene.Daily");   // E8/S (246): linia "Porzadek stanu (E8/S)" - PO WesterosClimate.Daily (stan klimatu po ponowieniu tej doby); tylko log
             try { FoodChain.Daily(); } catch (Exception e) { Log.Error("FoodChain.Daily", e); } DayProfile.Lap("FoodChain.Daily");   // E4/6a: raz na kampanie linia "Lancuch modelu jedzenia (E4/6a)"
             try { BkrotChains.Daily(); } catch (Exception e) { Log.Error("BkrotChains.Daily", e); } DayProfile.Lap("BkrotChains.Daily");   // P4 audytu: linia "Lancuchy modeli BKROT (P4): dzien N" (predkosc na morzu, zold Innych / Nieskalanych / na morzu, wzrok)
-            try { Perk514.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Perk514.Daily", e); }   // 514: Lithurgy (kaplani), Helmsman (morale), linia "Perki BK (514): dzien N"
+            try { Perk514.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Perk514.Daily", e); } DayProfile.Lap("Perk514.Daily");   // 514: Lithurgy (kaplani), Helmsman (morale), linia "Perki BK (514): dzien N"
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); } DayProfile.Lap("WinterBite.OnDaily");
             try { HarvestYear.Daily(); } catch (Exception e) { Log.Error("HarvestYear.Daily", e); } try { HerdCull.Daily(); } catch (Exception e) { Log.Error("HerdCull.Daily", e); } DayProfile.Lap("HarvestYear/HerdCull");   // R3-05e/f: rok urodzaju (losowanie w oknie zniw), okno uboju jesiennego i splata stad
             var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 146: ksiega towarow - zboze z furazu armii (tylko licznik)
