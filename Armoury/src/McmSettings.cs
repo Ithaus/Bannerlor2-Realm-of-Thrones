@@ -857,7 +857,7 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public bool CampHealingPerks { get; set; } = true;
 
-        [SettingPropertyBool("Battle Dressing Enabled", HintText = "after a battle your side has won, your surgeon (or the party leader, without one) dresses the wounds of every hero in the party, you too: each gets back a share of the hit points he lost - Battle Dressing Per 100 Medicine percent for every 100 points of the surgeon's Medicine (up to 300), plus 30% if the surgeon has Preventive Medicine. This replaces the game's own Preventive Medicine (which only healed the hero who had the perk himself). The surgeon learns Medicine from the hit points he restored. A grave wound still keeps you bedridden (Hero Wounds). The losing side heals as in the game. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyBool("Battle Dressing Enabled", HintText = "after a battle your side has won, your surgeon (or the party leader, without one) dresses the wounds of every hero in the party, you too: each gets back a share of the hit points he lost - Battle Dressing Per 100 Medicine percent for every 100 points of the surgeon's Medicine (up to 300), plus 30% if the surgeon has Preventive Medicine. A hero who has Preventive Medicine himself keeps it as in the game (30%), but it does not add up with the surgeon's - the 30% counts once. The surgeon learns Medicine from the hit points he restored. A grave wound still keeps you bedridden (Hero Wounds). The losing side heals as in the game. Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool BattleDressingEnabled { get; set; } = true;
 
@@ -869,7 +869,7 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public bool BattleDressingAi { get; set; } = true;
 
-        [SettingPropertyInteger("Battle Dressing Naval Resilience", 0, 100, "0", HintText = "Resilience (NavalDLC, Boatswain): after a won battle at sea the dressing of a hero who has this perk is this much bigger, in percent (30 = +30%). The perk's own healing after victory stays off, so it never counts twice. Only with Battle Dressing Enabled", RequireRestart = false)]
+        [SettingPropertyInteger("Battle Dressing Naval Resilience", 0, 100, "0", HintText = "Resilience (NavalDLC, Boatswain): after a won battle at sea the dressing of a hero who has this perk is this much bigger, in percent (30 = +30%). The perk's own healing from the NavalDLC is taken off whenever the dressing is given, so it never counts twice. Only with Battle Dressing Enabled", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int BattleDressingNavalResilience { get; set; } = 30;
 

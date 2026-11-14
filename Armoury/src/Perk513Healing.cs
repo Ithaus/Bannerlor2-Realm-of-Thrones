@@ -34,14 +34,14 @@ namespace Armoury
     /// 61 TriageTent - bez zmian (Jeff: zostaje).
     /// 62 OPATRUNEK PO WYGRANEJ (Jeff 14.11: "jak wygralismy bitwe po prostu mnie lecza moi ludzie, medycyna wpada tez do mnie"): postfiks
     ///    DefaultPartyHealingModel.GetBattleEndHealingAmount (DeclaredMethod; BKROT dziedziczy te metode, NavalDLC poza lancuchem - BkrotChains) -
-    ///    dla partii strony WYGRANEJ wynik gry (wlasne PreventiveMedicine 30%) zastapiony opatrunkiem: utracone HP x (Medicine CHIRURGA partii
+    ///    dla partii strony WYGRANEJ wynik gry zastapiony opatrunkiem: utracone HP x (Medicine CHIRURGA partii
     ///    (EffectiveSurgeon, bez chirurga wodz - jak gra) / 100 x BattleDressingPer100Medicine %, sufit Medicine 300) + PreventiveMedicine CHIRURGA
-    ///    (30%, wartosc perku gry) ; wlasne Medicine.WalkItOff +10 po bitwie zaczepnej - jak gra (perk osobisty). Strona PRZEGRANA - wynik gry bez
+    ///    (30%, wartosc perku gry; wlasne PreventiveMedicine bohatera zostaje, ale z chirurgowym liczy sie raz) ; wlasne Medicine.WalkItOff +10 po bitwie zaczepnej - jak gra (perk osobisty). Strona PRZEGRANA - wynik gry bez
     ///    zmian (decyzja dla Jeffa). Leczy gra (Hero.Heal w OnBattleEndCheckPerkEffects) - loze HeroWounds dalej przycina do progu, 318a dalej
-    ///    pomija rannych lordow pokonanych. XP chirurga - SkillLevelingManager.OnHeroHealedWhileWaiting z REALNIE przybylych HP (finalizer okna
+    ///    pomija rannych lordow pokonanych. XP chirurga - SkillLevelingManager.OnHeroHealedWhileWaiting z REALNIE przybylych HP, tylko czesc chirurga (finalizer okna
     ///    OnBattleEndCheckPerkEffects; ta sama droga XP co leczenie gry). AI - klucz BattleDressingAi.
     /// 69 NavalDLC Boatswain.Resilience (osobisty): po wygranej bitwie MORSKIEJ (MapEvent.IsNavalMapEvent) opatrunek bohatera z perkiem x (1 + 30%).
-    ///    Wlasne 30% DLC zostaje martwe (BkrotChains - metoda dziedziczona); gdyby lancuch NavalDLC wszedl na te metode, Resilience liczylby sie dwa razy.
+    ///    Wlasne 30% DLC zostaje martwe (BkrotChains - metoda dziedziczona); gdyby lancuch NavalDLC wszedl na te metode (515), NavalGuardPostfix zdejmuje dodatek DLC u opatrzonego.
     /// 63 BushDoctor (chirurg): takze w OBOZIE (NightRest / BK: gracz PlayerCamped, AI IsCamping) przy dowolnej wsi (ten sam promien co gra:
     ///    odleglosc^2 < 2, wies nie pladrowana) - gra liczy tylko ostatnio odwiedzona wies; gdy warunek gry jest spelniony, nie dokladamy drugi raz.
     /// 68 AGoodDaysRest (wodz partii): takze w obozie (gra: tylko w osadzie). Oba (63, 68): postfiks dziennego leczenia bohaterow i szeregowych, tylko
@@ -72,14 +72,15 @@ namespace Armoury
         [ThreadStatic] private static PartyBase _win;     // okno HealMemberHeroes z podniesiona stawka
         [ThreadStatic] private static float _winScale;
         // 62: okno OnBattleEndCheckPerkEffects
-        private sealed class Dress { public Hero H; public PartyBase Party; public Hero Surgeon; public int Hp0; public int Asked; public bool Player; public bool Naval; }
+        private sealed class Dress { public Hero H; public PartyBase Party; public Hero Surgeon; public int Hp0; public int Asked; public int SurgHp; public int WalkHp; public bool Player; public bool Naval; }
         [ThreadStatic] private static List<Dress> _dress;
         [ThreadStatic] private static bool _inEnd;
+        [ThreadStatic] private static Hero _dressedHero;   // bohater, ktoremu DressPostfix dal opatrunek w biezacym wywolaniu modelu (straz 69 / NavalDLC)
 
         // linia doby
         private static int _day = -1;
         private static int _dRaise, _dRaisePlayer, _dLight, _dHeavy, _dHeavyCut, _dWin;
-        private static int _dDressBattles, _dDressHeroes, _dDressHp, _dDressXpCalls, _dDressAi, _dDressNaval, _dDressPlayerHp = -1;
+        private static int _dDressBattles, _dDressHeroes, _dDressHp, _dDressXpCalls, _dDressAi, _dDressNaval, _dDressPlayerHp = -1, _dNavalCut;
         private static int _dGoodRest, _dBush, _dCheat, _dFfa;
         private static int _sDressHp, _sCheat, _sFfa;
         private static PerkObject _resilience; private static bool _resTried;
@@ -87,14 +88,15 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _raiseParty = null; _raiseAt = -1; _raiseLo = 0; _raiseHi = 0; _win = null; _winScale = 1f; _dress = null; _inEnd = false;
+            _raiseParty = null; _raiseAt = -1; _raiseLo = 0; _raiseHi = 0; _win = null; _winScale = 1f; _dress = null; _inEnd = false; _dressedHero = null;
+            _resTried = false; _resilience = null;   // recenzja: PerkObject NavalDLC zyje w MBObjectManager danej gry (NavalPerks.Create) - stara referencja po wczytaniu innego zapisu = GetPerkValue false
             _stumbles = 0; _errSites.Clear(); _day = -1; DayReset(); _sDressHp = 0; _sCheat = 0; _sFfa = 0;
         }
 
         private static void DayReset()
         {
             _dRaise = _dRaisePlayer = _dLight = _dHeavy = _dHeavyCut = _dWin = 0;
-            _dDressBattles = _dDressHeroes = _dDressHp = _dDressXpCalls = _dDressAi = _dDressNaval = 0; _dDressPlayerHp = -1;
+            _dDressBattles = _dDressHeroes = _dDressHp = _dDressXpCalls = _dDressAi = _dDressNaval = _dNavalCut = 0; _dDressPlayerHp = -1;
             _dGoodRest = _dBush = _dCheat = _dFfa = 0;
         }
 
@@ -128,13 +130,16 @@ namespace Armoury
                 notes.Add("GetBattleEndHealingAmount " + Wire(h, AccessTools.DeclaredMethod(typeof(DefaultPartyHealingModel), "GetBattleEndHealingAmount"), null, nameof(DressPostfix), null));
                 notes.Add("GetDailyHealingHpForHeroes " + Wire(h, AccessTools.DeclaredMethod(typeof(DefaultPartyHealingModel), "GetDailyHealingHpForHeroes"), null, nameof(CampPostfix), null));
                 notes.Add("GetDailyHealingForRegulars " + Wire(h, AccessTools.DeclaredMethod(typeof(DefaultPartyHealingModel), "GetDailyHealingForRegulars"), null, nameof(CampPostfix), null));
+                var navalModel = AccessTools.TypeByName("NavalDLC.GameComponents.NavalDLCPartyHealingModel");
+                notes.Add("NavalDLC GetBattleEndHealingAmount " + (navalModel == null ? "brak DLC"
+                          : Wire(h, AccessTools.DeclaredMethod(navalModel, "GetBattleEndHealingAmount"), null, nameof(NavalGuardPostfix), null)));
                 _hookNote = string.Join("; ", notes);
             }
             var s = Settings.Current;
             if (s == null) return;
             Log.Info(P + "start sesji - latki " + _hookNote + " | 37/60 WalkItOff lekko ranni (HP > progu) w marszu " + Math.Max(0, Math.Min(100, s.WalkItOffLightWoundPercent))
                      + "% stawki (marsz " + s.MovingHealPercent + "%, Heal Only At Rest " + (s.HealOnlyAtRest ? "TAK" : "NIE") + ") | 62 opatrunek po wygranej "
-                     + (s.BattleDressingEnabled ? "TAK" : "NIE") + " (Medicine chirurga " + s.BattleDressingPer100Medicine + "% na 100 pkt + Preventive Medicine chirurga 30%, AI "
+                     + (s.BattleDressingEnabled ? "TAK" : "NIE") + " (Medicine chirurga " + s.BattleDressingPer100Medicine + "% na 100 pkt + Preventive Medicine chirurga albo wlasne 30% raz, AI "
                      + (s.BattleDressingAi ? "TAK" : "NIE") + ", 69 Resilience na morzu +" + s.BattleDressingNavalResilience + "%) | 63/68 Bush Doctor i A Good Days Rest w obozie "
                      + (s.CampHealingPerks ? "TAK" : "NIE") + " | 66 Cheat Death chirurga w przesileniu " + (s.CheatDeathAtCrisis ? "TAK" : "NIE") + " | 36 Form Fitting Armor w biegu i zadyszce "
                      + (s.FormFittingArmorInBreath ? "TAK" : "NIE") + " | Resilience (NavalDLC) " + (Resilience != null ? "jest" : "BRAK") + ".");
@@ -246,7 +251,7 @@ namespace Armoury
             {
                 int heroes = 0, hp = 0, playerHp = -1;
                 bool player = false, naval = false;
-                Hero playerSurgeon = null;
+                Hero playerSurgeon = null; bool playerDressed = false;
                 var sb = new System.Text.StringBuilder(64);
                 foreach (var d in l)
                 {
@@ -257,9 +262,10 @@ namespace Armoury
                         heroes++; hp += got;
                         if (d.Player) player = true;
                         if (d.Naval) naval = true;
-                        if (d.H == Hero.MainHero) { playerHp = got; playerSurgeon = d.Surgeon; }
-                        if (d.Surgeon != null && d.H.PartyBelongedTo != null) { SkillLevelingManager.OnHeroHealedWhileWaiting(d.H, got); _dDressXpCalls++; }
-                        if (d.Player && sb.Length < 600) sb.Append(" [").Append(d.H.Name).Append(" +").Append(got).Append(" (prosba ").Append(d.Asked).Append(") HP ").Append(d.H.HitPoints).Append('/').Append(d.H.MaxHitPoints)
+                        if (d.H == Hero.MainHero) { playerHp = got; playerSurgeon = d.SurgHp > 0 ? d.Surgeon : null; playerDressed = d.Asked > d.WalkHp; }
+                        int surgGot = Math.Min(got, d.SurgHp);   // recenzja: XP chirurga tylko z jego opatrunku (bez wlasnego WalkItOff +10 i wlasnego Preventive Medicine)
+                        if (d.Surgeon != null && surgGot > 0 && d.H.PartyBelongedTo != null) { SkillLevelingManager.OnHeroHealedWhileWaiting(d.H, surgGot); _dDressXpCalls++; }
+                        if (d.Player && sb.Length < 600) sb.Append(" [").Append(d.H.Name).Append(" +").Append(got).Append(" (prosba ").Append(d.Asked).Append(", chirurga ").Append(d.SurgHp).Append(") HP ").Append(d.H.HitPoints).Append('/').Append(d.H.MaxHitPoints)
                                                     .Append(", chirurg ").Append(d.Surgeon != null ? d.Surgeon.Name.ToString() + " Medicine " + d.Surgeon.GetSkillValue(DefaultSkills.Medicine) : "brak").Append(']');
                     }
                     catch (Exception e) { Stumble("EndFinalizer(bohater)", e); }
@@ -268,7 +274,7 @@ namespace Armoury
                 _dDressBattles++; _dDressHeroes += heroes; _dDressHp += hp; _sDressHp += hp;
                 if (naval) _dDressNaval++;
                 if (!player) _dDressAi++;
-                if (playerHp > 0)
+                if (playerHp > 0 && playerDressed)   // sam WalkItOff +10 (bez opatrunku) - bez komunikatu
                 {
                     _dDressPlayerHp = Math.Max(0, _dDressPlayerHp) + playerHp;
                     try
@@ -284,9 +290,11 @@ namespace Armoury
             finally { l.Clear(); }
         }
 
-        /// <summary>Postfiks GetBattleEndHealingAmount (Default; BKROT dziedziczy). Strona wygrana - opatrunek chirurga zamiast wlasnego Preventive Medicine.</summary>
+        /// <summary>Postfiks GetBattleEndHealingAmount (Default; BKROT dziedziczy). Strona wygrana - opatrunek chirurga; wlasne Preventive Medicine
+        /// bohatera zostaje (recenzja: perk osobisty), ale z Preventive Medicine chirurga liczy sie RAZ (30%, nie 60%) - wygrany nigdy gorzej niz przegrany.</summary>
         public static void DressPostfix(PartyBase __0, Hero __1, ref ExplainedNumber __result)
         {
+            _dressedHero = null;
             try
             {
                 var s = Settings.Current;
@@ -299,13 +307,17 @@ namespace Armoury
                 int lost = hero.MaxHitPoints - hero.HitPoints;
                 var mp = party.MobileParty;
                 Hero surgeon = mp != null ? mp.EffectiveSurgeon : null;
-                float pct = 0f;
+                var pm = DefaultPerks.Medicine.PreventiveMedicine;
+                float surgPct = 0f, ownPct = 0f;
                 if (surgeon != null)
                 {
                     int med = Math.Min(300, Math.Max(0, surgeon.GetSkillValue(DefaultSkills.Medicine)));
-                    pct = med / 100f * Math.Max(0, s.BattleDressingPer100Medicine) / 100f;
-                    if (surgeon.GetPerkValue(DefaultPerks.Medicine.PreventiveMedicine)) pct += DefaultPerks.Medicine.PreventiveMedicine.SecondaryBonus;
+                    surgPct = med / 100f * Math.Max(0, s.BattleDressingPer100Medicine) / 100f;
+                    if (surgeon.GetPerkValue(pm)) surgPct += pm.SecondaryBonus;
                 }
+                // wlasne Preventive Medicine (jak gra) - tylko gdy nie liczyl go juz chirurg (sam bohater-chirurg albo chirurg z tym perkiem)
+                if (hero.GetPerkValue(pm) && !(surgeon != null && surgeon.GetPerkValue(pm))) ownPct = pm.SecondaryBonus;
+                float pct = surgPct + ownPct;
                 bool naval = false;
                 try { naval = me.IsNavalMapEvent; } catch { naval = false; }
                 var res = Resilience;
@@ -314,17 +326,45 @@ namespace Armoury
                 if (_tDress == null) _tDress = new TextObject("{=!}Wounds dressed after the victory");
                 var r = new ExplainedNumber(0f, false, null);
                 if (lost > 0 && pct > 0f) r.Add(pct * lost, _tDress);
+                // czesc chirurga (do XP i komunikatu): jego udzial w opatrunku, po mnozniku Resilience i suficie
+                float surgShare = (surgPct + ownPct) > 0f ? surgPct / (surgPct + ownPct) : 0f;
+                int surgHp = lost > 0 ? (int)Math.Round(pct * lost * surgShare) : 0;
                 // wlasne Medicine.WalkItOff (+10 HP po bitwie zaczepnej, perk osobisty) - jak gra
+                int walkHp = 0;
                 if (party.MapEventSide == me.AttackerSide && hero.GetPerkValue(DefaultPerks.Medicine.WalkItOff))
+                {
                     r.Add(DefaultPerks.Medicine.WalkItOff.SecondaryBonus, DefaultPerks.Medicine.WalkItOff.Name);
+                    walkHp = (int)Math.Round(DefaultPerks.Medicine.WalkItOff.SecondaryBonus);
+                }
                 __result = r;
+                _dressedHero = hero;
                 if (_inEnd && lost > 0)
                 {
                     if (_dress == null) _dress = new List<Dress>(8);
-                    _dress.Add(new Dress { H = hero, Party = party, Surgeon = surgeon, Hp0 = hero.HitPoints, Asked = r.RoundedResultNumber, Player = player, Naval = naval });
+                    _dress.Add(new Dress { H = hero, Party = party, Surgeon = surgeon, Hp0 = hero.HitPoints, Asked = r.RoundedResultNumber, SurgHp = surgHp, WalkHp = walkHp, Player = player, Naval = naval });
                 }
             }
-            catch (Exception e) { Stumble("DressPostfix", e); }
+            catch (Exception e) { _dressedHero = null; Stumble("DressPostfix", e); }
+        }
+
+        /// <summary>69 straz (recenzja; scalanie z 515 / punkt 102): gdyby NavalDLCPartyHealingModel wszedl do lancucha modeli, dolozylby swoje 30%
+        /// utraconego HP (Resilience) na KAZDEJ bitwie do wyniku bazy, w ktorym jest juz nasz opatrunek z mnoznikiem Resilience. Gdy opatrunek byl dany
+        /// temu bohaterowi w tym wywolaniu (_dressedHero) - dodatek DLC zdjety. Dzis metoda jest poza lancuchem (BkrotChains) - latka bez skutku.</summary>
+        public static void NavalGuardPostfix(Hero __1, ref ExplainedNumber __result)
+        {
+            var dh = _dressedHero;
+            _dressedHero = null;
+            try
+            {
+                if (dh == null || __1 == null || !ReferenceEquals(dh, __1)) return;
+                var res = Resilience;
+                if (res == null || !__1.GetPerkValue(res)) return;
+                float add = res.PrimaryBonus * (__1.MaxHitPoints - __1.HitPoints);   // dokladnie to, co dodal NavalDLC (NavalDLCPartyHealingModel.GetBattleEndHealingAmount)
+                if (add <= 0f) return;
+                __result.Add(-add, res.Name);
+                _dNavalCut++;
+            }
+            catch (Exception e) { Stumble("NavalGuardPostfix", e); }
         }
 
         // ------------------------------------------------------------ 63 / 68: perki w obozie
@@ -421,7 +461,7 @@ namespace Armoury
                 if (day == _day) return;
                 Log.Info(P + "doba " + _day + " - 37/60 WalkItOff: okna podniesionej stawki " + _dWin + " (gracz " + _dRaisePlayer + "), leczenia lekko rannych " + _dLight
                          + ", ciezko rannych przycietych " + _dHeavy + " (-" + _dHeavyCut + " HP) | 62 opatrunek: bitwy " + _dDressBattles + " (AI " + _dDressAi + ", morskie " + _dDressNaval
-                         + "), bohaterowie " + _dDressHeroes + ", +" + _dDressHp + " HP, XP chirurga " + _dDressXpCalls + ", gracz " + (_dDressPlayerHp < 0 ? "-" : "+" + _dDressPlayerHp + " HP")
+                         + ", zdjete Resilience NavalDLC " + _dNavalCut + "), bohaterowie " + _dDressHeroes + ", +" + _dDressHp + " HP, XP chirurga " + _dDressXpCalls + ", gracz " + (_dDressPlayerHp < 0 ? "-" : "+" + _dDressPlayerHp + " HP")
                          + " | 68 A Good Days Rest w obozie " + _dGoodRest + ", 63 Bush Doctor w obozie " + _dBush + " (wywolania modelu) | 66 Cheat Death w przesileniu " + _dCheat
                          + " | 36 Form Fitting Armor agenci " + _dFfa + " | sesja: opatrunek +" + _sDressHp + " HP, Cheat Death " + _sCheat + ", Form Fitting Armor " + _sFfa
                          + " | potkniecia " + _stumbles);
