@@ -24,12 +24,13 @@ namespace Armoury
     ///     rodem gracza i lordami fabuly (te same wyjatki co 408). Ostroznosc c w [0,1] = max(cH, cW): cH z HP wodza (HpStart% -> prog rannego gry
     ///     WoundedHealthLimit), cW z udzialu rannych szeregowych (ShareStart% -> RestShare%, od 10 ludzi); loze HeroWounds wodza = 1.
     ///     Stan partii (tylko w pamieci, czyszczony w Reset):
-    ///      - None -> Stand (POSTOJ): HP wodza &lt;= LitterHpThreshold albo loze Grave (ta sama regula co nosze gracza 501) ALBO ranni &gt;= RestShare%;
+    ///      - None -> Stand (POSTOJ): HP wodza &lt;= AiWoundedRestHp (E3: 20 = prog rannego gry; nosze gracza 501 maja swoje LitterHp*) albo loze Grave
+    ///        ALBO ranni &gt;= RestShare%;
     ///        postoj tylko w bezpiecznym miejscu (jedzenie na 2 doby, bez silniejszego wroga w promieniu AiCampDangerRadius, najblizsza osada nie wroga),
-    ///        inaczej od razu Fort. Skrot: twierdza, ktora wybierze 408 (HeroWounds.AiRestFort: najblizsza RODU, potem FRAKCJI), blizej niz RestSkipHours
-    ///        drogi (albo partia stoi w twierdzy swojej frakcji) - od razu Fort. Brak twierdzy z droga przy niebezpiecznym postoju - None (zwykle decyzje,
+    ///        inaczej od razu Fort. Skrot: twierdza, ktora wybierze 408 (HeroWounds.AiRestFort: najblizsza RODU, potem FRAKCJI, potem SOJUSZNIKA - E2),
+    ///        blizej niz RestSkipHours drogi (albo partia stoi w twierdzy swojej frakcji / sojusznika) - od razu Fort. Brak twierdzy z droga przy niebezpiecznym postoju - None (zwykle decyzje,
     ///        ostroznosc dziala) i CoolHours bez ponownego wejscia.
-    ///      - Stand -> Fort: HP &gt; LitterHpRelease, bez loza Grave i ranni &lt;= RestExitShare% (zdolna do drogi) ALBO RestMaxDays dob postoju ALBO zagrozenie /
+    ///      - Stand -> Fort: HP &gt; AiWoundedRestReleaseHp (E3: 30), bez loza Grave i ranni &lt;= RestExitShare% (zdolna do drogi) ALBO RestMaxDays dob postoju ALBO zagrozenie /
     ///        glod ALBO cudzy rozkaz drugi raz przestawil partie (bez migotania - ustepujemy). Gdy przy wyjsciu c &lt; 0.25 - od razu None; gdy nie ma
     ///        twierdzy z droga - None i CoolHours bez wejscia (bez petli postoj -> Fort bez celu -> postoj).
     ///      - Fort -> None: c &lt; 0.25 albo FortMaxDays (10) dob (zapas; potem CoolHours bez wejscia).
@@ -51,6 +52,12 @@ namespace Armoury
     ///     (ArmsFirst.DefendsOwn), obronca / chroniony 335 (LordEscort.GuardAllowsAttack).
     /// (F) ARMIE - bramki ArmsFirst (CanLordCreateArmy gry i BK, filtr kandydatow, wezwania BK, okno armii gracza) pytaja ArmsFirst.ArmyOut =
     ///     Unready || AiWounded500b.ArmyOut: c &gt;= ArmyGate% albo Stand / Fort. Czlonek juz w armii zostaje.
+    /// (G) DECYZJE JEFFA 14.11 (E1-E4): E1 obrona zagrozonej osady RODU z postoju / drogi do twierdzy tylko z szansa wygranej - DefendOk: zdrowi partii
+    ///     (Party.EstimatedStrength, ta sama miara co Unsafe) + obroncy osady (strona osady w bitwie albo GetInvolvedPartiesForEventType przy oblezeniu) &gt;=
+    ///     AiWoundedDefendEdgePercent (120) x napastnicy (druga strona bitwy albo obozu oblegajacych). W postoju: przy szansie mysl wolna (bez DoNotChangeBehavior),
+    ///     a postfiks 55 zostawia tylko obrone z szansa (reszta -1); HoldOnce nie przerywa jazdy na obrone z szansa. Bez szansy obrona -1 (55 i 408). Inicjatywa
+    ///     (postoj / Fort): atak na napastnika osady rodu tylko przy localAdvantage gry &gt;= ten sam prog. E2 twierdza sojusznika (HeroWounds.AiFort).
+    ///     E3 wlasne progi HP AI 20/30. E4 wodz ARMII: tylko ostroznosc w inicjatywie (migawka C, stan None) - bez rozwiazywania armii, bez mysli, bez bramek.
     /// Bez namiotow i wizerunkow; nic co klatke; bledy liczone na miejsce i partie (5 potkniec partii = poza migawka do konca doby), bez globalnego wylacznika.
     /// </summary>
     internal static class AiWounded500b
@@ -93,6 +100,9 @@ namespace Armoury
         private static int _dStand, _dStandFort, _dFortDirect, _dFortFromStand, _dStandEnd, _dFortEnd, _dHold, _dReHold, _dYield, _dThreat, _dHunger, _dMaxDays, _dFortMax, _dUnsafe;
         private static int _dThinkStand, _dArmyOff, _dCut, _dBoost, _dThinkC, _dSkipStory;
         private static int _dNoFort, _dCool, _dThinkFree, _dStandBattleOff;
+        private static int _dDefThink, _dDefOff, _dDefOnly, _dDefRide;   // E1: mysli wolne dla obrony z szansa, obrony bez szansy -1, inne opcje -1 przy obronie, godziny jazdy na obrone
+        private static int _iDefOff, _iArmyLead;                          // E1 inicjatywa: atak na napastnika osady rodu bez szansy zgaszony; E4: inicjatywa wodza armii przycieta
+        private static int _cArmy;                                        // E4: ostatni przeglad - wodzowie armii z c > 0
         private static int _iCut, _iCap, _iZero, _iZeroFort, _iAvoid, _iKeep, _gArmy;
         private static int _cMax, _cHalf, _cSome;   // ostatni przeglad: partie z c > 0, c >= 0.5, liczba w stanie
         private static long _scanTicks, _scanMaxTicks; private static int _scans;
@@ -112,6 +122,8 @@ namespace Armoury
             _dStand = _dStandFort = _dFortDirect = _dFortFromStand = _dStandEnd = _dFortEnd = _dHold = _dReHold = _dYield = _dThreat = _dHunger = _dMaxDays = _dFortMax = _dUnsafe = 0;
             _dThinkStand = _dArmyOff = _dCut = _dBoost = _dThinkC = _dSkipStory = 0;
             _dNoFort = _dCool = _dThinkFree = _dStandBattleOff = 0;
+            _dDefThink = _dDefOff = _dDefOnly = _dDefRide = 0;
+            Interlocked.Exchange(ref _iDefOff, 0); Interlocked.Exchange(ref _iArmyLead, 0);
             Interlocked.Exchange(ref _iCap, 0); Interlocked.Exchange(ref _iZeroFort, 0);
             Interlocked.Exchange(ref _iCut, 0); Interlocked.Exchange(ref _iZero, 0); Interlocked.Exchange(ref _iAvoid, 0); Interlocked.Exchange(ref _iKeep, 0);
             Interlocked.Exchange(ref _gArmy, 0);
@@ -186,7 +198,7 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             Dictionary<MobileParty, Snap> neu = null;
             bool anyFort = false;
-            int cSome = 0, cHalf = 0, cState = 0;
+            int cSome = 0, cHalf = 0, cState = 0, cArmy = 0;
             try
             {
                 double now = CampaignTime.Now.ToHours;
@@ -202,7 +214,7 @@ namespace Armoury
                         byte st = Step(mp, ref row, s, rest, now, out c);
                         if (row != null && row.St != None) cState++;
                         if (c <= 0f && st == None) continue;
-                        if (c > 0f) { cSome++; if (c >= 0.5f) cHalf++; }
+                        if (c > 0f) { cSome++; if (c >= 0.5f) cHalf++; if (mp.Army != null) cArmy++; }
                         if (st == Fort) anyFort = true;
                         if (neu == null) neu = new Dictionary<MobileParty, Snap>();
                         neu[mp] = new Snap { C = caution ? c : 0f, St = st };
@@ -225,7 +237,7 @@ namespace Armoury
             catch (Exception e) { Stumble(ref _sScan, "Hourly", e); }
             _snap = neu ?? Empty;
             _anyFort = anyFort;
-            _cSome = cSome; _cHalf = cHalf; _cMax = cState;
+            _cSome = cSome; _cHalf = cHalf; _cMax = cState; _cArmy = cArmy;
             long dt = Stopwatch.GetTimestamp() - t0;
             _scanTicks += dt; _scans++; if (dt > _scanMaxTicks) _scanMaxTicks = dt;
         }
@@ -258,7 +270,16 @@ namespace Armoury
             var clan = mp.ActualClan;
             if (lh == null || lh == Hero.MainHero || clan == null || clan == Clan.PlayerClan) return Clear(mp, row);
             if (row != null && row.Lead != lh) { _rows.Remove(mp); row = null; mp.Ai.RethinkAtNextHourlyTick = true; }   // nowy wodz - stan od zera
-            if (mp.Army != null) return Clear(mp, row);                                                              // armia - decyduje wodz armii
+            if (mp.Army != null)
+            {
+                // armia - decyduje wodz armii (stan None). E4 (Jeff "tylko ostroznosc"): wodz armii dostaje ostroznosc c tylko dla inicjatywy (InitPostfix);
+                // bez postoju, bez mysli (CautionPostfix wychodzi przy armii), bez bramek armii i bez rozwiazywania. Lordowie fabuly - te same wyjatki
+                Clear(mp, row); row = null;
+                if (mp.Army.LeaderParty != mp || !s.AiWoundedCaution) return None;
+                if (SiegePhantomLift.StoryLeaderOf(mp) != null || StoryNeed(lh)) return None;
+                c = Caution(mp, lh, s);
+                return None;
+            }
             byte keep = row != null ? row.St : None;
             // bitwa, oblezenie, morze, przejscie - stan bez zmian (ani wejscia, ani wyjscia)
             if (mp.MapEvent != null || mp.BesiegedSettlement != null || mp.SiegeEvent != null || mp.IsCurrentlyAtSea || mp.IsTransitionInProgress
@@ -275,7 +296,7 @@ namespace Armoury
             if (!rest) { c = c > 0f ? c : 0f; return Clear(mp, row); }
 
             int hp = lh.HitPoints;
-            int on = Math.Max(1, s.LitterHpThreshold), off = Math.Max(on, s.LitterHpRelease);
+            int on = Math.Max(1, s.AiWoundedRestHp), off = Math.Max(on, s.AiWoundedRestReleaseHp);   // E3: wlasne progi AI (20 / 30), nie nosze gracza
             float w = Share(mp);
             float restShare = Math.Max(1, Math.Min(100, s.AiWoundedRestSharePercent)) / 100f;
             float exitShare = Math.Max(0, Math.Min(100, s.AiWoundedRestExitSharePercent)) / 100f;
@@ -298,7 +319,7 @@ namespace Armoury
                 // skrot: w twierdzy swojej frakcji albo twierdza blisko - ta sama, ktora wybierze 408 (recenzja: wczesniej najblizsza frakcji, a 408 jechal do rodu)
                 float hrs;
                 var at = mp.CurrentSettlement;
-                if (at != null && at.IsFortification && at.MapFaction == mp.MapFaction)
+                if (at != null && HeroWounds.FriendlyFort(at, mp.MapFaction))   // E2: takze twierdza sojusznika
                 { Enter(mp, row, Fort, now); _dFortDirect++; Say(s, mp, lh, w, "-> TWIERDZA (stoi w " + at.StringId + ", " + why + ")"); return Fort; }
                 var near = NearFort(mp, out hrs);
                 int skip = Math.Max(0, s.AiWoundedRestSkipHours);
@@ -317,7 +338,7 @@ namespace Armoury
                     Say(s, mp, lh, w, "-> TWIERDZA (" + FortName(near, hrs) + "; postoj niebezpieczny: " + unsafeWhy + ", " + why + ")"); return Fort;
                 }
                 Enter(mp, row, Stand, now); _dStand++;
-                HoldOnce(mp, row);
+                HoldOnce(mp, row, s);
                 Say(s, mp, lh, w, "-> POSTOJ (" + why + (near != null ? ", potem twierdza " + FortName(near, hrs) : ", brak twierdzy z droga") + ")");
                 return Stand;
             }
@@ -335,7 +356,7 @@ namespace Armoury
                     string u = Unsafe(mp, s);
                     if (u != null) { why = u; if (u.StartsWith("glod", StringComparison.Ordinal) || u.StartsWith("jedzenie", StringComparison.Ordinal)) _dHunger++; else _dThreat++; }
                 }
-                if (why == null) { HoldOnce(mp, row); return Stand; }
+                if (why == null) { HoldOnce(mp, row, s); return Stand; }
                 _dStandEnd++;
                 if (c < FortCalm)
                 {
@@ -385,7 +406,7 @@ namespace Armoury
 
         /// <summary>Postoj: Hold raz po wejsciu (poza osada, AI czynne, bez ucieczki / zaczepki z inicjatywy). Partia przestawiona potem cudzym rozkazem
         /// (np. NightRest oddaje o swicie rozkaz sprzed snu) - Hold jeszcze raz, najwyzej ReHoldMax razy, potem Fort (bez migotania).</summary>
-        private static void HoldOnce(MobileParty mp, Row row)
+        private static void HoldOnce(MobileParty mp, Row row, Settings s)
         {
             if (mp.CurrentSettlement != null) return;   // w osadzie stoi sama (DoNotChangeBehavior)
             if (mp.DefaultBehavior == AiBehavior.Hold) { row.Held = true; return; }
@@ -396,6 +417,12 @@ namespace Armoury
             // ucieczka / zaczepka z INICJATYWY - nie przerywamy; poscig z mysli (rozkaz domyslny EngageParty / GoAroundParty, short-term EngageParty blisko
             // celu - MobilePartyAi.GetGoAroundPartyBehavior) przerywamy Holdem (recenzja: inaczej DoNotChangeBehavior zamrazal poscig na caly postoj)
             if (MobileParty.IsFleeBehavior(stb) || (stb == AiBehavior.EngageParty && db != AiBehavior.EngageParty && db != AiBehavior.GoAroundParty)) return;
+            // E1: jazda na obrone zagrozonej osady rodu z szansa wygranej - nie przerywamy (i nie liczymy jako cudzy rozkaz); bez szansy - Hold jak zwykle
+            if (db == AiBehavior.DefendSettlement)
+            {
+                var ts = mp.TargetSettlement;
+                if (ts != null && ts.OwnerClan == mp.ActualClan && DefendOk(mp, ts, s)) { row.Held = false; _dDefRide++; return; }
+            }
             // odwrot po bitwie (gra: AiMilitaryBehavior.OnMapEventEnded - SetMoveGoToPoint od zwyciezcy; 458 odwrot wodza; CrossingLaw zawrocenie) - najpierw dojechac
             if (db == AiBehavior.GoToPoint && mp.IsMoving) return;
             if (row.Held) { row.ReHolds++; _dReHold++; if (row.ReHolds >= ReHoldMax) return; }   // przy nastepnym kroku: Fort
@@ -486,8 +513,8 @@ namespace Armoury
         private static Settlement NearFort(MobileParty mp, out float hours)
         {
             hours = float.MaxValue;
-            bool own; float road;
-            var best = HeroWounds.AiRestFort(mp, out own, out road);
+            byte tier; float road;
+            var best = HeroWounds.AiRestFort(mp, out tier, out road);
             if (best == null) return null;
             if (road < 0f) road = mp.GetPosition2D.Distance(best.GetPosition2D) * 1.1f;
             float sp = 0f;
@@ -498,6 +525,67 @@ namespace Armoury
         }
 
         private static string FortName(Settlement st, float hrs) { return (st.StringId ?? "?") + " " + hrs.ToString("F1", Inv) + " h drogi"; }
+
+        // ------------------------------------------------------------ (G) E1 - obrona osady rodu tylko z szansa
+        private static float Edge(Settings s) { return Math.Max(100, Math.Min(300, s.AiWoundedDefendEdgePercent)) / 100f; }
+
+        /// <summary>E1: stosunek sil przy obronie zagrozonej osady - (zdrowi partii + obroncy osady) / napastnicy; EstimatedStrength jak Unsafe (liczy tylko
+        /// zdrowych). Bitwa o osade (rabunek, szturm): strona osady vs druga strona; oblezenie bez bitwy: GetInvolvedPartiesForEventType osady vs oboz oblegajacych
+        /// (ta sama lista co gra w DefaultMobilePartyAIModel). Bez zagrozenia - 0. Partia juz w bitwie / wsrod obroncow nie liczona drugi raz. Watek glowny.</summary>
+        internal static float DefendOdds(MobileParty mp, Settlement st)
+        {
+            if (mp == null || st == null || mp.Party == null) return 0f;
+            float ours = mp.Party.EstimatedStrength, def = 0f, att = 0f;
+            var sp = st.Party;
+            var me = sp != null ? sp.MapEvent : null;
+            if (me != null)
+            {
+                var side = sp.MapEventSide;
+                for (int k = 0; k < 2; k++)
+                {
+                    var ms = k == 0 ? me.AttackerSide : me.DefenderSide;
+                    if (ms == null) continue;
+                    var ps = ms.Parties;
+                    for (int i = 0; i < ps.Count; i++)
+                    {
+                        var pb = ps[i] != null ? ps[i].Party : null;
+                        if (pb == null || pb == mp.Party) continue;
+                        if (ms == side) def += pb.EstimatedStrength; else att += pb.EstimatedStrength;
+                    }
+                }
+            }
+            else if (st.SiegeEvent != null && st.SiegeEvent.BesiegerCamp != null)
+            {
+                foreach (var pb in st.SiegeEvent.BesiegerCamp.GetInvolvedPartiesForEventType()) if (pb != null && pb != mp.Party) att += pb.EstimatedStrength;
+                foreach (var pb in st.GetInvolvedPartiesForEventType()) if (pb != null && pb != mp.Party) def += pb.EstimatedStrength;
+            }
+            else return 0f;
+            if (att <= 0f) return 99f;
+            return (ours + def) / att;
+        }
+
+        /// <summary>E1: obrona osady rodu ma sens - szansa wygranej &gt;= AiWoundedDefendEdgePercent. Nie rzuca (blad = bez szansy, licznik).</summary>
+        internal static bool DefendOk(MobileParty mp, Settlement st, Settings s)
+        {
+            if (s == null || st == null) return false;
+            try { return DefendOdds(mp, st) >= Edge(s); }
+            catch (Exception e) { Stumble(ref _sThink, "DefendOk", e); return false; }
+        }
+
+        /// <summary>E1: w ocenach jest obrona zagrozonej osady rodu (bez zwolania armii, ocena &gt; 0) z szansa wygranej.</summary>
+        private static bool AnyDefendOk(MobileParty party, MBReadOnlyList<(AIBehaviorData, float)> scores, Settings s)
+        {
+            var clan = party.ActualClan;
+            if (clan == null || scores == null) return false;
+            for (int i = 0; i < scores.Count; i++)
+            {
+                if (!(scores[i].Item2 > 0f)) continue;
+                var d = scores[i].Item1;
+                if (d.WillGatherArmy || !ArmsFirst.IsOwnDefend(in d, clan)) continue;
+                if (DefendOk(party, d.Party as Settlement, s)) return true;
+            }
+            return false;
+        }
 
         private static void Say(Settings s, MobileParty mp, Hero lh, float w, string what)
         {
@@ -524,6 +612,8 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.AiWoundedRestEnabled) return;
                 if (Aggressive(party)) { _dThinkFree++; return; }   // poscig / oblezenie / rabunek bez Hold - mysl dziala, 55 daje bitwie -1
+                // E1: obrona zagrozonej osady rodu z szansa wygranej - mysl wolna, 55 zostawia tylko te obrone
+                if (AnyDefendOk(party, partyThinkParams.AIBehaviorScores, s)) { _dDefThink++; return; }
                 partyThinkParams.DoNotChangeBehavior = true;
                 _dThinkStand++;
             }
@@ -561,14 +651,29 @@ namespace Armoury
                 {
                     // gra tworzy armie mimo DoNotChangeBehavior (galaz WillGatherArmy przed sprawdzeniem flagi) - zamykamy u zrodla
                     // bez DoNotChangeBehavior (rozkaz szukajacy bitwy - StandPostfix go nie zamrozil) takze opcje bitwy -1 (ta sama lista co 408)
+                    // E1: obrona zagrozonej osady rodu - z szansa zostaje i wtedy jest JEDYNA opcja (reszta -1), bez szansy -1
                     bool free = !partyThinkParams.DoNotChangeBehavior;
                     var sc = party.ActualClan;
+                    bool defend = false;
+                    if (free && sc != null)
+                        for (int i = 0; i < _copy.Count && !defend; i++)
+                        {
+                            if (!(_copy[i].Item2 > 0f)) continue;
+                            var d = _copy[i].Item1;
+                            if (!d.WillGatherArmy && ArmsFirst.IsOwnDefend(in d, sc) && DefendOk(party, d.Party as Settlement, s)) defend = true;
+                        }
                     for (int i = 0; i < _copy.Count; i++)
                     {
                         if (!(_copy[i].Item2 > -1f)) continue;
                         var d = _copy[i].Item1;
                         if (d.WillGatherArmy) { partyThinkParams.SetBehaviorScore(in d, -1f); _dArmyOff++; }
-                        else if (free && HeroWounds.AiIsBattle(in d, sc)) { partyThinkParams.SetBehaviorScore(in d, -1f); _dStandBattleOff++; }
+                        else if (!free) continue;
+                        else if (sc != null && ArmsFirst.IsOwnDefend(in d, sc))
+                        {
+                            if (!DefendOk(party, d.Party as Settlement, s)) { partyThinkParams.SetBehaviorScore(in d, -1f); _dDefOff++; }
+                        }
+                        else if (defend) { partyThinkParams.SetBehaviorScore(in d, -1f); _dDefOnly++; }
+                        else if (HeroWounds.AiIsBattle(in d, sc)) { partyThinkParams.SetBehaviorScore(in d, -1f); _dStandBattleOff++; }
                     }
                     _copy.Clear();
                     return;
@@ -614,16 +719,21 @@ namespace Armoury
             {
                 Snap x;
                 if (!snap.TryGetValue(__0, out x)) return;
-                if (__0.Army != null) return;
+                var army = __0.Army;
+                if (army != null && army.LeaderParty != __0) return;   // E4: z armii tylko wodz (sama ostroznosc, stan None)
+                bool lead = army != null;
                 var s = Settings.Current;
                 if (s == null) return;
-                bool stand = x.St == Stand && s.AiWoundedRestEnabled;
-                bool fort = x.St == Fort && s.AiWoundedRestEnabled;   // recenzja: jazda do twierdzy jak postoj - bez zaczepek po drodze
+                bool stand = !lead && x.St == Stand && s.AiWoundedRestEnabled;
+                bool fort = !lead && x.St == Fort && s.AiWoundedRestEnabled;   // recenzja: jazda do twierdzy jak postoj - bez zaczepek po drodze
                 float c = stand || fort ? 1f : (s.AiWoundedCaution ? x.C : 0f);
                 if (c <= 0f) return;
                 if (__3 > 0f)
                 {
-                    if (ArmsFirst.DefendsOwn(__0, __1) || LordEscort.GuardAllowsAttack(__0, __1)) Interlocked.Increment(ref _iKeep);
+                    bool own = ArmsFirst.DefendsOwn(__0, __1);
+                    // E1: z postoju / drogi do twierdzy napastnika osady rodu atakujemy tylko z szansa (localAdvantage gry >= prog)
+                    if (own && (stand || fort) && __4 < Edge(s)) { __3 = 0f; Interlocked.Increment(ref _iDefOff); }
+                    else if (own || LordEscort.GuardAllowsAttack(__0, __1)) Interlocked.Increment(ref _iKeep);
                     else if (stand) { __3 = 0f; Interlocked.Increment(ref _iZero); }
                     else if (fort) { __3 = 0f; Interlocked.Increment(ref _iZeroFort); }
                     else
@@ -634,6 +744,7 @@ namespace Armoury
                             // gra z bliska mnozy atak x100 - ciecie skali nie wystarcza; bez wyraznej przewagi sil (__4 = localAdvantage) atak ponizej progu 1
                             if (__4 < 1f + AdvPerCaution * kc) { __3 = Math.Min(__3, 0.99f) * (1f - kc); Interlocked.Increment(ref _iCap); }
                             else { __3 *= 1f - kc; Interlocked.Increment(ref _iCut); }
+                            if (lead) Interlocked.Increment(ref _iArmyLead);
                         }
                     }
                 }
@@ -684,11 +795,12 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null) return;
                 _live = s.AiWoundedRestEnabled || s.AiWoundedCaution;
-                Log.Info(Tag + "postoj " + (s.AiWoundedRestEnabled ? "TAK" : "NIE") + " (wejscie: HP wodza <= " + s.LitterHpThreshold + " albo loze Grave, albo ranni >= "
-                         + s.AiWoundedRestSharePercent + "%; wyjscie: HP > " + s.LitterHpRelease + " i ranni <= " + s.AiWoundedRestExitSharePercent + "%, najdluzej "
-                         + s.AiWoundedRestMaxDays + " dob; twierdza blizej niz " + s.AiWoundedRestSkipHours + " h - od razu do niej; potem twierdza regula 408)"
+                Log.Info(Tag + "postoj " + (s.AiWoundedRestEnabled ? "TAK" : "NIE") + " (wejscie: HP wodza <= " + s.AiWoundedRestHp + " albo loze Grave, albo ranni >= "
+                         + s.AiWoundedRestSharePercent + "%; wyjscie: HP > " + Math.Max(s.AiWoundedRestHp, s.AiWoundedRestReleaseHp) + " i ranni <= " + s.AiWoundedRestExitSharePercent + "%, najdluzej "
+                         + s.AiWoundedRestMaxDays + " dob; twierdza blizej niz " + s.AiWoundedRestSkipHours + " h - od razu do niej; potem twierdza regula 408: rod, frakcja, sojusznik;"
+                         + " obrona osady rodu tylko z szansa >= " + Edge(s).ToString("F2", Inv) + " x napastnicy)"
                          + " | ostroznosc " + (s.AiWoundedCaution ? "TAK" : "NIE") + " (sila " + s.AiWoundedCautionPercent + "%, od HP < " + s.AiWoundedCautionHpStartPercent
-                         + "% albo rannych > " + s.AiWoundedCautionShareStartPercent + "%; armia zamknieta od " + s.AiWoundedArmyGatePercent + "%)"
+                         + "% albo rannych > " + s.AiWoundedCautionShareStartPercent + "%; armia zamknieta od " + s.AiWoundedArmyGatePercent + "%; wodz armii - tylko inicjatywa)"
                          + " | latki: postoj " + _hStand + ", mysl " + _hCaution + ", inicjatywa (CalculateInitiativeScoresForEnemy) " + _hInit
                          + " | log partii " + (s.AiWoundedLog ? "TAK" : "NIE") + ".");
             }
@@ -702,7 +814,7 @@ namespace Armoury
                 int stand = 0, fort = 0;
                 foreach (var r in _rows.Values) { if (r.St == Stand) stand++; else if (r.St == Fort) fort++; }
                 int stumbles = _sScan + _sThink + _sCaution + _sInit + _sArmy + _sParty;
-                if (stand + fort + _dStand + _dFortDirect + _dStandEnd + _dFortEnd + _cSome + stumbles == 0 && !s.AiWoundedLog) return;
+                if (stand + fort + _dStand + _dFortDirect + _dStandEnd + _dFortEnd + _cSome + _dDefThink + _dDefOff + stumbles == 0 && !s.AiWoundedLog) return;
                 double f = 1000.0 / Stopwatch.Frequency;
                 Log.Info(Tag + "doba " + _day + " - teraz postoj " + stand + ", do twierdzy " + fort
                          + " | wejscia: postoj " + _dStand + ", od razu twierdza " + _dFortDirect + " (z tego postoj niebezpieczny " + _dUnsafe + "), postoj -> twierdza " + _dFortFromStand
@@ -711,11 +823,13 @@ namespace Armoury
                          + ", bez twierdzy z droga (koniec bez celu) " + _dNoFort + ", wejscia wstrzymane (" + CoolHours.ToString("F0", Inv) + " h po wyjsciu bez wyleczenia) " + _dCool
                          + " | postoj: Hold " + _dHold + ", Hold ponownie po cudzym rozkazie " + _dReHold + ", mysli z DoNotChangeBehavior " + _dThinkStand
                          + ", mysli bez flagi (rozkaz szukajacy bitwy) " + _dThinkFree + ", opcje bitwy -1 " + _dStandBattleOff + ", opcje zwolania armii -1 " + _dArmyOff
+                         + " | obrona osady rodu (E1): mysli wolne z szansa " + _dDefThink + ", obrony bez szansy -1 " + _dDefOff + ", inne opcje -1 przy obronie " + _dDefOnly
+                         + ", godziny jazdy na obrone bez Hold " + _dDefRide + ", inicjatywa bez szansy zgaszona " + Volatile.Read(ref _iDefOff)
                          + " | ostroznosc: partie c>0 " + _cSome + " (c>=0.5 " + _cHalf + "), mysli z cieciem " + _dThinkC + ", opcje bitwy przyciete " + _dCut + ", twierdze podbite " + _dBoost
                          + ", lordowie fabuly pominieci " + _dSkipStory
                          + " | inicjatywa: ataki bez przewagi ponizej progu " + Volatile.Read(ref _iCap) + ", z przewaga przyciete " + Volatile.Read(ref _iCut)
                          + ", zgaszone (postoj " + Volatile.Read(ref _iZero) + ", do twierdzy " + Volatile.Read(ref _iZeroFort) + "), zostawione (obrona swoich) " + Volatile.Read(ref _iKeep)
-                         + ", unikanie wzmocnione " + Volatile.Read(ref _iAvoid)
+                         + ", unikanie wzmocnione " + Volatile.Read(ref _iAvoid) + " | wodzowie armii (E4): z c>0 " + _cArmy + ", ataki przyciete " + Volatile.Read(ref _iArmyLead)
                          + " | bramki armii: odmowy (wywolania predykatu) " + Volatile.Read(ref _gArmy)
                          + " | przeglad " + _scans + " razy, sr " + (_scans > 0 ? (_scanTicks * f / _scans).ToString("F2", Inv) : "0") + " ms, max " + (_scanMaxTicks * f).ToString("F2", Inv) + " ms"
                          + " | potkniecia: przeglad " + _sScan + ", partie " + _sParty + ", postoj " + _sThink + ", mysl " + _sCaution + ", inicjatywa " + _sInit + ", armie " + _sArmy + ".");
