@@ -35,6 +35,16 @@ namespace Armoury
 
         internal static string NameEn(int cat) { return cat >= 0 && cat < Cats ? En[cat] : "?"; }
 
+        /// <summary>535 (Jeff 15.11: "caly czas mam braki a dostaje informacje ze ludzie kupili brakujace rzeczy"): kopia tablicy rodzajow bez broni bocznej -
+        /// "kit slots empty" (meldunek QM, okno armii, zbrojownia, podpowiedz paska) liczy tylko sprzet niezbedny; bron boczna to dodatek, pokazywany osobno.</summary>
+        internal static int[] CoreOf(int[] byCat)
+        {
+            if (!KitPreview.SideOptional) return byCat;   // klucz SideArmsAreOptional wylaczony - bron boczna liczona jak dotad
+            var c = (int[])byCat.Clone();
+            c[SideArm] = 0;
+            return c;
+        }
+
         /// <summary>Braki jednego czlowieka wobec wzorca. Missing - ta sama liczba co GarrisonKit.Missing.</summary>
         internal sealed class Gaps
         {
@@ -45,6 +55,7 @@ namespace Armoury
             // wiec rozbicie w meldunku i w oknie sumuje sie do liczby pustych slotow (dotad Short sumowal sie do Missing + Replaced - 41 wobec 66)
             internal readonly int[] Open = new int[Cats];
             internal List<ItemObject> OpenIt;                // 525 (detail): sztuki wzorca, ktorych slot zostal pusty (po zastapieniu) - liczenie wedlug ItemType
+            internal List<int> OpenCat;                      // 535 (detail): rodzaj kazdej sztuki z OpenIt (ta sama kolejnosc) - bron boczna osobno od niezbednych
             internal int Armour, Weapons, Extra;             // pancerz 5-9 bez sztuki, sztuki broni wzorca bez pary, sztuki broni czlowieka bez pary
             internal List<KeyValuePair<int, ItemObject>> Lost;   // 133c (detail): sztuki wzorca bez pary - rodzaj i sztuka wzorca (do przyczyn w oknie)
             internal List<ItemObject> Spare;                     // 133c (detail): sztuki broni czlowieka bez pary (dodatki DTE, inny rodzaj)
@@ -60,7 +71,7 @@ namespace Armoury
         {
             var g = new Gaps();
             if (rf == null || eq == null) return g;
-            if (detail) { g.Lost = new List<KeyValuePair<int, ItemObject>>(); g.Spare = new List<ItemObject>(); g.OpenIt = new List<ItemObject>(); }
+            if (detail) { g.Lost = new List<KeyValuePair<int, ItemObject>>(); g.Spare = new List<ItemObject>(); g.OpenIt = new List<ItemObject>(); g.OpenCat = new List<int>(); }
             for (int i = 5; i <= 9; i++)
             {
                 var r = rf[(EquipmentIndex)i]; var e = eq[(EquipmentIndex)i];
@@ -69,7 +80,7 @@ namespace Armoury
                 if (e.IsEmpty || e.Item == null)
                 {
                     g.Short[i - 5]++; g.Open[i - 5]++; g.Armour++;
-                    if (detail) { g.Lost.Add(new KeyValuePair<int, ItemObject>(i - 5, r.Item)); g.OpenIt.Add(r.Item); }
+                    if (detail) { g.Lost.Add(new KeyValuePair<int, ItemObject>(i - 5, r.Item)); g.OpenIt.Add(r.Item); g.OpenCat.Add(i - 5); }
                 }
             }
             var held = new List<int>(4);
@@ -105,7 +116,7 @@ namespace Armoury
                 int k = Fill(sp, lostIt);
                 lostIt.RemoveAt(k); lostCat.RemoveAt(k);
             }
-            for (int i = 0; i < lostCat.Count; i++) { g.Open[lostCat[i]]++; if (detail) g.OpenIt.Add(lostIt[i]); }
+            for (int i = 0; i < lostCat.Count; i++) { g.Open[lostCat[i]]++; if (detail) { g.OpenIt.Add(lostIt[i]); g.OpenCat.Add(lostCat[i]); } }
             return g;
         }
 
