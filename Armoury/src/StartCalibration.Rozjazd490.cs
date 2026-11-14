@@ -205,6 +205,7 @@ namespace Armoury
             sb.Append(" | okregow bez rachunku 490 (przed pierwszym przeliczeniem po wczytaniu) ").Append(noRes).Append(", wsi nie Normal albo bez targu ").Append(notNormal)
               .Append(" | Plan: ").Append(P != null ? "z watku roboczego albo odbioru" : "brak (potkniecie albo Plan bez sum)").Append(r != null ? ", potkniecia Planu " + r.P490St : "")
               .Append(" | 497 czynniki gry w Planie: ").Append(SwVf497 ? "TAK" : "NIE").Append(", okregow z czynnikami w wejsciu ").Append(_vf497N).Append(", potkniecia ").Append(_vf497St)
+              .Append(", rachunki zimowe: czynniki zostawione ").Append(_vf497Kept).Append(", odbudowane bez zimy ").Append(_vf497Rebuilt)
               .Append(" | potkniecia pomiaru ").Append(_r490St).Append(" | gra bez zmian.");
             return sb.ToString();
         }

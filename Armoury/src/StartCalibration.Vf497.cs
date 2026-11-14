@@ -18,6 +18,7 @@ namespace Armoury
         private static bool SwVf497 { get { var s = Settings.Current; return s != null && s.KsPlanKnowsVillageFactors; } }
         private const double Vf497Lo = 0.5, Vf497Hi = 2.0;
         private static int _vf497St;
+        private static int _vf497Kept, _vf497Rebuilt;   // 497-p: rachunki zimowe - czynniki zostawione (ostatnie sprzed zimy) / odbudowane na podstawie bez zimy (od startu sesji)
 
         /// <summary>497 (watek glowny, po ScaleRates okregu): licznik i mianownik czynnika gry na towar. a - stawka A wsi po ScaleRates (null - pola mieszczan: s = 1).
         /// Bez PreY/PostY (klucz NIE albo rachunek bez czynnikow) - VfNum/VfDen null. Nie rzuca (potkniecie liczone).</summary>
@@ -27,6 +28,12 @@ namespace Armoury
             try
             {
                 if (res == null || res.PreY == null || res.PostY == null) { ld.VfNum = null; ld.VfDen = null; return; }
+                // 497-p (recenzja): w zimie stol okregu (pelna potrzeba, bez ciecia) bierze wieksza czesc scietego plonu, targ spada do ~0, mieszanka do 1 i F do samego
+                // roku urodzaju - Plan (bez zimy) dostalby co sezon inny cel. Dlatego w zimie: ostatnie czynniki zostaja (nie nadpisujemy); bez nich (pierwszy
+                // rachunek w zimie) - podstawa bez zimy: na targ' = (stol + targ) / czesc zimowa - stol (stol jak w zimie - dolne oszacowanie stolu bez zimy).
+                bool win = res.WinterF < 0.999;
+                if (win && ld.VfNum != null && ld.VfDen != null) { _vf497Kept++; return; }
+                if (win) _vf497Rebuilt++;
                 var num = new double[ItemCount]; var den = new double[ItemCount];
                 for (int i = 0; i < ItemCount; i++)
                 {
@@ -34,6 +41,7 @@ namespace Armoury
                     if (!(p0 > 1e-9)) continue;
                     double y = Math.Max(0.0, res.PostY[i]) / p0;
                     double own = Math.Max(0.0, res.Own[i]), mk = Math.Max(0.0, res.MarketKg[i]), tot = own + mk;
+                    if (win && !(res.WinterSp != null && i < res.WinterSp.Length && res.WinterSp[i])) { tot = tot / res.WinterF; mk = Math.Max(0.0, tot - own); }   // 497-p: podstawa bez zimy
                     double s = 1.0;
                     if (a != null && i < a.Length && res.Market[i] > 1e-9)
                     {

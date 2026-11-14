@@ -92,6 +92,7 @@ namespace Armoury
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;
             public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; public double[] WSpareKg; public double OrdPcs;
             public double[] PreY, PostY;   // 497: produkcja gry przed rokiem urodzaju i po roku urodzaju i ziemi zmeczonej (przed zamowieniami 363); null - klucz NIE albo Plan
+            public double WinterF = 1.0; public bool[] WinterSp;   // 497-p: czesc zimowa czynnika okregu (1 - VillageCut/TownCut; 1 - poza zima) i maska towarow oszczedzonych przez zime (297)
             public double[] S490; }   // 490 (sam pomiar): kroki drogi towaru okregu w grze (StartCalibration.Rozjazd490.cs); null - rachunek bez czynnikow (Plan)   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
         // m114-prace (recenzja): WorksAll - caly dodatek po czynnikach (sztuki gry na dobe), WorksPart - kg dodatku czesci przed zima (klucz DistrictWorks.PartKey):
         // udzial czesci w dodatku na targ (wycena okna i podzial puli miedzy posiadaczy wedlug dodatku NA TARG, nie wedlug calego E)
@@ -412,6 +413,15 @@ namespace Armoury
                 catch { f = 1.0; fs = 1.0; }
                 if (!(f >= 0) || double.IsInfinity(f)) f = 1.0;
                 if (!(fs >= 0) || double.IsInfinity(fs)) fs = 1.0;
+                if (SwVf497)
+                {
+                    // 497-p (recenzja): sama czesc zimowa f - Vf497Note liczy mieszanke stol/targ na podstawie bez zimy (Plan liczy bez zimy); tylko odczyt
+                    double wc = 0;
+                    try { wc = ld.TF ? WinterBite.TownCut(ld.T) : (ld.V != null ? WinterBite.VillageCut(ld.V) : 0f); } catch { wc = 0; _vf497St++; }
+                    double wf = 1.0 - wc;
+                    res.WinterF = wf > 0 && wf <= 1.0 && !double.IsNaN(wf) ? wf : 1.0;
+                    if (sp != null && fs > f) res.WinterSp = sp;
+                }
                 if (sp == null || !(fs > f)) for (int i = 0; i < ItemCount; i++) prod[i] *= f;
                 else
                 {
