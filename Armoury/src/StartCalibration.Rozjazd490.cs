@@ -104,6 +104,8 @@ namespace Armoury
             var tfb = new double[2 * G490];              // pola mieszczan: na targ x beta
             double sig = Math.Max(1, DailyLife.KsSigma);
             var rates = _rates; int noRes = 0, notNormal = 0;
+            // 497-q (sam pomiar): gra Produce x F gry okregu (VfNum/VfDen z ostatniego przeliczenia, srednia grupy wazona PreY) - [(m * 2 + tf) * G490 + g]; klucz NIE - nie liczone
+            bool vfq = SwVf497; var gpf = new double[2 * 2 * G490]; var gpfN = new int[2 * 2];
             if (_live != null)
                 foreach (var ld in _live.Values)
                 {
@@ -116,6 +118,17 @@ namespace Armoury
                         nd[m * 2 + tf]++;
                         int o = (m * 2 + tf) * K490 * G490;
                         for (int x = 0; x < K490 * G490; x++) st[o + x] += res.S490[x];
+                        if (vfq)
+                        {
+                            bool hasF = ld.VfNum != null && ld.VfDen != null;
+                            if (hasF) gpfN[m * 2 + tf]++;
+                            for (int g = 0; g < G490; g++)
+                            {
+                                double fn = 0, fd = 0;
+                                if (hasF) foreach (int i in G490Ix[g]) if (i < ld.VfNum.Length && i < ld.VfDen.Length) { fn += ld.VfNum[i]; fd += ld.VfDen[i]; }
+                                gpf[(m * 2 + tf) * G490 + g] += res.S490[g] * Vf497Clamp(fn, fd);   // krok 0 (Produce) x F grupy; bez czynnikow F = 1
+                            }
+                        }
                         if (ld.TF)
                         {
                             for (int g = 0; g < G490; g++) foreach (int i in G490Ix[g]) tfb[m * G490 + g] += Math.Max(0.0, res.Market[i]) * Beta(m, i);
@@ -200,12 +213,26 @@ namespace Armoury
                             sb.Append(" (wobec Planu na targ: gra na targ ").Append((Sx(6) / pm).ToString("0.00", inv)).Append(", po stawce ").Append((last / pm).ToString("0.00", inv))
                               .Append(", ksiega ").Append(days > 0 ? (lg / pm).ToString("0.00", inv) : "-").Append(')');
                         if (pmf > 1e-9) sb.Append(" (497: ksiega wobec Planu na targ z czynnikami ").Append(days > 0 ? (lg / pmf).ToString("0.00", inv) : "-").Append(')');
+                        if (vfq)
+                        {
+                            // 497-q: rozjazd rak (Plan wobec gry na samym Produce) osobno od rozjazdu czynnikow (Plan x F wobec gry Produce x F gry)
+                            double gp = Sx(0), gf = gpf[(m * 2 + tf) * G490 + g];
+                            sb.Append(" (497-q: gra Produce x F gry ").Append(gf.ToString("0.0", inv)).Append(" (F ").Append(gp > 1e-9 ? (gf / gp).ToString("0.000", inv) : "-").Append(')');
+                            if (P != null)
+                            {
+                                int p = ((m * 2 + tf) * G490 + g) * P490K;
+                                sb.Append(", Plan / gra Produce (rece) ").Append(gp > 1e-9 ? (P[p] / gp).ToString("0.00", inv) : "-")
+                                  .Append(", Plan x F / gra x F ").Append(gf > 1e-9 ? (P[p + 3] / gf).ToString("0.00", inv) : "-");
+                            }
+                            sb.Append(')');
+                        }
                     }
                 }
             sb.Append(" | okregow bez rachunku 490 (przed pierwszym przeliczeniem po wczytaniu) ").Append(noRes).Append(", wsi nie Normal albo bez targu ").Append(notNormal)
               .Append(" | Plan: ").Append(P != null ? "z watku roboczego albo odbioru" : "brak (potkniecie albo Plan bez sum)").Append(r != null ? ", potkniecia Planu " + r.P490St : "")
               .Append(" | 497 czynniki gry w Planie: ").Append(SwVf497 ? "TAK" : "NIE").Append(", okregow z czynnikami w wejsciu ").Append(_vf497N).Append(", potkniecia ").Append(_vf497St)
               .Append(", rachunki zimowe: czynniki zostawione ").Append(_vf497Kept).Append(", odbudowane bez zimy ").Append(_vf497Rebuilt)
+              .Append(vfq ? ", 497-q okregow gry z F (W wsie/pola, E wsie/pola) " + gpfN[0] + "/" + gpfN[1] + ", " + gpfN[2] + "/" + gpfN[3] : "")
               .Append(" | potkniecia pomiaru ").Append(_r490St).Append(" | gra bez zmian.");
             return sb.ToString();
         }

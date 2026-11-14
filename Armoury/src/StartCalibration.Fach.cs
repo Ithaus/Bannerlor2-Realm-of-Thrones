@@ -174,7 +174,11 @@ namespace Armoury
                 var d = dl[i]; int g = d.FachG;
                 double k = kOf[d.Market * KsTab.NG + g];
                 x.FhK[i] = k;
-                x.FhT[i] = k * d.FachKg + x.FhOwn[i];
+                // 497-q: cel w kg BEZ czynnikow, ale wlasny stol / F okregu - produkcja x F = k x baza x F + stol, czyli na targ Z czynnikami = k x baza x F (to, co zaklada
+                // mianownik k z 497-p). Dotad cel = k x baza + stol: Plan liczyl na targ k x baza x F + stol x (F - 1) - podloga, ktorej ceny nie zdejmowaly (zboze W 1.10-1.12).
+                // Gra (A7) dostaje T - stol = k x baza - stol x (1 - 1/F) - ta sama rownowaga. Klucz NIE: Vf null, F = 1, stol / 1 = stol (bit w bit jak dotad)
+                double vfT = d.Vf != null && g < d.Vf.Length && d.Vf[g] > 0 ? d.Vf[g] : 1.0;
+                x.FhT[i] = k * d.FachKg + x.FhOwn[i] / vfT;
                 ps.Add(pk.Count); os.Add(ord.Count);
                 var blk = new List<int>();
                 for (int b = b0l[i]; b < b1l[i]; b++)
@@ -360,6 +364,7 @@ namespace Armoury
             double sig = Math.Max(1.0, x.In.Sigma);
             Func<int, double> pcs = g => { KsItem it; return sig * (x.In.Items.TryGetValue(KsTab.Goods[g], out it) && it != null && it.Kg > 0 ? it.Kg : 10.0); };
             double A = 0, B = 0; int full = 0, part = 0, cLand = 0, cProfit = 0, cFloor = 0, nReg = 0, grainHeld = 0, grainN = 0; bool anyVf = false;
+            int vfqN = 0, vfqZero = 0; double vfqCut = 0;                    // 497-q: okregi z celem stolu / F, cel na targ 0 przez to, ile celu zdjete (szt./d bez czynnikow)
             var worst = new List<KeyValuePair<double, string>>();
             var sc = x.BlockScale;
             for (int i = 0; i < x.FhN; i++)
@@ -380,6 +385,11 @@ namespace Armoury
                 }
                 map[d.Id] = new KsFach { G = g, T = Tm, P = P, Own = own, K = x.FhK[i], Flag = flag };
                 if (d.Vf != null) anyVf = true;
+                if (d.Vf != null && own > 0 && g < d.Vf.Length && d.Vf[g] > 0 && d.Vf[g] != 1.0)   // 497-q: sam pomiar (to samo F co w FachStep)
+                {
+                    vfqN++; vfqCut += own * (1.0 - 1.0 / d.Vf[g]) / pcs(g);
+                    if (!(Tm > 0) && x.FhK[i] * d.FachKg > 0) vfqZero++;
+                }
                 if (g == KsTab.GGrain) { grainN++; if (x.FhHeld != null && i < x.FhHeld.Length && x.FhHeld[i]) grainHeld++; }   // 497-p: okregi zboza (wheat_farm) trzymane podloga fachu
                 double u = pcs(g);
                 A += Tm / u; double got = Math.Min(Tm, Math.Max(0.0, P - own)); B += got / u;
@@ -420,7 +430,8 @@ namespace Armoury
               .Append(" | najwiekszy niedobor (cel/w Planie szt./d): ");
             if (worst.Count == 0) sb.Append('-');
             for (int i = 0; i < worst.Count && i < 6; i++) sb.Append(i > 0 ? ", " : "").Append(worst[i].Value);
-            if (anyVf) sb.Append(" | 497 k z czynnikami gry; okregi zboza (wheat_farm) trzymane fachem ").Append(grainHeld).Append(" z ").Append(grainN);   // 497-p: tylko przy czynnikach (klucz NIE - linia jak dotad)
+            if (anyVf) sb.Append(" | 497 k z czynnikami gry; okregi zboza (wheat_farm) trzymane fachem ").Append(grainHeld).Append(" z ").Append(grainN)
+                                .Append("; 497-q cel ze stolem / F: okregow ").Append(vfqN).Append(", cel na targ zdjety ").Append(vfqCut.ToString("0", inv)).Append(" szt./d, cel 0 przez stol / F ").Append(vfqZero);   // 497-p: tylko przy czynnikach (klucz NIE - linia jak dotad)
             if (x.In.FachMarketRoom) sb.Append(" | miejsce na targu od popytu - zjedzone we wszystkich okregach (Ks Fach Market Room TAK)");   // m107 K5 (przed "czas fach" - regex WZ)
             sb.Append(" | czas fach ").Append(R.FachMs.ToString("0", inv)).Append(" ms.");
             R.FachLine = sb.ToString();
