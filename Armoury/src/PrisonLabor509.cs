@@ -129,7 +129,7 @@ namespace Armoury
         internal static float HungerWork(Town town)
         {
             var s = Settings.Current;
-            if (s == null || !s.DungeonPrisonersEat || town == null || town.Settlement == null || !town.Settlement.IsStarving) return 1f;
+            if (s == null || !s.DungeonPrisonersEat || !_foodWired || town == null || town.Settlement == null || !town.Settlement.IsStarving) return 1f;   // recenzja: bez latki jedzenia lochu jency nie jedza z zapasu - nie gloduja (jak Daily)
             float f = s.PrisonLaborHungryWorkPercent / 100f;
             return float.IsNaN(f) ? 1f : Math.Max(0f, Math.Min(1f, f));
         }

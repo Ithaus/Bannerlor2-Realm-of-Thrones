@@ -1668,7 +1668,7 @@ namespace Armoury
         public bool PerkNavalPortGoldPaid { get; set; } = true;
 
         // D5 (Jeff 14.11): ShipwrightsHand - ochotnik miasta
-        [SettingPropertyBool("Perk Shipwrights Hand Volunteer", HintText = "with Perk Naval Port Gold Paid: the Shipwright's Hand perk still brings a recruit to the garrison for each merchant convoy entering the governed port - one of the town's own volunteers, taken from a notable as the garrison recruits (the lord's clan pays the recruitment fee to the notable; the game's wage and garrison limits apply). No volunteer in the town, a battle or siege, an empty clan purse or a land with no hands to spare - no recruit. Off = Shipwright's Hand gives no recruit", RequireRestart = false)]
+        [SettingPropertyBool("Perk Shipwrights Hand Volunteer", HintText = "with Perk Naval Port Gold Paid: the Shipwright's Hand perk still brings a recruit to the garrison for each merchant convoy entering the governed port - one of the town's own volunteers, taken from a notable as the garrison recruits (the lord's clan pays the recruitment fee to the notable; the game's wage and garrison limits apply). Only volunteers of the town's own notables, never of its villages. No volunteer in the town, auto recruitment switched off for that garrison or the town's food balance not above zero, a battle or siege, an empty clan purse or a land with no hands to spare - no recruit. Off = Shipwright's Hand gives no recruit", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PerkShipwrightsHandVolunteer { get; set; } = true;
 

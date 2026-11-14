@@ -71,7 +71,7 @@ namespace Armoury
         private static long _insDue, _insPaid, _rapidDue, _rapidPaid;
         private static int _salvN, _salvShort, _handN, _handTroops;
         // D5 (Jeff 14.11 "D5 - tak z miasta"): ShipwrightsHand bierze ochotnika miasta - liczniki doby
-        private static int _handVolN, _handVolMen, _handVolNoVol, _handVolBlocked;
+        private static int _handVolN, _handVolMen, _handVolNoVol, _handVolBlocked, _handVolNoAuto, _handVolNoFilter, _handVolVillageOut;
         private static long _salvDue, _salvPaid;
         private static int _vetSaved, _vetLost, _vetGameOff, _vetGameRiders;
         private static int _stumbles;
@@ -398,11 +398,17 @@ namespace Armoury
 
         [ThreadStatic] private static Town _handCapTown;
         [ThreadStatic] private static int _handCap;
-        private static MethodInfo _miAutoRec;
+        [ThreadStatic] private static bool _handNoFilterNow;
+        private static MethodInfo _miAutoRec, _miCanAuto;
         private static bool _autoRecTried;
+        private static FieldInfo _fiVolCache;
+        private static bool _handTownOnlyWired;
+        private const string HandTownOnlyLabel = "D5 ShipwrightsHand - tylko ochotnicy miasta (GarrisonRecruitmentCampaignBehavior.RepopulateVolunteerListCache)";
+        private static bool _volCacheTried;
 
         /// <summary>D5: czy notabl MIASTA (nie wsi) ma ochotnika w slotach, ktore zaloga moze wziac (MaximumIndexGarrisonCanRecruitFromHero - jak gra).
-        /// Gra ustawia liste werbunku zalogi od notabli miasta, potem wsi - przy limicie 1 pierwszy jest ochotnik miasta.</summary>
+        /// Recenzja: gra trzyma kandydatow w SortedSet od najnizszego zoldu (VolunteerTroop.CompareTo), razem z ochotnikami wsi - dlatego w wywolaniu
+        /// HandVolunteer postfiks HandTownOnlyPostfix zostawia w tej liscie tylko ochotnikow notabli miasta.</summary>
         private static bool TownHasVolunteer(Settlement st)
         {
             var vm = Campaign.Current.Models.VolunteerModel;
@@ -432,15 +438,18 @@ namespace Armoury
                 {
                     _autoRecTried = true;
                     _miAutoRec = AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickAutoRecruitmentGarrisonChange", new[] { typeof(Town) });
+                    _miCanAuto = AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "CanSettlementAutoRecruit", new[] { typeof(Settlement) });
                 }
                 var beh = Campaign.Current.GetCampaignBehavior<GarrisonRecruitmentCampaignBehavior>();
-                if (_miAutoRec == null || beh == null) { _handVolBlocked++; return; }
+                if (_miAutoRec == null || _miCanAuto == null || beh == null || !_handTownOnlyWired) { _handVolBlocked++; return; }   // bez filtra miasta - nikt
+                // recenzja: warunek gry jak dzienny werbunek i zaloga frontu 326c - autowerbunek wlaczony (gracz moze go wylaczyc) i bilans jedzenia miasta > 0
+                if (!(bool)_miCanAuto.Invoke(beh, new object[] { st })) { _handVolNoAuto++; return; }
                 var g = st.Town.GarrisonParty;
                 int before = g != null ? g.MemberRoster.TotalManCount : 0;
-                _handCapTown = st.Town; _handCap = want;
+                _handCapTown = st.Town; _handCap = want; _handNoFilterNow = false;
                 ArmsFromPeople.FrontGarrisonCall = true;   // dodatkowe wywolanie poza doba A5 - bez licznikow A5/K8 (jak 326c)
                 try { _miAutoRec.Invoke(beh, new object[] { st.Town }); }
-                finally { ArmsFromPeople.FrontGarrisonCall = false; _handCapTown = null; _handCap = 0; }
+                finally { ArmsFromPeople.FrontGarrisonCall = false; _handCapTown = null; _handCap = 0; _handNoFilterNow = false; }
                 g = st.Town.GarrisonParty;
                 int d = (g != null ? g.MemberRoster.TotalManCount : 0) - before;
                 if (d > 0) { _handVolN++; _handVolMen += d; } else _handVolBlocked++;
@@ -453,8 +462,29 @@ namespace Armoury
         public static void HandCapPostfix(Town __0, ref ExplainedNumber __result)
         {
             if (_handCap <= 0 || __0 == null || !ReferenceEquals(__0, _handCapTown)) return;
-            try { if (__result.ResultNumber > _handCap) __result.LimitMax(_handCap); }
+            try
+            {
+                if (_handNoFilterNow) { __result.LimitMax(0); return; }   // recenzja: lista nie przefiltrowana do miasta - nikogo (nie ochotnik wsi)
+                if (__result.ResultNumber > _handCap) __result.LimitMax(_handCap);
+            }
             catch (Exception e) { Stumble("HandCapPostfix", e); }
+        }
+
+        /// <summary>D5 (recenzja): postfiks GarrisonRecruitmentCampaignBehavior.RepopulateVolunteerListCache - tylko w wywolaniu HandVolunteer tej twierdzy:
+        /// z listy kandydatow gry (_volunteerListCache, notable miasta i wsi, od najnizszego zoldu) usuwa ochotnikow notabli spoza miasta. Liczba, limit zoldu
+        /// i wybor (ElementAt) dzialaja wtedy tylko na ochotnikach miasta. Poza tym oknem nic. Lista jest budowana od nowa przy kazdym wywolaniu gry.</summary>
+        public static void HandTownOnlyPostfix(GarrisonRecruitmentCampaignBehavior __instance, Town __0)
+        {
+            if (_handCap <= 0 || __0 == null || !ReferenceEquals(__0, _handCapTown) || __instance == null) return;
+            try
+            {
+                if (!_volCacheTried) { _volCacheTried = true; _fiVolCache = AccessTools.Field(typeof(GarrisonRecruitmentCampaignBehavior), "_volunteerListCache"); }
+                var set = _fiVolCache != null ? _fiVolCache.GetValue(__instance) as SortedSet<GarrisonRecruitmentCampaignBehavior.VolunteerTroop> : null;
+                if (set == null) { _handVolNoFilter++; _handNoFilterNow = true; return; }   // bez filtra - HandCapPostfix zeruje werbunek
+                var town = __0.Settlement;
+                _handVolVillageOut += set.RemoveWhere(v => v.OwnerNotable == null || town == null || !town.Notables.Contains(v.OwnerNotable));
+            }
+            catch (Exception e) { _handNoFilterNow = true; Stumble("HandTownOnlyPostfix", e); }
         }
 
         // ================================================================ 67: Veterinarian
@@ -513,6 +543,11 @@ namespace Armoury
             Patch("NavalDLC Salvage / ShipwrightsHand (ShipTradeCampaignBehavior.OnSettlementEntered)",
                   nt != null ? AccessTools.DeclaredMethod(nt, "OnSettlementEntered", new[] { typeof(MobileParty), typeof(Settlement), typeof(Hero) }) : null,
                   nameof(NavalEnteredPrefix), null, Priority.Normal);
+            // D5 (recenzja): lista kandydatow tylko z notabli miasta w wywolaniu HandVolunteer (bez tej latki HandVolunteer nie werbuje - ochotnik wsi to nie decyzja Jeffa);
+            // przed latka na wolajacym GetAutoRecruitmentGarrisonChangeExplainedNumber - jego zastepnik budowany po niej nie wklei oryginalu
+            Patch(HandTownOnlyLabel, AccessTools.DeclaredMethod(typeof(GarrisonRecruitmentCampaignBehavior), "RepopulateVolunteerListCache", new[] { typeof(Town) }),
+                  null, nameof(HandTownOnlyPostfix), Priority.Last);
+            _handTownOnlyWired = _wired.Contains(HandTownOnlyLabel);
             // D5: limit ochotnikow ShipwrightsHand w wywolaniu autowerbunku zalogi (Last - po latkach 364 i K8, LimitMax tylko obniza)
             Patch("D5 ShipwrightsHand - limit ochotnikow (GarrisonRecruitmentCampaignBehavior.GetAutoRecruitmentGarrisonChangeExplainedNumber)",
                   AccessTools.DeclaredMethod(typeof(GarrisonRecruitmentCampaignBehavior), "GetAutoRecruitmentGarrisonChangeExplainedNumber", new[] { typeof(Town) }),
@@ -576,7 +611,9 @@ namespace Armoury
                 sb.Append(" | NavalDLC Salvage z kasy konwoju: ").Append(_salvN).Append(", nalezne ").Append(_salvDue).Append(", zaplacone ").Append(_salvPaid).Append(" (niedoplata ").Append(_salvShort)
                   .Append("); ShipwrightsHand - rekrut z niczego nie dany: ").Append(_handN).Append(" wjazdow, do ").Append(_handTroops).Append(" ludzi")
                   .Append("; ochotnik miasta (D5, ").Append(HandVolOn ? "tak" : "nie").Append("): wzieto ").Append(_handVolMen).Append(" ludzi przy ").Append(_handVolN)
-                  .Append(" wjazdach, bez ochotnika w miescie ").Append(_handVolNoVol).Append(", zablokowane (bitwa/oblezenie, pusta kiesa rodu, kraina bez wolnych rak, limity gry) ").Append(_handVolBlocked);
+                  .Append(" wjazdach, bez ochotnika w miescie ").Append(_handVolNoVol).Append(", zablokowane (bitwa/oblezenie, pusta kiesa rodu, kraina bez wolnych rak, limity gry) ").Append(_handVolBlocked)
+                  .Append(", autowerbunek twierdzy wylaczony albo bilans jedzenia <= 0 (warunek gry) ").Append(_handVolNoAuto)
+                  .Append(", ochotnikow wsi zdjetych z listy (tylko miasto) ").Append(_handVolVillageOut).Append(", bez filtra listy (pole gry) ").Append(_handVolNoFilter);
                 sb.Append(" | Veterinarian: kon ze wzorca nie dany ").Append(_vetGameOff).Append(" razy (zabitych konnych ").Append(_vetGameRiders).Append("); padle konie partii z perkiem - ranne, wrocily ")
                   .Append(_vetSaved).Append(", padly ").Append(_vetLost);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
@@ -610,7 +647,7 @@ namespace Armoury
             _insDisband = 0;
             _insN = _insShort = _rapidN = _rapidShort = _rapidPlayerPays = 0; _insDue = _insPaid = _rapidDue = _rapidPaid = 0;
             _salvN = _salvShort = _handN = _handTroops = 0; _salvDue = _salvPaid = 0;
-            _handVolN = _handVolMen = _handVolNoVol = _handVolBlocked = 0;
+            _handVolN = _handVolMen = _handVolNoVol = _handVolBlocked = _handVolNoAuto = _handVolNoFilter = _handVolVillageOut = 0;
             _vetSaved = _vetLost = _vetGameOff = _vetGameRiders = 0;
             _stumbles = 0;
         }
