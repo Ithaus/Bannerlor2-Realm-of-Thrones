@@ -1,5 +1,325 @@
 # DZIENNIK ZMIAN
 
+## 518: decyzje Jeffa D2, D4, D10, D11, D15 (galaz noc/d-reszta z e46a8c9a) - Armoury (klucze AllRecruitDiscounts, CapturedWorkshopsToTaker, RapidDevelopmentSavesCapital, PerkMountOverCap, LoserSelfDressingCap, LoserSelfDressingMaxHp, LithurgyLastingAi)
+
+### D2, D4, D10, D11, D15 (decyzje Jeffa 14.11 po serii 505-515): Armoury - wszystkie znizki werbunku pod podloga BK, warsztaty wrogich lordow do zdobywcy (Rapid Development wywozi kapital), kon z perkiem ponad sufit RBM, przegrany sam wiaze rany (najwyzej 10 HP), Lithurgy trwala u AI (klucze AllRecruitDiscounts, CapturedWorkshopsToTaker, RapidDevelopmentSavesCapital, PerkMountOverCap, LoserSelfDressingCap, LoserSelfDressingMaxHp, LithurgyLastingAi)
+
+Galaz noc/d-reszta z origin/noc/scal-perki (e46a8c9a). Klucze recznie (Settings.cs + McmSettings.cs, bez gen_mcm.py), wszystkie domyslnie TAK; nowe - Armoury.json Jeffa ich nie ma.
+Decyzje (PERKI-DECYZJE.md:68-74), Jeff 14.11: "D4 - ale jak zdobywam miasto to warsztaty naleza do np. gang leader to wtedy ich nie zabieram, ale jak warsztat nalezy np. do wrogiego lorda ktory go kupil, nie wiem czy lordowie kupuja warsztaty to wtedy mu zabieram i tak zdazyl wywiezc zloto to dobry pomysl / D2 - przepusc wszystkie znizki i pokaz mi to na przykladzie / D10 - nie sa wystarczajaco szybkie / D11 - wersja realna, perki najwyzej moga dac max 10hp albo cos innego wymysl trzeba to zmienic / D15 - tak jedna zasada u wszystkich".
+
+### D2 - wszystkie znizki werbunku przechodza pod podloga BK (klucz AllRecruitDiscounts)
+**Decyzja Jeffa:** "przepusc wszystkie znizki i pokaz mi to na przykladzie".
+**Problem / przyczyna:** BKPartyWageModel.GetTroopRecruitmentCost (bk :382-383) stawia LimitMin(zold x 10); nasz RecruitCost.Postfix ustawia podstawe na zold x RecruitCostDays (10) - kazda ujemna suma czynnikow ginie pod podloga. 508 przepuszczal tylko 6 perkow walki. Pozostale znizki w lancuchu (dekompilacja): gra DefaultPartyWageModel :233-283 - Frugal -15% (wodz partii), SwordForBarter / SlickNegotiator -20% (najemnicy, bandyci, straz karawan), cecha kultury KhuzaitRecruitUpgradeFeat -10% (konni); BK :406-445 - kultura oddzialu = kultura kupujacego -5%, RitterOathbound -15% (konni), MercenaryLocalConnections -10% (najemnicy), ranga rodu 0 / 1: -10% / -5%; NavalDLC NavalDLCPartyWageModel :82-90 PopularCaptain -30% (od 515 w lancuchu). Dodatnie: BK obca kultura w krolestwie +25%, ranga 4+ +5..15%, Artisan +15%, przyboczni +20%, prawa BK Drafting +50/+100%.
+**Zmiana:** Armoury/src/RecruitPerks508.cs:82-95 (Floor): przy AllRecruitDiscounts podloga schodzi o CALA ujemna sume NETTO czynnikow (`result.SumOfFactors` w chwili naszego postfiksu - po BK, NavalDLC, BEE/ROT): LimitMin(max(1, zold x 10 x (1 + netto))). Netto >= 0 - nic (podloga nie wiaze). Wynik = cel x (1 + netto), dokladnie jak gra bez podlogi. Liczniki per perk 508 zostaja (CountPerks :122-138), nowa linia doby "Znizki werbunku (D2)" (:160-163). Wylaczone = 508 (same perki). Settings.cs:1630-1631, McmSettings.cs:4275-4279 (grupa Iron Bank) i :14609.
+**PRZYKLAD (zold = tabela gry DefaultPartyWageModel.GetCharacterWage: tier 1 = 2, tier 2 = 3, tier 3 = 5, najemnik x1.5 w dol; RecruitCostDays 10, najemnik x2; piechota bez konia):**
+| Oddzial / kupujacy | Czynniki | Przed (508) | Po (D2) |
+|---|---|---|---|
+| Rekrut tier 1 (zold 2, cel 20), kupujacy tej samej kultury z Frugal | -5% -15% = -20% | 20 (podloga) | **16** |
+| Piechur tier 3 (zold 5, cel 50), ta sama kultura | -5% | 50 | **47.5 (48 po zaokragleniu gry)** |
+| Piechur tier 3, ta sama kultura + Frugal | -20% | 50 | **40** |
+| Piechur tier 3, ChinkInTheArmor + HeadHunter + kultura + Frugal | -20 -20 -5 -15 = -60% | 30 (508: podloga x (1 - 0.40)) | **20** |
+| Piechur tier 3, rod rangi 0 (bez perkow) | -10% | 50 | **45** |
+| Najemnik tier 3 (zold 7, cel 140, podloga BK 70), SwordForBarter + SlickNegotiator + Frugal | -55% | 70 | **63** |
+| Piechur tier 3 obcej kultury w krolestwie, z Frugal | +25% -15% = +10% | 55 | 55 (bez zmian) |
+**Ryzyko / co sprawdzic - kontrola calosci:**
+- Kto czyta cene (grep GetTroopRecruitmentCost): LevyGold.cs (AI placi notablowi - ta sama kwota z obu stron, notabl dostaje mniej), GarrisonRecruitFee.cs (dlug rodu za garnizon mniejszy), CaravanGuards285.cs, CanonWarBalance.Levers.cs, SpoilsCompany.cs, SideVillageVisit.Levy*.cs (gracz), RC FairRansom (kupujacy null - czynnikow brak, netto 0, nic). Zamknieta ekonomia: mniej zlota obu stronom, nic z niczego.
+- Najwiekszy efekt: kultura -5% u WSZYSTKICH lordow AI werbujacych swoja kulture (dotad zjadana) - werbunek AI ok. 5% tanszy, notable dostaja ok. 5% mniej za ochotnika. Rody rangi 0-1 dodatkowo -5/-10%.
+- Podwojne liczenie: brak - czynniki sa juz w SumOfFactors, D2 tylko obniza podloge; LimitMin nadpisuje poprzedni (ExplainedNumber.cs:257). Bez podlogi BK (min <= 1) nic. Postfiks tylko na zewnetrznej wycenie (_depth == 1) i przy HistoricalRecruitCost.
+- Linia 508 "podloga BK ciela znizke w N" przy D2 zostaje 0 (ciecie liczy linia D2).
+**Linie logu:** start (pierwsza doba) "Perki werbunku (508): start | ... | D2 AllRecruitDiscounts TAK (podloga schodzi o cala ujemna sume netto: ...)"; doba "Znizki werbunku (D2): dzien N | wyceny z ujemna suma czynnikow A, podloga BK cielaby cene w B (przepuszczone razem G zlota na wycenach; wyceny, nie zakupy)." Sprawdzic: B > 0; w oknie werbunku gracz tej samej kultury co oddzial widzi cene nizsza niz zold x 10.
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+### D4 - warsztaty przy zdobyciu miasta (klucze CapturedWorkshopsToTaker, RapidDevelopmentSavesCapital)
+**Decyzja Jeffa:** "jak zdobywam miasto to warsztaty naleza do np. gang leader to wtedy ich nie zabieram, ale jak warsztat nalezy np. do wrogiego lorda ktory go kupil ... to wtedy mu zabieram i tak zdazyl wywiezc zloto to dobry pomysl"; wczesniej "jak przejmuje wrogie warsztaty nikomu nic nie place, to wojna; warsztatow osob, z ktorymi nie tocze wojny, nie zabieram".
+**Ustalenia (dekompilacja):**
+- Gra (WorkshopsCampaignBehavior.OnSettlementOwnerChanged, tw-campaign :315-330): warsztatow nikt nie przenosi; wlasciciel w wojnie z nowym panem z Trade.RapidDevelopment dostaje 5 000 z niczego (510: placi nowy pan miasta). Potem TransferPlayerWorkshopsIfNeeded (:1074-1091): warsztaty GRACZA w miastach frakcji w wojnie z nim - za darmo do notabla (ApplyByWar, cena 0).
+- BK (BKWorkshopBehavior.OnOwnerChanged -> SeizeWorkshops, bk :65-181): przy KAZDEJ zmianie pana miedzy frakcjami warsztaty bohaterow STAREJ frakcji (notable maja frakcje osady - Hero.MapFaction przez HomeSettlement - wiec nie) ida za darmo: najpierw do notabla miasta (GetNotableOwnerForWorkshop), bez notabla do glowy rodu pana miasta (do limitu rangi), inaczej losowo do rodu krolestwa. Zdobywca prawie nigdy nic nie dostawal - dostawal notabl. To samo BK robi przy wypowiedzeniu wojny (OnWarDeclared - warsztaty wrogiej frakcji w miastach drugiej).
+- Czy lordowie kupuja warsztaty: TAK, przez BK - BKLordPropertyBehavior.OnSettlementEntered (bk :33-112): lord AI wjezdzajacy do osady wlasnego krolestwa, gdy krolestwo nie ma wojen, raz na tydzien moze kupic losowy warsztat miasta (jeden na miasto) za GetCostForPlayer - placi obecnemu wlascicielowi (gracz dostaje pytanie). Poza tym lordowie dostaja warsztaty z BK SeizeWorkshops i z przywileju najemnika BK (MercenaryPrivilegeRegistry). Vanilla: lordowie nie kupuja; na starcie warsztaty maja tylko notable. Nasze mody: kupuja tylko notable (DebtLadder, WorkshopIdleRetool); kapital zostaje przy zmianie wlasciciela (WorkshopTrade.OwnerPrefix).
+**Zmiana:** nowy Armoury/src/WorkshopSeizeD4.cs:
+- :93-138 prefiks Priority.First na WorkshopsCampaignBehavior.OnSettlementOwnerChanged (przed petla perka gry, TransferPlayerWorkshopsIfNeeded i sluchaczem BK): zdobywca = glowa rodu bohatera, ktory zdobyl (capturerHero), bez niego nowy pan miasta. Warsztat bohatera z rodem (lord, gracz, czlonek rodu; nie notabl, nie ukryty rzemieslnik), ktorego frakcja jest W WOJNIE z frakcja zdobywcy -> ChangeOwnerOfWorkshopAction.ApplyByDeath(w, zdobywca) (cena 0, kapital = w.Capital, typ bez zmian). Notable (gang leader, kupiec...) i osoby bez wojny - zostaja.
+- Rapid Development (nowy efekt, RapidDevelopmentSavesCapital): dawny wlasciciel z perkiem "zdazyl wywiezc zloto" - caly kapital obrotowy (w.Capital > 0) przechodzi z warsztatu do jego kiesy (w.ChangeGold(-cap), ChangeHeroGold(+cap), CirculationWindows.NoteHeroGold) PRZED przekazaniem. Platnik = warsztat, odbiorca = wlasciciel. 5 000 gry nie powstaje (po przejeciu nikt w miescie nie jest w wojnie z nowym panem - petla gry nic nie daje; 510 TradeGiftPayer dla Rapid Development staje sie nieczynny).
+- :85-90 prefiks na BK BKWorkshopBehavior.OnOwnerChanged - przy wlaczonym kluczu pomijany (reguly D4 zastepuja SeizeWorkshops przy zmianie pana). BK OnWarDeclared bez zmian.
+- Komunikaty gracza (EN): "You seize the X at T from Y - it is war, you pay nothing." / "Z seizes your X at T." (+ "managed to carry off its N denars of working capital (Rapid Development)").
+- Wpiecia: SubModuleMain.cs:410 (Harmony), ArmouryBehavior.cs:2718 (EnsureHooks w OnSessionLaunched), :3552 (Daily), :743 (Reset). Settings.cs:602-605 (opis PerkTradeGiftsPaid poprawiony - przy D4 gracz nie placi za wrogie warsztaty), McmSettings.cs:1652-1663 (grupa jak PerkTradeGiftsPaid) i :13955-13956.
+**Ryzyko / co sprawdzic - kontrola calosci:**
+- Kolejnosc: nasz prefiks przed cialem metody gry; BK slucha pozniej (behaviory modow po grze), a i tak jest wylaczony. Gracz z warsztatem w zdobytym mu miescie: dotad szedl do notabla (TransferPlayerWorkshopsIfNeeded), teraz do zdobywcy (gracz to "wrogi lord") - jedna regula. Warsztaty gracza w INNYCH miastach przy wypowiedzeniu wojny (gra + BK OnWarDeclared) - bez zmian, poza zakresem D4 (do decyzji Jeffa: czy tez "zostaja do zdobycia miasta").
+- ApplyInternal z cena 0: GiveGoldAction 0 (gracz kupujacy/sprzedajacy) - WorkshopTrade.SalePrefix dziala tylko przy cenie > 0; SmallGold.GivePrefix dopasowuje tylko kwote premii perka. Zdarzenie OnWorkshopOwnerChanged - BK OnWorkshopChange: -30 relacji nowego wlasciciela z wlascicielami warsztatow tego typu w miescie (jak przy kazdym kupnie BK).
+- Zamknieta ekonomia: przejecie bez zlota; kapital zostaje w warsztacie (u zdobywcy) albo idzie do dawnego wlasciciela (Rapid Development) - nic z niczego, nic w nicosc. MoneyLedger liczy kapital warsztatow w posiadaczach (MoneyLedger.cs:919) - przelew neutralny.
+- Pusty warsztat po Rapid Development: lord AI-zdobywca z kapitalem 0 przy najblizszym wydatku -> bankructwo gry -> notabl za darmo (gra ApplyByBankruptcy placi tylko graczowi), nowy wlasciciel wklada kapital z wlasnej kiesy (WorkshopTrade). Gracz-zdobywca placi wydatki z kiesy (HandlePlayerWorkshopExpense). To "realne" (warsztat bez gotowki pada), ale perk w praktyce odbiera AI-zdobywcy warsztat - do obserwacji w linii D4.
+- Lordowie AI dostaja teraz warsztaty zdobytych miast (dotad notable) - wiecej dochodu zdobywcom; limit warsztatow rangi rodu NIE jest sprawdzany (BK sprawdzal go tylko przy oddaniu glowie rodu); gracz moze miec ponad limit z przejec.
+- CitySack.OwnerPre/OwnerFin (pomiar przejec przy oblezeniu) liczy teraz nasze przejecia - tylko pomiar.
+- Bledy per warsztat liczone (5 pierwszych w Log.Error), bez wylacznika; nieudana zmiana wlasciciela - kapital wraca do warsztatu.
+**Linie logu:** start sesji "Warsztaty po zdobyciu (D4): start sesji | latki: gra OnSettlementOwnerChanged wpieta, BK OnOwnerChanged wpieta | klucze CapturedWorkshopsToTaker TAK, RapidDevelopmentSavesCapital TAK | regula: ..."; przy zmianie pana "Warsztaty po zdobyciu (D4): <miasto> | zdobywca X (zdobyl Y), nowy pan Z | przejete N: typ od W (kapital K[, Rapid Development wywiozl R]); ... | zostaja (notable / bez wojny) M."; doba "... dzien N | przejete przez zdobywcow A (kapital z warsztatem K) | Rapid Development wywiozl kapital B (G zl) | zostaly C | BK SeizeWorkshops pominiete D | potkniecia razem 0." Sprawdzic: "wpieta" x2; po zdobyciu miasta, w ktorym lord BK kupil warsztat - przejete > 0, warsztaty notabli zostaja.
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+### D10 - kon z perkiem przebija sufit predkosci RBM (klucz PerkMountOverCap)
+**Decyzja Jeffa:** "nie sa wystarczajaco szybkie".
+**Przyczyna:** recenzja 507 dodala przyciecie: po premii SweepingWind / BK CamelMaster / KheshigOutrider predkosc ponad sufit RBM (10 m/s, 8 przy koniu ponad 500 kg; rbmcombat HorseChanges.cs:75-83) wracala do max(predkosc RBM, sufit) - szybki kon z perkiem nie zyskiwal nic.
+**Zmiana:** Armoury/src/Perk507Strike.cs:466-479 - przy PerkMountOverCap przyciecia nie ma: premia liczona od predkosci RBM (tak jak dotad) i dodana w calosci; licznik doby ile przeliczen poszlo ponad sufit i srednia nadwyzka (:77, :117, :605); linia startu podaje klucz (:165). Wylaczone = do sufitu (507). Settings.cs:768-769, McmSettings.cs:2079-2083 (grupa Flesh and wind) i :14060.
+**Ryzyko / co sprawdzic:** HorseWind (136) bierze MountSpeed po naszym postfiksie jako Vbase - kara zmeczenia liczona od szybszej predkosci (kon z perkiem szybciej sie meczy przy galopie - zamierzone). Szarza RBM/ChargeTemper: wieksza predkosc = mocniejsza szarza (ChargeTemper liczy od predkosci). Tylko bohaterowie (SweepingWind - jezdziec-bohater; BK - jezdziec albo kapitan formacji) - kapitan Kheshig/Jawwal przyspiesza cala formacje konna ponad sufit (+5% / +8%). Nic w ekonomii.
+**Linie logu:** start "Sila ciosu perkow (507): start sesji | ... PerkMountAfterRbm TAK, PerkMountOverCap (D10) TAK | ..."; doba "... | przeliczen koni z premia N (ponad sufit RBM M, srednio +x.xx m/s - D10) | ...".
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+### D11 - po PRZEGRANEJ bitwie samoopatrunek najwyzej 10 HP (klucze LoserSelfDressingCap, LoserSelfDressingMaxHp)
+**Decyzja Jeffa:** "wersja realna, perki najwyzej moga dac max 10hp albo cos innego wymysl trzeba to zmienic".
+**Przyczyna:** strona przegrana dostawala wynik gry DefaultPartyHealingModel.GetBattleEndHealingAmount (:302-314): wlasne PreventiveMedicine 30% utraconego HP (np. 70 utraconych = 21 HP) + Medicine.WalkItOff +10 po bitwie zaczepnej - do 31 HP. Gra leczy tylko przy HasWinner (PartyHealCampaignBehavior.OnBattleEndCheckPerkEffects :67-92) - remisu nie ma.
+**Zmiana:** Armoury/src/Perk513Healing.cs:302-313 (DressPostfix): strona przegrana -> LoserCap (:360-371) - wynik gry LimitMax(LoserSelfDressingMaxHp = 10); wygrani bez zmian (opatrunek 513). Gracz i AI - jedna zasada (bez osobnego klucza AI). Straz NavalDLC (:375-385): gdyby NavalDLCPartyHealingModel wszedl do lancucha (Resilience +30% na KAZDEJ bitwie), przegranemu przycina sie wynik koncowy do tego samego sufitu. Linia startu i doby 513 (:147-148, :491). Settings.cs:324-326, McmSettings.cs:930-937 (grupa The slow mending) i :13774-13775.
+**"Cos innego":** rozwazalem (a) PreventiveMedicine po przegranej jako mniejsza szansa smierci w przesileniu rany (HeroWounds.Crisis) zamiast HP oraz (b) przegrany bez zadnego leczenia. Nie wdrozone (zasada 3 - nic "przy okazji"): wybrano doslowna regule Jeffa (max 10 HP z perkow). (a) zostaje jako propozycja.
+**Ryzyko / co sprawdzic:** WoundedLords318 (318a) przy bitwie wygranej przez gracza dalej calkiem blokuje leczenie rannych lordow pokonanych (prefiks Hero.Heal) - nasz sufit dotyczy reszty (gracz przegrany, lordowie AI w bitwach AI). 513 (opatrunek wygranych), HeroWounds (loze przycina leczenie lezacych) i Litter501 bez zmian. Wolniejsze wstawanie przegranych lordow AI - wiecej "rannych" w 500-b / HeroWounds.Ai (ostroznosc, odwrot do twierdzy). Bez zlota.
+**Linie logu:** start "Perki leczenia (513): start sesji - ... | D11 przegrani: samoopatrunek najwyzej 10 HP | ..."; doba "Perki leczenia (513): doba N - ... | D11 przegrani - samoopatrunek przyciety do 10 HP: A (-B HP, gracz/jego partia C) | ...". Sprawdzic po przegranej z PreventiveMedicine: HP gracza rosnie o najwyzej 10.
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+### D15 - Lithurgy trwala takze u lordow AI (klucz LithurgyLastingAi)
+**Decyzja Jeffa:** "tak jedna zasada u wszystkich".
+**Przyczyna:** 514 (Perk514.Daily, Lithurgy) daje +1 relacji z kaplanem osad rodu (szansa 0.2/7 na dobe). U gracza trwale (BK HeroRelations.UpdateRelations pomija MainHero), u AI chwilowe: kaplan ma wlasne HeroRelations i dryfuje relacje o 1 do celu z BKRelationsModel.CalculateModifiers (bk :36-170) - +1 wracalo.
+**Zmiana:** Armoury/src/Perk514.cs:606-655 (LithLasting) i :684: u lorda AI ten sam +1 dodaje w HeroRelations KAPLANA wpis RelationsModifier "Lithurgy (lasting)" wobec lorda (jeden wpis na pare, wartosc +1 przy kazdym zdarzeniu, najwyzej 100). BK sam zapisuje HeroRelations (BKRelationsBehavior.SyncData "bk_hero_relations") i dolicza te wpisy do celu (CalculateModifiers: list.AddRange(heroRelations.GetRelations(target)), bk :52) - cel rosnie razem z relacja, dryf juz jej nie sciaga. Gracz bez zmian. Linia doby 514 (:712). Settings.cs:4051-4052, McmSettings.cs:9371-9375 (grupa Banner Kings perks as described (514)) i :15883.
+**Ryzyko / co sprawdzic:** zapis - wpis siedzi w zapisie BK (zapis bez Armoury/po wylaczeniu klucza zachowuje wpisy - cel zostaje podniesiony; to tylko +N relacji kaplana). Dryf BK nie zmieniony; druga premia Lithurgy BK (SecondaryBonus w celu, ta sama religia) liczy sie dalej osobno - jak u gracza (premia celu + trwale +1). Refleksja (BKRelationsBehavior.GetRelations, HeroRelations.AddModifier, konstruktor RelationsModifier(int, TextObject)) szukana raz; brak - linia "BRAK (tylko chwilowe +1)" i licznik "nieudane". Inny workflow (D14 DiplomaticTies) dotyka Perk514 RelModPost - D15 zmienia tylko blok Lithurgy w Daily (mozliwy konflikt scalenia w linii doby 514).
+**Linie logu:** pierwsze zdarzenie w sesji "Perki BK (514): Lithurgy trwala u AI (D15): BK gotowe."; doba "Perki BK (514): dzien N | ... kaplani +1 A (cel kaplana trwale +1 u AI - D15: B) ...".
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+### Recenzja D2/D4/D10/D11/D15 (dwa przeglady diffu 8703265e) - poprawki na galezi noc/d-reszta
+Oba przeglady potwierdzily D2 (LimitMin nadpisuje podloge, SumOfFactors = netto, przyklad zgodny z BK i RecruitCost), D10 (miekki sufit RBM, HorseWind bierze nowa MountSpeed), D11 (sufit przed BattleDressingEnabled, straz NavalDLC) i D15 (HeroRelations w zapisie BK, RelationsModifier(int, TextObject) Expiry=Never). Uwagi i rozstrzygniecia:
+1. **[medium, PRAWDZIWA - poprawiona] Rapid Development zostawia warsztat z kapitalem 0 - AI-zdobywca traci go nazajutrz.** Sprawdzone: gra CanNotableWorkshopProduceThisCycle (tw-campaign WorkshopsCampaignBehavior :787) - Capital < koszt wsadu = brak produkcji; WorkshopTrade.ExpensePrefix -> PayToTown placi utrzymanie AI tylko z kapitalu (kiesa tylko u gracza przy niskim kapitale) -> Fail -> ApplyByBankruptcy do notabla. Dwie rozne reguly dla gracza i AI. **Zmiana:** WorkshopSeizeD4.Refill - po wywiezieniu kapitalu zdobywca wklada kapital obrotowy z WLASNEJ kiesy wedlug tej samej reguly co notabl po bankructwie (WorkshopTrade.Fail): do kapitalu startowego, najwyzej polowa kiesy, warunek - stac go na co najmniej miesiac utrzymania (30 x UpkeepOf); nie stac - nic nie wklada, warsztat pada jak kazdy bez gotowki (linia: "zdobywca bez kiesy na kapital - warsztat padnie"). Gracz i AI tak samo (gracz dostaje komunikat EN z kwota). Zloto: kiesa zdobywcy -> kapital jego warsztatu, CirculationWindows.NoteHeroGold - nic z niczego. Odrzucony wariant "wywozi tylko nadwyzke ponad rezerwe utrzymania": rezerwa na utrzymanie nie kupuje wsadu (warunek gry wyzej), warsztat i tak stalby i padl po miesiacu.
+2. **[medium, PRAWDZIWA - poprawiona] -30 relacji zdobywcy z notablami (BK OnWorkshopChange).** Sprawdzone: BKWorkshopBehavior.OnWorkshopChange (bk :51-66) - kazda zmiana wlasciciela daje nowemu -30 (x Generosity, x1.3 rzemieslnik) z wlascicielami warsztatow tego samego typu; ApplyInternal wola zdarzenie synchronicznie (ChangeOwnerOfWorkshopAction :18). **Zmiana:** flaga [ThreadStatic] _seizing na czas naszego ApplyByDeath + prefiks BkWorkshopChangePrefix (pomija BK tylko przy przejeciu wojennym; kupno, bankructwo, BK SeizeWorkshops przy wypowiedzeniu wojny - bez zmian). Inni sluchacze zdarzenia (gra, nasze mody) dzialaja dalej. Licznik "BK -30 relacji pominiete".
+3. **[medium, PRAWDZIWA - poprawiona] Regula dzialala przy kazdej zmianie pana, nie tylko przy zdobyciu.** Sprawdzone: ChangeOwnerOfSettlementDetail (Default, BySiege, ByBarter, ByLeaveFaction, ByKingDecision, ByGift, ByRebellion, ByClanDestruction); ApplyByDefault wolaja m.in. wydarzenia ROT (Krwawe Gody, Czarny Nurt, Aegon/Dany), Diplomacy (GrantFief, KeepFiefAfterSiege, Consolidate), BK (nadania tytulow). **Zmiana:** OwnerChangedPrefix bierze detail (__5) i dziala tylko przy BySiege; inne zmiany pana - nic nie przejmujemy (BK OnOwnerChanged i tak pominiety - warsztaty zostaja u wlascicieli), licznik "zmiany pana bez oblezenia". ByRebellion (bunt miasta) nie wlaczony - **pytanie do Jeffa**, czy bunt to "zdobycie". Gra w zmianach bez oblezenia dziala jak dotad (5 000 Rapid Development przy wrogim nowym panu - placi go nowy pan, 510; warsztaty gracza w miescie wrogiej frakcji - TransferPlayerWorkshopsIfNeeded do notabla).
+4. **[low, ODRZUCONA - pytanie do Jeffa] Najemnik-zdobywca zatrzymuje warsztaty.** BK SeizeWorkshops pomijal rody najemne tylko w puli LOSOWEGO nadania (bk :145, :164) - zdobywca (najemnik czy nie) w BK nigdy nic nie dostawal, wiec to nie jest "zachowanie BK, ktore zgubilismy". Regula Jeffa mowi o zdobywcy ("jak zdobywam miasto ... mu zabieram"), a Jeff sam moze sluzyc jako najemnik - oddanie lupu panu miasta odebraloby mu to, o co prosil. Zostaje: zdobywca = glowa rodu tego, kto zdobyl. Do decyzji Jeffa: czy najemnik (gracz i AI) ma oddawac przejete warsztaty panu miasta.
+5. **[low, PRAWDZIWA - poprawiona] Przemieszane komentarze i brak DayProfile.Lap.** Komentarze 510 wrocily na swoje linie (ArmouryBehavior EnsureHooks i Daily, SubModuleMain ApplyAll), przy D4 tylko komentarz D4; dopisane DayProfile.Lap("WorkshopSeizeD4.Daily").
+6. **[low, PRAWDZIWA - poprawiona w opisie] AllRecruitDiscounts obejmuje perki walki niezaleznie od PerkRecruitDiscounts.** Cena poprawna (perki sa w SumOfFactors); dopisane w HintText (Settings.cs i McmSettings.cs): "While on, it also covers the combat perks whatever Perk Recruit Discounts says". Opisy CapturedWorkshopsToTaker (tylko oblezenie, bez straty relacji, inne oddanie miasta nic nie zabiera) i RapidDevelopmentSavesCapital (zdobywca wklada kapital z kiesy) zaktualizowane tak samo.
+**Kontrola calosci poprawek:** Refill rusza tylko kiese zdobywcy i kapital przejetego warsztatu (ta sama para, co WorkshopTrade.Fail - przy wlaczonym WorkshopTrade utrzymanie idzie dalej z kapitalu; przy wylaczonym gra placi z kapitalu tak samo). Prefiks na BK OnWorkshopChange nic nie robi poza flaga (flaga zerowana w finally i w Reset). Filtr BySiege zmniejsza zakres D4 - poza oblezeniem stan jak przed D4 minus BK SeizeWorkshops (pominiety zawsze przy kluczu; warsztaty zostaja). WorkshopTrade.OwnerPrefix/SalePrefix bez zmian (cena 0). Build Armoury 0 bledow.
+**Linie logu (dopiski):** start sesji D4: "latki: gra OnSettlementOwnerChanged wpieta, BK OnOwnerChanged wpieta, BK OnWorkshopChange wpieta"; przy zdobyciu "... Rapid Development wywiozl R, zdobywca wlozyl z kiesy F"; doba "... zdobywca wlozyl z kiesy A x, G zl; bez kiesy B ... | zmiany pana bez oblezenia (nic nie przejete) C | BK SeizeWorkshops pominiete D, BK -30 relacji pominiete E ...".
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+**D10 korekta (Jeff 14.11 "moga ale max o 10% limitu RBM"):** Perk507Strike.HorsePostfix - premia konia z perkow ponad sufit RBM najwyzej do sufit x 1.10 (kon, ktory u RBM juz jest ponad sufitem, bez zmian); opis MCM/Settings PerkMountOverCap poprawiony.
+
+## 517: decyzje Jeffa D3, D5-D8, D12-D14 (galaz noc/d-gospodarka z origin/noc/scal-perki e46a8c9a): decyzje Jeffa D3, D5, D6, D7, D8, D12, D13, D14 - Armoury
+
+Jeff 14.11 (czat, odpowiedz na D1-D16 po serii 505-515): "D1 tak / D3 - tak, pol porcji / D5 - tak z miasta / D6 - C / D7 - o 25% krocej zrobmy, o polowe to za duzo / D8 - a / D9 - tak / D12 - tak do 75% / D13 - tak / D14 - tak / D16 - odzysk". Opis pytan: docs/audyty-2026-11-14/PERKI-DECYZJE.md:66-67 i sekcje "Decyzje dla Jeffa" wpisow 509-514 w CHANGELOG.md. D1, D9, D16 - grupa A; D2, D4, D10, D11, D15 - czekaja na Jeffa (nie ruszane).
+
+Build: `dotnet build Armoury/Armoury.csproj -c Release` - 0 bledow, Armoury.dll md5 97df3024. Klucze recznie w Settings.cs i McmSettings.cs (bez gen_mcm.py); wszystkie nowe - Armoury.json Jeffa ich nie ma, dzialaja wartosci domyslne z kodu. Jedyny usuniety klucz: IronMakerBloomBonus (511, niewgrany - nie ma go w Armoury.json).
+
+---
+
+### D3: jency przy pracy jedza pol porcji, glod oslabia prace, smierc z glodu po tygodniu laski (PrisonLabor509)
+
+**Problem:** decyzja Jeffa "D3 - tak, pol porcji" (509, pytania 1 i 2: "jency jedza pol porcji - czy pracujacy pelna? glod (Food 0) nie zmienia pracy ani zdrowia jencow - czy glodni maja pracowac slabiej / umierac?"; PERKI-DECYZJE.md:67 "glod oslabia prace; smierc/ucieczki - zgodnie z propozycja").
+**Przyczyna:** 509 karmi jencow lochu z zapasow twierdzy (DungeonPrisonersEat, pol porcji), ale przy Food 0 nic sie z nimi nie dzieje - jedza "z niczego" i pracuja jak syci.
+**Zmiana:**
+- Pol porcji - bez zmian (DungeonPrisonerFoodShare 0.5 zostaje, pracujacy nie jedza wiecej).
+- Armoury/src/PrisonLabor509.cs:129 `HungerWork(town)` - przy DungeonPrisonersEat i Food 0 (gra `Settlement.IsStarving` = FoodStocks <= 0) mnoznik pracy PrisonLaborHungryWorkPercent (50%); :122 `Share` mnozy przez niego - jedna liczba dla punktow budowy (EngExtra, AddGame/AddGameInt), dymka "Prisoners at work" i wypadkow przy pracy.
+- :308 `HungerDay` (z Daily :374, kazda twierdza we wlasnym try): licznik kolejnych dob glodu twierdzy z jencami (slownik StringId -> doby, stan sesji; czyszczony przy nowej kampanii i przy DungeonPrisonersEat wylaczonym); po PrisonHungerGraceDays (7) dobach co dobe ginie PrisonHungerDeathPercent (5%) szeregowych jencow lochu (RoundRandomized; :281 `StarveOne` - najpierw ranni, potem zdrowi; bez bohaterow - gra ich nie glodzi; bez Innych - nie jedza). Zdjeci z lochu -> PeopleBook.DieShares(Take(..., FDieHunger)) - nowa przyczyna ksiegi ludzi PeopleBook.Origin.cs:60 `FDieHunger = 66` (FKinds 67, FName "glod jencow lochu (D3)", linia ksiegi: "wyjscia ... glod jencow lochu N" i "dokad: polegli ... z glodu w lochu N"). Komunikat dla lochu gracza (EN): "N prisoners starved to death in the dungeon of X - its food stores are empty."
+- PROPOZYCJA (opis, bo propozycja 509 nie miala liczb): tydzien laski i 5%/dobe = te same wartosci co glod zalogi GL (SiegeWalls2: SiegeStarveGraceDays 7, SiegeStarveLossPercent 5) - jedna zasada dla glodu w murach. Ucieczek z glodu NIE ma (509 pkt 4: praca nie zwieksza ucieczek; ucieczka przez mur GL dotyczy zalogi oblezonej twierdzy, nie jencow w lochu).
+- Klucze (Settings.cs:1356-1358, McmSettings.cs grupa "Army purchases" po Dungeon Prisoner Food Share): PrisonLaborHungryWorkPercent 50, PrisonHungerGraceDays 7, PrisonHungerDeathPercent 5.
+**Linie logu:** start "Praca jencow (509): start sesji | ... | glod lochu (D3, przy Food 0): praca x0.5, po 7 dobach laski umiera 5%/dobe szeregowych jencow, ucieczek z glodu brak | ..."; doba "Praca jencow (509): dzien N | ... | jedzenie lochow (...): ... Food/dobe | glod lochu (D3): twierdz z Food 0 i jencami A (w tygodniu laski B), z glodnymi robotnikami (praca x0.5) C, zmarlych z glodu D | Perk509: ...". Ksiega ludzi: "glod jencow lochu (D3) N", "z glodu w lochu N".
+**Ryzyko / co sprawdzic - kontrola calosci:**
+- Share czytaja: BuildFunding.EngExtra (dymek, PowerIntPostfix, Walls :160/:386, EngPaidNeed), AddGame/AddGameInt, Daily (wypadki) - wszystkie dostaja ten sam mnoznik glodu (liniowy - wzor EngPaidNeed dalej dokladny). IsStarving to odczyt pola - mozna z watkow AI.
+- Zgony z glodu jencow vs inne systemy: Famine zabija mieszczan (TownDie), SiegeWalls2 zaloge i milicje, DungeonFate - goraczka lochu gracza; zaden nie dotyka glodu jencow (grep PrisonRoster + glod/starv: brak; RealisticCaptivity - brak IsStarving). Bez podwojnego liczenia.
+- Glod tylko gdy jency naprawde jedza z zapasow (DungeonPrisonersEat i latka jedzenia wpieta) - przy wylaczonym kluczu stan glodu czyszczony, jency nie gloduja (jedna zasada: kto nie je z zapasu, ten nie gloduje). Poprawka po recenzji: HungerWork tez sprawdza `_foodWired` (dotad tylko HungerDay i Daily).
+- Oblezona twierdza z Food 0: SiegeWalls2 zabija zaloge, my jencow - dwie grupy ludzi, ta sama stopa i laska. Jency umieraja z lochu (mniej ust - wolniejszy spadek zapasu; zgodne).
+- Stan sesji bez zapisu: po wczytaniu laska liczy sie od nowa (najwyzej tydzien zwloki) - swiadomie, bez nowego klucza zapisu.
+- Wyjatki: HungerDay w try per twierdza, PeopleBook w osobnym try - potkniecia liczone, bez wylacznika. Koszt: petla po rosterze lochu raz na dobe tylko w twierdzach z Food 0.
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+---
+
+### D5: ShipwrightsHand (NavalDLC) - rekrut z ochotnikow miasta (Perk510Gold)
+
+**Problem:** decyzja Jeffa "D5 - tak z miasta" (510: "ShipwrightsHand: rekrut z niczego wylaczony bez platnika - czy chce rekruta z ochotnikow miasta").
+**Przyczyna:** NavalDLC ShipTradeCampaignBehavior.OnSettlementEntered (:442-462) dopisuje zalodze BasicTroop z niczego za kazdy konwoj; 510 to wylaczyl (perk martwy).
+**Zmiana:**
+- Armoury/src/Perk510Gold.cs:388 w prefiksie NavalEnteredPrefix (warunek gry bez zmian: GarrisonWagePaymentLimit > zold + 5) - `HandVolunteer(st, want)` (:422), want = SecondaryBonus perka (1). Warunki: osada nie w bitwie / oblezeniu (warunek gry dla werbunku zalog), rod pana z glowa i zlotem > 0 (jak zaloga frontu 326c - bez werbunku na kredyt), kraina z wolnymi rekami (FreeHands.Braked), notabl MIASTA ma ochotnika w slotach dostepnych zalodze (MaximumIndexGarrisonCanRecruitFromHero - jak gra). Wtedy wywolanie autowerbunku gry GarrisonRecruitmentCampaignBehavior.TickAutoRecruitmentGarrisonChange (odbiciem, z flaga ArmsFromPeople.FrontGarrisonCall - jak 326c: bez licznikow A5/K8) z limitem sztuk = perk: postfiks :453 `HandCapPostfix` (Priority.Last) na GetAutoRecruitmentGarrisonChangeExplainedNumber - LimitMax(want) tylko w tym wywolaniu tej twierdzy ([ThreadStatic]). POPRAWKA PO RECENZJI: gra trzyma kandydatow w SortedSet od najnizszego zoldu (miasto i wsie razem), wiec sam limit 1 bral zwykle najtanszego rekruta ze wsi - teraz postfiks `HandTownOnlyPostfix` na RepopulateVolunteerListCache (tylko w tym wywolaniu tej twierdzy) usuwa z listy ochotnikow notabli spoza miasta; bez tej latki (albo bez pola listy) - nikt. Przed werbunkiem warunek gry CanSettlementAutoRecruit (autowerbunek zalogi wlaczony, bilans jedzenia miasta > 0) - jak dzienny werbunek gry i zaloga frontu 326c.
+- Droga gry daje cala reszte: slot notabla oprozniony; ksiega ludzi (A5Pre/A5Post) zdejmuje czlowieka z DOM; rod pana dopisuje koszt werbunku (AutoRecruitmentExpenses) -> GarrisonRecruitFee oddaje go notablowi; limity zoldu i miejsca w zalodze dzialaja.
+- Wpiecie: Perk510Gold.cs:517 (ApplyAll, przy starcie gry). Klucz PerkShipwrightsHandVolunteer (Settings.cs:609, McmSettings.cs grupa "The law of the battlefield"), wymaga PerkNavalPortGoldPaid.
+**Linie logu:** start "Perki 510 (okupy i zloto): latki przy starcie gry - wpiete: ..., D5 ShipwrightsHand - limit ochotnikow (GarrisonRecruitmentCampaignBehavior.GetAutoRecruitmentGarrisonChangeExplainedNumber), ..."; doba "... ShipwrightsHand - rekrut z niczego nie dany: A wjazdow, do B ludzi; ochotnik miasta (D5, tak): wzieto C ludzi przy D wjazdach, bez ochotnika w miescie E, zablokowane (bitwa/oblezenie, pusta kiesa rodu, kraina bez wolnych rak, limity gry) F, autowerbunek twierdzy wylaczony albo bilans jedzenia <= 0 (warunek gry) G, ochotnikow wsi zdjetych z listy (tylko miasto) H, bez filtra listy (pole gry) I"; start: wpiete "D5 ShipwrightsHand - tylko ochotnicy miasta (GarrisonRecruitmentCampaignBehavior.RepopulateVolunteerListCache)".
+**Ryzyko / co sprawdzic - kontrola calosci:**
+- TickAutoRecruitmentGarrisonChange latkuja: PeopleBook A5Pre/A5Post (ksiega ludzi), GarrisonRecruitFee TickPre/Post (oplata do notabla), ArmsFromPeople A5MeasurePre/Fin, ClanBudget GarRecruit (Straz), GarrisonPatrol364 - wszystkie dzialaja tak samo jak przy zalodze frontu 326c, ktora od dawna wola te metode tym samym sposobem (FrontGarrisonCall wylacza tylko liczniki A5/K8 i 364 InA5Window). Nowa latka na GetAutoRecruitmentGarrisonChangeExplainedNumber obok A5LimitPostfix i 364 - dziala tylko przy _handCap > 0 i tej twierdzy (poza tym return).
+- Ochotnik nie z niczego: czlowiek z DOM (ksiega), oplata rodu do notabla (GarrisonRecruitFee) - zamknieta ekonomia. Wiecej ludzi w zalodze = wiecej zoldu (limit zoldu gry pilnuje).
+- Wywolanie w zdarzeniu wjazdu konwoju (watek glowny, zdarzenie kampanii) - gra sama zmienia roster zalogi w tym samym zdarzeniu (NavalDLC). Koszt: odbicie raz na wjazd konwoju do portu z zarzadca z perkiem.
+- Gdy inna latka zablokuje autowerbunek (np. BK w pokoju) - nikt nie przychodzi, licznik "zablokowane".
+- Filtr listy (RepopulateVolunteerListCache): nikt inny w Armoury ani BetterEconomy nie latkuje tej metody (grep + dekompilacja); lista jest budowana od nowa przy kazdym wywolaniu GetAutoRecruitmentGarrisonChangeExplainedNumber, wiec skrocenie jej w oknie HandVolunteer nie dotyka dziennego werbunku gry, dymka zalogi ani zalogi frontu 326c. Latka zakladana przed latka D5 na wolajacym (zastepnik wolajacego budowany po niej). Limit zoldu gry liczy sie wtedy na ochotnikach miasta - to samo, co bralby werbunek z samego miasta.
+- CanSettlementAutoRecruit wolany odbiciem - wersja zalatana (TownGranary pkt 6: bilans miasta, ktore ma zapas, nie spada ponizej +0.01 w tym tescie) - ta sama co dzienny werbunek gry i 326c.
+**Status:** DO SPRAWDZENIA (nie wgrane; NavalDLC i perk Boatswain u zarzadcy portu - w autotescie rzadkie).
+
+---
+
+### D6: IronMaker - przekucie lupy stratne, perk zmniejsza strate (zamiast +20% z niczego)
+
+**Problem:** decyzja Jeffa "D6 - C" (511 decyzja 1, wariant c: "podstawa stratna (np. 24 sztaby = 80% masy) i perk zmniejsza strate do najwyzej 30").
+**Przyczyna:** 511 MaterialLaw: lupa (15 kg surowki) -> 30 sztab po 0.5 kg = cala masa; z IronMaker x1.2 = 36 sztab = 18 kg z 15 kg (3 kg metalu z niczego na lupe).
+**Zmiana:**
+- Armoury/src/Perk511Smithy.cs:175 `BloomLossPct` i :190 `BloomBars`: sztaby = masa lupy w sztabach (30) x (1 - strata / 100), co najmniej 1, NIGDY ponad mase lupy. Strata BloomForgeLossPercent (20) - 24 sztaby; z IronMaker IronMakerBloomLossPercent (0) - 30 sztab (nie wiecej niz bez perka).
+- Uzasadnienie 20%: przekucie surowej lupy na sztaby (zgrzewanie, wyciskanie zuzla, zgorzelina przy kazdym nagrzaniu) tracilo w kuzni historycznej od ok. 20 do ponad 40% masy; 20% to dolna granica i ta sama strata co kazdy dalszy stopien naszej kuzni ("5 sztabek + wegiel -> 4", MaterialLaw.cs:128-133, decyzja Jeffa) - jedna zasada na przekucie. IronMaker ("sprawny hutnik") wydobywa z lupy cale zelazo - 30 sztab = 15 kg, ani grama ponad.
+- MaterialLaw.cs:124-126 - komentarz i wywolanie (bez zmiany formuly poza BloomBars). Klucz IronMakerBloomBonus usuniety (Settings.cs, McmSettings.cs - kopia i pole MCM); nowe BloomForgeLossPercent 20, IronMakerBloomLossPercent 0 (Settings.cs:140-141, McmSettings.cs grupa "Mending it yourself").
+**Linie logu:** start "Perki kuzni (511): ..., przekucie lupy (D6): strata 20% masy, z IronMaker 0%, ..."; doba "Perki kuzni (511): doba | ... | IronMaker tak (przekucie lupy D6: strata 0% masy) | ..."; przetop (NightEcon "stopnie z weglem"): "IronOre 1 + wegiel 1 -> Iron1 24" (bez perka), 30 z IronMaker.
+**Ryzyko / co sprawdzic - kontrola calosci:**
+- BloomBars wola tylko MaterialLaw.RefinePostfix (galaz lupy przy cenach historycznych + Bloomery); galaz zwyklej rudy (x1.25 IronMaker, stara) i vanilla - bez zmian. GetRefiningFormulas czytaja: ekran kuzni, NightEcon (linia), Probes306 (sonda XP) - widza nowa liczbe.
+- XP za przetop (RefineXpPostfix) rosnie z liczba sztab - bez perka mniej XP za lupe (24 zamiast 30) - zgodne z mniejszym uzyskiem.
+- REGRES dla gracza bez perka: z lupy 24 sztaby zamiast 30 (strata 3 kg metalu na lupe idzie w zuzel - nie powstaje i nie znika zloto). Cena lupy (Bloomery: surowka 15 kg + wegiel) liczy cala mase - kucie lupy przez gracza bez perka jest teraz o 20% mniej oplacalne niz zakup sztab. Kuznie miast (WorkshopLaw.Needs, CountKg) licza metal lupy BEZ straty - dwie zasady przekucia (gracz / warsztat) - do decyzji Jeffa, czy warsztatom tez dac strate (osobna zmiana; tu tylko kuznia gracza, jak 511).
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+---
+
+### D7: PracticalSmith - zbroje i luki kuja sie o 25% krocej (nie o polowe)
+
+**Problem:** decyzja Jeffa "D7 - o 25% krocej zrobmy, o polowe to za duzo" (511 decyzja 2: z PracticalSmith godziny lawy = stamina / 6 po perku - o polowe krocej).
+**Przyczyna:** 511 Perk511.Stamina tnie stamine x0.5 (perk gry), a godziny lawy (ForgeLikeTownSmith = false) liczyly sie z tej samej, pobranej staminy.
+**Zmiana:**
+- Armoury/src/Perk511Smithy.cs:205 `HoursStamina(spent, h)`: stamina do godzin = pobrana x (1 - PracticalSmithTimeCutPercent / 100) / (1 + PrimaryBonus perka) = x0.75 / x0.5 = x1.5 pobranej (czyli 75% staminy przepisu); BK Smith (x0.9) dalej tnie i stamine, i czas (jak w BK). Bez PracticalSmith / klucz PerkSmithStamina wylaczony - bez zmian. Stamina (zmeczenie) dalej -50%.
+- Forge.cs:669 (Smith - luki, kusze, amunicja na lawe) i ForgeClock.cs:175 (CraftPost - zbroja z zakladki CRAFT BK): godziny z HoursStamina. "Dawne godziny" dla NoteQueued (licznik _bkQueued, ktory SkipBkWait odejmuje od odsiadki BK = miara BK: stamina pobrana / 6) - BEZ zmiany (Forge.cs:672, ForgeClock.cs:178) - inaczej przetop i rafinacja tracilyby godziny odsiadki.
+- Klucz PracticalSmithTimeCutPercent 25 (Settings.cs:143, McmSettings.cs grupa "Mending it yourself").
+**Linie logu:** start "Perki kuzni (511): ..., czas lawy z PracticalSmith (D7) -25% (stamina dalej -50%), ..."; doba "... | czas lawy D7: sztuk z godzinami po PracticalSmith N | ..."; przy sztuce "Kuznia jak u kowali (C5)" / "On the bench: ... X hours of work" - godziny = stamina przepisu x0.75 / 6.
+**Ryzyko / co sprawdzic - kontrola calosci:**
+- HoursOf wola tez bron z ekranu gry ("van") - nie ruszane (tam gra sama tnie stamine perkiem; zakres Jeffa "zbroje i luki"). Amunicja idzie ta sama droga co luki (Forge.Smith) - tez -25%.
+- PYTANIE DO JEFFA (z recenzji): po D7 jeden perk ma dwie stawki czasu - zbroje, luki, kusze i amunicja -25%, a bron z ekranu kowalstwa gry dalej -50% (godziny z staminy, ktora gra sama tnie o polowe). Pytanie 511 mowilo "tak samo jak bron z ekranu gry", odpowiedz "o polowe to za duzo" mogla dotyczyc tez broni. Jesli bron tez ma byc -25%: w ForgeClock przy godzinach dla broni z ekranu gry uzyc HoursStamina na staminie pobranej przez gre (jedna zmiana, jedna linia logu). Nie zmienione bez decyzji.
+- ForgeLikeTownSmith = true (dni kowala z warsztatu AI) - perk nie dziala na czas jak dotad (u Jeffa false).
+- Stamina pobierana, XP pracy (305d - przepis bez perka), okno kowadla (SmithMenu) - bez zmian.
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+---
+
+### D8: zwierzeta jedza pasze przez caly rok (Breeder 512)
+
+**Problem:** decyzja Jeffa "D8 - a" (512 decyzja 5: "Breeder: zwierzeta jedza tylko w zimie (poza stepem) i na pustyni/w sniegu - przez reszte roku rozmnazanie nic nie kosztuje; pasza caly rok = osobna zmiana, albo poza zima nie rodzic wcale?" - wariant a: pasza caly rok).
+**Przyczyna:** WinterBite.FoodPostfix doliczal pasze (WinterRealm.HorseFeed) tylko w zimie; poza zima pasze liczy tylko regula BK na pustyni i w sniegu.
+**Zmiana:**
+- Armoury/src/WinterRealm.cs:342 `YearShare` (klucze AnimalsEatAllYear, FodderOutsideWinterShare 0.25) i :356 `HorseFeed(party, realm, winter, ...)` - ta sama regula co zima (AnimalNeed: konie partii / konni po glowie x stawka BK + zwierzeta taboru x stawka; step bez paszy - wypas; pustynia i snieg - tylko roznica ponad pasze BK); poza zima udzial YearShare, w zimie udzial = wiekszy z (WinterHorseFeedShare x kraina) i YearShare (zima nigdy lzejsza niz reszta roku; Wyspy Letnie i cieple krainy placa co najmniej pasze roczna). Stara sygnatura HorseFeed(party, realm, ...) = winter true. Przy AnimalsEatAllYear wylaczonym - jak dotad.
+- WinterBite.cs:195-205 FoodPostfix: poza zima pozycja "Animals eat fodder" = -HorseFeed(winter false) (baza jedzenia - te same mnozniki co ludzie: perki, Rations).
+- WinterRealm.cs:503-510 Daily: poza zima linia paszy rocznej (YearLine :628).
+- Wartosc 0.25 = polowa paszy zimowej (0.5): w marszu kon dostaje ziarno, reszte daje trawa; kon ok. 1.25 czlowieka. Do zmiany w MCM.
+- Klucze (Settings.cs:1123-1124, McmSettings.cs grupa "The marching column" po Winter Horse Feed Share). Opis Breeder Realistic (Settings/MCM) i komentarz Perk512.cs:41 - "mlode jedza jak reszta stada (caly rok)".
+**Linie logu:** poza zima co dobe "Pasza przez caly rok (D8, Animals Eat All Year 0.25 pelnej paszy poza zima): dzien N | partii jedzacych A, z pasza B (konnych C, zwierzat w taborach D), +X jedzenia/d razem przed mnoznikami (pelna pasza tych partii Y/d) | bez paszy: step S, pustynia (...) P, snieg/zamiec (...) Q, bez zwierzat Z; doplata roznicy ponad pasze BK: ... | potkniecia dzis 0 | czas T ms."; w zimie linia "Zima wedlug krain (E4/1)" jak dotad (pasza = wieksza z zimowej i rocznej).
+**Ryzyko / co sprawdzic - kontrola calosci:**
+- ZMIANA BILANSU SWIATA (wazne): kazda partia jedzaca (lordowie AI, karawany z jucznymi, gracz) placi pasze przez caly rok - np. lord 150 ludzi / 60 konnych: ludzie 7.5, pasza +3.75 jedzenia/d (+50%); karawana 30 mulow +1.1/d. Wiecej zakupow jedzenia (HungerLaw, FoodThrift), czesciej glod partii (DesertionLaw, morale) - sprawdzic w autotescie liczbe partii glodnych przed/po (linie HungerLaw i E4/1). Gdy za ciezko - FodderOutsideWinterShare nizej.
+- Jedna zasada paszy: ta sama AnimalNeed i ta sama regula terenu (step, BK na pustyni/sniegu bez dubla - roznica ponad BkNeed) co zima E4/1; zima = max(zimowa, roczna) - bez sumowania dwoch pasz.
+- Latka jedzenia WinterBite wpinana tylko przy WinterBiteEnabled (start gry) - bez niej pasza roczna nie dziala (linia D8 tez nie).
+- Breeder: mlode (512) jedza od urodzenia - rozmnazanie ma koszt caly rok (cel decyzji). Bramka "partia glodna nie rodzi" bez zmian.
+- Watki: HorseFeed czyste (odczyt), jak dotad w zimie.
+**Status:** DO SPRAWDZENIA (nie wgrane; wymaga testu bilansu jedzenia AI).
+
+---
+
+### D12: Athletics.WalkItOff i Medicine.WalkItOff sumuja sie do 75% (513)
+
+**Problem:** decyzja Jeffa "D12 - tak do 75%" (513 decyzja 2: "Medicine.WalkItOff = to samo co Athletics, bez sumowania - czy ma sie sumowac (np. oba = 75%)?").
+**Zmiana:** Armoury/src/Perk513Healing.cs:192 MarchPct (wolane z SlowHealing.RestCut): wodz z Athletics.WalkItOff I chirurg z Medicine.WalkItOff (MobileParty.HasPerk - te same role co gra) -> stawka marszu lekko rannych bohaterow WalkItOffBothPercent (75) zamiast WalkItOffLightWoundPercent (50); jeden perk - jak dotad. Ciezko ranni (HP <= 20) dalej przycinani do MovingHealPercent tym samym oknem (skala _raiseLo / _raiseHi = 10/75). Klucz WalkItOffBothPercent 75 (Settings.cs:324, McmSettings.cs grupa "The slow mending"); opis WalkItOffLightWoundPercent poprawiony ("both together give Walk It Off Both Percent").
+**Linie logu:** start "Perki leczenia (513): start sesji - ... | D12 oba WalkItOff naraz 75% stawki | D13 Bush Doctor w samej wsi TAK | ..."; doba "Perki leczenia (513): doba N - ... | D12 oba WalkItOff (75%) podniesien K | ...".
+**Ryzyko / co sprawdzic:** okno 37 (WinPrefix/HealPrefix) skaluje ciezko rannych przez _raiseLo/_raiseHi - dziala dla dowolnego hi (75 tez). Linia 500-a "sciete" spada dla partii z oboma perkami (zamierzone). Gracz i AI - ta sama regula.
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+---
+
+### D13: BushDoctor dziala tez w samej wsi (513)
+
+**Problem:** decyzja Jeffa "D13 - tak" (513 decyzja 3: "BushDoctor w SAMEJ wsi (opis perku 'while waiting in villages', gra go tam nie liczy) - dopisac?").
+**Przyczyna:** DefaultPartyHealingModel :179-197 / :267-283 - partia w osadzie idzie galezia osady (AGoodDaysRest, GoodLodgings), BushDoctor tylko poza osada przy ostatnio odwiedzonej wsi.
+**Zmiana:** Armoury/src/Perk513Healing.cs:410 `InVillage` i :426 w CampPostfix (postfiks dziennego leczenia bohaterow i szeregowych, bez jencow, tylko dodatni wynik): partia w samej wsi (CurrentSettlement wies, nie pladrowana, nie w najezdzie, bez bitwy) z chirurgiem BushDoctor -> AddFactor SecondaryBonus (+20%, wartosc gry), pozycja "Bush Doctor (in the village)". Gracz i AI. Klucz BushDoctorInVillage (Settings.cs:325, McmSettings.cs grupa "The slow mending"), niezalezny od CampHealingPerks.
+**Linie logu:** doba 513 "... 63 Bush Doctor w obozie A, D13 w samej wsi B (wywolania modelu) ...".
+**Ryzyko / co sprawdzic:** bez dubla - gra w osadzie BushDoctor nie liczy, galaz obozu (Camped) wymaga CurrentSettlement == null. Leczenie w osadzie = spoczynek (500/500-a) - premia liczy sie w pelnej stawce. Garnizony i milicja pominiete (jak 63/68).
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+---
+
+### D14: DiplomaticTies gracza - +1 relacji z obcymi wladcami raz w tygodniu (514)
+
+**Problem:** decyzja Jeffa "D14 - tak" (514: "BK HeroRelations.UpdateRelations pomija Hero.MainHero - perk dziala dla lordow AI, gracz nic nie zyska").
+**Zmiana:** Armoury/src/Perk514.cs:462 `TiesWeekly(day)` (z Daily :681): co 7 dob (doba % 7 == 0), gdy GRACZ ma LordshipDiplomaticTies i BkPerkHalvesCourt - kazdy zywy wladca obcego krolestwa (Kingdom.All, nie wyeliminowane, nie krolestwo gracza) +1 relacji z graczem (ChangeRelationAction, jak BK), tylko gdy relacja < cel BK tego wladcy wobec gracza (BKRelationsBehavior.GetRelations(wladca).GetRelationsTarget(gracz) odbiciem - ten sam cel, do ktorego BK dryfuje lordow; zawiera +3 perka z RelModPost). Nigdy ponad cel. Komunikat (EN) "Diplomatic Ties: your standing with N foreign rulers rose a little this week." Klucz DiplomaticTiesPlayerWeekly (Settings.cs:4058, McmSettings.cs grupa "Banner Kings perks as described (514)"); opis BkPerkHalvesCourt odsyla do niego.
+**Linie logu:** raz w tygodniu "Perki BK (514): D14 Diplomatic Ties gracza (tydzien): dzien N: wladcow obcych A, +1 relacji B, juz na celu BK albo wyzej C (imie x->y (cel z), ...) | sesja: +1 razem S."; brak odbicia BK - "BRAK odbicia BK (...)".
+**Ryzyko / co sprawdzic:** cel BK liczony modelem BK (frakcja wiary, cechy, wasalstwo, perk) - gdy cel ponizej obecnej relacji, nic (perk nie obniza). Bez zlota. Koszt: ok. 20 wywolan modelu BK raz na tydzien. Odbicie BKRelationsBehavior odswiezane przy nowej kampanii (Campaign.Current). Wyjatek per wladca - potkniecie, bez wylacznika.
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+---
+
+### Recenzja (14.11, commit 0b0b68ad) - co sprawdzone i co poprawione
+
+Sprawdzone w dekompilacji gry (tw-campaign GarrisonRecruitmentCampaignBehavior) i w kodzie Armoury.
+
+1. **D5 - ochotnik ze wsi zamiast z miasta (sredni) - PRAWDZIWE, POPRAWIONE.** RepopulateVolunteerListCache wklada do `_volunteerListCache` (SortedSet, VolunteerTroop.CompareTo = od najnizszego zoldu) notabli miasta i wsi przypisanych (Normal); TickAutoRecruitmentGarrisonChange bierze ElementAt(0..n). Przy limicie 1 szedl najtanszy z miasta i wsi razem. Poprawka: Perk510Gold `HandTownOnlyPostfix` (postfiks RepopulateVolunteerListCache, Priority.Last, tylko przy `_handCapTown == town` w watku wywolania) - RemoveWhere ochotnikow, ktorych notabl nie jest w `town.Settlement.Notables`. Gdy latka sie nie wepnie - HandVolunteer nie werbuje (licznik "zablokowane"); gdy pola listy nie ma albo postfiks rzuci - HandCapPostfix daje LimitMax(0) (licznik "bez filtra listy"). Komentarz w kodzie, opis MCM/Settings (EN) i sekcja D5 poprawione.
+2. **D5 - brak CanSettlementAutoRecruit (sredni) - PRAWDZIWE, POPRAWIONE.** Gra (OnDailySettlementTick) i 326c sprawdzaja warunek (GarrisonAutoRecruitmentIsEnabled, FoodChange > 0, bez bitwy/oblezenia). HandVolunteer wola go teraz odbiciem przed werbunkiem; false -> licznik "autowerbunek twierdzy wylaczony albo bilans jedzenia <= 0". Port gracza z wylaczonym autowerbunkiem i glodne miasto nie dostaja ludzi.
+3. **D7 - dwie stawki jednego perka (niski) - PRAWDZIWE jako niespojnosc, BEZ ZMIANY KODU.** Zakres decyzji Jeffa (zbroje i luki) spelniony; czy bron z ekranu gry tez -25% - pytanie dopisane w sekcji D7 (do decyzji Jeffa, zasada 3: nie dodawac przy okazji).
+4. **D3 - HungerWork bez `_foodWired` (niski) - PRAWDZIWE, POPRAWIONE.** PrisonLabor509.HungerWork zwraca 1 przy `!_foodWired` - ten sam warunek co HungerDay i Daily.
+
+Build po poprawkach: Armoury 0 bledow, Armoury.dll md5 997c7399. Status calosci: DO SPRAWDZENIA (nie wgrane).
+
+## 516: decyzje Jeffa D1, D9, D16 (galaz noc/d-walka z origin/noc/scal-perki e46a8c9a): decyzje Jeffa D1, D9, D16 - Armoury (klucze PaviseBackShieldMelee, NavalAmmoPerksRecover, NavalAmmoPerkPercent; CombatXpPerksMultiply rozszerzony)
+
+Zrodlo decyzji: Jeff, czat 14.11, odpowiedz na D1-D16 po serii perkow 505-515: "D1 tak / ... / D9 - tak / ... / D16 - odzysk". Opis pytan: docs/audyty-2026-11-14/PERKI-DECYZJE.md (sekcja D1-D16). Kazda decyzja osobna sekcja nizej; jeden DLL (Armoury) - przy tescie sprawdzac trzy linie logu osobno.
+
+### D1: mnozenie premii XP takze na arenie i w turnieju
+
+**Problem:** decyzja Jeffa "D1 tak" (PERKI-DECYZJE: "D1 mnozenie XP takze arena i turniej: TAK"). Po 505 waga obrazen w bitwie MNOZY perki XP, a na arenie i w turnieju stawka (ArenaXpPercent 20%, TournamentXpPercent 50%) dalej sie DODAWALA do sumy czynnikow - perk +50% na arenie dawal baza x (1 + 0.5 - 0.8) = 0.7 bazy zamiast 0.2 x 1.5 = 0.3 bazy.
+
+**Zmiana:**
+- Armoury/src/XpMultiply505.cs:73-95 - nowa FactorPractice(ref wynik, pct): przy kluczu CombatXpPerksMultiply TAK czynnik = (1 + suma czynnikow) x (pct - 1), czyli wynik = baza x (1 + suma) x pct; klucz NIE / wyjatek = pct - 1 (jak dotad). Liczniki doby osobne (_dPrac*, :28-29, zerowane :36).
+- Armoury/src/FairXp.cs:46 (arena, PracticeFight) i :51 (turniej) - AddFactor(XpMultiply505.FactorPractice(...)) zamiast AddFactor(pct - 1).
+- Linia startu 505 (:104) mowi "od D1 takze areny i turnieju"; linia doby (:116) dopisuje "arena i turniej (D1): wywolan N, z premia K, XP dodawanie / mnozenie A / B".
+- Opis klucza Combat Xp Perks Multiply (Settings.cs:2499, McmSettings.cs:6596) - dopisane arena i turniej (po angielsku). Bez nowego klucza: jedna zasada na jedno zjawisko (stawka/waga mnozy perki), ten sam wylacznik.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Kto dopisuje czynniki do GetXpFromHit przed FairXp (Priority.Last) - wedlug wpisu 505 (dekompilacja): RBM InspiringLeader, PerkXp503 (tylko Battle / SimulationBattle - na arenie nic), NavalDLC (bitwa morska), BK Gladiator +2 (TYLKO Tournament). Skutek D1: Gladiator BK w turnieju liczy sie od stawki - dotad baza x (1 + 2 + 0.5 - 1) = 2.5 bazy, teraz baza x 3 x 0.5 = 1.5 bazy (bez perka 0.5 bazy w obu). To zamierzone (D1), ale XP z turnieju z Gladiatorem spada o 40% - do potwierdzenia przez Jeffa w grze.
+- Brak premii (suma 0): wynik identyczny jak dotad (czynnik pct - 1). Ujemna suma (np. polityka -15%) - mnozy sie tez (baza x 0.85 x pct). 1 + suma <= 0 - stary wzor.
+- Galaz bitwy (Factor) bez zmian; wywolania tylko z FairXp (grep: FactorPractice w FairXp.cs:46 i :51). Licznik _depth FairXp dalej liczy raz na zewnetrzny model.
+- Stan: tylko liczniki doby, bez zapisu.
+
+**Linie logu:** start "Perki XP x waga (505): start sesji | klucz CombatXpPerksMultiply TAK ... | dotyczy bitwy i symulacji, od D1 takze areny i turnieju (stawka % mnozy perki) | potkniecia 0."; doba "Perki XP x waga (505): dzien N | ... | arena i turniej (D1): wywolan N, z premia K, XP dodawanie / mnozenie A / B | potkniecia doby 0". Po walce na arenie z perkiem XP: B < A, gdy premia > 0 i stawka < 100%.
+
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane).
+
+### D9: Pavise chroni tarcze na plecach takze przed ciosami wrecz
+
+**Problem:** decyzja Jeffa "D9 - tak" (PERKI-DECYZJE: "D9 Pavise: tez ciosy wrecz w tarcze na plecach"). Po 506 Pavise (+30% wytrzymalosci, -25% zuzycia) dzialal tylko na pociski zatrzymane tarcza na plecach (RBM przepisuje je na blok - droga MissionCombatMechanicsHelper.ComputeBlowDamageOnShield i nasz ShieldPostfix). Cios wrecz w tarcze na plecach RBM liczy obok: prefiks RBM na ComputeBlowDamage (rbmcombat DamageRework.cs:538-553) przy CollidedWithShieldOnBack wola RBMComputeBlowDamageOnShield WPROST, absorbedByArmor = 0, a wynik idzie jako obrazenia ciosu (to, co przeszlo przez tarcze) - ShieldPostfix tam nie biegnie.
+
+**Zmiana:**
+- Armoury/src/Perk506.cs:145-166 - latka (raz na proces, w kampanii, jak reszta 506): postfiks Priority.Low na RBMCombat.DamageRework.RBMComputeBlowDamageOnShield (AccessTools.DeclaredMethod, metoda statyczna; Owned() potwierdza wpiecie, licznik latek 506 x/y obejmuje ja).
+- Perk506.cs:406-432 PaviseMeleePostfix: tylko CollidedWithShieldOnBack, NIE pocisk, NIE AttackBlockedWithShield (blok idzie przez ComputeBlowDamageOnShield -> ShieldPostfix, wiec bez podwojenia); klucze PerkShieldsAfterRbm i PaviseBackShieldMelee; ofiara-czlowiek z perkiem Pavise (perki kampanii odswiezane na starcie misji - poza kampania nieczynne): obrazenia / (1 + PaviseBackShieldDurability) (ta sama liczba co dla pociskow, 30%), zaokraglenie i min 1 jak w ShieldPostfix; ustawia out inflictedDamage i attackCollisionData.InflictedDamage (RBM ustawia oba). Sam Pavise - bez ArrowCatcher (D9 dotyczy Pavise).
+- Liczniki misji (_pvMelee, :92, zerowane w Reset) i linia konca misji 506 (:516): "Pavise wrecz w tarcze na plecach (D9): ciosow N, obrazenia A -> B"; linia startu 506: "ciosy wrecz w tarcze na plecach (D9) TAK (latka wpieta)".
+- Klucz PaviseBackShieldMelee (TAK): Settings.cs:236, McmSettings.cs:733-736 (+ ApplyTo :13705), grupa "Wear and tear" (recznie, bez gen_mcm.py). Opis Pavise Back Shield Durability (Settings.cs:234, McmSettings.cs:725) - zamiast "melee blows on the back shield are not changed" mowi o ciosach wrecz.
+- Komentarz klasy (:43-53) - nowy opis drogi ciosu wrecz.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Wywolania RBMComputeBlowDamageOnShield (dek rbmcombat): DamageRework.cs:180 (prefiks RBM na ComputeBlowDamageOnShield - blok, AttackBlockedWithShield = true -> nasz postfiks wychodzi) i :553 (prefiks ComputeBlowDamage - tarcza na plecach). Pocisk przebijajacy / Impale w plecy (IsMissile) - wychodzi, jak w 506 bez ulgi; RBM RangedRework.cs:1582-1602 sam odejmuje tarczy HP po tej liczbie tylko dla pociskow.
+- Ciecie zuzycia Pavise (-25%) tu NIE dziala: FieldCraft (FieldCraft.cs:1180-1222) liczy cios wrecz w plecy jako pancerz (nie AttackBlockedWithShield) - zuzycie pancerza spada przez mniejsze InflictedDamage, ale to ta sama regula co dla kazdego ciosu (raw = InflictedDamage + AbsorbedByArmor).
+- Cudze latki na tej metodzie: brak w naszym kodzie (grep RBMComputeBlowDamageOnShield - tylko komentarz RotData418). ShieldGuard 414 jest na ComputeBlowDamageOnShield, nie tu - pociski bez zmian.
+- Ta sama regula dla gracza i AI; tylko ofiary z perkiem (zwykle bohaterowie). Koszt: jedno sprawdzenie flag na cios w plecy z tarcza, perk czytany tylko przy trafieniu.
+- Liczba RBM w tej drodze to obrazenia przechodzace przez tarcze (na cialo), nie HP tarczy - "tarcza wytrzymalsza o 30%" = 30% mniej przechodzi. Jesli Jeff chcial inaczej (np. odejmowanie HP tarczy) - do decyzji.
+
+**Linie logu:** start "Perki pancerza i tarcz (506): latka raz na proces - pancerz i tarcze z perkow 4/4 ... Pavise tarcza na plecach +30% ..., -25% zuzycia, ciosy wrecz w tarcze na plecach (D9) TAK (latka wpieta); ShieldWall ..."; koniec misji "... | Pavise wrecz w tarcze na plecach (D9): ciosow N, obrazenia A -> B | ...". Gracz z Pavise i tarcza na plecach, trafiony wrecz w plecy: N > 0, B ~ A / 1.3.
+
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane).
+
+### D16: perki amunicji NavalDLC - odzysk zamiast dodatkowej amunicji
+
+**Problem:** decyzja Jeffa "D16 - odzysk" (PERKI-DECYZJE: "D16 amunicja NavalDLC: odzysk (jak 512)"). Po 515 Boatswain.WellStocked (+30% amunicji na stos, +2 bron miotana) i Boatswain.ShipwrightsInsight (druga premia +25% amunicji zalogi) daja tylko dodatkowa amunicje w bitwie morskiej - klucz NavalDeployAmmoFix domyslnie NIE, wiec perki nic nie robily.
+
+**Zmiana:**
+- Armoury/src/Perk512.cs:180-249 - czesc F: perki NavalDLC odbiciem (NavalPerks+Boatswain, wlasciwosci WellStocked / ShipwrightsInsight, czytane przy kazdym uzyciu - obiekt biezacej kampanii), NavalBonus: tylko bitwa morska, klucz NavalAmmoPerksRecover TAK i NavalDeployAmmoFix NIE; partia (MobileParty.HasPerk - rola perka: WellStocked glowna FirstMate, ShipwrightsInsight druga FirstMate, czyli EffectiveFirstMate) dostaje +NavalAmmoPerkPercent (10%) za kazdy perk. Recover (bitwa gracza, AmmoRecovery.cs:91): bitwa morska = Mission.IsNavalBattle (wypad z morza nie), bez misji MapEvent.IsNavalMapEvent; odzysk x (1 + premia B 512 + premia F), najwyzej 100%; odzysk 0 (pole stracone) zostaje 0 - tylko po wygranej.
+- AiLoss (:251-266) dostaje MapEvent (AiWear.cs:631 - przekazuje me): bitwy AI bez misji, IsNavalMapEvent, ten sam wzor natezenie x (1 - odzysk x (1 + premie)).
+- Klucze NavalAmmoPerksRecover (TAK) i NavalAmmoPerkPercent (10): Settings.cs:1650-1652, McmSettings.cs:4310-4317 (+ ApplyTo :14601), grupa "Ammunition and animal perks" (recznie). Opis Naval Deploy Ammo Fix (Settings / MCM) - zamiast "extra arrows wait for a decision" mowi o odzysku.
+- Linia startu 512 (:517-520) - "D16 perki NavalDLC ... -> odzysk po wygranej bitwie morskiej TAK +10% za perk - perki znalezione" (NIECZYNNE, gdy NavalDeployAmmoFix TAK); linia doby (:553) - "D16 odzysk z perkami NavalDLC (bitwa morska): agenci bitwy gracza N, pozycje AI M".
+- NavalDeploy515.cs:36-37 - komentarz: przy NIE perki daja odzysk (Perk512 F).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Zamknieta ekonomia: odzysk nie tworzy amunicji - ogranicza strate tego, co wystrzelone (kolczan wraca z prawdopodobienstwem / mniej sztuk schodzi ze zbrojowni AI), jak 512 B. Brak podwojenia: przy NavalDeployAmmoFix TAK (dodatkowa amunicja NavalDLC) odzysk z tych perkow wylaczony - jedna zasada na perk.
+- Sumuje sie z 512 B (DeepQuivers / Fletcher / WellPrepared wodza) jednym mnoznikiem - przy domyslnych 10% + 10% + 10% odzysk 65% x 1.3 = 84.5% (ponizej 100%).
+- Kolczany / bron miotana / tarcze OKRETU (AdditionalArcherQuivers, AdditionalThrowingWeaponStack, CrewShieldHitPointsFactor - wyposazenie statku, nie perki) zostaja pod NavalDeployAmmoFix (NIE) bez zmian - D16 dotyczy perkow; czy tarcze okretu (nie amunicja) wlaczyc osobno - do decyzji Jeffa.
+- Rola perka: NavalDLC w bitwie sprawdza kapitana szyku (Formation.Captain); odzysk liczony po bitwie dla partii - bierzemy role perka (FirstMate partii, jak MobileParty.HasPerk). Partia bez pierwszego oficera: EffectiveFirstMate gry (zwykle wodz).
+- AiWear.AmmoUse dziala tylko przy AiAmmoUse (wpis 249) - bez niego D16 dla AI tylko w pomiarze. Brak NavalDLC: perki null, premia 0 (linia startu "brak NavalDLC").
+- Wywolania AiLoss / Recover: tylko AiWear.cs:631 i AmmoRecovery.cs:91 (grep) - sygnatura AiLoss zmieniona, oba miejsca zbudowane.
+
+**Linie logu:** start "Perki amunicji i zwierzat (512): start sesji | AmmoPerksRework TAK (...) | D16 perki NavalDLC (WellStocked, ShipwrightsInsight) -> odzysk po wygranej bitwie morskiej TAK +10% za perk - perki znalezione | ..."; doba "Perki amunicji i zwierzat (512): dzien N | ... | D16 odzysk z perkami NavalDLC (bitwa morska): agenci bitwy gracza N, pozycje AI M | ...". Po wygranej bitwie morskiej gracza z pierwszym oficerem z WellStocked: N > 0 i linia AmmoRecovery "wrocilo" wieksza niz bez perka.
+
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane). Armoury.dll md5 4b8fceb0.
+
+### Recenzja grupy A (14.11, commit 90b9ee95) - rozpatrzenie uwag
+
+Recenzja potwierdzila D1, D9 i D16 bez bledow poprawnosci, regresji ani kolizji. Jedna uwaga (low):
+
+**Uwaga 1 (low) - zakres D16: kolczany i bron miotana OKRETU bez odzysku.** Sprawdzona: PRAWDZIWA jako niejasnosc zakresu, ODRZUCONA jako zmiana kodu w tej poprawce.
+- Pytanie zadane Jeffowi (CHANGELOG, wpis 515, recenzja pkt 100): "WellStocked / ShipwrightsInsight / kolczany okretu to DODATKOWA amunicja ... wlaczyc albo dac TYM PERKOM nowy efekt (odzysk / zuzycie jak 512)". Odpowiedz Jeffa: "D16 - odzysk"; notatka w PERKI-DECYZJE: "D16 amunicja NavalDLC: odzysk (jak 512)". Pytanie wymienia kolczany okretu, ale nowy efekt proponuje "tym perkom" - nie da sie jednoznacznie wyczytac, czy ulepszenie okretu (AdditionalArcherQuivers, AdditionalThrowingWeaponStack - wyposazenie statku, nie perk) tez ma dawac odzysk.
+- Dlaczego bez kodu: zasada 3 CLAUDE.md ("zanim cos dodasz przy okazji - nie dodawaj"). Odzysk z ulepszen okretu wymagalby nowego odczytu ulepszen statkow partii po bitwie (NavalDLC, odbiciem) - nowy kod i nowe ryzyko bez wyraznej decyzji Jeffa.
+- Stan po tej poprawce (wprost, zeby drugie konto nie bralo tego za przeoczenie): przy NavalDeployAmmoFix = NIE (domyslnie) kolczany i bron miotana OKRETU nie daja nic - ani dodatkowej amunicji, ani odzysku; ulepszenie okretu jest dla gracza martwe. Tarcze okretu (CrewShieldHitPointsFactor) to nie amunicja - poza D16, tez martwe przy NIE.
+- **PYTANIE DO JEFFA (D16b):** czy dodatkowe kolczany / bron miotana okretu maja dawac odzysk po wygranej bitwie morskiej (np. +10% za ulepszenie, ten sam warunek NavalDeployAmmoFix = NIE, wspolny limit 100% z 512 B i D16), czy zostaja martwe? Osobno: czy wlaczyc same tarcze okretu? Jesli "tak" - dopisac w Perk512 NavalBonus premie wedlug ulepszen okretow partii (najpierw sprawdzic w dekompilacji NavalDLC, skad NavalAgentStatCalculateModel bierze AdditionalArcherQuivers).
+
+Kod bez zmian w tej poprawce (tylko ten zapis); Armoury przebudowany kontrolnie.
+
 ## 515 (perki 28, 43, 46, 58, 100, 101, 102 audytu perkow): Armoury + RealisticCaptivity - perki predkosci podnosza sufit kolumny, NavalDLC pod modelami BK i po rozstawieniu w bitwie morskiej, ucieczka z morza przez NavalDLC (klucze ScoutPerksLiftMarchCap, NavalModelsUnderBk, NavalDeployStatsFix, NavalDeployAmmoFix)
 
 **Problem:** audyt perkow 14.11 (docs/audyty-2026-11-14/PERKI.md; decyzje PERKI-DECYZJE.md - Jeff: "43 ... pomiar, potem perk podnosi sufit kolumny: ok", "46 CallToArms jak 43", "28 NomadicTraditions: ok, sprawdzic HorsePace", "58 Logistician (sprawdzic podwojny podatek)", "78-105 ok ... 102 podlaczyc DLC pod modele BK"; "rob 1-7 od razu na raz").

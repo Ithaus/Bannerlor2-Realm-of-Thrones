@@ -310,6 +310,7 @@ namespace Armoury
         private static void ResetDay()
         {
             dGrace = dVassal = dMercJoin = dMercLeave = dMercDown = dMilit = dRelMod = dPeer = dPoly = dLith = dSeaMor = dSeaFood = dSeaSize = dSeaRen = 0;
+            dLithLast = dLithLastMiss = 0;
             dInspirer = dHonor = dHelms = dPath = dSeaEyesDay = dBet = dCrowds = dGhazw = dHorseRider = dHorseNoRider = 0;
             _dPeerXp = 0; _dStumbles = 0;
             ResetBattleDay();
@@ -672,10 +673,63 @@ namespace Armoury
             catch (Exception e) { Stumble("TourRenownPost", e); }
         }
 
+        // ============================================================ D15: Lithurgy trwala u lordow AI
+        private static readonly TextObject _tLith = new TextObject("{=!}Lithurgy (lasting)");
+        private static MethodInfo _getRelBeh, _relGet, _relAdd;
+        private static bool _lithTried;
+        internal static int dLithLast, dLithLastMiss;
+
+        /// <summary>D15: modyfikator "Lithurgy (lasting)" w HeroRelations kaplana wobec lorda: +1 (jeden wpis na pare, wartosc rosnie, najwyzej 100).
+        /// BK zapisuje HeroRelations (bk_hero_relations) i dolicza te wpisy do celu dryfu (BKRelationsModel.CalculateModifiers: GetRelations(target)).</summary>
+        private static void LithLasting(Hero preacher, Hero lord)
+        {
+            try
+            {
+                if (!_lithTried)
+                {
+                    _lithTried = true;
+                    var tBeh = AccessTools.TypeByName("BannerKings.Behaviours.Relations.BKRelationsBehavior");
+                    var tHeroRel = AccessTools.TypeByName("BannerKings.Behaviours.Relations.HeroRelations");
+                    var gcb = AccessTools.Method(typeof(Campaign), "GetCampaignBehavior");
+                    _getRelBeh = tBeh != null && gcb != null ? gcb.MakeGenericMethod(tBeh) : null;
+                    _relGet = tBeh != null ? AccessTools.Method(tBeh, "GetRelations", new[] { typeof(Hero) }) : null;
+                    _relAdd = tHeroRel != null ? AccessTools.Method(tHeroRel, "AddModifier") : null;
+                    Log.Info(P + "Lithurgy trwala u AI (D15): BK " + (_getRelBeh != null && _relGet != null && _relAdd != null && _relModCtor != null ? "gotowe" : "BRAK (tylko chwilowe +1)") + ".");
+                }
+                if (_getRelBeh == null || _relGet == null || _relAdd == null || _relModCtor == null || Campaign.Current == null) { dLithLastMiss++; return; }
+                var beh = _getRelBeh.Invoke(Campaign.Current, null);
+                var hr = beh != null ? _relGet.Invoke(beh, new object[] { preacher }) : null;
+                if (hr == null) { dLithLastMiss++; return; }
+                // GetRelations(target) zwraca liste zapisana w HeroRelations (albo nowa pusta, gdy pary jeszcze nie ma) - szukamy naszego wpisu
+                var getList = AccessTools.Method(hr.GetType(), "GetRelations", new[] { typeof(Hero) });
+                var list = getList != null ? getList.Invoke(hr, new object[] { lord }) as System.Collections.IList : null;
+                int had = 0;
+                if (list != null)
+                {
+                    for (int i = list.Count - 1; i >= 0; i--)
+                    {
+                        var m = list[i];
+                        if (m == null) continue;
+                        var ex = Traverse.Create(m).Property("Explanation").GetValue() as TextObject;
+                        if (ex == null || ex.ToString() != _tLith.ToString()) continue;
+                        had = (int)Traverse.Create(m).Property("Relation").GetValue();
+                        list.RemoveAt(i);   // lista zapisana w HeroRelations - jeden wpis na pare, nowy z wartoscia + 1
+                        break;
+                    }
+                }
+                int now = Math.Min(100, had + 1);
+                _relAdd.Invoke(hr, new object[] { lord, _relModCtor.Invoke(new object[] { now, _tLith }) });
+                dLithLast++;
+            }
+            catch (Exception e) { dLithLastMiss++; Stumble("LithLasting", e); }
+        }
+
         // ============================================================ doba: 79 Lithurgy, 97 Helmsman, linia
         /// <summary>ArmouryBehavior.OnDailyTickBodyInner: losowe relacje z kaplanami (Lithurgy), szybsze odrabianie morale (Helmsman), linia doby.
         /// Lithurgy (recenzja 514): u lordow AI +1 jest CHWILOWE - kaplan ma wlasne HeroRelations (BK GetHeroesToUpdate notabla = bohaterowie rodu pana osady)
-        /// i co kilka tygodni sciaga relacje do swojego celu (w nim BK juz ma druga premie Lithurgy). Trwale tylko u gracza (BK pomija MainHero).</summary>
+        /// i co kilka tygodni sciaga relacje do swojego celu (w nim BK juz ma druga premie Lithurgy). Trwale tylko u gracza (BK pomija MainHero).
+        /// D15 (Jeff 14.11 "tak jedna zasada u wszystkich"; klucz LithurgyLastingAi): u lorda AI ten sam +1 podnosi tez CEL relacji kaplana z nim - trwaly
+        /// modyfikator w HeroRelations kaplana (BK go zapisuje i liczy w CalculateModifiers), wiec dryf BK juz go nie sciaga. Gracz bez zmian (dryfu brak).</summary>
         internal static void Daily(int day)
         {
             try { TiesWeekly(day); } catch (Exception e) { Stumble("Daily(D14 Ties)", e); }   // D14: DiplomaticTies gracza - raz w tygodniu
@@ -698,6 +752,7 @@ namespace Armoury
                             var who = pool[MBRandom.RandomInt(pool.Count)];
                             TaleWorlds.CampaignSystem.Actions.ChangeRelationAction.ApplyRelationChangeBetweenHeroes(h, who, 1, h == Hero.MainHero);
                             dLith++;
+                            if (h != Hero.MainHero && Settings.Current != null && Settings.Current.LithurgyLastingAi) LithLasting(who, h);
                         }
                     }
                 }
@@ -725,7 +780,7 @@ namespace Armoury
                 {
                     Log.Info(P + "dzien " + day + " | dwor: laska " + N(dGrace) + ", wasale " + N(dVassal) + ", najemnicy chec / odejscie / zaliczka " + N(dMercJoin)
                              + " / " + N(dMercLeave) + " / " + N(dMercDown) + ", militaryzm (punkty) " + N(dMilit) + ", cel relacji z obcym wladca " + N(dRelMod)
-                             + " | nauka: ksiazki x2 " + N(dPeer) + " (+" + _dPeerXp.ToString(Inv) + " XP), jezyk " + N(dPoly) + ", kaplani +1 " + N(dLith)
+                             + " | nauka: ksiazki x2 " + N(dPeer) + " (+" + _dPeerXp.ToString(Inv) + " XP), jezyk " + N(dPoly) + ", kaplani +1 " + N(dLith) + " (cel kaplana trwale +1 u AI - D15: " + N(dLithLast) + (dLithLastMiss > 0 ? ", nieudane " + dLithLastMiss : "") + ")"
                              + " | style: morale Sea-Toughness " + N(dSeaMor) + ", jedzenie " + N(dSeaFood) + ", liczebnosc Sea Commander " + N(dSeaSize)
                              + ", slawa " + N(dSeaRen) + ", Inspirer " + N(dInspirer) + ", Honor Guard werbunek " + N(dHonor) + ", Helmsman morale " + N(dHelms)
                              + ", Pathfinder las/plaza " + N(dPath) + ", Sea-Eyes zdjete za dnia " + N(dSeaEyesDay) + ", zaklad x2 " + N(dBet) + ", slawa turnieju x2 "

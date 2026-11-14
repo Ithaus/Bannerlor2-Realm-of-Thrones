@@ -22,12 +22,21 @@ namespace Armoury
     /// (1 + perki) - dokladnie jak w grze; inne znizki (kultura -5%, Frugal, ranga klanu) dalej trzyma podloga BK (to nie zakres 508).
     /// Zloto: AI placi mniej i notabl dostaje mniej (LevyGold liczy z tego samego modelu w tej samej chwili), gracz placi notablowi przez BK
     /// mniej - nic z niczego. Koszt: kilka HasPerk na wycene (to samo, co gra robi chwile wczesniej), bez alokacji.
+    ///
+    /// D2 (Jeff 14.11: "przepusc wszystkie znizki i pokaz mi to na przykladzie"; klucz AllRecruitDiscounts): podloga BK schodzi o CALA ujemna
+    /// sume netto czynnikow wyceny (SumOfFactors w chwili naszego postfiksu - po BK, NavalDLC i BEE/ROT), nie tylko o perki 508: kultura -5% (BK),
+    /// Frugal -15%, SwordForBarter / SlickNegotiator -20% (najemnicy), RitterOathbound -15% i MercenaryLocalConnections -10% (BK), ranga klanu
+    /// 0-1 (-10% / -5%, BK), cecha Khuzait -10% (konni), PopularCaptain -30% (NavalDLC). Czynniki dodatnie (obca kultura w krolestwie +25%,
+    /// ranga 4+ +5..15%, Artisan +15%, oddzial przyboczny +20%, prawa BK) liczone jak dotad - netto ujemne: cena = cel x (1 + netto);
+    /// netto >= 0: podloga nie wiaze i nic sie nie zmienia. Wylaczone = 508 (same perki).
     /// </summary>
     internal static class RecruitPerks508
     {
         private static readonly string[] Names = { "HeadHunter", "ChinkInTheArmor", "ShowOfStrength", "HardyFrontline", "RenownedArcher", "Piercer" };
         // liczniki doby (wyceny, nie zakupy - model wolaja tez okna, AI przy decyzji i LevyGold przy zaplacie)
         private static int _dEval, _dPlayer, _dCut, _dStumbles, _stumbles;
+        private static int _dNet, _dNetCut;               // D2: wyceny z ujemna suma netto (wszystkie czynniki) i te, w ktorych podloga BK cielaby cene
+        private static long _dNetGold;                    // D2: suma (cena z podloga BK - cena po D2) na wycenach, gdzie podloga cielaby
         private static long _dGold;                       // suma (cena z podloga BK - cena po 508) na wycenach, gdzie podloga ciela
         private static readonly int[] _dPerk = new int[6];
         private static bool _started;
@@ -35,6 +44,7 @@ namespace Armoury
         internal static void Reset()
         {
             _dEval = _dPlayer = _dCut = _dStumbles = 0; _dGold = 0;
+            _dNet = _dNetCut = 0; _dNetGold = 0;
             Array.Clear(_dPerk, 0, _dPerk.Length);
             _started = false;
         }
@@ -66,9 +76,23 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.PerkRecruitDiscounts || troop == null || buyer == null) return;
+                if (s == null || troop == null) return;
                 float min = result.LimitMinValue;
                 if (min <= 1f) return;                    // bez podlogi BK (inny model) - gra i tak liczy perki
+                if (s.AllRecruitDiscounts)
+                {
+                    // D2: cala ujemna suma netto czynnikow (perki, kultura, Frugal, ranga, Khuzait, PopularCaptain...) schodzi pod podloge
+                    float net = result.SumOfFactors;
+                    if (net >= 0f) return;                // netto bez znizki - podloga nie wiaze (cel >= zold x 10)
+                    float b0 = result.ResultNumber;
+                    result.LimitMin(Math.Max(1f, min * (1f + net)));
+                    float a0 = result.ResultNumber;
+                    _dNet++;
+                    if (a0 < b0 - 0.5f) { _dNetCut++; _dNetGold += (long)Math.Round(b0 - a0); }
+                    if (buyer != null) CountPerks(troop, buyer);
+                    return;
+                }
+                if (!s.PerkRecruitDiscounts || buyer == null) return;
                 float sum = 0f; int mask = 0;
                 for (int i = 0; i < 6; i++)
                 {
@@ -95,6 +119,23 @@ namespace Armoury
             }
         }
 
+        /// <summary>D2: liczniki per perk do linii doby (te same warunki co gra) - bez wplywu na cene.</summary>
+        private static void CountPerks(CharacterObject troop, Hero buyer)
+        {
+            int mask = 0;
+            for (int i = 0; i < 6; i++)
+            {
+                if (!Applies(i, troop)) continue;
+                var p = Perk(i);
+                if (p == null || !buyer.GetPerkValue(p) || p.SecondaryBonus >= 0f) continue;
+                mask |= 1 << i;
+            }
+            if (mask == 0) return;
+            _dEval++;
+            if (buyer == Hero.MainHero) _dPlayer++;
+            for (int i = 0; i < 6; i++) if ((mask & (1 << i)) != 0) _dPerk[i]++;
+        }
+
         /// <summary>Linia doby (z RecruitCost.Daily); przy pierwszej dobie sesji linia startu z wartosciami perkow z gry.</summary>
         internal static void Daily()
         {
@@ -113,8 +154,12 @@ namespace Armoury
                 }
                 Log.Info("Perki werbunku (508): start | klucz PerkRecruitDiscounts " + (s.PerkRecruitDiscounts ? "TAK" : "NIE") + ", HistoricalRecruitCost "
                          + (s.HistoricalRecruitCost ? "TAK" : "NIE (508 nieczynny - podloga BK zostaje)") + " | perki z gry: " + string.Join(", ", parts.ToArray())
-                         + " | podloga BK (zold x 10) schodzi o te znizki (HeadHunter tier 2+, trzy pierwsze piechota, dwa ostatnie strzelcy).");
+                         + " | podloga BK (zold x 10) schodzi o te znizki (HeadHunter tier 2+, trzy pierwsze piechota, dwa ostatnie strzelcy)"
+                         + " | D2 AllRecruitDiscounts " + (s.AllRecruitDiscounts ? "TAK (podloga schodzi o cala ujemna sume netto: kultura, Frugal, ranga, Khuzait, najemnicy, PopularCaptain, perki)" : "NIE (same perki 508)") + ".");
             }
+            if (_dNet > 0)
+                Log.Info("Znizki werbunku (D2): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " | wyceny z ujemna suma czynnikow " + _dNet
+                         + ", podloga BK cielaby cene w " + _dNetCut + " (przepuszczone razem " + _dNetGold.ToString(inv) + " zlota na wycenach; wyceny, nie zakupy).");
             if (_dEval > 0 || _dStumbles > 0)
             {
                 var per = new List<string>();
@@ -124,6 +169,7 @@ namespace Armoury
                          + " | per perk: " + (per.Count > 0 ? string.Join(", ", per.ToArray()) : "-") + " | potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
             }
             _dEval = _dPlayer = _dCut = _dStumbles = 0; _dGold = 0;
+            _dNet = _dNetCut = 0; _dNetGold = 0;
             Array.Clear(_dPerk, 0, _dPerk.Length);
         }
     }
