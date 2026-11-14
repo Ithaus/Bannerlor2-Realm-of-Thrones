@@ -37,6 +37,8 @@ namespace Armoury
     ///     kraina z hamulcem wolnych rak (FreeHands.Braked) - etap co najmniej 2. Etap stoi przez cala dobe (cena nie skacze w trakcie dnia).
     ///  P4 ZAUFANIE idx 0-6: wlasna wioska gracza albo ziemia rodu gracza - 6; inaczej najwyzszy VolunteerModel.MaximumIndexHeroCanRecruitFromHero(gracz, notabl) po
     ///     notablach wsi okregu (zywi, na miejscu) - z BK to CalculateMaximumRecruitmentIndex (relacja, prawa poboru); okreg bez notabli - 2.
+    ///     493: miejsca = indeks gry + 1 (ekran werbunku gracza: HeroHelper.HeroCanRecruitFromHero - index &lt;= Maximum, indeks 0 = jedno miejsce), klucz
+    ///     SideVillageParentReputation; ujemny indeks (gra odmawia) - 0. Klucz NIE - stara regula min(6, max(0, indeks)).
     ///  P5 DZIENNY NAPLYW: muster = idx &lt;= 0 ? 0 : ceil(cap x SideRecruitDailyPercent (3) / 100 x idx/6 x F[etap]), F = 1 / 0.5 / 0.25. Callable = floor(Pool x
     ///     min(1, Home/P)) - ludzie poza domem (uciekinierzy) nie przyjda; ready = max(0, min(Callable, muster - Today)). Cena = koszt rekruta gry dla gracza x M[etap],
     ///     M = 1 / SideRecruitLevyPrice (1.5) / SideRecruitGeneralLevyPrice (2.0) - gdy chetni odeszli, rodziny chca wiecej.
@@ -99,6 +101,7 @@ namespace Armoury
         {
             public string Uid; public int Hour = -1, Day = -1;
             public bool Hide, Burned, Own;   // n36: wlasnosc wioski przy wycenie - zmiana (kupno / odkup / zamek) uniewaznia wycene w tej samej godzinie
+            public bool Rep;                 // 493: klucz SideVillageParentReputation przy wycenie - przelaczenie w MCM uniewaznia wycene w tej samej godzinie
             public double P, Home, Cap, Pool, Y;
             public double G; public string GWhy; public bool GFb;   // n36 (P3): stopa odnowy wsi okregu (% rocznie, ze znakiem), kod przyczyny, zapas
             public int Callable, Muster, Ready, Stage = 1, Idx, Price, Today, Room;
@@ -126,6 +129,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ klucze
         internal static bool LevyKey { get { var s = Settings.Current; return s != null && s.SideVillageRecruit; } }
+        internal static bool ParentRepKey { get { try { var s = Settings.Current; return s != null && s.SideVillageParentReputation; } catch { return false; } } }   // 493
         internal static bool HouseKey { get { var s = Settings.Current; return s != null && s.SideVillageRecruit && s.SideVillageHouseLevy; } }   // 474-P5
         private static double LvPoolPct { get { var s = Settings.Current; return s == null ? 10.0 : Clamp(s.SideRecruitPoolPercent, 1.0, 20.0); } }
         private static double LvYouthPct { get { var s = Settings.Current; return s == null ? 1.0 : Clamp(s.SideRecruitYouthPercent, 0.0, 3.0); } }
@@ -267,12 +271,19 @@ namespace Armoury
             var c = Campaign.Current;
             var model = c != null && c.Models != null ? c.Models.VolunteerModel : null;
             int best = -1, ok = 0; bool any = false;
+            bool rep = ParentRepKey;   // 493: miejsca jak ekran werbunku gry (indeks 0 = jedno miejsce)
             if (st.Notables != null && model != null && Hero.MainHero != null)
                 foreach (var n in st.Notables)
                 {
                     if (n == null || !n.IsAlive || n.CurrentSettlement != st) continue;
                     any = true;
-                    try { int i = model.MaximumIndexHeroCanRecruitFromHero(Hero.MainHero, n); best = Math.Max(best, Math.Max(0, Math.Min(6, i))); ok++; }
+                    try
+                    {
+                        int i = model.MaximumIndexHeroCanRecruitFromHero(Hero.MainHero, n);
+                        // 493: surowy indeks bez obcinania do 0 przed +1 - ujemny (gra odmawia) zostaje 0 miejsc
+                        int v = rep ? Math.Max(0, Math.Min(6, i + 1)) : Math.Max(0, Math.Min(6, i));
+                        best = Math.Max(best, v); ok++;
+                    }
                     catch (Exception e) { LvStumble("TrustIdx", e); }
                 }
             if (!any || ok == 0) return 2;
@@ -328,8 +339,9 @@ namespace Armoury
             int hour = (int)CampaignTime.Now.ToHours;
             bool own = SideVillageFief.IsMine(uid) || OwnLands(st);   // n36: zaufanie 6 zalezy od wlasnosci - kupno z menu wioski w tej samej godzinie nie moze trzymac starego indeksu
             var q = _lvQ;
-            if (q != null && q.Hour == hour && q.Own == own && string.Equals(q.Uid, uid, StringComparison.Ordinal)) return q;
-            q = new LvQuote { Uid = uid, Hour = hour, Own = own };   // recenzja: do pamieci (_lvQ) dopiero gotowa - wyjatek w srodku nie zostawia polowy wyceny na godzine
+            bool rep = ParentRepKey;   // 493
+            if (q != null && q.Hour == hour && q.Own == own && q.Rep == rep && string.Equals(q.Uid, uid, StringComparison.Ordinal)) return q;
+            q = new LvQuote { Uid = uid, Hour = hour, Own = own, Rep = rep };   // recenzja: do pamieci (_lvQ) dopiero gotowa - wyjatek w srodku nie zostawia polowy wyceny na godzine
             VillageBook.PartView me; double ha, na;
             if (st == null || uid == null || !PartOf(st, uid, out me, out ha, out na)) { q.Hide = true; _lvQ = q; return q; }
             int today = Today();

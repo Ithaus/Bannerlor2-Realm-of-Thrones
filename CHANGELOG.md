@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 493: wsie poboczne - werbunek wedlug reputacji wsi glownej
+
+**Problem:** Jeff 14.11: "czemu w wioskach pobocznych nie moge rekrutowac, a w glownej moge, przeciez jak zabijam bandytow, to reputacja tez powinna pozwalac rekrutowac w wioskach pobocznych". Log Armoury-2026-11-14_00-24-57.log: :44521 wjazd do Tumblestone (wies glowna, werbunek gry dziala), :45198 wjazd do Littlecross (wioska poboczna okregu Tumblestone), :45703 linia doby m113 "werbunki 0 ... odmowy: zaufanie 1" - jedyna odmowa w sesji.
+
+**Przyczyna:** reputacja juz szla z wsi glownej (TrustIdx czyta VolunteerModel.MaximumIndexHeroCanRecruitFromHero gracza z notablami Tumblestone), ale indeks byl czytany o jeden za nisko. Ekran werbunku gry (RecruitVolunteerVM -> Helpers.HeroHelper.HeroCanRecruitFromHero) ma `index <= Maximum` - Maximum to numer najwyzszego otwartego miejsca od 0, wiec indeks 0 = jedno miejsce. BK (CalculateMaximumRecruitmentIndex: start 1 + relacja/limit, minus prawa poboru obcej frakcji, Floor) daje graczowi spoza frakcji przy malej relacji czesto 0. U nas Idx 0 = Muster 0 i odmowa "zaufanie" (SideVillageVisit.Levy.cs LevyGate), a Math.Max(0, ..) mieszal 0 (gra pozwala) z -1 (gra odmawia). Surowej wartosci indeksu log nie pokazuje - to, ze byla 0, a nie -1, wynika z objawu Jeffa.
+
+**Zmiana:** klucz SideVillageParentReputation (TAK, "Side Villages Use Parent Village Reputation", grupa wsi pobocznych; recznie w Settings.cs + McmSettings.cs + linia kopiujaca). SideVillageVisit.Levy.cs TrustIdx: przy kluczu liczba miejsc = clamp(surowy indeks + 1, 0, 6) - bez obcinania do 0 przed +1 (ujemny indeks = gra odmawia = 0 miejsc). Klucz NIE - stara regula. Wlasna wioska / ziemia rodu nadal 6, brak notabli na miejscu nadal 2, wyjatek per wywolanie (LvStumble) bez zmian. LvQuote ma pole Rep - przelaczenie klucza uniewaznia wycene godziny (jak Own). Komentarz P4 uzupelniony. Linia werbunku "zaufanie N" pokazuje teraz liczbe miejsc (indeks gry + 1).
+
+**Ryzyko / co sprawdzic:** kontrola calosci: TrustIdx wolany tylko w LvQuoteFor i sondzie LevyProbe (PbLiftTrust podniesie relacje mniej razy - petla do PbTrustWant 3, zadnej stalej liczby krokow; `idx >= 1` / `q.Idx < 1` dalej znaczy "gra odmawia"). Dzienny naplyw rosnie o 1/6 na kazdym poziomie ponizej 6 (indeks 0 -> 1/6 x 3% cap, sr. wies ok. 3 ludzi/dobe w etapie 1); pula 10%, odnowa, podloga Room, cena i zaplata do kiesy wsi okregu bez zmian - nic z niczego. Levy rodu (1/5 Muster) lekko rosnie. CanonWarBalance.Levers.cs:138 (`i < max`, regula AI gry) celowo bez zmian. Klucza nie ma w Armoury.json Jeffa (nowy - domyslna TAK zadziala). W grze: przy Littlecross linia doby m113 "werbunki >= 1" i brak "odmowy ... zaufanie" przy tej samej relacji; linia werbunku "zaufanie 1".
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane - Jeff gra).
+
 ## 492: karawany wioza srebro do zlotnikow
 
 **Problem:** Jeff 14.11: "czemu moj warsztat nie zarabia?" - warsztat 'Silversmith' Jeffa w Lannisport 21 dob bez cyklu, wyplaty 0, kapital 5000 -> 4896. Log Armoury-2026-11-14_00-24-57.log (doba 108711-12): srebro w jukach karawan 864-940 szt. (54-62% swiata), polki miast 87-162, 73-79 z 97 miast bez srebra; linia 285 "srebro: proby 12, kontrakty karawan 0 szt., ... juki karawan 897, zuzycie zmierzone miast 20.3/d". Lannisport nie ma zrodla srebra (Rockford wyzerowany RockGold, Minetown / Pendric Mines przerobione na len GL5), a jeden cykl zlotnika potrzebuje 25 szt. naraz. Decyzja Jeffa: "wybieram A".
