@@ -54,7 +54,8 @@ namespace Armoury
         internal static bool RestingParty(MobileParty party)
         {
             if (party == null) return false;
-            if (AiWounded500b.Resting(party)) return true;   // 500-b: poturbowana partia w postoju albo w drodze do twierdzy - ta sama zasada
+            // 500-b: poturbowana partia w postoju albo w drodze do twierdzy - ta sama zasada (te same wyjatki morza i glodu co lozu nizej)
+            if (AiWounded500b.Resting(party) && !party.IsCurrentlyAtSea && !party.Party.IsStarving) return true;
             if (_n == 0) return false;
             try
             {
@@ -175,6 +176,23 @@ namespace Armoury
             if (fort == null) { _aiPick.Remove(party); return null; }
             if (pick == null) _aiPick[party] = pick = new AiPick();
             pick.Fort = fort; pick.H = now; pick.Own = own;
+            return fort;
+        }
+
+        /// <summary>500-b (recenzja): ta sama twierdza, ktora potem wybierze 408 (AiFort: stoi w swojej, inaczej najblizsza RODU, potem FRAKCJI; do AiRoadChecks
+        /// kandydatow z droga ladowa; wybor trzymany AiHoldHours w _aiPick - wiec 408 pojedzie do tej samej). road = droga modelu gry (0 = stoi w niej).
+        /// Bez listy blokad 408 (cudze -1 zna dopiero mysl) - rzadka roznica, 408 wtedy wybiera inna. Watek glowny. Moze rzucic (wolajacy liczy potkniecia).</summary>
+        internal static Settlement AiRestFort(MobileParty party, out bool own, out float road)
+        {
+            own = false; road = -1f;
+            if (party == null) return null;
+            var fort = AiFort(party, party.ActualClan, null, out own, out road);
+            if (fort != null && road < 0f)
+            {
+                // wybor z pamieci (road -1) - droga od nowa
+                float lr;
+                road = Campaign.Current.Models.MapDistanceModel.GetDistance(party, fort, false, MobileParty.NavigationType.Default, out lr);
+            }
             return fort;
         }
 

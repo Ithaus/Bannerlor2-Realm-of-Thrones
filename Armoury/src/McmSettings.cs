@@ -828,15 +828,15 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public bool AiHealOnlyAtRest { get; set; } = true;
 
-        [SettingPropertyBool("Litter Enabled", HintText = "you lie on a litter when you are nearly dead: at or below Litter Hp Threshold hit points, or with a grave wound (Hero Wounds). Your men carry you and the party moves at Litter Speed Percent of its pace until you are back above Litter Hp Release and the grave wound has passed. You cannot gallop away from an encounter while on a litter. In someone else's army or at sea you are simply carried along - no slowdown. AI parties are not affected. Off = you ride however badly hurt, as before", RequireRestart = false)]
+        [SettingPropertyBool("Litter Enabled", HintText = "you lie on a litter when you are nearly dead: at or below Litter Hp Threshold hit points, or with a grave wound (Hero Wounds). Your men carry you and the party moves at Litter Speed Percent of its pace until you are back above Litter Hp Release and the grave wound has passed. You cannot gallop away from an encounter while on a litter. In someone else's army or at sea you are simply carried along - no slowdown. AI parties are not slowed by it, but Litter Hp Threshold and Litter Hp Release also tell when a badly hurt AI lord halts to rest (Ai Wounded Rest Enabled), with or without this switch. Off = you ride however badly hurt, as before", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool LitterEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Litter Hp Threshold", 1, 50, "0", HintText = "at or below this many hit points you are too weak to ride and are carried on a litter. Only with Litter Enabled", RequireRestart = false)]
+        [SettingPropertyInteger("Litter Hp Threshold", 1, 50, "0", HintText = "at or below this many hit points you are too weak to ride and are carried on a litter (only with Litter Enabled). Also the hit points at which a badly hurt AI lord halts to rest (Ai Wounded Rest Enabled), with or without Litter Enabled", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int LitterHpThreshold { get; set; } = 10;
 
-        [SettingPropertyInteger("Litter Hp Release", 1, 60, "0", HintText = "you get off the litter only above this many hit points (and with no grave wound) - a gap above the threshold so a point of healing does not flip you on and off. Never below the threshold. Only with Litter Enabled", RequireRestart = false)]
+        [SettingPropertyInteger("Litter Hp Release", 1, 60, "0", HintText = "you get off the litter only above this many hit points (and with no grave wound) - a gap above the threshold so a point of healing does not flip you on and off. Never below the threshold. Only with Litter Enabled - but also the hit points above which a resting AI lord is fit to ride on (Ai Wounded Rest Enabled), with or without Litter Enabled", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int LitterHpRelease { get; set; } = 15;
 
@@ -848,7 +848,7 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int LitterSpeedPercentSledges { get; set; } = 75;
 
-        [SettingPropertyBool("Ai Wounded Rest Enabled", HintText = "a badly hurt AI lord stops and rests before riding on: when the lord is down to Litter Hp Threshold hit points or has a grave wound, or when Ai Wounded Rest Share Percent of his men are wounded, his party halts where it is safe (food for two days, no stronger enemy close by, not on enemy land) and mends there - at rest wounds heal far faster than on the march (Heal Only At Rest). Once fit to travel (lord above Litter Hp Release, wounded down to Ai Wounded Rest Exit Share Percent) or after Ai Wounded Rest Max Days, it rides to the nearest castle or town of its clan or realm and recovers there, where healing is fastest. With a fortress close by it goes straight there. While resting it does not take new orders, join or call armies; it still flees from danger. Off = wounded lords ride on as before", RequireRestart = false)]
+        [SettingPropertyBool("Ai Wounded Rest Enabled", HintText = "a badly hurt AI lord stops and rests before riding on: when the lord is down to Litter Hp Threshold hit points or has a grave wound, or when Ai Wounded Rest Share Percent of his men are wounded, his party halts where it is safe (food for two days, no stronger enemy within Ai Camp Danger Radius - at least 3 map units, even with the camp alarm off - and not on enemy land) and mends there - at rest wounds heal far faster than on the march (Heal Only At Rest). Once fit to travel (lord above Litter Hp Release, wounded down to Ai Wounded Rest Exit Share Percent) or after Ai Wounded Rest Max Days, it rides to the nearest castle or town of its clan or realm and recovers there, where healing is fastest. With a fortress close by it goes straight there. While resting or riding to the fortress it does not take new orders, join or call armies, and attacks no one on sight unless defending its clan's own fief; it still flees from danger. With no fortress to ride to it carries on with caution. Off = wounded lords ride on as before", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool AiWoundedRestEnabled { get; set; } = true;
 
@@ -864,7 +864,7 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int AiWoundedRestMaxDays { get; set; } = 3;
 
-        [SettingPropertyInteger("Ai Wounded Rest Skip Hours", 0, 48, "0", HintText = "a badly hurt AI party with its own or its realm's castle or town within this many hours of riding goes straight there instead of resting in the field first (0 = always rest in the field first)", RequireRestart = false)]
+        [SettingPropertyInteger("Ai Wounded Rest Skip Hours", 0, 48, "0", HintText = "a badly hurt AI party with the castle or town it would recover in (its clan's nearest, or its realm's nearest when the clan has none) within this many hours of riding goes straight there instead of resting in the field first (0 = always rest in the field first)", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int AiWoundedRestSkipHours { get; set; } = 6;
 
@@ -872,7 +872,7 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public bool AiWoundedCaution { get; set; } = true;
 
-        [SettingPropertyInteger("Ai Wounded Caution Percent", 0, 100, "0", HintText = "how much a fully cautious AI lord cuts his wish to fight: siege, raid and chase choices are multiplied by 1 - this percent x caution (75 = a lord at full caution keeps a quarter of his appetite for battle; half caution keeps five eighths). The same cut applies to attacking a party on sight. Only with Ai Wounded Caution", RequireRestart = false)]
+        [SettingPropertyInteger("Ai Wounded Caution Percent", 0, 100, "0", HintText = "how much a fully cautious AI lord cuts his wish to fight: siege, raid and chase choices are multiplied by 1 - this percent x caution (75 = a lord at full caution keeps a quarter of his appetite for battle; half caution keeps five eighths). The same cut applies to attacking a party on sight, and a cautious lord attacks on sight only with a clear edge in strength: 1 + 2 x this percent x caution times the enemy (at full caution and 75: two and a half times). Only with Ai Wounded Caution", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int AiWoundedCautionPercent { get; set; } = 75;
 
