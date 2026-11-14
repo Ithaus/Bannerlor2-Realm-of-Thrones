@@ -176,7 +176,12 @@ namespace Armoury
                 if (q < booked) _dAutoDown++;
                 int menPaid, compPaid, compPursePaid, playerPaid, folk;
                 long paidBefore = _lastTownPaidMin;
-                PayCore(st, q, b, "nocleg z urzedu (486, godzin nocy w miescie " + bestH + (stable ? ", gracz w stajni" : "") + ") w ", out menPaid, out compPaid, out compPursePaid, out playerPaid, out folk);
+                // N4 premia: pelna noc - wypoczeci do zmierzchu (ta sama regula co Wake(full)); 486-q: liczona PRZED zaplata, zeby linia "Karczmy (KA)" mowila to samo,
+                // co dostaje gracz (noc niepelna - premia brak; dotad linia PayCore zawsze wypisywala premie z rachunku)
+                bool full = NightRest.FullNight(restBefore, NightRest.BaseHours());
+                float sp, mo, sl, he; Bonus(b, out sp, out mo, out sl, out he);
+                bool bonus = full && sp + mo > 0f;
+                PayCore(st, q, b, "nocleg z urzedu (486, godzin nocy w miescie " + bestH + (stable ? ", gracz w stajni" : "") + ") w ", out menPaid, out compPaid, out compPursePaid, out playerPaid, out folk, bonus ? 1 : 0);
                 _lastTownPaidMin = paidBefore;   // PayCore zapisuje chwile oplaty dla noclegu z menu; oplata z urzedu nie blokuje nastepnej nocy
                 int paidAll = menPaid + compPaid + playerPaid;
                 _dAuto++; _sAuto++; _dAutoPaid += paidAll;
@@ -196,10 +201,7 @@ namespace Armoury
                          + ", zaplacono " + paidAll + " zl -> karczmy miasta (kiesa ludu " + folk + ", kasa miasta " + (paidAll - folk) + "; ludzie " + menPaid + ", towarzysze " + compPaid
                          + ", gracz " + playerPaid + ")" + (b.Sacked ? ", okno lupu - ludzie bez zaplaty" : "") + ", brak pieniedzy: " + (lack.Count > 0 ? string.Join(", ", lack.ToArray()) : "nikt")
                          + " | godzin nocy w miescie " + bestH + ", odpoczynek doby " + restBefore.ToString("0.0", Inv) + " h, dlug snu " + NightRest.Debt + ".");
-                // N4 premia: pelna noc - wypoczeci do zmierzchu (ta sama regula co Wake(full))
-                bool full = NightRest.FullNight(restBefore, NightRest.BaseHours());
-                float sp, mo, sl, he; Bonus(b, out sp, out mo, out sl, out he);
-                if (full && sp + mo > 0f)
+                if (bonus)
                 {
                     _rest = new Rest { Phase = 2, Q = q, PlayerQ = stable ? -1 : q, TownId = st.StringId, TownName = name, CommitMin = now, StartMin = now, UntilMin = RestedUntil(now),
                                        Speed = sp, Morale = mo, Sleep = 1f, Heal = 0f, Price = q == 2 && !stable, Auto = true };
@@ -210,7 +212,7 @@ namespace Armoury
                 // komunikat gracza raz na noc
                 string men = b.Foot + b.Mounted == 0 ? "" : b.Sacked ? " Your men took their beds by right of the sack and paid nothing." : " Your men paid " + menPaid + (b.MenStable > 0 ? ", " + b.MenStable + " of them slept in the stable." : ".");
                 string comps = compPaid > 0 ? " Your companions paid " + compPaid + "." : "";
-                string rested = full && sp + mo > 0f ? " Rested until " + Clock(RestedUntil(now)) + ": +" + F1(sp) + "% speed, +" + F1(mo) + " morale." : "";
+                string rested = bonus ? " Rested until " + Clock(RestedUntil(now)) + ": +" + F1(sp) + "% speed, +" + F1(mo) + " morale." : "";
                 if (stable)
                     Log.Player("You could not pay for a bed in " + name + " - you slept in the stable with the horses." + men + comps + rested, true);
                 else

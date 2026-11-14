@@ -610,8 +610,18 @@ namespace Armoury
             folk = 0;
             if (h == null || cost <= 0) return 0;
             int had = h.Gold;
-            GiveGoldAction.ApplyForCharacterToSettlement(h, st, cost, quiet);
+            // 486-q: zapora kuzni (TrueArmourCost.SwallowForgeFee, prefiks ApplyForCharacterToSettlement) polyka KAZDY przelew gracza do osady, gdy gracz
+            // czeka w menu kuzni, a przy wygaslej dobie kupuje za niego dobe kuzni - nocleg o swicie przy kuciu szedl do kosza (zaplacil 0) albo pomiar
+            // kiesy lapal cene doby kuzni (zaplacil 4 przy rachunku 3). Nocleg to nie oplata za kuznie - flaga, ktora zapora przepuszcza (jak WorkshopTrade.PayToTown).
+            bool was = DayPass.Charging;
+            try
+            {
+                DayPass.Charging = true;
+                GiveGoldAction.ApplyForCharacterToSettlement(h, st, cost, quiet);
+            }
+            finally { DayPass.Charging = was; }
             int paid = Math.Max(0, had - h.Gold);
+            if (paid != cost && h == Hero.MainHero) Log.Info(P + "uwaga: z kiesy gracza zeszlo " + paid + " przy rachunku " + cost + " (ma " + h.Gold + ").");
             if (paid > 0)
             {
                 int t0 = st.Town.Gold;
@@ -624,7 +634,9 @@ namespace Armoury
         /// <summary>486: zaplata noclegu w miescie wedlug rachunku b (wydzielone z Commit bez zmian w obiegu): sakiewka ludzi (InnPay), kiesy towarzyszy i gracza (HeroPays),
         /// kontrola obiegu World() przed i po, liczniki doby, linia logu "Karczmy (KA): " + head. Wolane z Commit (menu) i DawnCharge (nocleg z urzedu o swicie).
         /// Settlement st z rachunku, nie z CurrentSettlement (o swicie gracz mogl juz wyjechac).</summary>
-        private static void PayCore(Settlement st, int q, Bill b, string head, out int menPaid, out int compPaid, out int compPursePaid, out int playerPaid, out int folkAll)
+        /// dawnBonus (486-q): -1 nocleg z menu (premia z rachunku po snie w lozku), 0 nocleg z urzedu bez premii (noc niepelna), 1 nocleg z urzedu z premia
+        /// (tylko predkosc i morale - bez mnoznika snu i gojenia, jak DawnCharge).
+        private static void PayCore(Settlement st, int q, Bill b, string head, out int menPaid, out int compPaid, out int compPursePaid, out int playerPaid, out int folkAll, int dawnBonus = -1)
         {
             var mp = MobileParty.MainParty;
             var me = Hero.MainHero;
@@ -666,8 +678,10 @@ namespace Armoury
                      + " | razem " + paidAll + " (ludzie " + menPaid + ", towarzysze " + compPaid + ", gracz " + playerPaid + ") -> kiesa ludu " + folkAll + ", kasa miasta " + (paidAll - folkAll)
                      + " | kontrola obiegu: roznica " + diff
                      + " | osoby " + b.Persons + ": stajnia " + b.People[0] + ", wspolna izba " + b.People[1] + ", porzadna karczma " + b.People[2] + ", dobry dom " + b.People[3]
-                     + " | premia po snie: predkosc +" + F1(sp) + "%, morale +" + F1(mo) + ", sen x" + sl.ToString("0.00", Inv) + ", gojenie +" + (he * 100f).ToString("0", Inv) + "%"
-                     + ", cena " + (q == 2 && PriceKey ? "tak" : "nie") + ".");
+                     + (dawnBonus == 0 ? " | premia po snie: brak (noc niepelna - zaplacone bez premii)."
+                        : dawnBonus > 0 ? " | premia po snie (nocleg z urzedu): predkosc +" + F1(sp) + "%, morale +" + F1(mo) + ", sen x1.00, gojenie +0%, cena " + (q == 2 && PriceKey && b.PlayerCost > 0 ? "tak" : "nie") + "."
+                        : " | premia po snie: predkosc +" + F1(sp) + "%, morale +" + F1(mo) + ", sen x" + sl.ToString("0.00", Inv) + ", gojenie +" + (he * 100f).ToString("0", Inv) + "%"
+                          + ", cena " + (q == 2 && PriceKey ? "tak" : "nie") + "."));
         }
 
         private static void Commit(int q)
