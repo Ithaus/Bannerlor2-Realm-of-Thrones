@@ -20,7 +20,9 @@ namespace Armoury
     /// OneHanded Trainer, LeadByExample, CorpsACorps; TwoHanded BaptisedInBlood; Throwing Resourceful; Crossbow MountedCrossbowman; Bow BullsEye;
     /// Roguery NoRestForTheWicked (perki wodza partii) oraz TwoHanded ProjectileDeflection i Polearm Guards (gubernator - XP zalogi).
     /// Leadership InspiringLeader (kapitan) RBM dolicza sam - ta czesc dziala.
-    /// NAPRAWA: postfiks (Priority.VeryLow - po zwyklych cudzych postfiksach, PRZED FairXp, ktory na tej metodzie stoi z Priority.Last) na
+    /// NAPRAWA: postfiks (Priority.VeryLow - po zwyklych cudzych postfiksach; FairXp doklada wage obrazen tylko na ZEWNETRZNYM modelu lancucha
+    /// (licznik _depth) - przy NavalDLC na NavalDLCCombatXpModel, czyli i tak po nas; VeryLow < Last zabezpiecza tylko przypadek, gdy Default
+    /// jest modelem zewnetrznym, inaczej waga zabojstwa FairXp wygladalaby jak "perki juz w wyniku") na
     /// DefaultCombatXpModel.GetXpFromHit (DeclaredMethod), tylko gdy oryginal NIE biegl (__runOriginal == false - inaczej gra dodala perki sama)
     /// i tylko dla Battle / SimulationBattle (XP wojska z bitwy; arena i turniej bez zmian - tam stoja TXP i Gladiator BK). Liczy premie ta sama
     /// metoda gry (delegat na prywatne GetBattleXpBonusFromPerks - warunki morza, roli, gubernatora jak w grze) na probce ExplainedNumber(1)
@@ -41,7 +43,7 @@ namespace Armoury
         private static MethodBase _patched;
         private static BonusFn _bonus;
         private static string _hook = "nie wpieta", _bonusHook = "nie szukana", _rbm = "?";
-        private static int _stumbles;
+        private static int _stumbles, _dStumbles;   // calkowite (proces) i z danej doby (do warunku linii doby)
 
         // liczniki doby
         private static int _dCalls, _dAdded, _dAlready, _dNone;
@@ -55,13 +57,13 @@ namespace Armoury
 
         private static void Stumble(string where, Exception e)
         {
-            _stumbles++;
+            _stumbles++; _dStumbles++;
             if (_stumbles <= 3 || _stumbles % 100 == 0) Log.Error("PerkXp503." + where + " (potkniecie " + _stumbles + ")", e);
         }
 
         private static void ResetDay()
         {
-            _dCalls = 0; _dAdded = 0; _dAlready = 0; _dNone = 0; _dBase = 0; _dXp = 0;
+            _dCalls = 0; _dAdded = 0; _dAlready = 0; _dNone = 0; _dBase = 0; _dXp = 0; _dStumbles = 0;
             _dPerk.Clear(); _split.Clear();
         }
 
@@ -86,7 +88,7 @@ namespace Armoury
                 {
                     if (_patched == null)
                     {
-                        _h.Patch(m, postfix: new HarmonyMethod(typeof(PerkXp503), nameof(XpPostfix)) { priority = Priority.VeryLow });   // przed FairXp (Last)
+                        _h.Patch(m, postfix: new HarmonyMethod(typeof(PerkXp503), nameof(XpPostfix)) { priority = Priority.VeryLow });   // przed FairXp (Last) - liczy sie tylko, gdy Default jest modelem zewnetrznym
                         _patched = m;
                     }
                     _hook = "wpieta";
@@ -203,12 +205,12 @@ namespace Armoury
             _dPerk[name ?? "?"] = v + xp;
         }
 
-        /// <summary>ArmouryBehavior.OnDailyTickBodyInner: linia doby (gdy cos sie dzialo albo sa potkniecia) i zerowanie.</summary>
+        /// <summary>ArmouryBehavior.OnDailyTickBodyInner: linia doby (gdy byly ciosy albo potkniecia TEJ doby) i zerowanie.</summary>
         internal static void Daily(int day)
         {
             try
             {
-                if (_dCalls > 0 || _stumbles > 0)
+                if (_dCalls > 0 || _dStumbles > 0)
                 {
                     var parts = new List<string>();
                     foreach (var kv in _dPerk) parts.Add(kv.Key + " +" + F1(kv.Value));
@@ -217,7 +219,7 @@ namespace Armoury
                              + ", bez perkow " + _dNone + ", perki juz w wyniku (bez doliczania) " + _dAlready
                              + " | XP przed / doliczone " + F1(_dBase) + " / +" + F1(_dXp)
                              + " | per perk: " + (parts.Count > 0 ? string.Join(", ", parts) : "-")
-                             + " | latka " + _hook + ", potkniecia " + _stumbles + ".");
+                             + " | latka " + _hook + ", potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
                 }
             }
             catch (Exception e) { Stumble("Daily", e); }
