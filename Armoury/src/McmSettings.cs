@@ -722,13 +722,18 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float ArrowCatcherShieldWearCut { get; set; } = 0.25f;
 
-        [SettingPropertyFloatingInteger("Pavise Back Shield Durability", 0.00f, 1.00f, "0.00", HintText = "With Perk Shields After RBM: Pavise makes a shield carried on your back this much tougher against missiles it stops (melee blows on the back shield are not changed).", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Pavise Back Shield Durability", 0.00f, 1.00f, "0.00", HintText = "With Perk Shields After RBM: Pavise makes a shield carried on your back this much tougher against missiles it stops and, with Pavise Back Shield Melee, against melee blows that land on it.", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public float PaviseBackShieldDurability { get; set; } = 0.30f;
 
         [SettingPropertyFloatingInteger("Pavise Back Shield Wear Cut", 0.00f, 0.90f, "0.00", HintText = "With Perk Shields After RBM: Pavise cuts the wear of a shield carried on your back by this share.", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public float PaviseBackShieldWearCut { get; set; } = 0.25f;
+
+        // D9 (Jeff 14.11)
+        [SettingPropertyBool("Pavise Back Shield Melee", HintText = "With Perk Shields After RBM: Pavise also guards against melee blows that land on the shield carried on your back - less of the blow gets through (Pavise Back Shield Durability). Off = only missiles stopped by the back shield, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool PaviseBackShieldMelee { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Shield Wall Perk Cover", 0.00f, 0.30f, "0.00", HintText = "With Perk Shields After RBM: a commander with Shieldwall widens the missile cover of every shield in his formation by this much while it stands in the shield wall formation (Realistic Battle Mod gives every shield 0.01, the plain game 0.30). 0 = off.", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
@@ -4302,6 +4307,15 @@ namespace Armoury
         [SettingPropertyGroup("Ammunition and animal perks")]
         public float AmmoPerkPartyPercent { get; set; } = 10f;
 
+        // D16 (Jeff 14.11)
+        [SettingPropertyBool("Naval Ammo Perks Recover", HintText = "War Sails ammunition perks give no extra ammunition at sea (see Naval Deploy Ammo Fix). Instead: after a naval battle it wins, a party whose first mate has Well Stocked or Shipwright's Insight gathers back more of its shot arrows, bolts and thrown weapons (Naval Ammo Perk Percent for each of the two perks, added to the land ammunition perks). Does nothing while Naval Deploy Ammo Fix is on (the perks then give their extra ammunition instead). Off = no effect from these perks", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public bool NavalAmmoPerksRecover { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Naval Ammo Perk Percent", 0.00f, 50.00f, "0", HintText = "with Naval Ammo Perks Recover: how much more of its shot ammunition a party gathers back after a naval battle it wins, for each of Well Stocked and Shipwright's Insight its first mate has - a share of what it would gather anyway", RequireRestart = false)]
+        [SettingPropertyGroup("Ammunition and animal perks")]
+        public float NavalAmmoPerkPercent { get; set; } = 10f;
+
         [SettingPropertyFloatingInteger("Ammo Perk Own Percent", 0.00f, 90.00f, "0", HintText = "with Ammo Perks Rework: how much less your own crossbow (or a companion's) wears with every shot when the one shooting has Fletcher", RequireRestart = false)]
         [SettingPropertyGroup("Ammunition and animal perks")]
         public float AmmoPerkOwnPercent { get; set; } = 30f;
@@ -6591,7 +6605,7 @@ namespace Armoury
         public bool BattleXpScalesWithDamage { get; set; } = true;
 
         // 505 (perki)
-        [SettingPropertyBool("Combat Xp Perks Multiply", HintText = "battle experience: the damage weight multiplies the perk bonuses (perks, Inspiring Leader, naval bonus) instead of being added to them, so a +10% perk gives +10% on every blow, kills included. Off = added as before (a +10% perk gave about +2% on a kill)", RequireRestart = false)]
+        [SettingPropertyBool("Combat Xp Perks Multiply", HintText = "battle experience: the damage weight multiplies the perk bonuses (perks, Inspiring Leader, naval bonus) instead of being added to them, so a +10% perk gives +10% on every blow, kills included. The same in the arena and in tournaments: the arena and tournament share multiplies the perk bonuses (Banner Kings' Gladiator included) instead of being added to them. Off = added as before (a +10% perk gave about +2% on a kill)", RequireRestart = false)]
         [SettingPropertyGroup("The worth of a lesson")]
         public bool CombatXpPerksMultiply { get; set; } = true;
 
@@ -9357,7 +9371,7 @@ namespace Armoury
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool NavalDeployStatsFix { get; set; } = true;
 
-        [SettingPropertyBool("Naval Deploy Ammo Fix", HintText = "In naval battles the extra ammunition and shields of War Sails work again: the captain's Well Stocked and Shipwright's Insight perks and each ship's extra quivers, throwing weapons and shield strength. Off by default (extra arrows wait for a decision; the log still counts the soldiers who would get them). Off = no extra ammunition at sea, as before", RequireRestart = false)]
+        [SettingPropertyBool("Naval Deploy Ammo Fix", HintText = "In naval battles the extra ammunition and shields of War Sails work again: the captain's Well Stocked and Shipwright's Insight perks and each ship's extra quivers, throwing weapons and shield strength. Off by default: instead of extra ammunition, Well Stocked and Shipwright's Insight help gather shot ammunition back after a naval battle you win (Naval Ammo Perks Recover); the log still counts the soldiers who would get extra ammunition. Off = no extra ammunition at sea, as before", RequireRestart = false)]
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool NavalDeployAmmoFix { get; set; } = false;
 
@@ -13688,6 +13702,7 @@ namespace Armoury
             s.ArrowCatcherShieldWearCut = ArrowCatcherShieldWearCut;
             s.PaviseBackShieldDurability = PaviseBackShieldDurability;
             s.PaviseBackShieldWearCut = PaviseBackShieldWearCut;
+            s.PaviseBackShieldMelee = PaviseBackShieldMelee;   // D9
             s.ShieldWallPerkCover = ShieldWallPerkCover;
             s.PerkArmourAfterRbm = PerkArmourAfterRbm;
             s.BowUsesAtTier1 = BowUsesAtTier1;
@@ -14583,6 +14598,7 @@ namespace Armoury
             s.AmmoPerksRework = AmmoPerksRework;
             s.AmmoPerkPartyPercent = AmmoPerkPartyPercent;
             s.AmmoPerkOwnPercent = AmmoPerkOwnPercent;
+            s.NavalAmmoPerksRecover = NavalAmmoPerksRecover; s.NavalAmmoPerkPercent = NavalAmmoPerkPercent;   // D16
             s.SaddlebagsCarryPercent = SaddlebagsCarryPercent;
             s.BreederRealistic = BreederRealistic;
             s.BeastWhispererPlainMounts = BeastWhispererPlainMounts;

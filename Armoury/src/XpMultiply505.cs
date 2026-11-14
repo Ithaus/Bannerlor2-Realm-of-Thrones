@@ -11,8 +11,8 @@ namespace Armoury
     /// FraternalFleetDoctrine -15%) licza sie od BAZY RBM, nie od wyniku po wadze: przy zabojstwie (waga ok. 5.3) perk +10% daje ok. +1.9%,
     /// a przy bloku (waga 0.25) ten sam perk daje +40%.
     /// NAPRAWA: w galezi bitwy FairXp czynnik wagi = (1 + suma czynnikow juz w wyniku) x (waga - 1), czyli wynik = baza x (1 + suma) x waga -
-    /// waga mnozy calosc, kazdy perk dziala swoim procentem od kazdego ciosu. Arena i turniej bez zmian (tam stawka % i Gladiator BK - decyzja
-    /// Jeffa). Klucz CombatXpPerksMultiply (TAK; NIE = dodawanie jak dotad). Bledy liczone (potkniecia) - przy wyjatku czynnik jak dotad.
+    /// waga mnozy calosc, kazdy perk dziala swoim procentem od kazdego ciosu. Arena i turniej: od D1 (Jeff 14.11 "D1 tak") stawka % (ArenaXpPercent,
+    /// TournamentXpPercent) tez mnozy perki (FactorPractice) - Gladiator BK w turnieju liczy sie od stawki, nie od bazy. Klucz CombatXpPerksMultiply (TAK; NIE = dodawanie jak dotad). Bledy liczone (potkniecia) - przy wyjatku czynnik jak dotad.
     /// Linie: "Perki XP x waga (505): start sesji ..." (OnSessionLaunched) i "Perki XP x waga (505): dzien N ..." (doba: XP z ciosow bitwy
     /// wedlug dodawania i wedlug mnozenia z tego samego biegu). Stan tylko liczniki doby, bez zapisu.
     /// </summary>
@@ -24,12 +24,16 @@ namespace Armoury
         private static int _stumbles, _dStumbles;
         private static int _dHits, _dWithBonus;
         private static double _dAdd, _dMul, _dAddBonus, _dMulBonus;
+        // D1 (Jeff 14.11 "D1 tak"): arena i turniej - osobne liczniki doby (stawka % mnozy perki tak samo jak waga w bitwie)
+        private static int _dPrac, _dPracBonus;
+        private static double _dPracAdd, _dPracMul;
 
         private static string F1(double v) { return v.ToString("0.#", Inv); }
 
         private static void ResetDay()
         {
             _dHits = 0; _dWithBonus = 0; _dAdd = 0; _dMul = 0; _dAddBonus = 0; _dMulBonus = 0; _dStumbles = 0;
+            _dPrac = 0; _dPracBonus = 0; _dPracAdd = 0; _dPracMul = 0;
         }
 
         /// <summary>
@@ -61,6 +65,35 @@ namespace Armoury
             }
         }
 
+        /// <summary>
+        /// D1 (Jeff 14.11 "D1 tak"): FairXpPatch.Postfix (arena / turniej): czynnik do AddFactor dla stawki pct (juz przycietej, np. 0.2 areny).
+        /// Klucz TAK: wynik = baza x (1 + suma czynnikow) x pct - stawka mnozy perki (Gladiator BK, InspiringLeader, Naval), jak waga w bitwie.
+        /// Klucz NIE albo wyjatek = pct - 1 (dodawanie, jak dotad).
+        /// </summary>
+        internal static float FactorPractice(ref ExplainedNumber result, float pct)
+        {
+            float additive = pct - 1f;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.CombatXpPerksMultiply) return additive;
+                float sum = result.SumOfFactors;
+                if (!(1f + sum > 0f)) return additive;
+                float mul = (1f + sum) * (pct - 1f);
+                float b = result.BaseNumber;
+                double xAdd = b * (1f + sum + additive), xMul = b * (1f + sum) * pct;
+                _dPrac++; _dPracAdd += xAdd; _dPracMul += xMul;
+                if (sum > 1e-4f || sum < -1e-4f) _dPracBonus++;
+                return mul;
+            }
+            catch (Exception e)
+            {
+                _stumbles++; _dStumbles++;
+                if (_stumbles <= 3 || _stumbles % 100 == 0) Log.Error("XpMultiply505.FactorPractice (potkniecie " + _stumbles + ")", e);
+                return additive;
+            }
+        }
+
         /// <summary>OnSessionLaunched: zerowanie licznikow i linia startu.</summary>
         internal static void Start()
         {
@@ -68,7 +101,7 @@ namespace Armoury
             var s = Settings.Current;
             Log.Info(P + "start sesji | klucz CombatXpPerksMultiply " + (s != null && s.CombatXpPerksMultiply ? "TAK (waga obrazen mnozy perki)" : "NIE (dodawanie jak dotad)")
                      + " | FairXp " + (s != null && s.CombatXpFixEnabled ? "TAK" : "NIE") + ", waga z obrazen " + (s != null && s.BattleXpScalesWithDamage ? "TAK" : "NIE")
-                     + " | dotyczy bitwy i symulacji (arena, turniej bez zmian) | potkniecia " + _stumbles + ".");
+                     + " | dotyczy bitwy i symulacji, od D1 takze areny i turnieju (stawka % mnozy perki) | potkniecia " + _stumbles + ".");
         }
 
         /// <summary>ArmouryBehavior.OnDailyTickBodyInner: linia doby (gdy byly ciosy albo potkniecia TEJ doby) i zerowanie.</summary>
@@ -76,10 +109,11 @@ namespace Armoury
         {
             try
             {
-                if (_dHits > 0 || _dStumbles > 0)
+                if (_dHits > 0 || _dStumbles > 0 || _dPrac > 0)
                     Log.Info(P + "dzien " + day + " | wywolania XP za cios z waga (bohater 2x: umiejetnosc i udzial) " + _dHits + ", w tym z premia (perki / Naval / InspiringLeader) " + _dWithBonus
                              + " | XP dodawanie / mnozenie: wszystkie " + F1(_dAdd) + " / " + F1(_dMul)
                              + ", z premia " + F1(_dAddBonus) + " / " + F1(_dMulBonus)
+                             + " | arena i turniej (D1): wywolan " + _dPrac + ", z premia " + _dPracBonus + ", XP dodawanie / mnozenie " + F1(_dPracAdd) + " / " + F1(_dPracMul)
                              + " | potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
             }
             catch (Exception e) { _stumbles++; Log.Error("XpMultiply505.Daily", e); }

@@ -43,12 +43,12 @@ namespace Armoury
 
                 if (missionType == CombatXpModel.MissionTypeEnum.PracticeFight)
                 {
-                    __result.AddFactor(MBMath.ClampFloat(s.ArenaXpPercent / 100f, 0f, 2f) - 1f);
+                    __result.AddFactor(XpMultiply505.FactorPractice(ref __result, MBMath.ClampFloat(s.ArenaXpPercent / 100f, 0f, 2f)));   // D1: stawka mnozy perki
                     return;
                 }
                 if (missionType == CombatXpModel.MissionTypeEnum.Tournament)
                 {
-                    __result.AddFactor(MBMath.ClampFloat(s.TournamentXpPercent / 100f, 0f, 2f) - 1f);
+                    __result.AddFactor(XpMultiply505.FactorPractice(ref __result, MBMath.ClampFloat(s.TournamentXpPercent / 100f, 0f, 2f)));   // D1: stawka mnozy perki
                     return;
                 }
                 if (missionType != CombatXpModel.MissionTypeEnum.Battle &&

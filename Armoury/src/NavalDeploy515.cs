@@ -33,7 +33,8 @@ namespace Armoury
     /// Bledy liczone (potkniecia) - wyjatek = agent bez premii NavalDLC (jak dotad), bez globalnego wylacznika. Nic co klatke: dwa wywolania na agenta na bitwe.
     ///
     /// RECENZJA 515: (1) NavalDeployAmmoFix domyslnie NIE (Jeff 14.11, 16/20/25: "dodatkowe strzaly to glupota") - przy NIE linia doby liczy tylko agentow,
-    /// ktorzy dostaliby amunicje NavalDLC (pomiar na sucho). (2) Uspiony blad NavalDLC ozywiony przez 515: ApplyFigureheadBonuses dla Hawk/Boar robi
+    /// ktorzy dostaliby amunicje NavalDLC (pomiar na sucho). D16 (Jeff 14.11 "D16 - odzysk"): przy NIE perki WellStocked / ShipwrightsInsight daja zamiast tego
+    /// odzysk amunicji po wygranej bitwie morskiej (Perk512, czesc F, klucz NavalAmmoPerksRecover); przy TAK tamten odzysk jest nieczynny (bez podwojenia). (2) Uspiony blad NavalDLC ozywiony przez 515: ApplyFigureheadBonuses dla Hawk/Boar robi
     /// _agentFigureHeadSpawnMap.Add(agent, ...) (NavalAgentStatCalculateModel.cs:69), a slownika nikt nie czysci (tylko Add :69 i TryGetValue :216) - Agenci
     /// (a przez nich cala Mission) zostawali w pamieci do konca sesji. Czyscimy go przy pierwszym wywolaniu w nowej misji i w linii doby (Mission.Current == null),
     /// _loggedMission zerowany w linii doby. (3) Commodore + Hawk/Boar na okrecie flagowym i na okrecie agenta = drugi Add tego samego klucza w JEDNYM wywolaniu

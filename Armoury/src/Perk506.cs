@@ -43,8 +43,14 @@ namespace Armoury
     /// liczone po obcieciu 414 do int (T(was) / T(now)); ShieldWearCut PO granicy mnozy przez ciecia perkow -25% (ArrowCatcher) / -25% (Pavise na
     /// plecach). Dowodca ArrowCatcher zuzycia nie rusza. Przy strzalach (liczby 0/1 po 414) wynik jest przyblizony: cios, ktory przez dzielenie
     /// spadl z 1 do 0, nie wzial tarczy nic i nie liczy sie do zuzycia (jak kazda strzala ponizej progu).
-    /// Pavise dziala tylko na pociski zatrzymane tarcza na plecach (RBM przepisuje je na blok); cios wrecz w plecy i pocisk przebijajacy / Impale
-    /// RBM liczy obok tej metody (DamageRework.cs:538-553, RBMComputeBlowDamageOnShield wprost) - bez ulgi.
+    /// Pavise dziala na pociski zatrzymane tarcza na plecach (RBM przepisuje je na blok). Cios wrecz w plecy i pocisk przebijajacy / Impale
+    /// RBM liczy obok tej metody (DamageRework.cs:538-553: prefiks ComputeBlowDamage wola RBMComputeBlowDamageOnShield wprost, absorbedByArmor = 0,
+    /// wynik idzie jako obrazenia ciosu - to, co przeszlo przez tarcze na plecach).
+    /// D9 (Jeff 14.11 "D9 tak"): Pavise takze przed ciosami WRECZ w tarcze na plecach - postfiks na RBMCombat.DamageRework.RBMComputeBlowDamageOnShield
+    /// (DeclaredMethod), tylko gdy CollidedWithShieldOnBack, NIE pocisk i NIE AttackBlockedWithShield (droga bloku idzie przez ComputeBlowDamageOnShield
+    /// i ShieldPostfix - bez podwojenia). Obrazenia / (1 + PaviseBackShieldDurability), sam Pavise ofiary (bez ArrowCatcher - D9 dotyczy Pavise).
+    /// Zuzycie: cios wrecz w plecy FieldCraft liczy jako pancerz (nie AttackBlockedWithShield) - ciecie zuzycia Pavise tu nie dotyczy. Pocisk
+    /// przebijajacy / Impale w plecy dalej bez ulgi. Klucz PaviseBackShieldMelee (TAK; NIE = jak dotad).
     ///
     /// Bez RBM: pancerz i ShieldWall nieczynne (gra liczy je sama); tarcze tez nieczynne (recenzja 506 - bez prefiksu RBM na ComputeBlowDamageOnShield
     /// gra daje ArrowCatcher jako oslone i Pavise rzut 75%, 506 liczylby perk drugi raz). Jedna regula dla gracza i AI.
@@ -64,6 +70,7 @@ namespace Armoury
         private static MethodBase _shieldM;                  // MissionCombatMechanicsHelper.ComputeBlowDamageOnShield
         private static bool _rbmShield;                      // recenzja 506: prefiks RBMCombat na ComputeBlowDamageOnShield (bez RBM gra daje ArrowCatcher jako oslone - 506 nic)
         private static bool _guard414;                       // recenzja 506: postfiks ShieldGuard 414 na tej metodzie (tnie pociski po nas)
+        private static bool _paviseMeleePatched;             // D9: postfiks na RBMCombat.DamageRework.RBMComputeBlowDamageOnShield
 
         // recenzja 506: ostatni cios w tarcze z ulga perka (ShieldPostfix -> FieldCraft w tym samym ciosie). Zwrot zuzycia liczony z tego,
         // co NAPRAWDE przeszlo przez 414 (obciecie do int): T(was) / T(now). Czyszczone na poczatku kazdego ShieldPostfix i po odczycie.
@@ -82,6 +89,7 @@ namespace Armoury
         private static int _shN, _shAc, _shCap, _shPav;
         private static long _shIn, _shOut;
         private static int _swSet, _wearN, _undoN;
+        private static int _pvMelee; private static long _pvMeleeIn, _pvMeleeOut;   // D9: ciosy wrecz w tarcze na plecach z ulga Pavise
         private static float _wearSum, _undoSum;
         private static int _errs, _errsLogged;
 
@@ -134,6 +142,27 @@ namespace Armoury
                 catch (Exception e) { miss += " tarcza BLAD " + e.GetType().Name + ";"; Log.Error("Perk506.Patch(shield)", e); }
             }
 
+            // D9: Pavise - cios wrecz w tarcze na plecach (RBM liczy go wprost RBMComputeBlowDamageOnShield, obok ComputeBlowDamageOnShield)
+            Type tDmg = null;
+            try { tDmg = AccessTools.TypeByName("RBMCombat.DamageRework"); } catch { }
+            if (tDmg != null)
+            {
+                _wanted++;
+                MethodInfo direct = null;
+                try { direct = AccessTools.DeclaredMethod(tDmg, "RBMComputeBlowDamageOnShield"); } catch { }
+                if (direct == null || !direct.IsStatic) miss += " brak DamageRework.RBMComputeBlowDamageOnShield (Pavise wrecz);";
+                else
+                {
+                    try
+                    {
+                        h.Patch(direct, postfix: new HarmonyMethod(typeof(Perk506), nameof(PaviseMeleePostfix)) { priority = Priority.Low });
+                        _paviseMeleePatched = Owned(direct, h.Id, false);
+                        if (_paviseMeleePatched) _patched++; else miss += " Pavise wrecz NIE wszedl;";
+                    }
+                    catch (Exception e) { miss += " Pavise wrecz BLAD " + e.GetType().Name + ";"; Log.Error("Perk506.Patch(paviseMelee)", e); }
+                }
+            }
+
             // 2: ShieldWall po RBM (postfiks po postfiksie RBM na UpdateHumanStats)
             MethodInfo stats = null;
             try { stats = AccessTools.DeclaredMethod(typeof(SandboxAgentStatCalculateModel), "UpdateHumanStats"); } catch { }
@@ -162,7 +191,8 @@ namespace Armoury
                      + " | klucz PerkShieldsAfterRbm " + (s != null && s.PerkShieldsAfterRbm ? "TAK" : "NIE")
                      + ": ArrowCatcher tarcza +" + Pct(s != null ? s.ArrowCatcherShieldDurability : 0f) + " wytrzymalosci, -" + Pct(s != null ? s.ArrowCatcherShieldWearCut : 0f)
                      + " zuzycia, dowodca +" + Pct(s != null ? s.ArrowCatcherCaptainDurability : 0f) + "; Pavise tarcza na plecach +" + Pct(s != null ? s.PaviseBackShieldDurability : 0f)
-                     + ", -" + Pct(s != null ? s.PaviseBackShieldWearCut : 0f) + " zuzycia; ShieldWall (dowodca, tylko sciana tarcz) oslona +" + F(s != null ? s.ShieldWallPerkCover : 0f)
+                     + ", -" + Pct(s != null ? s.PaviseBackShieldWearCut : 0f) + " zuzycia, ciosy wrecz w tarcze na plecach (D9) "
+                     + (s != null && s.PaviseBackShieldMelee ? "TAK" : "NIE") + " (latka " + (_paviseMeleePatched ? "wpieta" : "NIE wpieta") + "); ShieldWall (dowodca, tylko sciana tarcz) oslona +" + F(s != null ? s.ShieldWallPerkCover : 0f)
                      + " (RBM 0.01, gra 0.30).");
             return _note;
         }
@@ -373,6 +403,34 @@ namespace Armoury
             catch (Exception e) { Count("Perk506.ShieldPostfix", e); }
         }
 
+        /// <summary>D9: postfiks na RBMCombat.DamageRework.RBMComputeBlowDamageOnShield - tylko cios WRECZ w tarcze na plecach (RBM wola te metode wprost
+        /// z prefiksu ComputeBlowDamage, DamageRework.cs:538-553); wynik to obrazenia, ktore przeszly przez tarcze. Pavise ofiary: / (1 + PaviseBackShieldDurability).
+        /// Blok (AttackBlockedWithShield) i pociski pominiete - te liczy ShieldPostfix (blok) albo zostaja bez ulgi (przebijajace / Impale), jak w 506.</summary>
+        private static void PaviseMeleePostfix(ref AttackInformation attackInformation, ref AttackCollisionData attackCollisionData, ref int inflictedDamage)
+        {
+            try
+            {
+                if (inflictedDamage <= 0) return;
+                if (!attackCollisionData.CollidedWithShieldOnBack || attackCollisionData.IsMissile || attackCollisionData.AttackBlockedWithShield) return;
+                var s = Settings.Current;
+                if (s == null || !s.PerkShieldsAfterRbm || !s.PaviseBackShieldMelee || !(s.PaviseBackShieldDurability > 0f)) return;
+                var pv = _pavise;
+                var v = attackInformation.VictimAgent;
+                if (pv == null || v == null || !v.IsHuman) return;                         // poza kampania (perki null) - nieczynne
+                var self = v.Character as CharacterObject;
+                if (self == null || !self.GetPerkValue(pv)) return;
+                float m = 1f + Math.Max(0f, s.PaviseBackShieldDurability);
+                int was = inflictedDamage;
+                int now = (int)(was / m + 0.5f);
+                if (now < 1) now = 1;                                                       // trafienie zostaje trafieniem (jak ShieldPostfix)
+                if (now > was) now = was;
+                inflictedDamage = now;
+                attackCollisionData.InflictedDamage = now;                                  // RBM ustawia oba (przy wywolaniu z ComputeBlowDamage to samo pole)
+                _pvMelee++; _pvMeleeIn += was; _pvMeleeOut += now;
+            }
+            catch (Exception e) { Count("Perk506.PaviseMeleePostfix", e); }
+        }
+
         /// <summary>FieldCraft.OnAgentHit (zuzycie tarczy w ksiedze bohatera), PRZED granica wytrzymalosci tarczy (414): oddaje to, co ShieldPostfix
         /// zabral z obrazen w tym samym ciosie - liczone po obcieciu 414 (T(was) / T(now)), wiec dowodca ArrowCatcher zuzycia nie zmienia,
         /// a osobisty / Pavise nie licza sie dwa razy. Jednorazowe (czysci zapis). 1 = bez zmian.</summary>
@@ -438,6 +496,7 @@ namespace Armoury
             _armHuman = 0; _armHorse = 0; _armHumanBefore = 0f; _armHumanAfter = 0f; _armHorseBefore = 0f; _armHorseAfter = 0f;
             _shN = 0; _shAc = 0; _shCap = 0; _shPav = 0; _shIn = 0; _shOut = 0;
             _swSet = 0; _wearN = 0; _wearSum = 0f; _undoN = 0; _undoSum = 0f;
+            _pvMelee = 0; _pvMeleeIn = 0; _pvMeleeOut = 0;
             _hitVictim = null; _hitUndo = 1f;
             _errs = 0; _errsLogged = 0;
         }
@@ -446,7 +505,7 @@ namespace Armoury
 
         private static void Flush(Mission m)
         {
-            if (_armHuman == 0 && _armHorse == 0 && _shN == 0 && _swSet == 0 && _wearN == 0 && _undoN == 0 && _errs == 0) { Reset(); return; }
+            if (_armHuman == 0 && _armHorse == 0 && _shN == 0 && _swSet == 0 && _wearN == 0 && _undoN == 0 && _pvMelee == 0 && _errs == 0) { Reset(); return; }
             string kind = "?";
             try { kind = MissionTeams.Kind(m); } catch { }
             Log.Info("Perki pancerza i tarcz (506): koniec misji (" + kind + ") | latki " + _patched + "/" + _wanted
@@ -454,6 +513,7 @@ namespace Armoury
                      + "), konie " + _armHorse + " (" + Avg(_armHorseBefore, _armHorse) + " -> " + Avg(_armHorseAfter, _armHorse) + ")"
                      + " | tarcze: ciosy z ulga " + _shN + " (ArrowCatcher osobisty " + _shAc + ", dowodcy " + _shCap + ", Pavise na plecach " + _shPav
                      + "; obrazenia tarcz " + _shIn + " -> " + _shOut + ")"
+                     + " | Pavise wrecz w tarcze na plecach (D9): ciosow " + _pvMelee + ", obrazenia " + _pvMeleeIn + " -> " + _pvMeleeOut
                      + " | zuzycie tarcz bohaterow: zwrot wytrzymalosci " + _undoN + " (sredni x" + (_undoN > 0 ? F(_undoSum / _undoN) : "-") + "), ciecie perkow "
                      + _wearN + " (sredni x" + (_wearN > 0 ? F(_wearSum / _wearN) : "-") + ")"
                      + (_rbmShield ? "" : " | tarcze: prefiks RBM nieobecny - nieczynne")

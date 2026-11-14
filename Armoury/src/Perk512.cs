@@ -41,6 +41,12 @@ namespace Armoury
     ///    mlode = sztuka rodzicow; mlode jedza jak reszta stada (WinterRealm.AnimalNeed liczy kazde zwierze w taborze).
     /// E. 44 BEASTWHISPERER: prefiks na ROT.CampaignBehaviors.ROTDragonBehavior.DailyTickParty - zamiast niej: ten sam teren (step, rownina) i perk zwiadowcy,
     ///    szansa x BeastWhispererChanceFactor, tylko zwykle konie wierzchowe i juczne (bez rumakow bojowych, egzotyki, smokow, unikatow, rzeczy nie na handel).
+    /// F. D16 (Jeff 14.11 "D16 - odzysk"): perki amunicji NavalDLC (Boatswain.WellStocked, Boatswain.ShipwrightsInsight - rola FirstMate) zamiast dodatkowej
+    ///    amunicji w bitwie morskiej (NavalDeploy515, klucz NavalDeployAmmoFix domyslnie NIE) daja ODZYSK jak B: po WYGRANEJ bitwie morskiej (pole utrzymane,
+    ///    odzysk > 0) odzysk x (1 + NavalAmmoPerkPercent za kazdy z dwoch perkow pierwszego oficera partii), wszystkie pociski (strzaly, belty, bron miotana);
+    ///    sumuje sie z B (jeden mnoznik 1 + suma premii), najwyzej 100%. Bitwa gracza: Mission.IsNavalBattle (albo MapEvent.IsNavalMapEvent partii agenta);
+    ///    bitwy AI: MapEvent.IsNavalMapEvent. Gdy NavalDeployAmmoFix TAK (perki daja znow dodatkowa amunicje) - odzysku z tych perkow NIE ma (jedna zasada,
+    ///    bez podwojnej premii). Perki NavalDLC czytane odbiciem (NavalPerks+Boatswain), brak NavalDLC = nic. Klucz NavalAmmoPerksRecover.
     /// Bledy liczone (potkniecia), bez wylacznika. Stan: tylko liczniki doby. Linie: "Perki amunicji i zwierzat (512): start sesji" i "... dzien N".
     /// </summary>
     internal static class Perk512
@@ -57,6 +63,7 @@ namespace Armoury
         // liczniki doby
         private static int _dEquipCalls, _dEquipReverted, _dEquipShots;
         private static int _dRecover, _dRecoverAi, _dXbowShots;
+        private static int _dNavalRecover, _dNavalRecoverAi;   // D16: odzysk z perkiem NavalDLC (agenci bitwy gracza / pozycje AI)
         private static int _dBreedTry, _dBreedSea, _dBreedHungry, _dBreedNoPair, _dBreedBirths, _dBreedEvents;
         private static int _dWhispTry, _dWhispFound;
         private static readonly Dictionary<string, int> _dBreedBy = new Dictionary<string, int>();
@@ -170,7 +177,57 @@ namespace Armoury
             return s.AmmoPerkPartyPercent / 100f;
         }
 
-        /// <summary>AmmoRecovery.Postfix (bitwa gracza, agent DTE): odzysk po perku wodza partii agenta. Odzysk 0 (pole stracone) zostaje 0.</summary>
+        // ------------------------------------------------------------ F. D16: perki amunicji NavalDLC -> odzysk po wygranej bitwie morskiej
+
+        private static bool _navTried;
+        private static PropertyInfo _pWellStocked, _pShipwright;
+        private static string _navHook = "nie szukano";
+
+        private static void NavalPerksFind()
+        {
+            if (_navTried) return;
+            _navTried = true;
+            try
+            {
+                var t = AccessTools.TypeByName("NavalDLC.CharacterDevelopment.NavalPerks+Boatswain");
+                _pWellStocked = t != null ? AccessTools.Property(t, "WellStocked") : null;
+                _pShipwright = t != null ? AccessTools.Property(t, "ShipwrightsInsight") : null;
+                _navHook = t == null ? "brak NavalDLC" : (_pWellStocked != null && _pShipwright != null ? "znalezione" : "BRAK (" + (_pWellStocked == null ? "WellStocked " : "") + (_pShipwright == null ? "ShipwrightsInsight" : "") + ")");
+            }
+            catch (Exception e) { _navHook = "wyjatek " + e.GetType().Name; Stumble("NavalPerksFind", e); }
+        }
+
+        private static PerkObject NavPerk(PropertyInfo pi)
+        {
+            return pi != null ? pi.GetValue(null, null) as PerkObject : null;   // obiekt biezacej kampanii (NavalPerks.Instance) - czytany przy kazdym uzyciu
+        }
+
+        /// <summary>D16: premia odzysku z perkow NavalDLC pierwszego oficera partii - tylko bitwa morska, klucz TAK i NavalDeployAmmoFix NIE.
+        /// WellStocked: rola glowna (FirstMate, amunicja na stos); ShipwrightsInsight: rola druga (FirstMate, amunicja zalogi).</summary>
+        private static float NavalBonus(MobileParty mp, bool naval)
+        {
+            var s = S;
+            if (!naval || mp == null || s == null || !s.NavalAmmoPerksRecover || s.NavalDeployAmmoFix || s.NavalAmmoPerkPercent <= 0f) return 0f;
+            NavalPerksFind();
+            float b = 0f;
+            var ws = NavPerk(_pWellStocked);
+            if (ws != null && mp.HasPerk(ws, false)) b += s.NavalAmmoPerkPercent / 100f;
+            var si = NavPerk(_pShipwright);
+            if (si != null && mp.HasPerk(si, true)) b += s.NavalAmmoPerkPercent / 100f;
+            return b;
+        }
+
+        /// <summary>Czy biezaca bitwa partii pb jest bitwa morska: misja (IsNavalBattle, bez wypadu z morza) albo MapEvent partii.</summary>
+        private static bool NavalNow(PartyBase pb)
+        {
+            var m = Mission.Current;
+            if (m != null) return m.IsNavalBattle;
+            var me = pb != null ? pb.MapEvent : null;
+            return me != null && me.IsNavalMapEvent;
+        }
+
+        /// <summary>AmmoRecovery.Postfix (bitwa gracza, agent DTE): odzysk po perku wodza partii agenta (B) i perkach NavalDLC pierwszego oficera w bitwie
+        /// morskiej (F, D16). Odzysk 0 (pole stracone) zostaje 0.</summary>
         internal static float Recover(float recover, Agent agent, ItemObject it)
         {
             try
@@ -179,23 +236,31 @@ namespace Armoury
                 var pb = agent.Origin != null ? agent.Origin.BattleCombatant as PartyBase : null;
                 var mp = pb != null && pb.IsMobile ? pb.MobileParty : null;
                 float b = PartyBonus(mp, it);
-                if (b <= 0f) return recover;
-                _dRecover++;
-                return Math.Min(1f, recover * (1f + b));
+                if (b > 0f) _dRecover++;
+                float nb = 0f;
+                try { nb = NavalBonus(mp, NavalNow(pb)); }
+                catch (Exception e) { Stumble("Recover.Naval", e); nb = 0f; }
+                if (nb > 0f) _dNavalRecover++;
+                if (b + nb <= 0f) return recover;
+                return Math.Min(1f, recover * (1f + b + nb));
             }
             catch (Exception e) { Stumble("Recover", e); return recover; }
         }
 
         /// <summary>AiWear.AmmoUse (bitwa AI bez misji): ulamek pociskow, ktory schodzi - f liczone jak tam (natezenie x (zwyciezca: 1 - odzysk)).</summary>
-        internal static float AiLoss(float f, float intensity, bool won, float keep, MobileParty mp, ItemObject it)
+        internal static float AiLoss(float f, float intensity, bool won, float keep, MobileParty mp, ItemObject it, MapEvent me)
         {
             try
             {
                 if (!won || keep <= 0f) return f;
                 float b = PartyBonus(mp, it);
-                if (b <= 0f) return f;
-                _dRecoverAi++;
-                return Math.Min(1f, intensity * (1f - Math.Min(1f, keep * (1f + b))));
+                if (b > 0f) _dRecoverAi++;
+                float nb = 0f;
+                try { nb = NavalBonus(mp, me != null && me.IsNavalMapEvent); }   // D16: perki NavalDLC w bitwie morskiej AI
+                catch (Exception e) { Stumble("AiLoss.Naval", e); nb = 0f; }
+                if (nb > 0f) _dNavalRecoverAi++;
+                if (b + nb <= 0f) return f;
+                return Math.Min(1f, intensity * (1f - Math.Min(1f, keep * (1f + b + nb))));
             }
             catch (Exception e) { Stumble("AiLoss", e); return f; }
         }
@@ -449,6 +514,9 @@ namespace Armoury
             Log.Info(P + "start sesji | AmmoPerksRework " + (s != null && s.AmmoPerksRework ? "TAK" : "NIE")
                      + " (odzysk druzyny +" + (s != null ? s.AmmoPerkPartyPercent.ToString("0.#", Inv) : "?") + "%, kusza Fletcher -" + (s != null ? s.AmmoPerkOwnPercent.ToString("0.#", Inv) : "?")
                      + "% zuzycia, Saddlebags udzwig +" + (s != null ? s.SaddlebagsCarryPercent.ToString("0.#", Inv) : "?") + "%)"
+                     + " | D16 perki NavalDLC (WellStocked, ShipwrightsInsight) -> odzysk po wygranej bitwie morskiej " + (s != null && s.NavalAmmoPerksRecover ? "TAK" : "NIE")
+                     + " +" + (s != null ? s.NavalAmmoPerkPercent.ToString("0.#", Inv) : "?") + "% za perk" + (s != null && s.NavalDeployAmmoFix ? " (NIECZYNNE: NavalDeployAmmoFix TAK - perki daja dodatkowa amunicje)" : "")
+                     + " - perki " + NavalHookNow()
                      + " | straz dawnej amunicji (Sandbox InitializeMissionEquipment) " + _ammoHook
                      + " | udzwig " + _capHook
                      + " | Breeder " + (s != null && s.BreederRealistic ? "TAK" : "NIE") + " - " + _breedHook
@@ -456,10 +524,17 @@ namespace Armoury
                      + " | potkniecia " + _stumbles + ".");
         }
 
+        private static string NavalHookNow()
+        {
+            try { NavalPerksFind(); } catch { }
+            return _navHook;
+        }
+
         private static void ResetDay()
         {
             _dEquipCalls = _dEquipReverted = _dEquipShots = 0;
             _dRecover = _dRecoverAi = _dXbowShots = 0;
+            _dNavalRecover = _dNavalRecoverAi = 0;
             _dBreedTry = _dBreedSea = _dBreedHungry = _dBreedNoPair = _dBreedBirths = _dBreedEvents = 0;
             _dWhispTry = _dWhispFound = 0;
             _dBreedBy.Clear();
@@ -475,6 +550,7 @@ namespace Armoury
                 Log.Info(P + "dzien " + day
                          + " | straz amunicji: wywolan metody gry " + _dEquipCalls + " (0 = ROT jej nie wola - dawna premia martwa), cofniete sloty " + _dEquipReverted + " (" + _dEquipShots + " szt.)"
                          + " | odzysk z perkiem wodza: agenci bitwy gracza " + _dRecover + ", pozycje AI " + _dRecoverAi
+                         + " | D16 odzysk z perkami NavalDLC (bitwa morska): agenci bitwy gracza " + _dNavalRecover + ", pozycje AI " + _dNavalRecoverAi
                          + " | strzaly z kuszy z Fletcher " + _dXbowShots
                          + " | Breeder: proby " + _dBreedTry + ", morze " + _dBreedSea + ", glod " + _dBreedHungry + ", bez pary " + _dBreedNoPair
                          + ", porody " + _dBreedEvents + " (" + _dBreedBirths + " szt." + (by.Length > 0 ? ": " + by : "") + ")"
