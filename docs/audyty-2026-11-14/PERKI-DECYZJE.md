@@ -84,3 +84,4 @@ Jeff 14.11 po logu 237: D10 - tak (perk konia daje do +10% predkosci samego koni
 Panika (Jeff 14.11): 1 kompanie po 10 ludzi (nie 25/50); 2 bez rzutu przy pierwszej 1/6 strat, gdy kompanie prowadzi lord albo przed zwarciem - tak; 3 mnoznik stanu bitwy max 1.25 (zamiast 1.5) - tak.
 Panika - korekta (Jeff 14.11): "ostrzal ktory masakruje ludzi moze doprowadzic do paniki - jesli straca 1/2 w wyniku ostrzalu rzucamy test na panike". Czyli przed zwarciem / pod lordem: bez rzutow przy malych stratach, ale przy stracie 1/2 kompanii od ostrzalu - rzut na panike. Dopisac po workflow 529.
 Chorazy (Jeff 14.11): po raporcie (gra zdejmuje luk/tarcze, RBM trzyma chorazego z tylu bez celu, nasze choragwie do 6 na formacje; plan E1-E4) - "na razie olej to". Odlozone; plan w transkrypcie workflow chorazy-rozpoznanie (wf_4355efff-720).
+Jeff 14.11: przy wgraniu 531 - po wczytaniu zapisu przeliczyc od nowa oferty werbunku wszystkich wsi pobocznych (jednorazowo).
