@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 496: GrandTourney - log z data w nazwie, 12 ostatnich sesji
+
+**Problem:** GrandTourney pisal zawsze do Modules/GrandTourney/GrandTourney.log (File.WriteAllText przy starcie) - kazda nowa sesja gry albo autotest nadpisywal log poprzedniej, wiec po tescie nocnym nie bylo juz sladu turniejow z gry Jeffa (Armoury od dawna ma log z data).
+
+**Przyczyna:** GrandTourney/src/Log.cs Init: stala nazwa pliku "GrandTourney.log".
+
+**Zmiana:** Log.Init pisze do GrandTourney-RRRR-MM-DD_HH-MM-SS.log (format jak Armoury-*.log), kasuje stary GrandTourney.log (jak Armoury.log) i wola Prune: zostaje KeepLogs = 12 najnowszych GrandTourney-*.log (wedlug CreationTimeUtc, kopia Armoury Log.Prune). Bez klucza (decyzja domyslna (noc 14.11): to tylko nazwa pliku logu).
+
+**Ryzyko / co sprawdzic:** kontrola calosci: _path ustawiany tylko w Log.Init (jedno wywolanie z SubModuleMain.OnSubModuleLoad); Info/Error/Player bez zmian. Nikt w kodzie ani w narzedziach autotestu (tools/, bannerlord-autotest src/skrypty) nie czyta pliku GrandTourney.log po nazwie - jedynie dokumenty (CHANGELOG, docs) wspominaja stara nazwe. Wzorzec Prune obejmuje tylko GrandTourney-*.log w katalogu modulu. W grze: w Modules/GrandTourney po starcie plik GrandTourney-<data>.log z naglowkiem "=== Grand Tourney", brak GrandTourney.log, po 13 startach nadal 12 plikow.
+
+**Status:** DO SPRAWDZENIA
+
 ## 493: wsie poboczne - werbunek wedlug reputacji wsi glownej
 
 **Problem:** Jeff 14.11: "czemu w wioskach pobocznych nie moge rekrutowac, a w glownej moge, przeciez jak zabijam bandytow, to reputacja tez powinna pozwalac rekrutowac w wioskach pobocznych". Log Armoury-2026-11-14_00-24-57.log: :44521 wjazd do Tumblestone (wies glowna, werbunek gry dziala), :45198 wjazd do Littlecross (wioska poboczna okregu Tumblestone), :45703 linia doby m113 "werbunki 0 ... odmowy: zaufanie 1" - jedyna odmowa w sesji.
