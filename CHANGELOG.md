@@ -18,6 +18,15 @@
 **Zmiana:** (tylko diagnostyka / prognoza, bez klucza) GoldForecast.cs: TickBegin robi migawke Seal31B.PendingOwnerTax gracza przed modulami taktu (_otSnap/_otSnapN, -1 = brak; wlasny try z potknieciem TickBegin(495); czyszczone w Reset i na poczatku kazdego TickBegin). W Corrections, tylko gdy _inTickEnd i migawka >= 0: pozycja "podatek warsztatow 495 (kolejka przed taktem N)" = -migawka (0 migawek - brak pozycji, otDone = true, wiec srednia 3 dob dalej go nie liczy). Podpowiedz w panelu Finance (poza TickEnd) bez zmian: kolejka po wyplacie albo udzial x przewidywana wyplata. Komentarz przy linii 361 w Line poprawiony.
 
 **Ryzyko / co sprawdzic:** kontrola calosci: PendingOwnerTax tylko czyta _otPay (bez zmiany stanu); kolejke zapelnia tylko ClanPayPost (wyplata), nie moduly taktu - migawka z TickBegin to dokladnie to, co pobierze OwnerTaxDaily (ArmouryBehavior:3090) w tym takcie, najwyzej mniej przy pustej kiesie (OwnerTaxDaily bierze najwyzej kiese). Kolejnosc wyplata/takt zalezna od godziny wczytania - migawka przed taktem jest poprawna w obu ukladach. Po wczytaniu kolejka nie jest zapisywana: migawka 0 = prognoza 0, takt tez 0. OtKey dalej w _fcKeys (otDone) - podatek nie wpada do "nieregularne". Pary udzialu (historia) bez zmian - galaz udzialu dziala dalej w podpowiedzi. Rozgrywka bez zmian (zadne zloto nie plynie inaczej). W grze: linia dobowa "poprawki 345 ... podatek warsztatow 495 (kolejka przed taktem 1) -X" z X rownym "podatek warsztatow w takcie tej doby" i rozjazd w dobach bez wyplat innych niz warsztaty bliski 0 (zostaje tylko blad "warsztaty do wyplaty").
+## 496: GrandTourney - log z data w nazwie, 12 ostatnich sesji
+
+**Problem:** GrandTourney pisal zawsze do Modules/GrandTourney/GrandTourney.log (File.WriteAllText przy starcie) - kazda nowa sesja gry albo autotest nadpisywal log poprzedniej, wiec po tescie nocnym nie bylo juz sladu turniejow z gry Jeffa (Armoury od dawna ma log z data).
+
+**Przyczyna:** GrandTourney/src/Log.cs Init: stala nazwa pliku "GrandTourney.log".
+
+**Zmiana:** Log.Init pisze do GrandTourney-RRRR-MM-DD_HH-MM-SS.log (format jak Armoury-*.log), kasuje stary GrandTourney.log (jak Armoury.log) i wola Prune: zostaje KeepLogs = 12 najnowszych GrandTourney-*.log (wedlug CreationTimeUtc, kopia Armoury Log.Prune). Bez klucza (decyzja domyslna (noc 14.11): to tylko nazwa pliku logu).
+
+**Ryzyko / co sprawdzic:** kontrola calosci: _path ustawiany tylko w Log.Init (jedno wywolanie z SubModuleMain.OnSubModuleLoad); Info/Error/Player bez zmian. Nikt w kodzie ani w narzedziach autotestu (tools/, bannerlord-autotest src/skrypty) nie czyta pliku GrandTourney.log po nazwie - jedynie dokumenty (CHANGELOG, docs) wspominaja stara nazwe. Wzorzec Prune obejmuje tylko GrandTourney-*.log w katalogu modulu. W grze: w Modules/GrandTourney po starcie plik GrandTourney-<data>.log z naglowkiem "=== Grand Tourney", brak GrandTourney.log, po 13 startach nadal 12 plikow.
 
 **Status:** DO SPRAWDZENIA
 
