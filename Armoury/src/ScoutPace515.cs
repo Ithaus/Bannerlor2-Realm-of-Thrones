@@ -81,8 +81,8 @@ namespace Armoury
             // scalenie 514+515: BK Sjofarandi Pathfinder (Perk514.SpeedPost, +3% las / plaza dla wodza) podnosi sufit jak perki gry (515.md, zasada 0)
             float bkPath = Perk514.PathShare(mp);
             if (bkPath > 0f) { probe.AddFactor(bkPath); mask |= 256; }
-            if (scout == null && bkPath > 0f) return Math.Max(0f, probe.ResultNumber - 1f);
-            if (scout == null && (army0 == null || army0.LeaderParty == null || army0.LeaderParty == mp)) return 0f;   // recenzja 515: tanie odrzucenie
+            // kontrola scalenia: bez wczesnego powrotu - czlonek armii bez zwiadowcy z BK Pathfinder dostaje tez CallToArms wodza armii (blok nizej)
+            if (scout == null && bkPath <= 0f && (army0 == null || army0.LeaderParty == null || army0.LeaderParty == mp)) return 0f;   // recenzja 515: tanie odrzucenie
             if (scout != null)
             {
                 TerrainType face = TerrainType.Plain;

@@ -65,6 +65,7 @@
 
 **Status:** DO SPRAWDZENIA (galaz noc/515-mapa-naval z 3fb9ed48; Armoury.dll i RealisticCaptivity.dll zbudowane, 0 bledow; nie wgrane; md5 przed commitem Armoury.dll e9966e4f, RealisticCaptivity.dll 4e953a20; po recenzji Armoury.dll 0ea372dd, RealisticCaptivity.dll bez zmian).
 - Scalenie (galaz noc/scal-perki, 14.11): zasada "BK Sjofarandi Pathfinder a sufit kolumny" PRZYJETA - Perk514.PathShare (te same warunki co Perk514.SpeedPost: klucz BkPerkHalvesLifestyle, wodz partii z perkiem, las / plaza) doliczany w ScoutPace515.PerkShare (takze dla partii bez zwiadowcy); w linii doby 515 licznik "BK Pathfinder", w linii startu na liscie perkow.
+- Kontrola scalenia (14.11): w PerkShare usuniety wczesny powrot przy braku zwiadowcy i premii BK Pathfinder - pomijal CallToArms wodza armii dla czlonka armii bez zwiadowcy w lesie / na plazy; teraz BK Pathfinder tylko wylacza tanie odrzucenie (warunek bkPath <= 0f), reszta liczy sie jak dotad.
 
 ## 514 (perki 70-98 audytu): Armoury - polowki perkow BK dopisane wedlug opisow (klucze BkPerkHalvesCourt, BkPerkHalvesLifestyle, BkPerkHalvesBattle)
 
