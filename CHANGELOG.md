@@ -17,7 +17,7 @@ Klucz NIE: Vf null, F = 1, stol / 1 = stol (bit w bit), linie bez dopiskow 497-q
 
 **Ryzyko / co sprawdzic:** recenzja 497-q (krok poprawek): (d) zmienia porownanie A7 tylko w okregach z licznikiem Z (stol gry rf.Own wobec stolu Planu / F - ta sama miara bez czynnikow, jak zywiec od Z5); przed wgraniem zgrepowac w logu autotestu "cel produkcji zamiast celu na targ 0" i sprawdzic towary tych okregow (ryby, welna). Petla zwrotna: F zboza rosnie z udzialem targu w plonie (s > 1), a cel stol / F spada - sprawdzic, czy "cel na targ zdjety" i "trzymane fachem" nie oscyluja miedzy kolejnymi Planami; jesli tak - vfT z samego roku urodzaju (PostY/PreY). Porownac "cel na targ zdjety X" z nadmiarem w linii "KS: bilans Westeros" (oczekiwane tylko 2-3 punkty z ok. 12%). Klucz NIE: Vf null - Prod nigdy, vfT = 1 (bit w bit). Kontrola calosci w kodzie: FhT czytaja tylko ApplyFach (luka do celu) i FachFinish (Tm = T - stol -> KsFach.T -> FachOf -> ld.FachKg -> Rule.cs A7 fT). Lista "najwiekszy niedobor" liczy got = P - stol wobec Tm, wiec zostaje spojna. Mianownik k (497-p) i OVal / F sa bez zmian. Vf jest tylko odczytywane (watek roboczy) i nie dochodzi zadne nowe liczenie. Pomiar 490 czyta ld.VfNum/VfDen i res.S490 na watku glownym, tak jak dotad. Ryzyka: (i) okreg ze stolem duzo wiekszym od bazy (ok. 16x przy F 1.06) dostaje cel 0 i gra zdejmuje mu fach (np. wies rybacka moze wrocic do zera); sprawdzic "cel 0 przez stol / F" w linii fachu. (ii) Przy F < 1 (Essos, zly rok) - po recenzji cel bez zmian (tylko licznik L). (iii) To zdejmuje tylko przeciek stolu, szacunkowo 2-3 punkty z 12% nadmiaru zboza W (ok. 300 szt./d bez czynnikow). Nie jest to cala naprawa zboza: k nie odejmuje podazy okregow bez fachu (m106), a z 497 prawie caly Westeros jest "niezbiezny". Nastepny krok to test z KsVillageTradeKeep NIE przy 497 TAK. (iv) Zywiec: oczekiwane w 490 "Plan x F / gra x F" ok. "Plan / gra Produce (rece)", a F gry zywca W ok. 1.02-1.03. Zostaje rozjazd rak (ok. 0.87), czyli tempo hamulcow A7/f20. To decyzja projektowa dla Jeffa (osobny klucz), nie blad 497. Oczekiwane mniej rak z sheep_farm w linii fachu (dawcy). (v) Dwie sesje nie sa deterministyczne (szum ok. +-5% poziomu przy wlaczeniu KS); porownywac wzrost od wlaczenia.
 
-**Status:** DO SPRAWDZENIA
+**Status:** WGRANE 230 (14.11 ~10:05, po autotescie at-497q2: 220/220 dob, 23 bledy cudze, 0 potkniec; Armoury ea06b3b9, GrandTourney 5f67df14).
 
 ## 497: Plan KS zna mnoznik budynkow wsi (ScaleRates) i urodzaj roku/ziemi
 
@@ -34,7 +34,7 @@ Klucz NIE: PreY/PostY nie powstaja, Vf null, Plan co do bitu jak dotad (zmienia 
 
 **Ryzyko / co sprawdzic:** kontrola calosci w kodzie: (a) KsDeliver.Produce (gra) nie czyta Vf - brak podwojnego liczenia; ScaleRates/PlanBack/mkByM bez zmian. (b) Czytelnicy wyniku Planu: udzialy rak (X) ida do gry - gra liczy Produce na nich i doklada te same czynniki, wiec targ = Plan z czynnikami; ceny cienia i krok 8 (sprzedaz wsi, praca domowa) licza z podazy z czynnikami - jak gra sprzedaje; linia "na targ (plan doba N)", Rule.cs (regula przelaczen) i fach licza bez czynnikow jak dotad (linia "na targ" pokaze mniej zboza niz ksiega - to oczekiwane). (c) Rampa beta po oknie startu = 1 - bez podwojnej korekty. (d) Zbieznosc: F stale w czasie jednego Planu (jak przydatnosc ziemi) - bez sprzezenia w rownowadze; miedzy Planami F zalezy lekko od udzialu targu w plonie (wiecej rak w zbozu -> troche wieksze F), przyciete 0.5-2.0. (e) Regale (rudy, drewno, sol za cena) bez czynnikow - kopalnie BK w ScaleRates zostaja poza Planem (s rud z Market 0 = 1). (f) PairFood: prog wyzywienia widzi F takze na czesci zjadanej (rok urodzaju dotyczy tez stolu; s tylko na targu) - male zawyzenie kcal przy ScaleRates. (g) Po wczytaniu pierwszy Plan bez czynnikow (VfNum z przeliczenia okregow, co 7 dob na zmiane) - czynniki dochodza okreg po okregu. (h) Mieso - oscylacja przydzialu (479-k) to osobna sprawa, tu nie ruszana. (i) 497-p (recenzja): zima - VillageCut tnie plon przed stolem okregu, a stol bierze pelna potrzebe, wiec targ spadal do ~0, mieszanka stol/targ do 1 i F do samego roku urodzaju (bez ScaleRates); Flip324 przelicza wszystkie okregi na zmiane pory, wiec Plany zimowe oddawalyby rece zbozu i nadmiar wracal co rok (wahanie celu, nie zbieznosc). Poprawka: ComputeDistrict zapisuje czesc zimowa czynnika (DistResult.WinterF = 1 - VillageCut/TownCut, maska 297 towarow oszczedzonych); Vf497Note w zimie zostawia ostatnie czynniki okregu, a bez nich (pierwszy rachunek w zimie) liczy mieszanke na podstawie bez zimy (na targ' = (stol + targ) / WinterF - stol); czesci rak (spustoszenie, wojna) nie dzielimy - Plan ma je w Wf. Linia 490: "rachunki zimowe: czynniki zostawione N, odbudowane bez zimy M". (j) 497-p (recenzja 2): fach - k mianownik z czynnikami (bez tego przy k < 1 fach przestrzelal o F, np. zboze Westeros x1.10); klucz NIE: F = 1, suma ta sama co do bitu, linia fachu bez nowego dopisku. Ziemia zmeczona (TiredLand.KsStep) wyjeta z F - zostaje tylko w grze (R3-06d); Plan nie widzi juz kary za zajecie ziemi wlasnego okregu (bez petli Plan -> ziemia -> F -> Plan); rozjazd 490 moze pokazac reszte rzedu ziemi (+-1-2%). Sprawdzic w logu: linia fachu - "okregi zboza (wheat_farm) trzymane fachem" (oczekiwane malo, gdy k < 1), k zboza W nieco nizsze niz przed 497-p. Oczekiwane w logu: linia 490 Westeros zboze - Plan z czynnikami na targ ~ ksiega (1.00 +- 0.05) po 2-3 Planach, Plan bez czynnikow - mniej rak w zbozu (linia "zajecia" wheat_farm w dol); Essos bez wiekszej zmiany.
 
-**Status:** DO SPRAWDZENIA
+**Status:** WGRANE 230 (14.11 ~10:05, po autotescie at-497q2: 220/220 dob, 23 bledy cudze, 0 potkniec; Armoury ea06b3b9, GrandTourney 5f67df14).
 
 ## 496: GrandTourney - log z data w nazwie, 12 ostatnich sesji
 
@@ -46,7 +46,7 @@ Klucz NIE: PreY/PostY nie powstaja, Vf null, Plan co do bitu jak dotad (zmienia 
 
 **Ryzyko / co sprawdzic:** kontrola calosci: _path ustawiany tylko w Log.Init (jedno wywolanie z SubModuleMain.OnSubModuleLoad); Info/Error/Player bez zmian. Nikt w kodzie ani w narzedziach autotestu (tools/, bannerlord-autotest src/skrypty) nie czyta pliku GrandTourney.log po nazwie - jedynie dokumenty (CHANGELOG, docs) wspominaja stara nazwe. Wzorzec Prune obejmuje tylko GrandTourney-*.log w katalogu modulu. W grze: w Modules/GrandTourney po starcie plik GrandTourney-<data>.log z naglowkiem "=== Grand Tourney", brak GrandTourney.log, po 13 startach nadal 12 plikow.
 
-**Status:** DO SPRAWDZENIA
+**Status:** WGRANE 230 (14.11 ~10:05, po autotescie at-497q2: 220/220 dob, 23 bledy cudze, 0 potkniec; Armoury ea06b3b9, GrandTourney 5f67df14).
 
 ## 495: prognoza zlota gracza (345/361b) - podatek warsztatow z kolejki po wyplacie poprzedniej doby
 
@@ -58,7 +58,7 @@ Klucz NIE: PreY/PostY nie powstaja, Vf null, Plan co do bitu jak dotad (zmienia 
 
 **Ryzyko / co sprawdzic:** kontrola calosci: PendingOwnerTax tylko czyta _otPay (bez zmiany stanu); kolejke zapelnia tylko ClanPayPost (wyplata), nie moduly taktu - migawka z TickBegin to dokladnie to, co pobierze OwnerTaxDaily (ArmouryBehavior:3090) w tym takcie, najwyzej mniej przy pustej kiesie (OwnerTaxDaily bierze najwyzej kiese). Kolejnosc wyplata/takt zalezna od godziny wczytania - migawka przed taktem jest poprawna w obu ukladach. Po wczytaniu kolejka nie jest zapisywana: migawka 0 = prognoza 0, takt tez 0. OtKey dalej w _fcKeys (otDone) - podatek nie wpada do "nieregularne". Pary udzialu (historia) bez zmian - galaz udzialu dziala dalej w podpowiedzi. Rozgrywka bez zmian (zadne zloto nie plynie inaczej). W grze: linia dobowa "poprawki 345 ... podatek warsztatow 495 (kolejka przed taktem 1) -X" z X rownym "podatek warsztatow w takcie tej doby" i rozjazd w dobach bez wyplat innych niz warsztaty bliski 0 (zostaje tylko blad "warsztaty do wyplaty").
 
-**Status:** DO SPRAWDZENIA
+**Status:** WGRANE 230 (14.11 ~10:05, po autotescie at-497q2: 220/220 dob, 23 bledy cudze, 0 potkniec; Armoury ea06b3b9, GrandTourney 5f67df14).
 
 ## 494: CloseRanks - alarm 146 tylko przy sytuacjach, w ktorych RBM naprawde decyduje o szyku
 
@@ -70,7 +70,7 @@ Klucz NIE: PreY/PostY nie powstaja, Vf null, Plan co do bitu jak dotad (zmienia 
 
 **Ryzyko / co sprawdzic:** kontrola calosci: `sure` czyta tylko `_sitSure` (licznik + warunek UWAGI w Write) - decyzje szyku, `sit`, `gap`, `contact`, 310 i liczniki RBM bez zmian. InfRangedGap liczony tylko przy `sit` (szyk AI piechoty od 30 w Advance / Charge, co 0.5 s) - koszt jak FootGap. Kryterium jest ostrozniejsze niz RBM (FindSignificantEnemy ma zapasowe zwracanie dowolnego szyku, np. jedynego szyku wroga) - mniej "pewnych" sytuacji, wiec UWAGA rzadziej, nigdy czesciej. Bitwa bez kampanii (custom battle) - _bandit false, jak RBM. Alarm z logu 13.11 18-20-15 sprawdzic tak samo (z kim byla bitwa). W grze: bitwa z bandytami - "pominiete: N, bitwa z bandytami" i brak UWAGI; bitwa lordow (autotest armii 200 vs 240) - pewne > 0 i wywolan latki > 0.
 
-**Status:** DO SPRAWDZENIA
+**Status:** WGRANE 230 (14.11 ~10:05, po autotescie at-497q2: 220/220 dob, 23 bledy cudze, 0 potkniec; Armoury ea06b3b9, GrandTourney 5f67df14).
 
 ## 493: wsie poboczne - werbunek wedlug reputacji wsi glownej
 
@@ -82,7 +82,7 @@ Klucz NIE: PreY/PostY nie powstaja, Vf null, Plan co do bitu jak dotad (zmienia 
 
 **Ryzyko / co sprawdzic:** kontrola calosci: TrustIdx wolany tylko w LvQuoteFor i sondzie LevyProbe (PbLiftTrust podniesie relacje mniej razy - petla do PbTrustWant 3, zadnej stalej liczby krokow; `idx >= 1` / `q.Idx < 1` dalej znaczy "gra odmawia"). Dzienny naplyw rosnie o 1/6 na kazdym poziomie ponizej 6 (indeks 0 -> 1/6 x 3% cap, sr. wies ok. 3 ludzi/dobe w etapie 1); pula 10%, odnowa, podloga Room, cena i zaplata do kiesy wsi okregu bez zmian - nic z niczego. Levy rodu (1/5 Muster) lekko rosnie. CanonWarBalance.Levers.cs:138 (`i < max`, regula AI gry) celowo bez zmian. Klucza nie ma w Armoury.json Jeffa (nowy - domyslna TAK zadziala). W grze: przy Littlecross linia doby m113 "werbunki >= 1" i brak "odmowy ... zaufanie" przy tej samej relacji; linia werbunku "zaufanie 1".
 
-**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane - Jeff gra).
+**Status:** WGRANE 229 (14.11 07:10, po autotescie at-493b).
 
 ## 492: karawany wioza srebro do zlotnikow
 
