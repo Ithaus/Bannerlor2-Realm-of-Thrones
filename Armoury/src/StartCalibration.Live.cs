@@ -70,6 +70,7 @@ namespace Armoury
             // indeks towaru dostawy (KsDeliver.ItemIds) i cel na targ w kg/d po k
             public int FachI = -1; public double FachKg;
             public bool FachLive;                              // m106 recenzja Z5: fach zywca (bydlo, swinie, owce) - regula A7 porownuje produkcje (na targ + zjedzone)
+            public bool FachProd;                              // 497-q recenzja: FachKg to cel produkcji (cel na targ spadl do 0 przez stol / F) - A7 porownuje na targ + zjedzone
             // 324 (glod zimy, StartCalibration.Glod324.cs; pamiec sesji, z ostatniego przeliczenia okregu): brak wlasnego stolu (racje/d - koszyk, ktorego dom nie robi; NaN - brak
             // rachunku), koszyk jedzenia pokryty dzis ze stodoly wsi (racje/d i kcal/d) i kg zboza zdjete z koszyka (zboze, ktorego wies nie kupi w miescie)
             public double DefR324 = double.NaN, BarnR324, BarnKcal324, BarnGrainKg324;
@@ -364,9 +365,9 @@ namespace Armoury
             if (R != null && R.DistFach != null && ld != null && ld.Id != null && R.DistFach.TryGetValue(ld.Id, out f) && f != null && f.G >= 0 && f.G < KsTab.NG && f.T > 0)
             {
                 int it = f.G == KsTab.GMeat ? IMeat : GoodToItem[f.G];
-                if (it >= 0) { ld.FachI = it; ld.FachKg = f.T; ld.FachLive = f.G == KsTab.GCow || f.G == KsTab.GHog || f.G == KsTab.GSheep; return; }
+                if (it >= 0) { ld.FachI = it; ld.FachKg = f.T; ld.FachLive = f.G == KsTab.GCow || f.G == KsTab.GHog || f.G == KsTab.GSheep; ld.FachProd = f.Prod; return; }
             }
-            if (ld != null) { ld.FachI = -1; ld.FachKg = 0; ld.FachLive = false; }
+            if (ld != null) { ld.FachI = -1; ld.FachKg = 0; ld.FachLive = false; ld.FachProd = false; }
         }
 
         /// <summary>m106-wozy P1: odbior Planu w stanie zastosowanym - cel fachu kazdego okregu od nowa (co 7 dob z Planem; klucz wylaczony - Plan bez DistFach: cele zerowane).</summary>

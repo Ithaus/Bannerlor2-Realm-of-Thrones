@@ -311,7 +311,8 @@ namespace Armoury
                         // sa w ld.Res, a w celu Planu nie - wieloletnia zima Westeros dawala "niedobor" ponad potrzebe Planu); zywiec - produkcja (na targ + zjedzone: Own ubija zywiec
                         // na stol, a chec zjedzenia zywca w celu = 0)
                         var rf = ComputeDistrict(ld, false, null);
-                        fM = rf != null ? rf.MarketKg[ld.FachI] + (ld.FachLive ? rf.Own[ld.FachI] : 0.0) : ld.Res.MarketKg[ld.FachI];
+                        // 497-q recenzja: FachProd - cel produkcji z Planu (cel na targ 0 przez stol / F), ta sama miara co zywiec
+                        fM = rf != null ? rf.MarketKg[ld.FachI] + (ld.FachLive || ld.FachProd ? rf.Own[ld.FachI] : 0.0) : ld.Res.MarketKg[ld.FachI] + (ld.FachProd ? ld.Res.Own[ld.FachI] : 0.0);
                         fT = ld.FachKg;
                         double kgI = _itemKg != null && ld.FachI < _itemKg.Length ? _itemKg[ld.FachI] : 10.0;
                         if (fM < 0.95 * fT)
