@@ -1138,6 +1138,9 @@ namespace Armoury
                 string daypass = DayPass.Export();
                 SaveText.Sync(dataStore, "arm_daypass", ref daypass);
                 if (dataStore.IsLoading) DayPass.Import(daypass);
+                string perk511 = Perk511.Export();   // 511 (perki): ksiega wlasnej roboty gracza (ArtisanSmith)
+                SaveText.Sync(dataStore, "arm_perk511", ref perk511);
+                if (dataStore.IsLoading) Perk511.Import(perk511);
                 string nightrest = NightRest.Export();
                 SaveText.Sync(dataStore, "arm_nightrest", ref nightrest);
                 if (dataStore.IsLoading) NightRest.Import(nightrest);
@@ -1672,6 +1675,7 @@ namespace Armoury
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("CirculationWindows.OnPartyDestroyed", CirculationWindows.OnPartyDestroyed));    // paczka 169: kiesy partii bez wodza, ktore znikaja z mapy (tylko log) - MUSI byc pierwszym nasluchem MobilePartyDestroyed
             Seal31.RegisterEvents(this);   // 3.1 (31): Reset stanu kampanii; nasluch MobilePartyDestroyed DRUGI (biegnie przedostatni - po 3.2 i 112, przed ksiega obiegu), OnPartyRemoved, upadek krolestw, zdarzenia zlota
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => Perk511.OnNewGame());   // 511 (perki): ksiega wlasnej roboty z poprzedniej gry
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => DayPass.Clear());   // przeglad 07.10: doby kuzni z poprzedniej gry
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => CamelLaw.OnNewGame());   // E6/M2 (208): wielblady tylko w Qarthu - tylko nowa kampania (flaga w zapisie)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => Bloomery.OnNewGame());   // E6/R1 (214): wytop przy kopalni - tylko nowa kampania (flaga w zapisie)
@@ -1950,6 +1954,7 @@ namespace Armoury
             CampaignEvents.OnClanChangedKingdomEvent.AddNonSerializedListener(this, FallenCrown.OnClanChangedKingdom);
             CampaignEvents.MakePeace.AddNonSerializedListener(this, FallenCrown.OnMakePeace);   // G14: druga strona ostatniego pokoju (upadek przy stole pokoju)
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, PlayerSale430.OnPlayerExchange);   // 430 (A6): przyrost koszykow na polce miasta do pamieci sprzedazy gracza (przed sprzataniem ekranu)
+            CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, Perk511.OnPlayerExchange);   // 511 (perki): sprzedane sztuki wlasnej roboty schodza z ksiegi
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, SellByCondition.OnPlayerExchange);   // cena sprzedazy sprzetu: kazda sprzedaz gracza do handel.log (tylko log)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("PeopleLedger.OnMapEventEnded", PeopleLedger.OnMapEventEnded));
             CampaignEvents.OnTroopRecruitedEvent.AddNonSerializedListener(this, PeopleLedger.OnTroopRecruited);
@@ -3013,7 +3018,8 @@ namespace Armoury
 
         private void OnDailyTickBodyInner()
         {
-            try { Cost174.Daily(); } catch (Exception e) { Log.Error("Cost174.Daily", e); } DayProfile.Lap("Cost174.Daily");   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
+            try { Cost174.Daily(); } catch (Exception e) { Log.Error("Cost174.Daily", e); } DayProfile.Lap("Cost174.Daily");
+            try { Perk511.Daily(); } catch (Exception e) { Log.Error("Perk511.Daily", e); }   // 511 (perki kuzni): linia doby i przyciecie ksiegi wlasnej roboty do sakw   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
             try { PerfD2.Daily(); } catch (Exception e) { Log.Error("PerfD2.Daily", e); } DayProfile.Lap("PerfD2.Daily");   // perf-d2d3: linia "Szybkosc doby (perf-d2d3)" za okres od poprzedniego taktu (tylko log) i straznik podatku miast raz na dobe   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
             try { StoryGuard.Daily(); } catch (Exception e) { Log.Error("StoryGuard.Daily", e); } DayProfile.Lap("StoryGuard.Daily");   // 396: straz fabuly PIERWSZA w dobie (przed zaraza, murami, lochem) - przeliczenie 32 postaci, linia doby tylko gdy cos zaszlo
             try { HeroWounds.Daily(); } catch (Exception e) { Log.Error("HeroWounds.Daily", e); } DayProfile.Lap("HeroWounds.Daily");   // 401: ksiega ran po strazy fabuly, przed zaraza - termin loza, wstajacy, linia "Rany (HW): dzien"

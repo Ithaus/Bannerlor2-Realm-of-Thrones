@@ -420,6 +420,27 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public int LegendarySkillNeeded { get; set; } = 250;
 
+        // 511 (perki) - perki kowalskie w naszej kuzni
+        [SettingPropertyBool("Smithing Perks Lighten Your Forge", HintText = "Practical Smith (-50%) and the Banner Kings Smith lifestyle perk (-10%) lighten every piece of your own forge too: armour from the Craft tab, bows, crossbows, ammunition and your own projects. Smithing XP still counts the full work", RequireRestart = false)]
+        [SettingPropertyGroup("Mending it yourself")]
+        public bool PerkSmithStamina { get; set; } = true;
+
+        [SettingPropertyBool("Smith Perk Cheaper Forge Hire", HintText = "the Banner Kings Smith lifestyle perk makes your forge hire 15% cheaper also with historical forge hire (a day of the forge, the hourly rate and the old per-piece fee)", RequireRestart = false)]
+        [SettingPropertyGroup("Mending it yourself")]
+        public bool PerkSmithHireDiscount { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Iron Maker Bloom Bonus", 0.00f, 1.00f, "0.00", HintText = "Efficient Iron Maker: this many more crude iron bars from one iron bloom at your forge (0.2 = +20%); the bloom is still used up", RequireRestart = false)]
+        [SettingPropertyGroup("Mending it yourself")]
+        public float IronMakerBloomBonus { get; set; } = 0.2f;
+
+        [SettingPropertyBool("Artisan Smith For Your Own Work", HintText = "Artisan Smith: the lower trade penalty when selling covers the armour, bows and ammunition you forged yourself, not only weapons from the smithing screen", RequireRestart = false)]
+        [SettingPropertyGroup("Mending it yourself")]
+        public bool PerkArtisanSmithOwnWork { get; set; } = true;
+
+        [SettingPropertyBool("Craftsman Perk Better Quality", HintText = "the Banner Kings Craftsman lifestyle perk: a 5% chance that a piece from your forge comes out one quality step better", RequireRestart = false)]
+        [SettingPropertyGroup("Mending it yourself")]
+        public bool PerkCraftsmanQuality { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Smelting Return Share", 0.00f, 1.80f, "0.00", HintText = "share of the metal that comes back when you break a piece down", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
         public float SmeltingReturnShare { get; set; } = 0.45f;
@@ -13360,6 +13381,12 @@ namespace Armoury
             s.LegendaryValueFloor = LegendaryValueFloor;
             s.LegendaryMaterialFactor = LegendaryMaterialFactor;
             s.LegendarySkillNeeded = LegendarySkillNeeded;
+            // 511 (perki)
+            s.PerkSmithStamina = PerkSmithStamina;
+            s.PerkSmithHireDiscount = PerkSmithHireDiscount;
+            s.IronMakerBloomBonus = IronMakerBloomBonus;
+            s.PerkArtisanSmithOwnWork = PerkArtisanSmithOwnWork;
+            s.PerkCraftsmanQuality = PerkCraftsmanQuality;
             s.SmeltingReturnShare = SmeltingReturnShare;
             s.SmeltingSkillBonus = SmeltingSkillBonus;
             s.LoreSeedAfterFinalStats = LoreSeedAfterFinalStats;

@@ -277,7 +277,7 @@ namespace Armoury
         /// plyta (Stark Knight Armor: 298) byla NIEOSIAGALNA dla kogokolwiek.
         /// Od teraz jedna regula dla calej kuzni: tier x StaminaPerTier,
         /// x1.5 dla drobnej roboty (helmy, rekawice) - jak przy naszym kowadle.</summary>
-        internal static void RangedStamina(ItemObject __0, ref int __result)
+        internal static void RangedStamina(ItemObject __0, Hero __1, ref int __result)
         {
             try
             {
@@ -290,7 +290,7 @@ namespace Armoury
                            || t == ItemObject.ItemTypeEnum.LegArmor || t == ItemObject.ItemTypeEnum.HandArmor
                            || t == ItemObject.ItemTypeEnum.Cape || t == ItemObject.ItemTypeEnum.HorseHarness;
                 if (!ranged && !armour) return;
-                __result = Recipes.For(item).Stamina;
+                __result = Perk511.Stamina(Recipes.For(item).Stamina, __1);   // 511 (perki): PracticalSmith i BK Smith takze dla naszej receptury (NoPerk - XP pracy bez perkow)
             }
             catch { }
         }

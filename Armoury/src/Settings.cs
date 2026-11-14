@@ -133,6 +133,12 @@ namespace Armoury
         public float LegendaryValueFloor = 25000f;         // an unbuyable piece worth at least this much is a LEGEND - legendary bills and the one-of-a-kind rule apply
         public float LegendaryMaterialFactor = 4f;         // a legend's bill: every material count multiplied by this, plus the noblest steel on top. With Recipes By Mass: every kilogram of every material multiplied by this (the master keeps only the best of each) and all its metal is the noblest steel - a bow still takes no metal
         public int LegendarySkillNeeded = 250;             // no legend leaves the forge below this Smithing
+        // 511 (perki) - perki kowalskie w naszej kuzni (audyt perkow 14.11, punkty 40, 41, 42, 91, 92)
+        public bool PerkSmithStamina = true;               // Practical Smith (-50%) and the Banner Kings Smith lifestyle perk (-10%) lighten every piece of your own forge too: armour from the Craft tab, bows, crossbows, ammunition and your own projects. Smithing XP still counts the full work
+        public bool PerkSmithHireDiscount = true;          // the Banner Kings Smith lifestyle perk makes your forge hire 15% cheaper also with historical forge hire (a day of the forge, the hourly rate and the old per-piece fee)
+        public float IronMakerBloomBonus = 0.2f;           // Efficient Iron Maker: this many more crude iron bars from one iron bloom at your forge (0.2 = +20%); the bloom is still used up
+        public bool PerkArtisanSmithOwnWork = true;        // Artisan Smith: the lower trade penalty when selling covers the armour, bows and ammunition you forged yourself, not only weapons from the smithing screen
+        public bool PerkCraftsmanQuality = true;           // the Banner Kings Craftsman lifestyle perk: a 5% chance that a piece from your forge comes out one quality step better
         public float SmeltingReturnShare = 0.45f;          // share of the metal that comes back when you break a piece down
         public float SmeltingSkillBonus = 0.002f;          // extra recovery per point of Smithing
 
