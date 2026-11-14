@@ -217,7 +217,7 @@ namespace Armoury
                     parts.Sort(StringComparer.Ordinal);
                     Log.Info(P + "dzien " + day + " | ciosy RBM (bitwa, symulacja) " + _dCalls + ", z premia perkow doliczona " + _dAdded
                              + ", bez perkow " + _dNone + ", perki juz w wyniku (bez doliczania) " + _dAlready
-                             + " | XP przed / doliczone " + F1(_dBase) + " / +" + F1(_dXp)
+                             + " | XP przed / doliczone (przed waga FairXp - pelny efekt w linii 505) " + F1(_dBase) + " / +" + F1(_dXp)
                              + " | per perk: " + (parts.Count > 0 ? string.Join(", ", parts) : "-")
                              + " | latka " + _hook + ", potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
                 }

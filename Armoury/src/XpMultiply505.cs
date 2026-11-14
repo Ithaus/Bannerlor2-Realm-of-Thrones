@@ -77,12 +77,12 @@ namespace Armoury
             try
             {
                 if (_dHits > 0 || _dStumbles > 0)
-                    Log.Info(P + "dzien " + day + " | ciosy bitwy z waga " + _dHits + ", w tym z premia (perki / Naval / InspiringLeader) " + _dWithBonus
+                    Log.Info(P + "dzien " + day + " | wywolania XP za cios z waga (bohater 2x: umiejetnosc i udzial) " + _dHits + ", w tym z premia (perki / Naval / InspiringLeader) " + _dWithBonus
                              + " | XP dodawanie / mnozenie: wszystkie " + F1(_dAdd) + " / " + F1(_dMul)
                              + ", z premia " + F1(_dAddBonus) + " / " + F1(_dMulBonus)
                              + " | potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
             }
-            catch { }
+            catch (Exception e) { _stumbles++; Log.Error("XpMultiply505.Daily", e); }
             ResetDay();
         }
     }
