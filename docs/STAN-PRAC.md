@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 - WGRANIE 228 (486-q nocleg zgodny z rachunkiem, 491 rany na turnieju, 492 karawany wioza srebro do zlotnikow; bez autotestu - Jeff sprawdza w grze)
+
+- Armoury.dll md5 a97b2e28cc42498f8e6be06f5555c5d5, GrandTourney.dll md5 5a3e98b29b129b5519a58420eed928a1 = galaz noc/367c-jeniec-po-odejsciu (2f2dc3a4 + odstep CHANGELOG). CrashScribe bez zmian (62174c0a).
+- Jeff 14.11 "mozesz wgrywac" - wgrane bez autotestu (jak 227). Kopie przed: .bak-2026-11-14-przed-wgranie228 (Armoury 95f6ea4f = 227, GrandTourney 900e32bc), C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie228 i -przed).
+- Sprawdzone na grze Jeffa po 227 (log Armoury-2026-11-14_00-24-57): 0 BLAD, 0 wyjatkow; 484 dziala (bitwa: wbite 1, odbite slabe 3, kon nie-smiertelne 2); 487 57/57 zajazdow z droga; 488 tarcze z masy (185/190 -> 0/190 drozszych od sztuki); 486 naliczal, ale kuznia polykala platnosc (naprawione w 486-q); 485 jeszcze nie widziane (brak wizyty w zajezdzie); 490 linie co 7 dob.
+- Do sprawdzenia po 228: "Nocleg w miescie (486)" zaplacono = rachunek; "Rany szranek (491)" po turnieju; "Srebro do zlotnikow (492)" - karawany skierowane i sprzedane szt.; warsztat Jeffa 'Silversmith' (Lannisport) zaczyna cykle.
+
 ## STAN 14.11 - WGRANIE 227 (484-490, BEZ autotestu - decyzja Jeffa "wgrywaj od razu", sprawdzanie na jego grze)
 
 - Armoury.dll md5 95f6ea4fdaf50ca2f90279b432017084 = galaz noc/367c-jeniec-po-odejsciu 1c49d1ee (WGRANIE 226 + 484 wbite pociski, 485 karczma jedno krzeslo jedno miejsce, 486 nocleg w miescie co noc + wybor pokoju, 487 zajazdy dostaja drogi boczne, 488 tarcze z masy, 489 prog oszczednosci miast x1, 490 pomiar Plan-gra). CrashScribe bez zmian (62174c0a).
