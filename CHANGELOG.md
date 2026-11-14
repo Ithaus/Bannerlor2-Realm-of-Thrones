@@ -28,6 +28,11 @@
 
 **Status:** DO SPRAWDZENIA (build 0 bledow, niewgrane).
 
+**Recenzja 535 (poprawki):**
+- Petla zakup -> sprzedaz: sztuka z tej samej grupy, ktora juz lezy w zbrojowni po rozdaniu (`Result.Rem`), a ktos z brakujacych typow by jej uzyl, nie zostala wydana przez rozdzielacz DTE (klasa broni, tier, kolejnosc) - podglad dalej liczyl brak, wiec zakupy kupowaly co wizyte kolejna taka sama, a przy bronie bocznej (spoza papieru) sprzedaz nadwyzek tej samej wizyty (Sell przed Buy w OnEntered) oddawala lezaca kupcom za pol ceny. Teraz `MenPurse.IdleFor`: kazda lezaca pasujaca sztuka zdejmuje jeden brak przed zakupem (linia 535: "bez zakupu, bo w zbrojowni lezy niewydana sztuka tej grupy: N"), a `KeepOf` (Given + te same lezace sztuki, ta sama kolejnosc `SortedWants`) chroni je przed sprzedaza i zuzyciem musztry. Papier mial to samo przez FitFor (lezaca uzyteczna = "ma").
+- Settings.cs: komentarz-opis `DteMapBarShowsKitPreview` (z niego `tools/gen_mcm.py` bierze podpowiedz) byl przeniesiony na koniec linii `SideArmsAreOptional` - przywrocony na swoje miejsce (inaczej nastepne uruchomienie gen_mcm.py zostawiloby 533 bez opisu, a 535 z doklejonym cudzym).
+- Sprawdzone bez zmian: jedna regula Core w meldunku QM (316d - `missing` = Core, Q316-3: poczatek/koniec linii i "nic do meldowania (podglad: komplet)" bez zmian), Review the army, zbrojowni (EMPTY n of Core, OpenT bez bocznej), pasku 533, linii startu bitwy; K15 ZGODNE i 133c (t1k) na Missing; "Last battle" na Missing (rekord bitwy); przeliczenie po zakupie przez wersje zbrojowni w kluczu.
+
 ## 534: wies poboczna - kazde okienko werbunku losowane osobno (mieszanka chlopow i ludzi rodu), okno z cena wedlug rodzaju - Armoury (SideVillageVisit.Levy / Screen / LevyProbe, klucz istniejacy SideVillageHouseRecruit)
 
 **Problem:** Jeff, czat 15.11, po wpisie 531: w Bluefork Bend okno werbunku `chlopi 8, ludzie rodu 0`. Wyjasnienie: wies poboczna losowala RAZ na dobe jeden rodzaj dla wszystkich rekrutow (`TroopFor` - jedna oferta `(wioska, doba) -> CharacterObject`), wiec albo wszyscy chlopi, albo wszyscy Blackwood Recruit. Jeff: "nie wszyscy tego samego rodzaju - losuje w kazdym okienku, jesli wioska ma 5 okienek to losuje kazde okienko 5 razy kto bedzie".
