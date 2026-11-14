@@ -62,6 +62,7 @@ namespace Armoury
         {
             public int Kind; public Village V; public Hero H; public Settlement S; public float H0; public bool Done, Player, Off;
             public Hero NewOwner;   // 510 (perk 54): nowy pan miasta - platnik Rapid Development
+            public bool NoDestroyer;   // 510 recenzja (perk 53): DestroyPartyAction bez niszczyciela (rozwiazanie, nie zniszczenie) - bez ubezpieczenia
         }
 
         private static readonly Ctx[] _stack = new Ctx[4];
@@ -274,7 +275,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ 4. perki 5 000: okna DestroyPartyAction.ApplyInternal i OnSettlementOwnerChanged (warsztaty)
-        public static void InsPre(MobileParty __1, out Ctx __state)
+        public static void InsPre(PartyBase __0, MobileParty __1, out Ctx __state)
         {
             __state = null;
             try
@@ -282,7 +283,7 @@ namespace Armoury
                 if (__1 == null || !Live || !__1.IsCaravan || __1 == MobileParty.MainParty) return;
                 var owner = __1.Party != null ? __1.Party.Owner : null;
                 if (owner == null || !owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans)) return;   // ten sam warunek co gra (DestroyPartyAction.cs:19)
-                __state = new Ctx { Kind = KIns, H = owner, Player = owner == Hero.MainHero, S = __1.HomeSettlement };   // 510 (perk 53): S - miasto macierzyste karawany (platnik)
+                __state = new Ctx { Kind = KIns, H = owner, Player = owner == Hero.MainHero, S = __1.HomeSettlement, NoDestroyer = __0 == null };   // 510 (perk 53): S - miasto macierzyste karawany (platnik); bez niszczyciela - rozwiazanie
                 Push(__state);
             }
             catch (Exception e) { __state = null; Stumble("InsPre", e); }
@@ -348,7 +349,7 @@ namespace Armoury
                     perk = __4 == bonus && OwnsWorkshopIn(c.S, __2) && __2.GetPerkValue(DefaultPerks.Trade.RapidDevelopment);
                 }
                 if (!perk) return;                                               // inne zdarzenia w oknie perka (np. zwrot ceny warsztatu gracza - ChangeOwnerOfWorkshopAction) nie sa nasze
-                if (Perk510Gold.TradeGiftPayer(c.Kind == KIns, c.S, c.NewOwner, __2, ref __0, ref __1, ref __4)) return;   // 510 (perki 53/54): platnik - gildia miasta karawany / nowy pan miasta (gracz i AI)
+                if (Perk510Gold.TradeGiftPayer(c.Kind == KIns, c.NoDestroyer, c.S, c.NewOwner, __2, ref __0, ref __1, ref __4)) return;   // 510 (perki 53/54): platnik - gildia miasta karawany / nowy pan miasta (gracz i AI)
                 bool player = __2 == Hero.MainHero;
                 if (player)
                 {

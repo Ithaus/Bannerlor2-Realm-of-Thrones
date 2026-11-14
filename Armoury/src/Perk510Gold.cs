@@ -26,7 +26,7 @@ namespace Armoury
     ///        wodz partii, w ktorej jeniec siedzi (osada: jej wlasciciel). Placi rod jenca (krol - skarbiec) ta sama droga co reszte okupu (gotowka + dlug 168).
     ///  55 PerkManOfMeansRansom: okup gracza 178 (Ransom178.PlayerPrice; RC RansomAmountPatch podmienia kwote gry) gubil Man of Means (gra PlayerCaptivity.cs:171:
     ///        x (1 + SecondaryBonus) = x0.7). Teraz x0.7 w PlayerPrice i w PriceOf(gracz) (384).
-    ///  50 PerkManhunterAfterBk: BK (VanillaModelTweakPatches.cs:1215-1225) w mieście z polityka Enslavement podmienia cene szeregowego jenca na cene niewolnika -
+    ///  50 PerkManhunterAfterBk: BK (VanillaModelTweakPatches.cs:1215-1225) w miescie z polityka Enslavement podmienia cene szeregowego jenca na cene niewolnika -
     ///        premia Manhunter gry (+20%, sprzedajacy na ladzie) ginie. Postfiks po BK (Low; RC Last biegnie po nas): gdy BK zmienil wynik gry - x1.2 na tym samym
     ///        warunku co gra. Placi kupiec: zolnierzy w SellPrisonersAction placi osada kupujaca (RealPayer KPris, z tych samych wywolan modelu).
     ///  52 PerkSpringOfGoldFromMerchants: odsetki Spring of Gold (gra DefaultClanFinanceModel.cs:160-164: 0.1% kiesy glowy rodu dziennie, do 1 000; kazdy rod, takze
@@ -37,7 +37,7 @@ namespace Armoury
     ///  53/54 PerkTradeGiftsPaid: Insurance Plans (5 000 za zniszczona karawane) - wyplaca gildia (kiesa kupcow) miasta macierzystego karawany do wysokosci kiesy;
     ///        Rapid Development (5 000 za warsztat w miescie zdobytym przez wroga) - odkup placi nowy pan miasta z wlasnej kiesy (najwyzej tyle, ile ma).
     ///        Gracz i AI ta sama regula (dotad: AI 0 przez SmallGold TradePerkGiftsAiOff, gracz z niczego). Wpiecie: SmallGold.GivePrefix (ten sam okno i dopasowanie).
-    ///  104 PerkNavalPortGoldPaid: NavalDLC ShipTradeCampaignBehavior.OnSettlementEntered (:428-458): Salvage - licznik ceł miasta +40 za kazdy konwoj (z niczego),
+    ///  104 PerkNavalPortGoldPaid: NavalDLC ShipTradeCampaignBehavior.OnSettlementEntered (:428-458): Salvage - licznik cel miasta +40 za kazdy konwoj (z niczego),
     ///        ShipwrightsHand - rekrut do zalogi z niczego. Teraz: Salvage placi kasa konwoju (najwyzej tyle, ile ma; jak myto Tollgates w RealPayer),
     ///        ShipwrightsHand wylaczony (licznik "rekrut z niczego - nie dany"). MerchantPrince i MasterShipwright juz placi nadwyzka portu (181 ShipTradeThroughPort,
     ///        ShipsToPort181.P_Between) - bez zmian.
@@ -64,6 +64,7 @@ namespace Armoury
         private static long _hunterAdd;
         private static int _springClans, _springShort, _springNoShop;
         private static long _springDue, _springPaid;
+        private static int _insDisband;   // recenzja 510: karawany rozwiazane (bez niszczyciela) - bez ubezpieczenia
         private static int _insN, _insShort, _rapidN, _rapidShort, _rapidPlayerPays;
         private static long _insDue, _insPaid, _rapidDue, _rapidPaid;
         private static int _salvN, _salvShort, _handN, _handTroops;
@@ -88,8 +89,9 @@ namespace Armoury
             try
             {
                 if (captive == null) return 1.0;
-                if (RansomOn) f *= CaptorFactor(captive);
+                // recenzja 510: premie porywacza tylko dla jencow-lordow (gra GetPlayerRansomValue ich dla gracza nie liczy) - jedna cena gracza w 178/RC i w 384
                 if (captive == Hero.MainHero) f *= MeansFactor();
+                else if (RansomOn) f *= CaptorFactor(captive);
             }
             catch (Exception e) { Stumble("RansomFactor", e); return 1.0; }
             return f;
@@ -126,15 +128,19 @@ namespace Armoury
         {
             var c = CaptorOf(captive);
             if (c == null || c == captive) return 1.0;
-            double add = 0;
+            var pb = captive.PartyBelongedToAsPrisoner;
+            bool inCell = pb != null && pb.IsSettlement;
+            double add = 0, bb = 0;
             bool broker = false, kid = false;
-            // gra (DefaultRansomValueCalculationModel.cs:40-48): sprzedajacy prowadzi partie i ma perk; na morzu polowa
-            if (c.IsPartyLeader && c.GetPerkValue(DefaultPerks.Roguery.RansomBroker))
+            // gra (DefaultRansomValueCalculationModel.cs:40-48): sprzedajacy prowadzi partie i ma perk; na morzu polowa.
+            // Recenzja 510 - JEDNA REGULA: jeniec w partii - jak gra (wodz tej partii, polowa na morzu); jeniec w lochu - wlasciciel osady z perkiem, pelna premia
+            // bez warunku partii i morza (sprzedaje z lochu, nie z pokladu; cena tego samego jenca nie skacze wedlug tego, gdzie akurat jest wlasciciel)
+            if (c.GetPerkValue(DefaultPerks.Roguery.RansomBroker) && (inCell || c.IsPartyLeader))
             {
-                double b = DefaultPerks.Roguery.RansomBroker.PrimaryBonus;
+                bb = DefaultPerks.Roguery.RansomBroker.PrimaryBonus;
                 var mp = c.PartyBelongedTo;
-                if (mp != null && mp.IsCurrentlyAtSea) b *= 0.5;
-                add += b; broker = true;
+                if (!inCell && mp != null && mp.IsCurrentlyAtSea) bb *= 0.5;
+                add += bb; broker = true;
             }
             // BK (VanillaModelTweakPatches.cs:1229-1232): +30% za bohatera, perk stylu zycia Kidnapper sprzedajacego
             if (BkKidnapper(c)) { add += 0.3; kid = true; }
@@ -149,7 +155,7 @@ namespace Armoury
             catch { }
             // BK dolicza swoje 30% do wyniku gry z premia brokera (kolejno), wiec iloczyn - ta sama kolejnosc co gra + BK
             double f = 1.0;
-            if (broker) f *= 1.0 + DefaultPerks.Roguery.RansomBroker.PrimaryBonus * (c.PartyBelongedTo != null && c.PartyBelongedTo.IsCurrentlyAtSea ? 0.5 : 1.0);
+            if (broker) f *= 1.0 + bb;
             if (kid) f *= 1.3;
             return f;
         }
@@ -263,7 +269,7 @@ namespace Armoury
             }
             if (all == 0) { noShop = true; return 0; }
             var have = new Dictionary<Town, long>();
-            foreach (var kv in n) have[kv.Key] = Math.Max(0, kv.Key.Gold);
+            foreach (var kv in n) have[kv.Key] = PurseOf(kv.Key);
             long left = due, paid = 0;
             for (int round = 0; round < 2 && left > 0; round++)
             {
@@ -281,19 +287,35 @@ namespace Armoury
             return paid;
         }
 
+        /// <summary>Recenzja 510: "kiesa kupcow" miasta = nadwyzka kasy ponad zapas kupcow (TownPurse.Spare, jak A17Fix / Seal31 / BuildFunding) przy czynnym A1;
+        /// bez A1 - cala kasa miasta (nie mniej niz 0). Jedna regula dla Spring of Gold i Insurance Plans.</summary>
+        private static long PurseOf(Town t)
+        {
+            if (t == null) return 0;
+            return TownPurse.On ? TownPurse.Spare(t) : Math.Max(0, (long)t.Gold);
+        }
+
         // ================================================================ 53/54: Insurance Plans i Rapid Development z platnikiem
         /// <summary>SmallGold.GivePrefix (okno perka dopasowane: "nic -> wlasciciel" o kwocie premii). true - platnik ustawiony (dajacy i kwota), SmallGold nic wiecej
         /// nie robi; false - klucz wylaczony (SmallGold jak dotad). ins - Insurance Plans (home: miasto macierzyste karawany), inaczej Rapid Development (newOwner: nowy pan).</summary>
-        internal static bool TradeGiftPayer(bool ins, Settlement home, Hero newOwner, Hero recipient, ref Hero giverHero, ref PartyBase giverParty, ref int amount)
+        internal static bool TradeGiftPayer(bool ins, bool disbanded, Settlement home, Hero newOwner, Hero recipient, ref Hero giverHero, ref PartyBase giverParty, ref int amount)
         {
             if (!GiftsOn) return false;
             try
             {
                 long due = amount, pay = 0;
+                if (ins && disbanded)
+                {
+                    // recenzja 510: DestroyPartyAction bez niszczyciela = rozwiazanie (CaravanFlow, BK, DisbandPartyAction, smierc wlasciciela), nie zniszczenie -
+                    // decyzja 53 mowi o karawanie zniszczonej; gildia nie placi za rozwiazanie (kiesa z utargiem i tak wraca do wlasciciela)
+                    _insDisband++;
+                    amount = 0;
+                    return true;
+                }
                 if (ins)
                 {
                     var t = home != null && home.IsTown ? home.Town : null;
-                    if (t != null && home.Party != null) { pay = Math.Min(due, Math.Max(0, t.Gold)); if (pay > 0) giverParty = home.Party; }
+                    if (t != null && home.Party != null) { pay = Math.Min(due, PurseOf(t)); if (pay > 0) giverParty = home.Party; }   // recenzja: kiesa kupcow ponad zapas
                     _insN++; _insDue += due; _insPaid += pay; if (pay < due) _insShort++;
                 }
                 else
@@ -366,7 +388,7 @@ namespace Armoury
         /// <summary>Prefiks CampaignBattleRecoveryBehavior.RecoverMountWithChance: kon ze wzorca (z niczego) - nie dany (licznik). Klucz wylaczony - gra.</summary>
         public static bool VetGamePrefix(int __1)
         {
-            if (!VetOn) return true;
+            if (!VetOn || !HorseFate.DieOn) return true;   // recenzja 510: bez HorsesDieOnlyKilled nie ma zastepczego "rannego konia" w HorseFate - gra jak dotad
             _vetGameOff++; _vetGameRiders += Math.Max(0, __1);
             return false;
         }
@@ -377,7 +399,7 @@ namespace Armoury
         {
             try
             {
-                if (!VetOn || p == null || p.IsCurrentlyAtSea || !p.HasPerk(DefaultPerks.Medicine.Veterinarian)) return false;
+                if (!VetOn || !HorseFate.DieOn || p == null || p.IsCurrentlyAtSea || !p.HasPerk(DefaultPerks.Medicine.Veterinarian)) return false;
                 if (MBRandom.RandomFloat < DefaultPerks.Medicine.Veterinarian.SecondaryBonus) { _vetSaved++; return true; }
                 _vetLost++;
                 return false;
@@ -466,10 +488,12 @@ namespace Armoury
                 sb.Append("Perki 510 (okupy i zloto): dzien ").Append(day);
                 sb.Append(" | okup 178 z premia porywacza: jency ").Append(_rCaptives.Count).Append(" (Ransom Broker ").Append(_rBroker.Count).Append(", BK Kidnapper ").Append(_rKidnap.Count)
                   .Append("); Man of Means gracza (x0.7) - dob z wycena ").Append(_meansN);
-                sb.Append(" | Manhunter po BK: ").Append(_hunterN).Append(" wycen, +").Append(_hunterAdd).Append(" (placi kupujacy - RealPayer), na morzu bez premii ").Append(_hunterSea);
+                // recenzja 510: model wolany takze do samych wycen (RealPayer.PrisPre, ekran druzyny, SpoilsReport) - to liczba i suma WYCEN z premia, nie zaplat
+                sb.Append(" | Manhunter po BK: wycen z premia ").Append(_hunterN).Append(" (z podgladami), suma premii w wycenach +").Append(_hunterAdd)
+                  .Append(" (to nie kwota zaplacona; placi kupujacy wedlug ceny - RealPayer), na morzu bez premii ").Append(_hunterSea);
                 sb.Append(" | Spring of Gold z kies kupcow: rody ").Append(_springClans).Append(", nalezne ").Append(_springDue).Append(", zaplacone ").Append(_springPaid)
                   .Append(" (niedoplata u ").Append(_springShort).Append(", w tym bez warsztatow ").Append(_springNoShop).Append(')');
-                sb.Append(" | Insurance Plans z gildii miasta karawany: ").Append(_insN).Append(", nalezne ").Append(_insDue).Append(", zaplacone ").Append(_insPaid).Append(" (niedoplata ").Append(_insShort).Append(')');
+                sb.Append(" | Insurance Plans z gildii miasta karawany: ").Append(_insN).Append(", nalezne ").Append(_insDue).Append(", zaplacone ").Append(_insPaid).Append(" (niedoplata ").Append(_insShort).Append("), rozwiazane bez ubezpieczenia ").Append(_insDisband);
                 sb.Append(" | Rapid Development od nowego pana: ").Append(_rapidN).Append(", nalezne ").Append(_rapidDue).Append(", zaplacone ").Append(_rapidPaid).Append(" (niedoplata ").Append(_rapidShort)
                   .Append(", placil gracz ").Append(_rapidPlayerPays).Append(')');
                 sb.Append(" | NavalDLC Salvage z kasy konwoju: ").Append(_salvN).Append(", nalezne ").Append(_salvDue).Append(", zaplacone ").Append(_salvPaid).Append(" (niedoplata ").Append(_salvShort)
@@ -486,11 +510,25 @@ namespace Armoury
 
         private static string YN(bool b) { return b ? "tak" : "nie"; }
 
+        /// <summary>Recenzja 510: konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie) - stan sesji od zera. Latki (_wired, _hooksTried) sa na proces
+        /// i zostaja; obiekty perkow (BK Kidnapper, NavalDLC) czytane od nowa z menedzera obiektow nowej gry.</summary>
+        internal static void Reset()
+        {
+            Zero();
+            _startLogged = false;
+            _meansDay = -1;
+            _err.Clear();
+            _bkKid = null;
+            _navTried = false; _pSalvage = null; _pHand = null;
+            _hPris = null; _hV0 = 0;
+        }
+
         private static void Zero()
         {
             _rCaptives.Clear(); _rKidnap.Clear(); _rBroker.Clear();
             _meansN = _hunterN = _hunterSea = 0; _hunterAdd = 0;
             _springClans = _springShort = _springNoShop = 0; _springDue = _springPaid = 0;
+            _insDisband = 0;
             _insN = _insShort = _rapidN = _rapidShort = _rapidPlayerPays = 0; _insDue = _insPaid = _rapidDue = _rapidPaid = 0;
             _salvN = _salvShort = _handN = _handTroops = 0; _salvDue = _salvPaid = 0;
             _vetSaved = _vetLost = _vetGameOff = _vetGameRiders = 0;
