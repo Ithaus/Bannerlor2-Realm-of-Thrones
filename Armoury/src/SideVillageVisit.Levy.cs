@@ -296,7 +296,14 @@ namespace Armoury
         private static CharacterObject TroopFor(Settlement st, string uid, int today)
         {
             KeyValuePair<int, CharacterObject> o;
-            if (_lvOffer.TryGetValue(uid, out o) && o.Key == today && o.Value != null) return o.Value;
+            if (_lvOffer.TryGetValue(uid, out o) && o.Key == today && o.Value != null)
+            {
+                // 531 recenzja: rekrut rodu tylko we wsi nie gracza - kupno wsi (albo lenna) w ciagu dnia nie zostawia oferty rodu do konca doby
+                KeyValuePair<int, int> ok;
+                bool stale = _lvOfferKind.TryGetValue(uid, out ok) && ok.Key == today && ok.Value == 1 && (SideVillageFief.IsMine(uid) || OwnLands(st));
+                if (!stale) return o.Value;
+                _lvOffer.Remove(uid); _lvOfferKind.Remove(uid);
+            }
             var cul = st.Culture ?? (st.OwnerClan != null ? st.OwnerClan.Culture : null);
             CharacterObject basic = cul != null ? cul.BasicTroop : null, t = null;
             var c = Campaign.Current;

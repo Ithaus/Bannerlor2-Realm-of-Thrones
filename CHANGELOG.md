@@ -18,6 +18,8 @@
 - Szablon zwyklego klanu (drzewo kultury) daje pusta liste (bez zwyklego rekruta i elity) -> (b)/(c), nie "czlowiek rodu".
 - W grze: wies poboczna na ziemi Blackwoodow (np. Bluefork Bend) - w niektore doby oferta `blackwood_recruit` zamiast `river_recruit`; linia doby z odcinkiem 531; wies gracza i wies pana obcej kultury - chlop jak dotad.
 
+**Recenzja 531 (14.11):** zgodne z decyzja Jeffa; dane ROT sprawdzone skryptem (kazdy `kingdom_hero_party_*` szablon kultury ma w tier <= 1 tylko zwyklego rekruta kultury -> zwykle klany daja chlopa; 34 szablony rodow daja rekruta rodu tier 1, np. `clan_blackwood_party_template` -> `blackwood_recruit`, `clan_stark_party_template` -> `stark_volunteer`). Jedna poprawka: oferta doby (`_lvOffer`) trzymala rekruta rodu do konca dnia takze po kupnie wsi/lenna przez gracza w ciagu tej doby - `TroopFor` odrzuca teraz taka oferte (rodzaj 1 + wies juz gracza) i losuje od nowa (w linii doby taka wies moze sie wtedy policzyc dwa razy: raz jako rod, raz jako chlop). Bez zmian: `HouseLevies`, 493 `TrustIdx`, `LevyProbe`, 474-P5 `HouseQuote`.
+
 **Status:** DO SPRAWDZENIA (zbudowane, niewgrane - gra Jeffa wlaczona).
 
 ## 529: panika kompanii - kompania 10 ludzi (sztandary jak dotad, jeden na 50), bez rzutu 1/6 strat pod okiem lorda albo przed zwarciem, stan bitwy najwyzej x1.25 - Armoury (BannerCompanies)
