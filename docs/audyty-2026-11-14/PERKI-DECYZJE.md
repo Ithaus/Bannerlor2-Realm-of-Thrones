@@ -38,3 +38,4 @@ Nowe efekty 16, 20, 21, 23, 25a, 25b: zaakceptowane.
 - Statek: "plywanie statkiem to nie marsz, statek moze plynac a ja moge odpoczywac w kajucie" - morze = spoczynek (tratwa: ujemne bez zmian).
 - "jency i partie AI tez maja miec ten sam efekt" - leczenie tylko w spoczynku takze dla partii AI i jencow (gracza i AI).
 - Nosze (501): Jeff "tak zrob nosze".
+- Jeff 14.11: "lordowie stoja az sie wylecza a potem jada do zamku bo tam sie szybciej wylecza" -> 500-b (po 500-a): AI ciezko poturbowane (lord HP <= 10 albo duzy udzial rannych) staje obozem; po podleczeniu (lord > 15 HP, czesc rannych wstala) jedzie do najblizszej swojej/sojuszniczej twierdzy dokonczyc leczenie. Uzyc HeroWounds.Ai (juz wiezie rannego lorda do twierdzy). Kolizje: StrategicCampaignAI, BK, NightRest AI.
