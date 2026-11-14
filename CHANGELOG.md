@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 502 (P1 audytu perkow): CrashScribe - atuty BK z nagrody za bitwe liczone RAZ (byly podwojnie)
+
+**Problem:** audyt perkow 14.11 (docs/audyty-2026-11-14/PERKI.md, pkt A1): Commander Warband, Mercenary Famous Sellswords i styl Cataphract daja premie dwa razy - wplyw z bitwy x1.5625 zamiast x1.25, slawa x1.44 zamiast x1.20, x1.2544 zamiast x1.12, u wszystkich lordow. Dowod: log CrashScribe session-2026-11-14_13-09-07.log [13:12:50] dwie linie obok siebie: "BK atuty bitew (B10b): wpiete 2/2 ..." oraz "Mends: atuty BK z nagrody za bitwe (decyzja 4) - wplyw ... wpiete; slawa ... wpiete".
+**Przyczyna:** dwie niezalezne naprawy tej samej padajacej latki BK (BKBattleRewardTweakPatches, parametr 'party' w 1.4.8): Mends.BkRewardPerks (decyzja 4, 12.10, klucz BkBattleRewardPerks) i BkBattlePerks (B10b, klucz BkBattlePerksFix). Kazda sprawdza tylko postfiks wlasciciela "BannerKings", nie siebie nawzajem - obie wpiete na DefaultBattleRewardModel.CalculateInfluenceGain/CalculateRenownGain.
+**Zmiana:** Mends.BkRewardPerks wychodzi przy Config.BkBattlePerksFix = true (linia w logu "pominiete, dziala BK atuty bitew (B10b) ... (P1)"). Zostaje B10b (ma liczniki doby w logu). Przy BkBattlePerksFix = false dziala jak dotad droga Mends (jedna).
+**Ryzyko / co sprawdzic:** kontrola calosci: BkRewardPerks wolany tylko z OnSessionLaunched (Mends.cs:6799), B10b z wlasnego EnsureHooks - kolejnosc bez znaczenia, bo warunek to klucz, nie stan latek. Inne miejsca czytajace CalculateInfluenceGain/RenownGain w naszych modach: brak (grep). W logu: jedna linia "BK atuty bitew (B10b): wpiete 2/2" i linia Mends "pominiete ... (P1)"; liczniki B10b w linii doby bez zmian. Wplyw/slawa lordow z tymi atutami spadnie do wartosci z opisu BK.
+**Status:** DO SPRAWDZENIA (galaz noc/p1-podwojne-perki-bk z b7be8169; CrashScribe.dll 564070b5).
+
 ## 500-a: Armoury - leczenie w spoczynku takze dla partii AI i jencow (gracza i AI); morze = spoczynek (klucz AiHealOnlyAtRest, stawka marszu wspolna MovingHealPercent)
 
 **Problem:** Jeff 14.11, decyzje po wpisie 500: (1) "plywanie statkiem to nie marsz, przeciez statek moze plynac a ja moge odpoczywac w kajucie, nie ma to wplywu."; (2) "jency i partie Ai tez maja miec tn sam efekt" (leczenie pelne tylko w spoczynku, jak druzyna gracza w 500); (3) "to dobrze ze wojna sie spowolni". W 500 morze w ruchu liczylo sie jako marsz (10%), jency byli pomijani (RestCut: prisoners -> return), a partie AI leczyly sie w marszu pelna stawka. Zachowanie AI na mapie (odpoczynek po bitwie, jazda do twierdzy, unikanie ryzyka) to 500-b - NIE w tym wpisie. Dowodu z logu brak (zmiana zasady na zyczenie Jeffa, nie blad).

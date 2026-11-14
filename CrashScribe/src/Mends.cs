@@ -3218,6 +3218,10 @@ namespace CrashScribe
             try
             {
                 if (!Config.BkBattleRewardPerks) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - wylaczone (BkBattleRewardPerks=false)."); return; }
+                // P1 (audyt perkow 14.11, decyzja Jeffa "rob po kolei"): te same dwa postfiksy wpina tez BkBattlePerks (B10b, klucz BkBattlePerksFix) -
+                // oba czynne = Warband x1.5625 wplywu, Famous Sellswords x1.44 i Cataphract x1.2544 slawy (log 14.11 13:12:50: obie linie "wpiete").
+                // Jedna regula na jedno zjawisko: przy czynnym B10b (liczniki doby w logu) ta droga sie nie wpina.
+                if (Config.BkBattlePerksFix) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - pominiete, dziala BK atuty bitew (B10b, BkBattlePerksFix=true); bez podwojnego liczenia (P1)."); return; }
                 var tCfg = AccessTools.TypeByName("BannerKings.BannerKingsConfig");
                 if (tCfg == null) { Scribe.Line("Mends: atuty BK z nagrody za bitwe - BK nieobecny, nic do wpiecia."); return; }
                 var tPerks = AccessTools.TypeByName("BannerKings.Managers.Skills.BKPerks");
