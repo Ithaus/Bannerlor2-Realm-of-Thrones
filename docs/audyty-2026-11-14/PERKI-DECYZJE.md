@@ -59,3 +59,5 @@ Lordship: Jeff chce dokladnego wyjasnienia (wasale, grace, najemnicy) zanim zdec
 76 ScholarshipTutor (naprawic + poprawic docs/pytania-2026-10-14/ROZWOJ-POSTACI.md:168), 77 PeerReview / Polyglot (dopisac drugie polowy): ok.
 60-68 (medycyna poza 69): brak odpowiedzi - dopytac.
 Potwierdzenia: 60-68 (medycyna) ok, 69 Resilience (+30% opatrunku po wygranej bitwie morskiej) ok, 70-75 (Lordship: 70/71/75 dopisac z opisu, 72 +15% -> +10%, 73 militaryzm sprawdzic i poprawic, 74 zostawic) ok.
+Potwierdzenia 14.11: 78-105 ok (teologia, style zycia BK, NavalDLC - wedlug propozycji; 102 podlaczyc DLC pod modele BK). Jeff: "rob po kolei".
+Kolejnosc wdrozen: podwojne perki BK -> XP z perkow (RBM) -> latki bledow BK -> pancerz/tarcze po RBM -> RecruitCost -> budowy (+ praca jencow) -> okupy i zloto z platnikiem -> kuznia -> reszta.
