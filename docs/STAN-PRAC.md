@@ -3,6 +3,13 @@
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
 
+## Otwarte po 504 (14.11, galaz noc/p3-bledy-bk)
+
+- Przy scaleniu z galezia, na ktorej jest `docs/pytania-2026-10-14/ROZWOJ-POSTACI.md` (claude/bannerlord-rot-setup-o75kvo): linia 168
+  zmienic na "Tutor: martwy w BK (lambda sprawdzala dziecko) - naprawiony 504; Teacher dziala".
+- Decyzje Jeffa do 504: Ranger (domyslnie: wodz partii gracza z perkiem -> wszystkie slady x1.2; wariant: zostawic x0.2 BK) i Tutor
+  (domyslnie +1 za kazdego czlonka rodu z perkiem; wariant: tylko glowa rodu).
+
 ## Aktualizacja 05.10 (wpisy 98-99 + pelny audyt) - czytaj przed reszta
 
 - **Test nowej kampanii (sesja 07:40, 12 dob)** odczytany; wynik w audycie nizej. Po sesji Jeff kazal wylaczyc
