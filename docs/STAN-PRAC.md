@@ -1,5 +1,9 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 242 (533 podpowiedz paska DTE = nasza liczba pustych slotow), bez autotestu
+
+- Armoury.dll 4090b559 = noc/scal-perki (241 + 533). Kopie: .bak-2026-11-15-przed-wgranie242, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie242 i -przed). Do sprawdzenia w logu: 'Pasek DTE na mapie (533): latka TAK'.
+
 ## STAN 15.11 - WGRANIE 241 (529 panika kompanii + 529-a ostrzal, 530 atak AI z przewaga, 531 rekruci rodu we wsiach pobocznych, 532 jedna liczba brakow sprzetu), bez autotestu
 
 - Armoury.dll 88b8242a = noc/scal-perki. Kopie: .bak-2026-11-14-przed-wgranie241, Backup-Bannerlord-C/wgrane i D: (2026-11-14-wgranie241 i -przed).
