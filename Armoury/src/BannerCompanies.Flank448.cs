@@ -58,6 +58,8 @@ namespace Armoury
         // 448-p: bok/tyl czlowieka uznany za przod wedlug patrzenia kompanii, kierunek jezdzca z ruchu konia, prog podniesiony wielkoscia (wynik ponizej),
         // zalamania bez dalszego lancucha (pokolenie NbMaxGen), SASIAD pominiety przy rzutach z morale gry
         internal static int ToFront448, RideDir448, SizeHeld448, NbCut448, NbMorale448;
+        // recenzja 529: waga rzutow SASIAD (suma, liczba) - linia konca, segment 529
+        internal static float NbWSum529; internal static int NbWN529;
 
         internal static void Reset448()
         {
@@ -65,6 +67,7 @@ namespace Armoury
             Array.Clear(Trig448, 0, 3); Array.Clear(Roll448, 0, 3); Array.Clear(Would448, 0, 3);
             HitSkip448 = RiderFlank448 = NbSkip448 = Stumbles448 = HitLost448 = 0;
             ToFront448 = RideDir448 = SizeHeld448 = NbCut448 = NbMorale448 = 0;
+            NbWSum529 = 0f; NbWN529 = 0;
         }
 
         /// <summary>448: segment linii "Choragwie (CH) koniec" (bez znaku '|' w srodku segmentu poza separatorem na poczatku).</summary>
@@ -107,6 +110,7 @@ namespace Armoury
             public Company Co;
             public float Due;
             public int Gen;   // 448-p: pokolenie lancucha (1 = sasiad zalamania z innego zrodla)
+            public float W;   // recenzja 529: waga ucieczki widzianej przez sasiada - zlamani / ludzie na sztandar (BannerStandardSize), suma w oknie NbDelay, najwyzej 1
         }
 
         private readonly object _hq = new object();
@@ -182,7 +186,7 @@ namespace Armoury
                 var x = _nb[i];
                 if (now < x.Due) continue;
                 _nb.RemoveAt(i);
-                try { NbDue(x.Co, x.Gen, now, on, c); }
+                try { NbDue(x.Co, x.Gen, x.W, now, on, c); }
                 catch (Exception e) { BannerCompanies.Stumbles448++; BannerCompanies.Stumble("BannerCompaniesMission.Nb448", e); }
             }
         }
@@ -271,9 +275,16 @@ namespace Armoury
         }
 
         /// <summary>448 (Break, glowny watek): sasiedzi zlamanej kompanii do kolejki rzutu SASIAD po NbDelay s - takze przy kluczu NIE (pomiar).</summary>
-        private void Neighbors448(Company br, Vec3 cen, float now)
+        private void Neighbors448(Company br, Vec3 cen, float now, int fled, Settings c)
         {
             if (br == null || br.T == null || br.Peak < 4) return;
+            // recenzja 529: kompanie po 10 sa waskimi pasami szyku (podzial wedlug rzutu na wektor w prawo), wiec w NbRange 25 m / NbTouch 8 m stoi prawie
+            // caly szyk - bez wagi ucieczka 10 ludzi dawalaby rzut SASIAD 9 kompaniom (90 ludzi przy F 0.6), przy kompanii 50 - jednej (50 ludzi). Waga
+            // W = uciekajacy / BannerStandardSize (50) trzyma narazenie na czlowieka jak przy kompanii 50; ucieczka kilku kompanii naraz sumuje sie (do 1)
+            float sz = c != null && c.BannerStandardSize >= 10 ? c.BannerStandardSize : 50f;
+            float w = fled > 0 ? fled / sz : 0f;
+            if (w > 1f) w = 1f;
+            if (!(w > 0f)) return;
             // 448-p: tlumienie lawiny - zalamanie z rzutu SASIAD ostatniego pokolenia nie kolejkuje dalej
             int gen = _nbGen + 1;
             if (gen > BannerCompanies.NbMaxGen) { BannerCompanies.NbCut448++; return; }
@@ -317,14 +328,21 @@ namespace Armoury
             for (int i = 0; i < _nbHit.Count; i++)
             {
                 bool queued = false;
-                for (int j = 0; j < _nb.Count && !queued; j++) queued = ReferenceEquals(_nb[j].Co, _nbHit[i]);
-                if (!queued) _nb.Add(new Nb448 { Co = _nbHit[i], Due = now + BannerCompanies.NbDelay, Gen = gen });
+                for (int j = 0; j < _nb.Count && !queued; j++)
+                {
+                    if (!ReferenceEquals(_nb[j].Co, _nbHit[i])) continue;
+                    queued = true;
+                    var q = _nb[j];
+                    q.W = Math.Min(1f, q.W + w);   // recenzja 529: druga ucieczka w oknie NbDelay - waga sumowana (pokolenie zostaje pierwsze)
+                    _nb[j] = q;
+                }
+                if (!queued) _nb.Add(new Nb448 { Co = _nbHit[i], Due = now + BannerCompanies.NbDelay, Gen = gen, W = w });
             }
             _nbHit.Clear();
             _nbPos.Clear();
         }
 
-        private void NbDue(Company co, int gen, float now, bool on, Settings c)
+        private void NbDue(Company co, int gen, float w, float now, bool on, Settings c)
         {
             if (co == null) return;
             var st = co.D ?? (co.D = new Dir448());
@@ -337,6 +355,8 @@ namespace Armoury
             if (gen < 1) gen = 1;
             float f = BannerCompanies.NbF;
             for (int i = 1; i < gen; i++) f *= BannerCompanies.NbDecay;
+            f *= w > 1f ? 1f : w;   // recenzja 529: waga widzianej ucieczki (Neighbors448)
+            BannerCompanies.NbWSum529 += w; BannerCompanies.NbWN529++;
             _nbGen = gen;
             try
             {

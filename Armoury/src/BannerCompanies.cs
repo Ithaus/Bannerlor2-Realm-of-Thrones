@@ -135,6 +135,9 @@ namespace Armoury
         // 529 (klucz BannerFirstRollNeedsMelee): rzut 1/6 odlozony - kompanie (pierwszy powod: prowadzi bohater / bez zwarcia), takty odlozenia, odlozone, ktore
         // jednak rzucily przy 1/6; kompanie, ktore doszly do zwarcia
         internal static int EarlyHeldLord, EarlyHeldNoMelee, EarlyHeldTicks, EarlyHeldRolled, MeleeCompanies;
+        // recenzja 529: kompanie bez wlasnego sztandaru wstrzasniete upadkiem sztandaru swojej grupy (StdGroup) i ich zalamania; rzuty upadku sierzanta
+        // z waga Peak / BannerStandardSize (suma wag, liczba)
+        internal static int StdGroupRolls, StdGroupBreaks, SgtRolls; internal static float SgtWSum;
         // 309 (klucz BannerEventRollByLoss): rzuty zdarzen (sztandar, dowodca) bez bramki morale gry - liczba, suma udzialu strat, suma p, zalamania
         internal static int EventRolls, EventBreaks;
         internal static float EventShareSum, EventPSum;
@@ -155,6 +158,7 @@ namespace Armoury
             EarlyRolls = EarlyBreaks = EmptyBroken = RanksPanicSkip = RanksWithdrawSkip = ShareNoRoll = EmptyWait = BreakShareN = 0; EarlyPSum = BreakShareSum = 0f;
             EventRolls = EventBreaks = 0; EventShareSum = EventPSum = 0f;
             EarlyHeldLord = EarlyHeldNoMelee = EarlyHeldTicks = EarlyHeldRolled = MeleeCompanies = 0;
+            StdGroupRolls = StdGroupBreaks = SgtRolls = 0; SgtWSum = 0f;
             Reset318();
             Reset448();
         }
@@ -947,6 +951,9 @@ namespace Armoury
                         best.BonusDue = false;
                         BannerCompanies.StdRaised++;
                         Shock(best, +0.5f * c.BannerShockStandardLost);
+                        // recenzja 529: podniesiony sztandar widzi tez jego grupa (kompanie bez wlasnego - StdGroup), jak wstrzas upadku
+                        for (int j = 0; j < list.Count; j++)
+                            if (!list[j].Broken && ReferenceEquals(StdGroup(list, list[j]), best)) Shock(list[j], +0.5f * c.BannerShockStandardLost);
                     }
                     if (again) StdLine(best, afterFall ? "PODNIESIONY po upadku" : "znowu w gorze (poprzedni chorazy odszedl do innego szyku)", b, b.Position);
                 }
@@ -1045,6 +1052,36 @@ namespace Armoury
             if (PlayerSide(co)) Msg("The standard of " + NameOf(co) + " has fallen!", now, c, true);
             BannerCompanies.StandardFell(co.F, co.Index, pos);
             Roll(co, 1f, c, now, false, -1f, 1);
+            // recenzja 529: sztandar jest jeden na ok. BannerStandardSize ludzi, a kompania 10 - upadek widza tez kompanie szyku bez wlasnego sztandaru,
+            // dla ktorych ten jest najblizszy (StdGroup); ten sam wstrzas i rzut co kompania chorazego, jak dotad przy kompanii 50 (wszyscy pod sztandarem)
+            List<Company> grp;
+            if (_forms.TryGetValue(co.F, out grp))
+                for (int i = 0; i < grp.Count; i++)
+                {
+                    var x = grp[i];
+                    if (x.Broken || !ReferenceEquals(StdGroup(grp, x), co)) continue;
+                    Shock(x, -c.BannerShockStandardLost);
+                    BannerCompanies.StdGroupRolls++;
+                    Roll(x, 1f, c, now, false, -1f, 1);
+                    if (x.Broken) BannerCompanies.StdGroupBreaks++;
+                }
+        }
+
+        /// <summary>Recenzja 529: kompania ze sztandarem, pod ktorym stoi x - x bez wlasnego sztandaru (HadStandard NIE): najblizsza wedlug numeru kompania
+        /// szyku, ktora sztandar dostala (remis - nizszy numer); x ze sztandarem albo szyk bez sztandarow - null.</summary>
+        private static Company StdGroup(List<Company> list, Company x)
+        {
+            if (x == null || x.HadStandard) return null;
+            Company best = null;
+            int bd = int.MaxValue;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var y = list[i];
+                if (!y.HadStandard) continue;
+                int d = Math.Abs(y.Index - x.Index);
+                if (d < bd) { bd = d; best = y; }
+            }
+            return best;
         }
 
         private void CommanderLost(Company co, Vec3 pos, float now, Settings c)
@@ -1055,7 +1092,17 @@ namespace Armoury
             if (co.CmdHero) BannerCompanies.CmdFellHero++;
             if (co.CmdGeneral) BannerCompanies.CmdFellGeneral++;
             if (co.Broken) return;
-            float s = c.BannerShockCommanderLost * (co.CmdHero ? 1.5f : 1f) * (co.CmdGeneral ? 2f : 1f);
+            // recenzja 529: sierzant (nie bohater) kompanii 10 - waga Peak / BannerStandardSize (najwyzej 1): przy kompanii 10 sierzantow jest 5x wiecej, wiec
+            // bez wagi kazdy czlowiek mialby 5x czestszy wstrzas i rzut upadku dowodcy niz przy kompanii 50; bohater i wodz bez zmian
+            float sw = 1f;
+            if (!co.CmdHero)
+            {
+                float sz = c.BannerStandardSize >= 10 ? c.BannerStandardSize : 50f;
+                sw = co.Peak > 0 ? co.Peak / sz : 1f;
+                if (sw > 1f) sw = 1f;
+                BannerCompanies.SgtRolls++; BannerCompanies.SgtWSum += sw;
+            }
+            float s = c.BannerShockCommanderLost * (co.CmdHero ? 1.5f : 1f) * (co.CmdGeneral ? 2f : 1f) * sw;
             Shock(co, -s);
             if (PlayerSide(co))
             {
@@ -1064,7 +1111,7 @@ namespace Armoury
                                                      : "The sergeant of " + name + " has fallen - the company wavers!", now, c, true);
             }
             BannerCompanies.CommanderFell(co.F, co.Index, pos);
-            Roll(co, co.CmdGeneral ? 2f : (co.CmdHero ? 1.5f : 1f), c, now, false, -1f, 2);
+            Roll(co, (co.CmdGeneral ? 2f : (co.CmdHero ? 1.5f : 1f)) * sw, c, now, false, -1f, 2);
         }
 
         /// <summary>154: linia zdarzenia sztandaru (kto, strona, co) - dowod do testu okrzyku "Save the banner!" i podnoszenia; najwyzej StdLinesMax na misje
@@ -1324,7 +1371,7 @@ namespace Armoury
                 else BannerCompanies.CheersNoEnemy++;
             }
             BannerCompanies.CompanyBroke(co.F, co.Index, cen);
-            try { Neighbors448(co, cen, now); }   // 448: sasiedzi rzucaja po NbDelay s (przy kluczu NIE tylko pomiar)
+            try { Neighbors448(co, cen, now, q.Count, c); }   // 448: sasiedzi rzucaja po NbDelay s (przy kluczu NIE tylko pomiar)
             catch (Exception e) { BannerCompanies.Stumbles448++; BannerCompanies.Stumble("BannerCompaniesMission.Neighbors448", e); }
         }
 
@@ -1505,6 +1552,9 @@ namespace Armoury
               .Append(", bez zwarcia ").Append(BannerCompanies.EarlyHeldNoMelee).Append("), taktow odlozenia ").Append(BannerCompanies.EarlyHeldTicks)
               .Append(", odlozone, ktore rzucily przy 1/6 ").Append(BannerCompanies.EarlyHeldRolled).Append(", kompanii w zwarciu ").Append(BannerCompanies.MeleeCompanies)
               .Append(" z ").Append(BannerCompanies.Companies).Append(", stan bitwy najwyzej x").Append(BannerCompanies.StateHigh.ToString("0.00", inv305))
+              .Append("; recenzja 529: rzuty grupy sztandaru ").Append(BannerCompanies.StdGroupRolls).Append(" (zalaman ").Append(BannerCompanies.StdGroupBreaks)
+              .Append("), rzuty sierzanta ").Append(BannerCompanies.SgtRolls).Append(" (sr. waga ").Append(BannerCompanies.SgtRolls > 0 ? (BannerCompanies.SgtWSum / BannerCompanies.SgtRolls).ToString("0.00", inv305) : "-")
+              .Append("), rzuty SASIAD z waga ").Append(BannerCompanies.NbWN529).Append(" (sr. waga ").Append(BannerCompanies.NbWN529 > 0 ? (BannerCompanies.NbWSum529 / BannerCompanies.NbWN529).ToString("0.00", inv305) : "-").Append(')')
               .Append(" | rzuty zdarzen wedlug strat (309) ").Append(c305 != null && c305.BannerEventRollByLoss ? "TAK" : "NIE")
               .Append(": rzutow ").Append(ev).Append(" (sr. udzial strat ").Append(ev > 0 ? (BannerCompanies.EventShareSum / ev).ToString("0.00", inv305) : "-")
               .Append(", sr. szansa ").Append(ev > 0 ? (BannerCompanies.EventPSum / ev).ToString("0.000", inv305) : "-")

@@ -12588,7 +12588,7 @@ namespace Armoury
         [SettingPropertyGroup("Banner companies")]
         public int BannerCompanySize { get; set; } = 10;
 
-        [SettingPropertyInteger("Banner Standard Size", 20, 150, "0", HintText = "with Banner Companies: a formation carries one standard for about this many men (at most 6), and a company without a standard of its own has none to lose. 50 = as many standards as before", RequireRestart = false)]
+        [SettingPropertyInteger("Banner Standard Size", 20, 150, "0", HintText = "with Banner Companies: a formation carries one standard for about this many men (at most 6). When a standard falls, every company standing under it is shaken, not only the bearer's; the fall of a sergeant, and the flight of a neighbouring company, weigh by how many men that is against this number. 50 = as many standards as before", RequireRestart = false)]
         [SettingPropertyGroup("Banner companies")]
         public int BannerStandardSize { get; set; } = 50;
 
