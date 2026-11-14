@@ -61,7 +61,7 @@ namespace Armoury
         private static int _dOwnVol, _dOwnMerc;
         private static readonly Dictionary<string, int> _dOwnMercTowns = new Dictionary<string, int>();
 
-        internal static void Reset() { ClearDay(); }
+        internal static void Reset() { ClearDay(); RecruitPerks508.Reset(); }
 
         private static void ClearDay()
         {
@@ -102,6 +102,7 @@ namespace Armoury
                 if (mult <= 0.01f) return;
                 float baseNow = __result.ResultNumber / mult;
                 __result.Add(target - baseNow, _txt);
+                RecruitPerks508.Floor(__0, __1, ref __result);   // 508 (perki): znizki werbunku z perkow schodza pod podloge BK
             }
             catch { }
         }
@@ -257,6 +258,7 @@ namespace Armoury
         /// <summary>Linia dnia "Konie rekrutow (157)" - zamiast 8 probek wyceny z 143 (wolane z ticku dobowego ArmouryBehavior).</summary>
         internal static void Daily()
         {
+            try { RecruitPerks508.Daily(); } catch (Exception e) { Log.Error("RecruitPerks508.Daily", e); }   // 508 (perki): linia "Perki werbunku (508)"
             var s = Settings.Current;
             if (s == null) return;
             var inv = System.Globalization.CultureInfo.InvariantCulture;
