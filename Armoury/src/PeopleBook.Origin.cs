@@ -56,7 +56,9 @@ namespace Armoury
             FRally = 64,
             // 509 recenzja: wyjscie (Take) - jency zmarli w wypadku przy budowie (PrisonLabor509; dotad FDieOthers = 'Inni')
             FDieWork = 65,
-            FKinds = 66;
+            // D3 (Jeff 14.11, grupa B): wyjscie (Take) - jency lochu zmarli z glodu (twierdza bez jedzenia po tygodniu laski; PrisonLabor509.Daily)
+            FDieHunger = 66,
+            FKinds = 67;
         private static readonly string[] FName =
         {
             "wsie", "miasta", "zamki", "karczmy AI", "A5", "gracz", "karczma gracza", "pobor wymuszony",
@@ -72,7 +74,7 @@ namespace Armoury
             "z karczmy (WETERANI, E4/10)",
             "Straz z Muru (E4/9)", "Straz z pul wyrzutkow Westeros (E4/9)", "Straz z ludnosci Westeros (E4/9)", "Straz bez pokrycia (podloga, E4/9)", "pojmani z rabunku (E4/9)",
             "polegli w oblezeniu (ostrzal)", "ucieczka ponad limit lochu",
-            "rozbici pod choragiew (N7)", "wypadki przy pracy jencow (509)"
+            "rozbici pod choragiew (N7)", "wypadki przy pracy jencow (509)", "glod jencow lochu (D3)"
         };
 
         // rodzaj rosteru (nazwy "bez pochodzenia" / "z niczego" / "w nicosc")
@@ -2213,9 +2215,9 @@ namespace Armoury
             sb.Append(" | przenosiny: ").Append(Part(_fIn, FToGarrison, FPrisRecruit));
             // E4/8 (Z17): wejscia i wyjscia przyczynami E4/8 - te same liczniki co reszta (wchodza do "wejscia/wyjscia" kontroli)
             sb.Append(" | E4/8: wejscia ").Append(Part(_fIn, FMilitiaLevy, FArmsFloor)).Append("; wyjscia ").Append(Part(_fOut, FMilitiaHome, FDisbandHome));
-            sb.Append(" | wyjscia: ").Append(Part(_fOut, FDieBattle, FGone)).Append(", ").Append(Part(_fOut, FDieSiege, FEscape)).Append(", ").Append(FName[FDieWork]).Append(' ').Append(M0(_fOut[FDieWork]))     // fixA: ostrzal, ucieczki z lochu; 509: wypadki przy pracy jencow
+            sb.Append(" | wyjscia: ").Append(Part(_fOut, FDieBattle, FGone)).Append(", ").Append(Part(_fOut, FDieSiege, FEscape)).Append(", ").Append(FName[FDieWork]).Append(' ').Append(M0(_fOut[FDieWork])).Append(", ").Append(FName[FDieHunger]).Append(' ').Append(M0(_fOut[FDieHunger]))     // fixA: ostrzal, ucieczki z lochu; 509: wypadki przy pracy jencow; D3: glod jencow lochu
               .Append(" -> dokad: polegli ").Append(M0(_dest[ODead])).Append(" (bitwa ").Append(M0(_deadBy[FDieBattle])).Append(", zaraza ").Append(M0(_deadBy[FDiePlague])).Append(", straceni ").Append(M0(_deadBy[FDieExec]))
-              .Append(", Inni ").Append(M0(_deadBy[FDieOthers])).Append(", ostrzal w oblezeniu ").Append(M0(_deadBy[FDieSiege])).Append(", przy pracy ").Append(M0(_deadBy[FDieWork])).Append("; tabory poza kontem ").Append(M0(_deadCarts)).Append(")")
+              .Append(", Inni ").Append(M0(_deadBy[FDieOthers])).Append(", ostrzal w oblezeniu ").Append(M0(_deadBy[FDieSiege])).Append(", przy pracy ").Append(M0(_deadBy[FDieWork])).Append(", z glodu w lochu ").Append(M0(_deadBy[FDieHunger])).Append("; tabory poza kontem ").Append(M0(_deadCarts)).Append(")")
               .Append(", do domu z pochodzeniem ").Append(M0(_dest[OHomeKnown])).Append(" (H3 ").Append(M0(_homeBy[MBackH3])).Append(", 166 ").Append(M0(_homeBy[MBack166])).Append(", W4c ").Append(M0(_homeBy[MBackW4c]))
               .Append(", 179 ").Append(M0(_homeBy[MBack179])).Append(", z puli ").Append(M0(_homeBy[MBackPool])).Append(", jency ").Append(M0(_homeBy[MBackFreed])).Append(", rozwiazane ").Append(M0(_homeBy[MBackDisband]))
               .Append("; w tym do stanu miasta ").Append(M0(_homeTown)).Append("; bez wsi w regionie ").Append(M0(_homeNoVillage)).Append(")")

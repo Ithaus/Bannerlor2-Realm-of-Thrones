@@ -22,8 +22,9 @@ namespace Armoury
     ///
     /// 37 Athletics.WalkItOff (wodz partii) i 60 Medicine.WalkItOff (chirurg): w marszu ladem LEKKO ranni bohaterowie (HP powyzej progu rany gry
     ///    WoundedHealthLimit = 20, nie pelne HP) lecza sie WalkItOffLightWoundPercent (50) % stawki zamiast MovingHealPercent (10); CIEZKO ranni (HP <= 20)
-    ///    i ranni szeregowi (w grze ranny szeregowy = niezdolny do walki, czyli ciezko) - bez zmian (MovingHealPercent). Obie wersje perku daja TO SAMO
-    ///    (jedna zasada, bez sumowania): Medicine.WalkItOff = chirurg opatruje w drodze. Druga polowa Medicine.WalkItOff - "mniejsze pogorszenie ran
+    ///    i ranni szeregowi (w grze ranny szeregowy = niezdolny do walki, czyli ciezko) - bez zmian (MovingHealPercent). Jedna wersja perku daje
+    ///    WalkItOffLightWoundPercent; D12 (Jeff 14.11 "tak do 75%"): obie naraz (wodz Athletics + chirurg Medicine) sumuja sie do WalkItOffBothPercent (75)
+    ///    - ta sama droga (MarchPct). Medicine.WalkItOff = chirurg opatruje w drodze. Druga polowa Medicine.WalkItOff - "mniejsze pogorszenie ran
     ///    w marszu" - czeka na pogorszenie ran (jeszcze go nie ma): stala WalkItOffWorseningCut i MarchWorseningFactor (haczyk, dzis nieuzywany).
     ///    Mechanika: stawka gry jest na ROSTER (jedna liczba dla wszystkich bohaterow partii), wiec RestCut (SlowHealing) podnosi stawke marszu
     ///    do 50%, gdy partia ma perk i w rosterze jest lekko ranny bohater; ciezko rannym w tym samym ticku leczenie skalowane z powrotem
@@ -44,6 +45,8 @@ namespace Armoury
     ///    Wlasne 30% DLC zostaje martwe (BkrotChains - metoda dziedziczona); gdyby lancuch NavalDLC wszedl na te metode (515), NavalGuardPostfix zdejmuje dodatek DLC u opatrzonego.
     /// 63 BushDoctor (chirurg): takze w OBOZIE (NightRest / BK: gracz PlayerCamped, AI IsCamping) przy dowolnej wsi (ten sam promien co gra:
     ///    odleglosc^2 < 2, wies nie pladrowana) - gra liczy tylko ostatnio odwiedzona wies; gdy warunek gry jest spelniony, nie dokladamy drugi raz.
+    ///    D13 (Jeff 14.11 "tak", klucz BushDoctorInVillage): takze W SAMEJ WSI (CurrentSettlement - wies nie pladrowana, nie w najezdzie) - gra w osadzie
+    ///    idzie galezia osady i BushDoctor nie liczy (DefaultPartyHealingModel :179-197 / :267-283), wiec bez dubla; ta sama premia SecondaryBonus (+20%).
     /// 68 AGoodDaysRest (wodz partii): takze w obozie (gra: tylko w osadzie). Oba (63, 68): postfiks dziennego leczenia bohaterow i szeregowych, tylko
     ///    dodatni wynik, poza osada (w osadzie liczy gra), bez jencow.
     /// 66 CheatDeath CHIRURGA w rzucie smierci przesilenia HeroWounds (p x (1 + premia perku gry -50%)) - wolane z HeroWounds.Crisis.
@@ -82,9 +85,10 @@ namespace Armoury
         private static int _dRaise, _dRaisePlayer, _dLight, _dHeavy, _dHeavyCut, _dWin;
         private static int _dDressBattles, _dDressHeroes, _dDressHp, _dDressXpCalls, _dDressAi, _dDressNaval, _dDressPlayerHp = -1, _dNavalCut;
         private static int _dGoodRest, _dBush, _dCheat, _dFfa;
+        private static int _dBoth, _dBushVillage;   // D12: podniesienia stawki marszu z obu WalkItOff; D13: Bush Doctor w samej wsi (wywolania modelu)
         private static int _sDressHp, _sCheat, _sFfa;
         private static PerkObject _resilience; private static bool _resTried;
-        private static TextObject _tDress, _tCampRest, _tBush;
+        private static TextObject _tDress, _tCampRest, _tBush, _tBushVillage;
 
         internal static void Reset()
         {
@@ -98,6 +102,7 @@ namespace Armoury
             _dRaise = _dRaisePlayer = _dLight = _dHeavy = _dHeavyCut = _dWin = 0;
             _dDressBattles = _dDressHeroes = _dDressHp = _dDressXpCalls = _dDressAi = _dDressNaval = _dNavalCut = 0; _dDressPlayerHp = -1;
             _dGoodRest = _dBush = _dCheat = _dFfa = 0;
+            _dBoth = _dBushVillage = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -141,7 +146,8 @@ namespace Armoury
                      + "% stawki (marsz " + s.MovingHealPercent + "%, Heal Only At Rest " + (s.HealOnlyAtRest ? "TAK" : "NIE") + ") | 62 opatrunek po wygranej "
                      + (s.BattleDressingEnabled ? "TAK" : "NIE") + " (Medicine chirurga " + s.BattleDressingPer100Medicine + "% na 100 pkt + Preventive Medicine chirurga albo wlasne 30% raz, AI "
                      + (s.BattleDressingAi ? "TAK" : "NIE") + ", 69 Resilience na morzu +" + s.BattleDressingNavalResilience + "%) | 63/68 Bush Doctor i A Good Days Rest w obozie "
-                     + (s.CampHealingPerks ? "TAK" : "NIE") + " | 66 Cheat Death chirurga w przesileniu " + (s.CheatDeathAtCrisis ? "TAK" : "NIE") + " | 36 Form Fitting Armor w biegu i zadyszce "
+                     + (s.CampHealingPerks ? "TAK" : "NIE") + " | D12 oba WalkItOff naraz " + Math.Max(0, Math.Min(100, s.WalkItOffBothPercent)) + "% stawki | D13 Bush Doctor w samej wsi "
+                     + (s.BushDoctorInVillage ? "TAK" : "NIE") + " | 66 Cheat Death chirurga w przesileniu " + (s.CheatDeathAtCrisis ? "TAK" : "NIE") + " | 36 Form Fitting Armor w biegu i zadyszce "
                      + (s.FormFittingArmorInBreath ? "TAK" : "NIE") + " | Resilience (NavalDLC) " + (Resilience != null ? "jest" : "BRAK") + ".");
         }
 
@@ -172,16 +178,22 @@ namespace Armoury
         }
 
         /// <summary>Wolane z SlowHealing.RestCut (bohaterowie-czlonkowie, partia w marszu, przed cieciem). Zwraca procent marszu: pct albo
-        /// WalkItOffLightWoundPercent, gdy partia ma WalkItOff (Athletics wodza albo Medicine chirurga) i w rosterze jest lekko ranny bohater.</summary>
+        /// WalkItOffLightWoundPercent, gdy partia ma WalkItOff (Athletics wodza albo Medicine chirurga) i w rosterze jest lekko ranny bohater;
+        /// D12 (Jeff 14.11 "D12 - tak do 75%"): oba perki naraz (wodz z Athletics i chirurg z Medicine) - WalkItOffBothPercent (75).</summary>
         internal static int MarchPct(PartyBase party, MobileParty mp, int pct)
         {
             try
             {
                 var s = Settings.Current;
-                int hi = s != null ? Math.Min(100, s.WalkItOffLightWoundPercent) : 0;
-                if (hi <= pct || party == null || mp == null) return pct;
+                if (s == null || party == null || mp == null) return pct;
+                bool ath = mp.HasPerk(DefaultPerks.Athletics.WalkItOff), med = mp.HasPerk(DefaultPerks.Medicine.WalkItOff);
+                if (!ath && !med) return pct;
+                int hi = Math.Min(100, s.WalkItOffLightWoundPercent);
+                bool both = ath && med && hi > pct;
+                if (both) hi = Math.Max(hi, Math.Min(100, s.WalkItOffBothPercent));   // D12: sumuja sie (domyslnie 50 -> 75); jeden perk - jak dotad
+                if (hi <= pct) return pct;
                 var ro = party.MemberRoster;
-                if (ro == null || ro.TotalHeroes <= 0 || !HasWalkItOff(mp)) return pct;
+                if (ro == null || ro.TotalHeroes <= 0) return pct;
                 bool light = false;
                 for (int i = 0; i < ro.Count && !light; i++)
                 {
@@ -189,6 +201,7 @@ namespace Armoury
                     if (hh != null && hh.HitPoints > hh.WoundedHealthLimit && !hh.IsHealthFull()) light = true;
                 }
                 if (!light) return pct;
+                if (both) _dBoth++;
                 _raiseParty = party; _raiseAt = CampaignTime.Now.ToHours; _raiseLo = pct; _raiseHi = hi;
                 return hi;
             }
@@ -392,15 +405,35 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>D13 (Jeff 14.11 "D13 - tak"): partia stoi W SAMEJ WSI (opis perka "while waiting in villages"; gra w osadzie liczy tylko galaz osady, bez BushDoctor) -
+        /// wies nie pladrowana i nie w trakcie najazdu (ten sam warunek co gra przy wsi obok), nie oblezenie / bitwa.</summary>
+        private static bool InVillage(MobileParty mp)
+        {
+            var st = mp != null ? mp.CurrentSettlement : null;
+            return st != null && st.IsVillage && !st.IsUnderRaid && !st.IsRaided && mp.MapEvent == null && !mp.IsCurrentlyAtSea;
+        }
+
         public static void CampPostfix(PartyBase __0, bool __1, ref ExplainedNumber __result)
         {
             try
             {
                 if (__1 || __0 == null || __result.ResultNumber <= 0f) return;   // jency, kary (glod, tratwa) - bez zmian
                 var s = Settings.Current;
-                if (s == null || !s.CampHealingPerks) return;
+                if (s == null) return;
                 var mp = __0.MobileParty;
-                if (mp == null || mp.IsGarrison || mp.IsMilitia || !Camped(mp)) return;
+                if (mp == null || mp.IsGarrison || mp.IsMilitia) return;
+                // D13: BushDoctor chirurga takze w samej wsi (gra: w osadzie bez tego perka) - ta sama premia co gra przy wsi obok (SecondaryBonus +20%)
+                if (s.BushDoctorInVillage && InVillage(mp))
+                {
+                    if (mp.HasPerk(DefaultPerks.Medicine.BushDoctor, true))
+                    {
+                        if (_tBushVillage == null) _tBushVillage = new TextObject("{=!}Bush Doctor (in the village)");
+                        __result.AddFactor(DefaultPerks.Medicine.BushDoctor.SecondaryBonus, _tBushVillage);
+                        _dBushVillage++;
+                    }
+                    return;
+                }
+                if (!s.CampHealingPerks || !Camped(mp)) return;
                 bool player = mp == MobileParty.MainParty;
                 if (mp.HasPerk(DefaultPerks.Athletics.AGoodDaysRest))
                 {
@@ -462,7 +495,8 @@ namespace Armoury
                 Log.Info(P + "doba " + _day + " - 37/60 WalkItOff: okna podniesionej stawki " + _dWin + " (gracz " + _dRaisePlayer + "), leczenia lekko rannych " + _dLight
                          + ", ciezko rannych przycietych " + _dHeavy + " (-" + _dHeavyCut + " HP) | 62 opatrunek: bitwy " + _dDressBattles + " (AI " + _dDressAi + ", morskie " + _dDressNaval
                          + ", zdjete Resilience NavalDLC " + _dNavalCut + "), bohaterowie " + _dDressHeroes + ", +" + _dDressHp + " HP, XP chirurga " + _dDressXpCalls + ", gracz " + (_dDressPlayerHp < 0 ? "-" : "+" + _dDressPlayerHp + " HP")
-                         + " | 68 A Good Days Rest w obozie " + _dGoodRest + ", 63 Bush Doctor w obozie " + _dBush + " (wywolania modelu) | 66 Cheat Death w przesileniu " + _dCheat
+                         + " | D12 oba WalkItOff (" + Math.Max(0, Math.Min(100, Settings.Current != null ? Settings.Current.WalkItOffBothPercent : 0)) + "%) podniesien " + _dBoth
+                         + " | 68 A Good Days Rest w obozie " + _dGoodRest + ", 63 Bush Doctor w obozie " + _dBush + ", D13 w samej wsi " + _dBushVillage + " (wywolania modelu) | 66 Cheat Death w przesileniu " + _dCheat
                          + " | 36 Form Fitting Armor agenci " + _dFfa + " | sesja: opatrunek +" + _sDressHp + " HP, Cheat Death " + _sCheat + ", Form Fitting Armor " + _sFfa
                          + " | potkniecia " + _stumbles);
                 _day = day;

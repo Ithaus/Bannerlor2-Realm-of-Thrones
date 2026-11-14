@@ -429,9 +429,19 @@ namespace Armoury
         [SettingPropertyGroup("Mending it yourself")]
         public bool PerkSmithHireDiscount { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Iron Maker Bloom Bonus", 0.00f, 1.00f, "0.00", HintText = "Efficient Iron Maker: this many more crude iron bars from one iron bloom at your forge (0.2 = +20%); the bloom is still used up", RequireRestart = false)]
+        // D6 (Jeff 14.11, wariant c): przekucie lupy stratne, IronMaker zmniejsza strate
+        [SettingPropertyFloatingInteger("Bloom Forge Loss Percent", 0f, 50f, "0", HintText = "forging an iron bloom into crude iron bars at your forge loses this percent of its metal to slag and scale (20 = 24 bars instead of the 30 the bloom weighs - the same fifth as every later forging step, five bars to four)", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
-        public float IronMakerBloomBonus { get; set; } = 0.2f;
+        public float BloomForgeLossPercent { get; set; } = 20f;
+
+        [SettingPropertyFloatingInteger("Iron Maker Bloom Loss Percent", 0f, 50f, "0", HintText = "with Efficient Iron Maker the loss of Bloom Forge Loss Percent falls to this (0 = all 30 bars; never more metal than the bloom holds)", RequireRestart = false)]
+        [SettingPropertyGroup("Mending it yourself")]
+        public float IronMakerBloomLossPercent { get; set; } = 0f;
+
+        // D7 (Jeff 14.11): PracticalSmith - czas lawy o 25% krocej
+        [SettingPropertyFloatingInteger("Practical Smith Time Cut Percent", 0f, 50f, "0", HintText = "with Smithing Perks Lighten Your Forge: Practical Smith makes armour, bows, crossbows and ammunition at your forge take this percent less time at the anvil (the stamina they cost still falls by half)", RequireRestart = false)]
+        [SettingPropertyGroup("Mending it yourself")]
+        public float PracticalSmithTimeCutPercent { get; set; } = 25f;
 
         [SettingPropertyBool("Artisan Smith For Your Own Work", HintText = "Artisan Smith: the lower trade penalty when selling covers the armour, bows and ammunition you forged yourself, not only weapons from the smithing screen", RequireRestart = false)]
         [SettingPropertyGroup("Mending it yourself")]
@@ -908,9 +918,18 @@ namespace Armoury
         public int LitterSpeedPercentSledges { get; set; } = 75;
 
         // 513 (perki): perki leczenia (Perk513Healing.cs)
-        [SettingPropertyInteger("Walk It Off Light Wound Percent", 0, 100, "0", HintText = "with Athletics Walk It Off on your party leader or Medicine Walk It Off on your surgeon, lightly wounded heroes (above 20 hit points but not whole) still mend on the march at this percent of the full daily rate - a man with a few cuts walks it off. The badly wounded (20 hit points or less) and wounded soldiers still mend only at Moving Heal Percent: they need rest. Both perks do the same and do not add up. The same for AI parties. Only with Heal Only At Rest. 0 (or not above Moving Heal Percent) = the perks give nothing on the march", RequireRestart = false)]
+        [SettingPropertyInteger("Walk It Off Light Wound Percent", 0, 100, "0", HintText = "with Athletics Walk It Off on your party leader or Medicine Walk It Off on your surgeon, lightly wounded heroes (above 20 hit points but not whole) still mend on the march at this percent of the full daily rate - a man with a few cuts walks it off. The badly wounded (20 hit points or less) and wounded soldiers still mend only at Moving Heal Percent: they need rest. One of the two perks gives this; both together give Walk It Off Both Percent. The same for AI parties. Only with Heal Only At Rest. 0 (or not above Moving Heal Percent) = the perks give nothing on the march", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int WalkItOffLightWoundPercent { get; set; } = 50;
+
+        // D12, D13 (Jeff 14.11)
+        [SettingPropertyInteger("Walk It Off Both Percent", 0, 100, "0", HintText = "with Walk It Off Light Wound Percent: when the party leader has Athletics Walk It Off and the surgeon has Medicine Walk It Off, the two add up - lightly wounded heroes mend on the march at this percent of the full daily rate (75 = half again as much as one perk)", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int WalkItOffBothPercent { get; set; } = 75;
+
+        [SettingPropertyBool("Bush Doctor In Village", HintText = "Bush Doctor (your surgeon) also works while the party waits inside a village that is not being raided: +20% healing, as the game gives it only when resting right beside the last village you visited. The same for AI parties. Off = only as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool BushDoctorInVillage { get; set; } = true;
 
         [SettingPropertyBool("Camp Healing Perks", HintText = "A Good Days Rest (your party leader) and Bush Doctor (your surgeon) also work in a camp in the field - your own camp, a Banner Kings camp or the night camp - not only in a settlement: A Good Days Rest +10% healing in camp, Bush Doctor +20% when the camp stands right by any village that is not being raided (the game counts only the last village you visited). The same for AI parties camped for the night. Off = only as in the game", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
@@ -1652,6 +1671,11 @@ namespace Armoury
         [SettingPropertyBool("Perk Naval Port Gold Paid", HintText = "with War Sails: the 40 denars of the Salvage perk for every merchant convoy entering a governed port are paid by the convoy out of its own purse (as much as it has), and the Shipwright's Hand perk no longer adds a recruit to the garrison out of thin air. Off = as before this change", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool PerkNavalPortGoldPaid { get; set; } = true;
+
+        // D5 (Jeff 14.11): ShipwrightsHand - ochotnik miasta
+        [SettingPropertyBool("Perk Shipwrights Hand Volunteer", HintText = "with Perk Naval Port Gold Paid: the Shipwright's Hand perk still brings a recruit to the garrison for each merchant convoy entering the governed port - one of the town's own volunteers, taken from a notable as the garrison recruits (the lord's clan pays the recruitment fee to the notable; the game's wage and garrison limits apply). Only volunteers of the town's own notables, never of its villages. No volunteer in the town, auto recruitment switched off for that garrison or the town's food balance not above zero, a battle or siege, an empty clan purse or a land with no hands to spare - no recruit. Off = Shipwright's Hand gives no recruit", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PerkShipwrightsHandVolunteer { get; set; } = true;
 
         [SettingPropertyBool("Perk Veterinarian Horses", HintText = "the Veterinarian perk no longer creates a horse out of thin air for every second slain horseman; instead, when a horse of a party whose surgeon has the perk falls in battle (not at sea), it is only wounded half of the time and comes back to the party. Needs Horses Die Only Killed (without it the game's rule stays). The same rule for you and for the AI. Off = as before this change", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
@@ -2811,6 +2835,15 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float WinterHorseFeedShare { get; set; } = 0.5f;
 
+        // D8 (Jeff 14.11 "D8 - a"): zwierzeta jedza pasze przez caly rok
+        [SettingPropertyBool("Animals Eat All Year", HintText = "horses and pack animals eat fodder out of the party's food all year round, not only in winter: outside winter every mounted soldier's horse and every animal in the baggage eats Fodder Outside Winter Share of its full Banner Kings feed (grazing on the march covers the rest) - not on the steppe, where they graze; in desert, snow and blizzard only what Banner Kings' own animal feed does not already count. In winter they eat the larger of this and the winter fodder. The same for AI parties and caravans; so a Breeder's new foals must be fed. Off = fodder only in winter, in deserts and in snow, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool AnimalsEatAllYear { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Fodder Outside Winter Share", 0.00f, 1.00f, "0.00", HintText = "with Animals Eat All Year: the share of an animal's full Banner Kings feed eaten outside winter (0.25 = half the winter fodder: grain on the march, grass for the rest; a horse eats about as much as 1.25 men)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float FodderOutsideWinterShare { get; set; } = 0.25f;
+
         [SettingPropertyBool("Scorched Earth Enabled", HintText = "war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly (with Devastation Enabled the march drives out a share of the countryside's people instead of taking hearths, and they come home in time)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool ScorchedEarthEnabled { get; set; } = true;
@@ -3436,6 +3469,19 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Dungeon Prisoner Food Share", 0.00f, 1.50f, "0.00", HintText = "with Dungeon Prisoners Eat: a prisoner eats this share of a garrison man's ration (0.5 = as prisoners in a party in the base game)", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public float DungeonPrisonerFoodShare { get; set; } = 0.5f;
+
+        // D3 (Jeff 14.11): glod lochu
+        [SettingPropertyFloatingInteger("Prison Labor Hungry Work Percent", 0f, 100f, "0", HintText = "with Dungeon Prisoners Eat: when the food stores of a castle or town are empty, its prisoners work at only this percent of their usual help to the works (hungry men carry less)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float PrisonLaborHungryWorkPercent { get; set; } = 50f;
+
+        [SettingPropertyInteger("Prison Hunger Grace Days", 0, 60, "0", HintText = "with Dungeon Prisoners Eat: days in a row a castle or town may run out of food before its prisoners begin to die of hunger (the same week of grace as a starving garrison)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public int PrisonHungerGraceDays { get; set; } = 7;
+
+        [SettingPropertyFloatingInteger("Prison Hunger Death Percent", 0f, 20f, "0.0", HintText = "with Dungeon Prisoners Eat: after the days of grace, percent of the common prisoners in the dungeon who die of hunger each day while its food stores stay empty (the wounded first; lords are not starved; the same rate as a starving garrison). 0 = they never starve to death", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float PrisonHungerDeathPercent { get; set; } = 5f;
 
         [SettingPropertyBool("Architectural Commissions Town Pays", HintText = "the 20 denars a day of the governor's Architectural Commissions perk are paid out of the settlement's treasury; when it has less, the clan gets only what it has. Off = the clan gets the money from nowhere, as before", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
@@ -4324,7 +4370,7 @@ namespace Armoury
         [SettingPropertyGroup("Ammunition and animal perks")]
         public float SaddlebagsCarryPercent { get; set; } = 5f;
 
-        [SettingPropertyBool("Breeder Realistic", HintText = "Breeder: animals in the party breed only on land, only while the party is not starving, and only where there is at least a pair of the same kind (horses with horses, sheep with sheep; mules do not breed); never dragons, elephants, mammoths, chariots or unique beasts. The young are of their parents' kind (an ordinary horse from ordinary horses, a noble one only from noble ones; zorses do not breed). Animals eat fodder only in winter, in deserts and in snow. Off = as Realm of Thrones has it", RequireRestart = false)]
+        [SettingPropertyBool("Breeder Realistic", HintText = "Breeder: animals in the party breed only on land, only while the party is not starving, and only where there is at least a pair of the same kind (horses with horses, sheep with sheep; mules do not breed); never dragons, elephants, mammoths, chariots or unique beasts. The young are of their parents' kind (an ordinary horse from ordinary horses, a noble one only from noble ones; zorses do not breed). The young eat fodder like the rest of the herd (all year with Animals Eat All Year). Off = as Realm of Thrones has it", RequireRestart = false)]
         [SettingPropertyGroup("Ammunition and animal perks")]
         public bool BreederRealistic { get; set; } = true;
 
@@ -9350,9 +9396,14 @@ namespace Armoury
         public bool FixPrincelyArbiterWage { get; set; } = true;
 
         // 514 (perki): polowki perkow BK z opisow
-        [SettingPropertyBool("Bk Perk Halves Court", HintText = "Banner Kings perks of Lordship, Scholarship and Theology do what their descriptions say: Aristocratic Rites (court grace +4%, +8% as ruler; one more vassal), Rogue Connections (hired companies 10% keener to join and stay, earnest money 5% cheaper), Traditionalist and Military Administration (militarism +1 and +2 points, not a fraction of a point), Diplomatic Ties (you and foreign rulers both aim at 3 more relation with each other - Banner Kings never moves relations with the player, so only lords gain from it), Peer Review (books teach twice the skill experience), Polyglot (languages learned half again as fast), Lithurgy (now and then +1 relation with a preacher of your fiefs; for AI lords the preacher later pulls it back). Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Bk Perk Halves Court", HintText = "Banner Kings perks of Lordship, Scholarship and Theology do what their descriptions say: Aristocratic Rites (court grace +4%, +8% as ruler; one more vassal), Rogue Connections (hired companies 10% keener to join and stay, earnest money 5% cheaper), Traditionalist and Military Administration (militarism +1 and +2 points, not a fraction of a point), Diplomatic Ties (you and foreign rulers both aim at 3 more relation with each other - Banner Kings never moves relations with the player, so for you see Diplomatic Ties Player Weekly), Peer Review (books teach twice the skill experience), Polyglot (languages learned half again as fast), Lithurgy (now and then +1 relation with a preacher of your fiefs; for AI lords the preacher later pulls it back). Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings perks as described (514)")]
         public bool BkPerkHalvesCourt { get; set; } = true;
+
+        // D14 (Jeff 14.11 "D14 - tak"): DiplomaticTies gracza
+        [SettingPropertyBool("Diplomatic Ties Player Weekly", HintText = "with Bk Perk Halves Court: Banner Kings never moves relations with the player, so the Diplomatic Ties perk gave you nothing. Now, once a week while you have the perk, every ruler of a foreign realm gains +1 relation with you - but only up to the relation Banner Kings aims at between him and you (the perk's +3 included), never above it. Off = the perk does nothing for you", RequireRestart = false)]
+        [SettingPropertyGroup("Banner Kings perks as described (514)")]
+        public bool DiplomaticTiesPlayerWeekly { get; set; } = true;
 
         [SettingPropertyBool("Bk Perk Halves Lifestyle", HintText = "Banner Kings lifestyle perks on the map do what their descriptions say: Sea-Toughness (party morale +5%, food -5%), Sea Commander (party size +8, renown from victories +10%), Inspirer (halves the Kheshig morale penalty for men of other cultures), Ghazw (mounts +12%, not 10%), Honor Guard (one more recruitment level with notables), Helmsman (bad morale fades 10% faster), Pathfinder (+3% speed in forests and on beaches), Sea-Eyes (the +8% sight only at night), Tour de Calradia (double the tournament bet), Crowds' Favorite (double tournament renown). Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Banner Kings perks as described (514)")]
@@ -13626,7 +13677,9 @@ namespace Armoury
             // 511 (perki)
             s.PerkSmithStamina = PerkSmithStamina;
             s.PerkSmithHireDiscount = PerkSmithHireDiscount;
-            s.IronMakerBloomBonus = IronMakerBloomBonus;
+            s.BloomForgeLossPercent = BloomForgeLossPercent;             // D6
+            s.IronMakerBloomLossPercent = IronMakerBloomLossPercent;     // D6
+            s.PracticalSmithTimeCutPercent = PracticalSmithTimeCutPercent;   // D7
             s.PerkArtisanSmithOwnWork = PerkArtisanSmithOwnWork;
             s.PerkCraftsmanQuality = PerkCraftsmanQuality;
             s.SmeltingReturnShare = SmeltingReturnShare;
@@ -13749,6 +13802,8 @@ namespace Armoury
             // 513 (perki)
             s.WalkItOffLightWoundPercent = WalkItOffLightWoundPercent;
             s.CampHealingPerks = CampHealingPerks;
+            s.WalkItOffBothPercent = WalkItOffBothPercent;   // D12
+            s.BushDoctorInVillage = BushDoctorInVillage;     // D13
             s.BattleDressingEnabled = BattleDressingEnabled;
             s.BattleDressingPer100Medicine = BattleDressingPer100Medicine;
             s.BattleDressingAi = BattleDressingAi;
@@ -13933,6 +13988,7 @@ namespace Armoury
             s.PerkSpringOfGoldFromMerchants = PerkSpringOfGoldFromMerchants;   // 510 (perki)
             s.PerkTradeGiftsPaid = PerkTradeGiftsPaid;   // 510 (perki)
             s.PerkNavalPortGoldPaid = PerkNavalPortGoldPaid;   // 510 (perki)
+            s.PerkShipwrightsHandVolunteer = PerkShipwrightsHandVolunteer;   // D5
             s.PerkVeterinarianHorses = PerkVeterinarianHorses;   // 510 (perki)
             s.GentryPurseFromTown = GentryPurseFromTown;
             s.GentryStartFromTown = GentryStartFromTown;
@@ -14222,6 +14278,8 @@ namespace Armoury
             s.WinterWarmRealmFactor = WinterWarmRealmFactor;
             s.WinterHorsesEat = WinterHorsesEat;
             s.WinterHorseFeedShare = WinterHorseFeedShare;
+            s.AnimalsEatAllYear = AnimalsEatAllYear;               // D8
+            s.FodderOutsideWinterShare = FodderOutsideWinterShare; // D8
             s.ScorchedEarthEnabled = ScorchedEarthEnabled;
             s.ScorchedEarthFastScan = ScorchedEarthFastScan;
             s.ForageMinMen = ForageMinMen;
@@ -14379,6 +14437,9 @@ namespace Armoury
             s.PrisonLaborDeathPercent = PrisonLaborDeathPercent;
             s.DungeonPrisonersEat = DungeonPrisonersEat;
             s.DungeonPrisonerFoodShare = DungeonPrisonerFoodShare;
+            s.PrisonLaborHungryWorkPercent = PrisonLaborHungryWorkPercent;   // D3
+            s.PrisonHungerGraceDays = PrisonHungerGraceDays;
+            s.PrisonHungerDeathPercent = PrisonHungerDeathPercent;
             s.ArchitecturalCommissionsTownPays = ArchitecturalCommissionsTownPays;
             s.WallWorksHistorical = WallWorksHistorical;
             s.WallCastlePointPriceFactor = WallCastlePointPriceFactor;
@@ -15857,6 +15918,7 @@ namespace Armoury
             s.FixBkrotWageSeaCut = FixBkrotWageSeaCut;
             s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
             s.BkPerkHalvesCourt = BkPerkHalvesCourt;   // 514 (perki)
+            s.DiplomaticTiesPlayerWeekly = DiplomaticTiesPlayerWeekly;   // D14
             s.BkPerkHalvesLifestyle = BkPerkHalvesLifestyle;
             s.BkPerkHalvesBattle = BkPerkHalvesBattle;
             s.NavalModelsUnderBk = NavalModelsUnderBk; s.NavalDeployStatsFix = NavalDeployStatsFix; s.NavalDeployAmmoFix = NavalDeployAmmoFix;   // 515 (perki)

@@ -26,7 +26,11 @@ namespace Armoury
     ///  91 BK ArtisanSmith (styl zycia Artisan, "Smith"): -10% staminy (PrimaryBonus perka BK) tak samo jak wyzej, x po PracticalSmith (BK mnozy osobno, x0.9);
     ///     -15% (SecondaryBonus perka BK) ceny dnia kuzni przy ForgeHireHistorical (Forge.ForgeDayRent - karnet, dzien projektu i stawka godzinowa z niej)
     ///     i oplaty za robote bez stawek historycznych (Forge.ForgeFee). Kowal dostaje mniej - zloto nie powstaje.
-    ///  40 IronMaker (gra): lupa -> sztaby surowki przy kuzni gracza x (1 + IronMakerBloomBonus); ruda (lupa) zuzywa sie dalej jedna na przepis.
+    ///  40 IronMaker (gra) - D6 (Jeff 14.11, wariant c): przekucie lupy na sztaby surowki przy kuzni gracza jest STRATNE - BloomForgeLossPercent (20%) masy lupy
+    ///     idzie w zuzel i zgorzeline (24 sztaby z 30 = 15 kg lupy); z IronMaker strata IronMakerBloomLossPercent (0% = 30 sztab, nigdy ponad mase lupy).
+    ///     Dawne +20% sztab z niczego (IronMakerBloomBonus, 36 sztab = 18 kg z 15 kg) usuniete. Ruda (lupa) zuzywa sie dalej jedna na przepis.
+    ///  41 PracticalSmith - D7 (Jeff 14.11 "o 25% krocej zrobmy, o polowe to za duzo"): stamina sztuki dalej x0.5 (perk gry), ale GODZINY lawy (stamina / 6 przy
+    ///     ForgeLikeTownSmith = false) licza sie ze staminy x (1 - PracticalSmithTimeCutPercent / 100) = x0.75, nie x0.5 (HoursStamina).
     ///  42 ArtisanSmith (gra, PartyLeader): kara handlowa przy sprzedazy zbroi, luku i amunicji WYKUTYCH przez gracza - ten sam wzor co gra dla broni z ekranu
     ///     (AddFactor PrimaryBonus = -50% na czlonie 1.5 + 0.25 x (Tierf - 1)). Gra przyjmuje tylko ItemObject - co jest "nasze", mowi KSIEGA wykutych sztuk
     ///     (id przedmiotu -> sztuk; zapis arm_perk511): dopisuje Forge.Deliver/Finish/Smith, zdejmuje sprzedaz (PlayerInventoryExchangeEvent, isTrading) i doba (nie wiecej,
@@ -43,6 +47,7 @@ namespace Armoury
 
         private static int _errors, _dErrors;
         private static int _dPieces, _dStamRaw, _dStamNow, _dQualRolls, _dQualUp, _dPriced, _dSoldOurs, _dMade;
+        private static int _dHoursAdj;   // D7: sztuki, ktorym godziny lawy policzono z ciecia czasu PracticalSmith (x0.75), nie ze staminy (x0.5)
         private static readonly Dictionary<string, int> _made = new Dictionary<string, int>();
 
         private static bool _bkLooked, _bkOk;
@@ -165,17 +170,55 @@ namespace Armoury
             catch (Exception e) { Stumble("HireFactor", e); return 1f; }
         }
 
-        // ------------------------------------------------------------ 40: IronMaker przy lupie
-        /// <summary>Sztaby surowki z lupy przy kuzni kowala h: baza x (1 + IronMakerBloomBonus) z perkiem IronMaker.</summary>
+        // ------------------------------------------------------------ 40: IronMaker przy lupie (D6 - przekucie stratne, perk zmniejsza strate)
+        /// <summary>Procent masy lupy traconej przy przekuciu na sztaby u kowala h: BloomForgeLossPercent, z IronMaker IronMakerBloomLossPercent (nie wiecej niz bez perka).</summary>
+        internal static float BloomLossPct(Hero h)
+        {
+            var s = S;
+            if (s == null) return 0f;
+            float loss = float.IsNaN(s.BloomForgeLossPercent) ? 0f : Math.Max(0f, Math.Min(90f, s.BloomForgeLossPercent));
+            if (Has(h, DefaultPerks.Crafting.IronMaker))
+            {
+                float perk = float.IsNaN(s.IronMakerBloomLossPercent) ? loss : Math.Max(0f, Math.Min(90f, s.IronMakerBloomLossPercent));
+                loss = Math.Min(loss, perk);
+            }
+            return loss;
+        }
+
+        /// <summary>Sztaby surowki z lupy przy kuzni kowala h: bars = cala masa lupy w sztabach (30); wynik bars x (1 - strata / 100), co najmniej 1,
+        /// nigdy wiecej niz bars (metal nie powstaje z niczego).</summary>
         internal static int BloomBars(int bars, Hero h)
         {
             try
             {
-                var s = S;
-                if (s == null || s.IronMakerBloomBonus <= 0f || !Has(h, DefaultPerks.Crafting.IronMaker)) return bars;
-                return Math.Max(bars, (int)Math.Round(bars * (1f + s.IronMakerBloomBonus)));
+                if (bars <= 1) return bars;
+                float loss = BloomLossPct(h);
+                if (!(loss > 0f)) return bars;
+                return Math.Max(1, Math.Min(bars, (int)Math.Round(bars * (1f - loss / 100f))));
             }
             catch (Exception e) { Stumble("BloomBars", e); return bars; }
+        }
+
+        // ------------------------------------------------------------ 41: PracticalSmith - czas lawy (D7)
+        /// <summary>D7: stamina do GODZIN lawy (ForgeClock.HoursOf) ze staminy pobranej po perkach (spent): godziny tna PracticalSmith o PracticalSmithTimeCutPercent (25%)
+        /// zamiast o polowe staminy; BK Smith (x0.9) - jak stamina. Bez perkow / klucz PerkSmithStamina wylaczony - spent bez zmian.</summary>
+        internal static int HoursStamina(int spent, Hero h)
+        {
+            if (spent <= 0) return spent;
+            try
+            {
+                var s = S;
+                if (s == null || !s.PerkSmithStamina || h == null) return spent;
+                var ps = DefaultPerks.Crafting.PracticalSmith;
+                if (!Has(h, ps)) return spent;
+                float sf = Math.Max(0.05f, 1f + ps.PrimaryBonus);                                         // to, co pobrala stamina (x0.5)
+                float cut = float.IsNaN(s.PracticalSmithTimeCutPercent) ? 25f : Math.Max(0f, Math.Min(90f, s.PracticalSmithTimeCutPercent));
+                float tf = 1f - cut / 100f;                                                                 // to, co ma zostac z czasu (x0.75)
+                if (Math.Abs(sf - tf) < 1e-4f) return spent;
+                _dHoursAdj++;
+                return Math.Max(1, (int)Math.Round(spent * tf / sf));
+            }
+            catch (Exception e) { Stumble("HoursStamina", e); return spent; }
         }
 
         // ------------------------------------------------------------ 92: BK Craftsman w losowaniu jakosci
@@ -371,7 +414,8 @@ namespace Armoury
             var s = S;
             Log.Info("Perki kuzni (511): stamina naszej kuzni z PracticalSmith i BK Smith " + (s != null && s.PerkSmithStamina ? "TAK" : "NIE")
                      + ", stawka kuzni BK Smith " + (s != null && s.PerkSmithHireDiscount ? "TAK" : "NIE")
-                     + ", IronMaker przy lupie +" + (s != null ? (s.IronMakerBloomBonus * 100f).ToString("0", Inv) : "-") + "%"
+                     + ", przekucie lupy (D6): strata " + (s != null ? s.BloomForgeLossPercent.ToString("0", Inv) : "-") + "% masy, z IronMaker " + (s != null ? s.IronMakerBloomLossPercent.ToString("0", Inv) : "-") + "%"
+                     + ", czas lawy z PracticalSmith (D7) -" + (s != null ? s.PracticalSmithTimeCutPercent.ToString("0", Inv) : "-") + "% (stamina dalej -50%)"
                      + ", ArtisanSmith dla wlasnej roboty " + (s != null && s.PerkArtisanSmithOwnWork ? "TAK" : "NIE") + " (latka kary handlu " + price + ")"
                      + ", BK Craftsman w jakosci " + (s != null && s.PerkCraftsmanQuality ? "TAK" : "NIE") + ".");
         }
@@ -412,13 +456,14 @@ namespace Armoury
                 Log.Info("Perki kuzni (511): doba | stamina x" + StaminaFactor(hero).ToString("0.00", Inv) + " (PracticalSmith " + (Has(hero, DefaultPerks.Crafting.PracticalSmith) ? "tak" : "nie")
                          + ", BK Smith " + (ResolveBk() && BkHas(hero, _bkSmith) ? "tak" : "nie") + "), sztuk przy kowadle " + _dPieces + ", stamina przepisu " + _dStamRaw + " -> pobrana " + _dStamNow
                          + " | stawka kuzni x" + HireFactor().ToString("0.00", Inv)
-                         + " | IronMaker " + (Has(hero, DefaultPerks.Crafting.IronMaker) ? "tak" : "nie") + " (lupa +" + (S.IronMakerBloomBonus * 100f).ToString("0", Inv) + "%)"
+                         + " | IronMaker " + (Has(hero, DefaultPerks.Crafting.IronMaker) ? "tak" : "nie") + " (przekucie lupy D6: strata " + BloomLossPct(hero).ToString("0", Inv) + "% masy)"
+                         + " | czas lawy D7: sztuk z godzinami po PracticalSmith " + _dHoursAdj
                          + " | ksiega wlasnej roboty: dopisane " + _dMade + ", sprzedane " + _dSoldOurs + ", w sakwach i na bohaterach " + ours + " (" + _made.Count + " wzorow), wyceny z ArtisanSmith " + _dPriced
                          + " | BK Craftsman: losowan " + _dQualRolls + ", w gore " + _dQualUp
                          + " | potkniecia " + _dErrors + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { _dPieces = _dStamRaw = _dStamNow = _dQualRolls = _dQualUp = _dPriced = _dSoldOurs = _dMade = _dErrors = 0; }
+            finally { _dPieces = _dStamRaw = _dStamNow = _dQualRolls = _dQualUp = _dPriced = _dSoldOurs = _dMade = _dErrors = _dHoursAdj = 0; }
         }
     }
 }
