@@ -178,6 +178,8 @@ namespace Armoury
                     for (int q = x.BStart[b]; q < x.BStart[b + 1]; q++)
                     {
                         double og = OValOf(x, q, g);
+                        // 497: fach mierzy kg BEZ czynnikow gry (jak regula A7 w grze - ComputeDistrict bez czynnikow i cel z bazy gry); OVal ma czynnik Vf - zdjety tu
+                        if (og != 0.0 && d.Vf != null && g < d.Vf.Length && d.Vf[g] > 0) og /= d.Vf[g];
                         if (og != 0.0) { x.FhOg[q] = og; pk.Add(q); }
                         if (x.Pc[q] == d.FachC) x.FhKt[b] = q;
                     }

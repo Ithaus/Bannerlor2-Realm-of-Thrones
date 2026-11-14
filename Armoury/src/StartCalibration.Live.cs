@@ -84,10 +84,14 @@ namespace Armoury
             public bool OrdOk, OrdRedo; public int OrdDay = int.MinValue;
             // 363b: wytworca wedlug ziemi okregu (zajecie bez rak w planie KS - rece tylko z pola na zamowienie)
             public bool OrdLand;
+            // 497 (klucz Ks Plan Knows Village Factors; pamiec sesji, bez zapisu): czynniki gry po Planie z ostatniego rachunku okregu (watek glowny) - [ItemCount] kg/d:
+            // Den - produkcja przed rokiem urodzaju (po zimie i rekach), Num - Den x rok urodzaju / ziemia zmeczona x (wlasny stol + na targ x ScaleRates) / (stol + targ); null - brak
+            public double[] VfNum, VfDen;
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;
             public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; public double[] WSpareKg; public double OrdPcs;
+            public double[] PreY, PostY;   // 497: produkcja gry przed rokiem urodzaju i po roku urodzaju i ziemi zmeczonej (przed zamowieniami 363); null - klucz NIE albo Plan
             public double[] S490; }   // 490 (sam pomiar): kroki drogi towaru okregu w grze (StartCalibration.Rozjazd490.cs); null - rachunek bez czynnikow (Plan)   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
         // m114-prace (recenzja): WorksAll - caly dodatek po czynnikach (sztuki gry na dobe), WorksPart - kg dodatku czesci przed zima (klucz DistrictWorks.PartKey):
         // udzial czesci w dodatku na targ (wycena okna i podzial puli miedzy posiadaczy wedlug dodatku NA TARG, nie wedlug calego E)
@@ -422,9 +426,12 @@ namespace Armoury
                     res.WSpareKg = sk;                                // linia 297: kg produkcji okregu, ktorej zima juz nie zabiera (przed stolem okregu i targiem)
                 }
                 if (res.S490 != null) S490Snap(res.S490, 3, prod, kgT, 1.0);   // 490: sam pomiar - x zima x rece
+                bool vf497 = SwVf497;
+                if (vf497) res.PreY = (double[])prod.Clone();   // 497: przed rokiem urodzaju (tylko odczyt)
                 HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (rok zniw - poza zima; 432: rok trybu zimy takze w zimie)
                 // R3-06d (TiredLand): ziemia zajeta ponad baze okregu - tylko gra (Plan bez zmian); przedtem kopia plonu bez stada i ziemi do bramki krainy (StartCalibration.Stada.cs)
                 LandKs(ld, prod, f);
+                if (vf497) res.PostY = (double[])prod.Clone();  // 497: po roku urodzaju i ziemi zmeczonej, przed zamowieniami (tylko odczyt)
                 // 363: towar zamowienia po zimie i czynnikach rak wyjety z produkcji PRZED stolem okregu i targiem (okreg go nie spala, wozy go nie wioza) - sztuki doby dla zamawiajacych
                 if (ord) OrderAfter(ld, res, prod, kgT);
                 if (res.S490 != null) S490Snap(res.S490, 4, prod, kgT, 1.0);   // 490: sam pomiar - po roku urodzaju, ziemi i zamowieniach
@@ -673,7 +680,7 @@ namespace Armoury
                     string reg = ld.TF ? ld.St.StringId : (ld.V.Bound != null ? ld.V.Bound.StringId : ld.St.StringId);
                     double rh; regionHands.TryGetValue(reg ?? "-", out rh); regionHands[reg ?? "-"] = rh + kd.Wf;
                     int m = ld.Market == 0 ? 0 : 1;
-                    if (ld.TF) { for (int i = 0; i < ItemCount; i++) mkByM[m * ItemCount + i] += res.Market[i]; ntf++; tfList.Add(new KeyValuePair<LiveDist, DistResult>(ld, res)); continue; }
+                    if (ld.TF) { Vf497Note(ld, res, null); for (int i = 0; i < ItemCount; i++) mkByM[m * ItemCount + i] += res.Market[i]; ntf++; tfList.Add(new KeyValuePair<LiveDist, DistResult>(ld, res)); continue; }   // 497: pola mieszczan - sam rok urodzaju
                     nv++;
                     var a = new float[ItemCount];
                     for (int i = 0; i < ItemCount; i++) a[i] = (float)res.Market[i];
@@ -681,6 +688,7 @@ namespace Armoury
                     // recenzja 338 W3: plan (mkByM - rampa i targ ZC4, mk) widzi to samo co stawka A - dopisek budynkow (0, gdy 338 nic nie skaluje)
                     for (int i = 0; i < ItemCount; i++) { double x = res.Market[i] + (a[i] - (float)res.Market[i]) + Buildings338Village.PlanBack(ld.V, i); mkByM[m * ItemCount + i] += x; mk[i] += x; }   // 338c: chleb i skora wsi wracaja do Planu jako surowiec
                     rates[ld.V] = new VRate { A = a, M = m };
+                    Vf497Note(ld, res, a);   // 497: czynniki gry po Planie (rok urodzaju, ziemia, ScaleRates) do wejscia nastepnego Planu - tylko odczyt
                     try { ld.Basket = VillageBasket(ld, res); zv[ld.V] = ld.Basket; if (ld.BasketPaid != null) zvp[ld.V] = ld.BasketPaid; } catch (Exception e) { Stumble("VillageBasket", e); }
                     // racje spichlerza: kcal czesci domowej z wlasnego pola i domu + jedzenie robione w domu (krok 8 - koszyk, na ktory wsi nie stac)
                     ld.Rations = res.KcalNeed > 0 ? ld.PeopleHome * Math.Min(1.5, (res.OwnKcal + ld.HomeKcal) / res.KcalNeed) : -1;

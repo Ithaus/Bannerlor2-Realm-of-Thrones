@@ -193,6 +193,7 @@ namespace Armoury
                         }
                         double wH, sub, cl, W;
                         BlockOutput(d, x.B[b], x.Pc[k], o, out wH, out sub, out cl, out W);
+                        if (d.Vf != null) ApplyVf(d.Vf, o);               // 497: jak pary (Pairs) - czynniki gry po Planie; klucz NIE: Vf null
                         double s = 0, v = 0;
                         for (int g = 0; g < KsTab.NG; g++) if (o[g] != 0.0) { s += o[g] * FeedKcal(x, g); if (FeedSold(x, g)) v += o[g] * x.Val[g]; }   // feed-swiat: przy Ks Self Feed Staples jedzenie podstawowe
                         x.PairKcal[k] = s; x.PairNf[k] = v;

@@ -84,7 +84,7 @@ namespace Armoury
             if (inp == null || r.Error != null || _itemIx == null || _items == null || kg == null) return;
             var mk = new double[ItemCount]; var tf = new double[ItemCount]; var own = new double[ItemCount]; double kcal = 0, need = 0; int nd = 0;
             var live = BuildLive(r, inp, false);
-            var p490 = new double[2 * 2 * G490 * 3];   // 490: sam pomiar (Plan wedlug rynku i grupy towaru)
+            var p490 = new double[2 * 2 * G490 * P490K];   // 490: sam pomiar (Plan wedlug rynku i grupy towaru)
             foreach (var ld in live)
             {
                 if (cancelled != null && cancelled()) return;
