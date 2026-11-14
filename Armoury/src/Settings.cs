@@ -718,6 +718,10 @@ namespace Armoury
         public bool ChargeTemperEnabled = true;            // RBM charge damage = horse mass x speed, so even a slow bump crushes men - temper it
         public float ChargeDamageFactor = 0.6f;            // multiplier on mounted charge damage
         public float ChargeFullSpeed = 7f;                 // full charge damage only at this speed (m/s) and above - slower rides pay proportionally less
+        // 507 (perki): RBM liczy sile ciosu, pocisku i predkosc/szarze konia sam - premie perkow gry i stylow BK przepadaja; Perk507Strike.cs dolicza je po RBM
+        public bool PerkStrikeAfterRbm = true;             // RBM computes blow strength itself and drops the perk bonuses from speed and from crafted weapons: Reckless Charge, Dash and Slash, Surging Blow, Lancer, Unstoppable Force (all only when you strike on the move, by the game's own rules), Running Throw (thrown weapons while running), Sharpened Edge and Sharpened Tip (weapons crafted by you). On = they count again on top of RBM. Off = as before, without them
+        public bool PerkLifestyleDamage = true;            // Bannerlord Kings lifestyle perks that had no effect at all now work: Klibanophori (mounted thrusts +6%, mounted men take 5% less damage), Highlander (greatswords on foot +4%), Fennid (two-handed weapons +10%), Drengr (infantry in the formation you lead +10% melee damage). For you and the AI alike. Off = they do nothing, as before
+        public bool PerkMountAfterRbm = true;              // perks that should make the horse faster or stronger now reach the horse: Sweeping Wind (+5% top speed, lost to RBM's horse speed), and the Bannerlord Kings perks Equites (+10% charge damage), Adaptive Tactics (+8% maneuver), Camel Master (+8% speed) and Outrider (+5% speed), which Bannerlord Kings put on the rider where the game never reads them. Off = as before
 
         // --- Horse wind ---
         // 136 (25.10, Jeff: "konie tez powinny miec stamine, ze nie moge ciagle biegac po polu walki, stamina powinna byc zalezna od cech konia", "ogolna zasada"):

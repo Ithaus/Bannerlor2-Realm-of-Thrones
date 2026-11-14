@@ -1924,6 +1924,19 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float ChargeFullSpeed { get; set; } = 7f;
 
+        // 507 (perki): premie perkow gry i stylow BK do sily ciosu i konia po RBM (Perk507Strike.cs)
+        [SettingPropertyBool("Perk Strike After Rbm", HintText = "RBM computes blow strength itself and drops the perk bonuses from speed and from crafted weapons: Reckless Charge, Dash and Slash, Surging Blow, Lancer, Unstoppable Force (all only when you strike on the move, by the game's own rules), Running Throw (thrown weapons while running), Sharpened Edge and Sharpened Tip (weapons crafted by you). On = they count again on top of RBM. Off = as before, without them", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool PerkStrikeAfterRbm { get; set; } = true;
+
+        [SettingPropertyBool("Perk Lifestyle Damage", HintText = "Bannerlord Kings lifestyle perks that had no effect at all now work: Klibanophori (mounted thrusts +6%, mounted men take 5% less damage), Highlander (greatswords on foot +4%), Fennid (two-handed weapons +10%), Drengr (infantry in the formation you lead +10% melee damage). For you and the AI alike. Off = they do nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool PerkLifestyleDamage { get; set; } = true;
+
+        [SettingPropertyBool("Perk Mount After Rbm", HintText = "perks that should make the horse faster or stronger now reach the horse: Sweeping Wind (+5% top speed, lost to RBM's horse speed), and the Bannerlord Kings perks Equites (+10% charge damage), Adaptive Tactics (+8% maneuver), Camel Master (+8% speed) and Outrider (+5% speed), which Bannerlord Kings put on the rider where the game never reads them. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool PerkMountAfterRbm { get; set; } = true;
+
         [SettingPropertyBool("Horse Stamina Enabled", HintText = "horses tire in battle like men do: a gallop spends a horse's wind and a blown horse slows down, while a walk or a trot gives the wind back. How long a horse lasts depends on the horse itself (speed, weight, breed), the load it carries (rider, armour, weapons, barding) and the rider's Riding skill - the same rule for you, your men and the enemy. Dragons, chariots, elephants, mammoths and the horses of the dead do not tire. Off = horses never tire, as before", RequireRestart = false)]
         [SettingPropertyGroup("Horse wind")]
         public bool HorseStaminaEnabled { get; set; } = true;
@@ -13736,6 +13749,9 @@ namespace Armoury
             s.ChargeTemperEnabled = ChargeTemperEnabled;
             s.ChargeDamageFactor = ChargeDamageFactor;
             s.ChargeFullSpeed = ChargeFullSpeed;
+            s.PerkStrikeAfterRbm = PerkStrikeAfterRbm;   // 507 (perki)
+            s.PerkLifestyleDamage = PerkLifestyleDamage;
+            s.PerkMountAfterRbm = PerkMountAfterRbm;
             s.HorseStaminaEnabled = HorseStaminaEnabled;
             s.HorseStaminaBar = HorseStaminaBar;
             s.HorseGallopDrainScale = HorseGallopDrainScale;
