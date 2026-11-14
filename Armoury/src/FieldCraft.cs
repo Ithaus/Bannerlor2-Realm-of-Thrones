@@ -1100,7 +1100,7 @@ namespace Armoury
                 // ApplyWear dzieli potem przez solidnosc tieru - kompensujemy, zeby liczby Jeffa trzymaly co do sztuki
                 float sturdiness = 1f + Math.Max(0, tier - 1) * Settings.Current.TierDurabilityFactor;
                 int slot = (int)weaponIndex;
-                if (slot >= 0 && slot < 4) led[slot] += 100f / uses * sturdiness;
+                if (slot >= 0 && slot < 4) led[slot] += 100f / uses * sturdiness * Perk512.CrossbowWear(shooterAgent, item);   // 512 (perki): Fletcher - kusza bohatera zuzywa sie mniej
             }
             catch { }
         }
