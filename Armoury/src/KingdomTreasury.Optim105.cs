@@ -53,6 +53,7 @@ namespace Armoury
         {
             "Armoury:MercContract.MercIncomePrefix",            // AddMercenaryIncome: tylko najemnik z umowa (ci sa poza petla powinnosci)
             "Armoury:MercContract.TierPostfix",                 // CalculateClanIncomeInternal: zapis licznikow tylko przy applyWithdrawals
+            "Armoury:Perk510Gold.SpringPostfix",               // 510 (perk 52): CalculateClanIncomeInternal - przy applyWithdrawals = false tylko odczyt (kasy miast i liczniki tylko przy true), bez MBRandom
             "Armoury:CouncilWages35.IncomesPostfix",            // BK AddIncomes: wychodzi przy applyWithdrawals = false
             "Armoury:SideVillageFief.IncomeViewPostfix",        // CalculateClanIncome czynnego modelu: tylko rod gracza (pominiety); m115: linia prac tylko przy FinanceBox.In, sam odczyt
             "BannerKings:ClanFinancesPatches.KingdomBudgetPrefix",

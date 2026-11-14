@@ -387,7 +387,7 @@ namespace Armoury
             if (_ownerDay.TryGetValue(owner, out was) && was != day && (!idle || day - was < IdleDisbandDays)) { _dAgain++; return "wlasciciel mial juz rozwiazana karawane (ochrona przed petla)"; }
             if (!CaravanCapital.On) return "Caravan Capital Real wylaczone (kiesa przepadlaby)";
             if (!HorseFate.SpoilsOn) return "Spoils Of Broken Parties wylaczone (towar przepadlby)";
-            if (!SmallGold.PerksOn && owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans)) return "perk Insurance Plans bez ciecia (zloto z niczego)";
+            if (!SmallGold.PerksOn && !Perk510Gold.GiftsOn && owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans)) return "perk Insurance Plans bez ciecia (zloto z niczego)";
             if (!idle && RoadNow(c, at)) return "droga jest w swiezym odczycie";   // m6b (6): karawana bez zysku ma droge - stoi, bo BK nie widzi zysku
             return null;
         }
@@ -582,7 +582,7 @@ namespace Armoury
             if ((c.MemberRoster != null && c.MemberRoster.TotalHeroes > 0) || (c.PrisonRoster != null && c.PrisonRoster.TotalManCount > 0)) return "bohater w skladzie albo jency";
             if (!CaravanCapital.On) return "Caravan Capital Real wylaczone (kiesa przepadlaby)";
             if (!HorseFate.SpoilsOn) return "Spoils Of Broken Parties wylaczone (towar przepadlby)";
-            if (!SmallGold.PerksOn && owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans)) return "perk Insurance Plans bez ciecia (zloto z niczego)";
+            if (!SmallGold.PerksOn && !Perk510Gold.GiftsOn && owner.GetPerkValue(DefaultPerks.Trade.InsurancePlans)) return "perk Insurance Plans bez ciecia (zloto z niczego)";
             return null;
         }
 

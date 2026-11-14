@@ -415,6 +415,7 @@ namespace Armoury
                             _dDeadMission[cat]++;
                             continue;
                         }
+                        if (Perk510Gold.VetSaves(d.Party)) continue;   // 510 (perk 67): Veterinarian - kon tylko ranny, wraca (nie schodzi ze zbrojowni)
                         if (TakeOne(d.Party, d.Item, touched, ref pa)) _dDeadMission[cat]++; else _dMissionOutside++;
                     }
                     catch (Exception e) { Stumble("ApplyMission(kon)", e); }
@@ -703,8 +704,8 @@ namespace Armoury
                         Horsed(b.Horses, high, low, out hh, out hl);
                         double eh = high > 0 ? kh * w * hh / high : 0.0, el = low > 0 ? kl * w * hl / low : 0.0;
                         int dh = Rnd(eh), dl = Rnd(el), got = 0;
-                        for (int k = 0; k < dh; k++) { var it = TakeLevel(arm, OrdHigh, null); if (it == null) break; _dDeadAuto[Cat(it)]++; got++; }
-                        for (int k = 0; k < dl; k++) { var it = TakeLevel(arm, OrdLow, null); if (it == null) break; _dDeadAuto[Cat(it)]++; got++; }
+                        for (int k = 0; k < dh; k++) { if (Perk510Gold.VetSaves(mp)) continue; var it = TakeLevel(arm, OrdHigh, null); if (it == null) break; _dDeadAuto[Cat(it)]++; got++; }
+                        for (int k = 0; k < dl; k++) { if (Perk510Gold.VetSaves(mp)) continue; var it = TakeLevel(arm, OrdLow, null); if (it == null) break; _dDeadAuto[Cat(it)]++; got++; }   // 510 (perk 67): Veterinarian - padly kon partii z perkiem z szansa tylko ranny (wraca)
                         _dAutoKilled += kh + kl; _dAutoExp += dh + dl; _dAutoNoHorse += (kh + kl) - (int)Math.Round((high > 0 ? (double)kh * hh / high : 0) + (low > 0 ? (double)kl * hl / low : 0));
                         _dAutoParties++;
                         if (got > 0) HorseState.Refresh(mp);

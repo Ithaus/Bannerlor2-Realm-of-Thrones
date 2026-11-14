@@ -163,11 +163,11 @@ namespace Armoury
                 byCrown = true;
                 D = CrownAvg(k);
                 // M6a-2: okup powtorny w oknie RansomRepeatDays tanszy (RansomRepeat.Factor; klucz wylaczony - mnoznik 1, cena jak dotad)
-                return (long)(Math.Max(0f, s.RansomKingDays) * D * RepeatFactor(captive));   // Jeff 10.10 (wariant 1): krol 20 dni wplywow korony, osobno od glowy rodu
+                return (long)(Math.Max(0f, s.RansomKingDays) * D * RepeatFactor(captive) * Perk510Gold.RansomFactor(captive));   // 510 (perki 49/96/55): premie porywacza, Man of Means gracza   // Jeff 10.10 (wariant 1): krol 20 dni wplywow korony, osobno od glowy rodu
             }
             D = DebtLadder.DebtD(captive.Clan);
             double w = captive.Clan.Leader == captive ? head : Math.Max(0f, s.RansomLordDays);
-            return (long)(w * D * RepeatFactor(captive));   // M6a-2: jw.; 430: mniejszy z mnoznikow osoby (M6a-2) i rodu (430 C5)
+            return (long)(w * D * RepeatFactor(captive) * Perk510Gold.RansomFactor(captive));   // 510 (perki 49/96/55): Ransom Broker / BK Kidnapper porywacza, Man of Means gracza - placi rod jenca   // M6a-2: jw.; 430: mniejszy z mnoznikow osoby (M6a-2) i rodu (430 C5)
         }
 
         /// <summary>430 (C5): jeden mnoznik powtarzalnosci okupu - MNIEJSZY z dwoch: ta sama osoba w 56 dob (M6a-2, RansomRepeat) i ten sam rod temu samemu
@@ -888,7 +888,7 @@ namespace Armoury
         private static long PlayerPrice()
         {
             var s = Settings.Current;
-            return (long)(Math.Max(0f, s.RansomHeadYears) * 364.0 * DebtLadder.DebtD(Clan.PlayerClan));
+            return (long)(Math.Max(0f, s.RansomHeadYears) * 364.0 * DebtLadder.DebtD(Clan.PlayerClan) * Perk510Gold.PlayerRansomFactor());   // 510 (perk 55): Man of Means x0.7
         }
 
         /// <summary>RansomFlows.MenuRansomPrefix po zaplaceniu gotowki porywaczowi: reszta okupu gracza - dlug gracza wobec odbiorcy (ksiega 168).</summary>

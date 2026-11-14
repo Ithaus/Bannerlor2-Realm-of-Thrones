@@ -992,7 +992,7 @@ namespace Armoury
         {
             double a = 0, b = 0;
             try { bool bc; double dd; a = Ransom178.PriceOf(me, out bc, out dd); } catch (Exception e) { Stumble("PlayerPrice.Own", e); }
-            try { b = Campaign.Current.Models.RansomValueCalculationModel.PrisonerRansomValue(me.CharacterObject, lord); } catch (Exception e) { Stumble("PlayerPrice.Game", e); }
+            try { b = Campaign.Current.Models.RansomValueCalculationModel.PrisonerRansomValue(me.CharacterObject, lord) * Perk510Gold.PlayerRansomFactor(); } catch (Exception e) { Stumble("PlayerPrice.Game", e); }
             return Math.Max(0, Math.Max(a, b));
         }
 
