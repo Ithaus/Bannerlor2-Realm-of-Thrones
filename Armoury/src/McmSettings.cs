@@ -685,7 +685,7 @@ namespace Armoury
         public float ThrownShieldDamagePercent { get; set; } = 100f;
 
         // 506 (perki): pancerz i tarcze z perkow po RBM (Perk506.cs)
-        [SettingPropertyBool("Perk Shields After RBM", HintText = "Shield perks get their own effects back under Realistic Battle Mod. Arrow Catcher: your shield is tougher in battle and wears slower; as a commander the shields of the men in your formation are tougher. Pavise: a shield carried on your back is tougher and wears slower. Shieldwall: as a commander, the men of your formation lock their shields better against missiles, only in the shield wall formation. Off = Realistic Battle Mod as it is (these perks do nothing). The same rule for you and for the AI.", RequireRestart = false)]
+        [SettingPropertyBool("Perk Shields After RBM", HintText = "Shield perks get their own effects back under Realistic Battle Mod. Arrow Catcher: your shield is tougher in battle and wears slower; as a commander the shields of the men in your formation are tougher. Pavise: a shield carried on your back is tougher against missiles it stops and wears slower. Shieldwall: as a commander, the men of your formation lock their shields better against missiles, only in the shield wall formation. Off = Realistic Battle Mod as it is (these perks do nothing). Without Realistic Battle Mod the plain game rules apply and this does nothing. The same rule for you and for the AI.", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool PerkShieldsAfterRbm { get; set; } = true;
 
@@ -701,7 +701,7 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float ArrowCatcherShieldWearCut { get; set; } = 0.25f;
 
-        [SettingPropertyFloatingInteger("Pavise Back Shield Durability", 0.00f, 1.00f, "0.00", HintText = "With Perk Shields After RBM: Pavise makes a shield carried on your back this much tougher against hits from behind.", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Pavise Back Shield Durability", 0.00f, 1.00f, "0.00", HintText = "With Perk Shields After RBM: Pavise makes a shield carried on your back this much tougher against missiles it stops (melee blows on the back shield are not changed).", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public float PaviseBackShieldDurability { get; set; } = 0.30f;
 

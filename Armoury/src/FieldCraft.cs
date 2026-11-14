@@ -1198,7 +1198,7 @@ namespace Armoury
                             // przekracza wytrzymalosci tarczy: oszczep RBM robi jej 1000-3000 pkt (x25), a tarcza ma 300-800 -
                             // bez tej granicy jeden zablokowany rzut zjadalby caly stan sztuki w ekwipunku. Strzaly, belty i ciosy wrecz: bez zmian.
                             float shieldMissile = 1f;
-                            float rawSh = raw;
+                            float rawSh = raw * Perk506.ShieldWearUndo(affectedAgent);   // 506 (perki): zwrot wytrzymalosci PRZED granica tarczy
                             if (blow.IsMissile)
                             {
                                 int mk;
@@ -1210,7 +1210,7 @@ namespace Armoury
                                 }
                             }
                             if (sh >= 0) vled[sh] += rawSh * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor) * shieldMissile
-                                                    * Perk506.ShieldWearFactor(affectedAgent, attackCollisionData.CollidedWithShieldOnBack);   // 506 (perki): ArrowCatcher / Pavise
+                                                    * Perk506.ShieldWearCut(affectedAgent, attackCollisionData.CollidedWithShieldOnBack);   // 506 (perki): ciecie ArrowCatcher / Pavise
                         }
                         else
                         {

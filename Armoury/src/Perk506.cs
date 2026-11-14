@@ -39,10 +39,15 @@ namespace Armoury
     /// WYTRZYMALOSC TARCZY = obrazenia tarczy / mnoznik (postfiks na MissionCombatMechanicsHelper.ComputeBlowDamageOnShield, Priority.Low - PRZED
     /// ShieldGuard 414 (Priority.Last), ktory potem tnie strzaly do 1%). Mnozniki sumowane: 1 + osobisty + dowodca + Pavise. Silnik zaraz potem
     /// robi AbsorbedByArmor = InflictedDamage (MissionCombatMechanicsHelper.cs:208-209), a FieldCraft liczy zuzycie tarczy z tej liczby - dlatego
-    /// WearFactor oddaje mnoznik wytrzymalosci (zuzycie Armoury bez podwojnego liczenia) i dopiero mnozy przez ciecia perkow: zuzycie = dokladnie
-    /// -25% (ArrowCatcher) / -25% (Pavise na plecach), a dowodca ArrowCatcher zuzycia nie rusza.
+    /// (recenzja 506) zuzycie ma dwa kroki: ShieldWearUndo PRZED granica wytrzymalosci tarczy (414) oddaje to, co dzielenie zabralo w tym ciosie,
+    /// liczone po obcieciu 414 do int (T(was) / T(now)); ShieldWearCut PO granicy mnozy przez ciecia perkow -25% (ArrowCatcher) / -25% (Pavise na
+    /// plecach). Dowodca ArrowCatcher zuzycia nie rusza. Przy strzalach (liczby 0/1 po 414) wynik jest przyblizony: cios, ktory przez dzielenie
+    /// spadl z 1 do 0, nie wzial tarczy nic i nie liczy sie do zuzycia (jak kazda strzala ponizej progu).
+    /// Pavise dziala tylko na pociski zatrzymane tarcza na plecach (RBM przepisuje je na blok); cios wrecz w plecy i pocisk przebijajacy / Impale
+    /// RBM liczy obok tej metody (DamageRework.cs:538-553, RBMComputeBlowDamageOnShield wprost) - bez ulgi.
     ///
-    /// Bez RBM: pancerz i ShieldWall nieczynne (gra liczy je sama), wytrzymalosc tarcz dziala. Jedna regula dla gracza i AI.
+    /// Bez RBM: pancerz i ShieldWall nieczynne (gra liczy je sama); tarcze tez nieczynne (recenzja 506 - bez prefiksu RBM na ComputeBlowDamageOnShield
+    /// gra daje ArrowCatcher jako oslone i Pavise rzut 75%, 506 liczylby perk drugi raz). Jedna regula dla gracza i AI.
     /// Latki w kampanii (NightHooks.InCampaign, raz na proces), po 415 - postfiks pancerza tej samej waznosci (Priority.Last) biegnie po NeckGuard415
     /// (kolejnosc zakladania), wiec premia perka idzie na pancerz juz z szyja / barkami - jak w grze (perk na koncu).
     /// Perki czytane z obiektow kampanii odswiezanych na starcie kazdej misji (Logic) - poza kampania (bitwa wlasna) nieczynne.
@@ -56,6 +61,14 @@ namespace Armoury
         private static bool _armorPatched, _shieldPatched, _statsPatched;
         private static MethodBase _stats;                    // SandboxAgentStatCalculateModel.UpdateHumanStats
         private static bool _rbmStats;                       // postfiks RBM (0.01) jest teraz na UpdateHumanStats
+        private static MethodBase _shieldM;                  // MissionCombatMechanicsHelper.ComputeBlowDamageOnShield
+        private static bool _rbmShield;                      // recenzja 506: prefiks RBMCombat na ComputeBlowDamageOnShield (bez RBM gra daje ArrowCatcher jako oslone - 506 nic)
+        private static bool _guard414;                       // recenzja 506: postfiks ShieldGuard 414 na tej metodzie (tnie pociski po nas)
+
+        // recenzja 506: ostatni cios w tarcze z ulga perka (ShieldPostfix -> FieldCraft w tym samym ciosie). Zwrot zuzycia liczony z tego,
+        // co NAPRAWDE przeszlo przez 414 (obciecie do int): T(was) / T(now). Czyszczone na poczatku kazdego ShieldPostfix i po odczycie.
+        private static Agent _hitVictim;
+        private static float _hitUndo = 1f;
 
         /// <summary>Choc jedna latka 506 siedzi w procesie - SubModuleMain dodaje wtedy Logic w kazdej misji (odswiezenie perkow / zerowanie).</summary>
         internal static bool Patched { get { return _patched > 0; } }
@@ -68,8 +81,8 @@ namespace Armoury
         private static float _armHumanBefore, _armHumanAfter, _armHorseBefore, _armHorseAfter;
         private static int _shN, _shAc, _shCap, _shPav;
         private static long _shIn, _shOut;
-        private static int _swSet, _wearN;
-        private static float _wearSum;
+        private static int _swSet, _wearN, _undoN;
+        private static float _wearSum, _undoSum;
         private static int _errs, _errsLogged;
 
         /// <summary>NightHooks.InCampaign (ArmouryBehavior.OnSessionLaunched, raz na proces). Zwraca opis do linii "Latki nocy (K3): kampania".</summary>
@@ -106,6 +119,7 @@ namespace Armoury
             _wanted++;
             MethodInfo shield = null;
             try { shield = AccessTools.DeclaredMethod(typeof(MissionCombatMechanicsHelper), "ComputeBlowDamageOnShield"); } catch { }
+            _shieldM = shield;
             if (shield == null) miss += " brak MissionCombatMechanicsHelper.ComputeBlowDamageOnShield;";
             else
             {
@@ -114,6 +128,8 @@ namespace Armoury
                     h.Patch(shield, postfix: new HarmonyMethod(typeof(Perk506), nameof(ShieldPostfix)) { priority = Priority.Low });
                     _shieldPatched = Owned(shield, h.Id, false);
                     if (_shieldPatched) _patched++; else miss += " tarcza NIE weszla;";
+                    RefreshShieldState();
+                    if (_shieldPatched && !_rbmShield) miss += " ComputeBlowDamageOnShield bez prefiksu RBM (teraz) - ArrowCatcher/Pavise liczy gra, tarcze 506 nieczynne;";
                 }
                 catch (Exception e) { miss += " tarcza BLAD " + e.GetType().Name + ";"; Log.Error("Perk506.Patch(shield)", e); }
             }
@@ -185,6 +201,27 @@ namespace Armoury
             }
             catch { }
             _rbmStats = on;
+        }
+
+        /// <summary>Recenzja 506: czy RBM liczy obrazenia tarcz (prefiks RBMCombat) i czy ShieldGuard 414 tnie pociski po nas - przy zakladaniu
+        /// i na starcie misji. Bez RBM 506 nie rusza tarcz (gra daje ArrowCatcher jako oslone, Pavise rzut 75% - bez podwojnego liczenia).</summary>
+        private static void RefreshShieldState()
+        {
+            bool rbm = false, g = false;
+            try
+            {
+                var info = _shieldM != null ? Harmony.GetPatchInfo(_shieldM) : null;
+                if (info != null)
+                {
+                    foreach (var p in info.Prefixes)
+                        if (p != null && p.PatchMethod != null && p.PatchMethod.DeclaringType != null
+                            && (p.PatchMethod.DeclaringType.FullName ?? "").StartsWith("RBMCombat.", StringComparison.Ordinal)) { rbm = true; break; }
+                    foreach (var p in info.Postfixes)
+                        if (p != null && p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(ShieldGuard)) { g = true; break; }
+                }
+            }
+            catch { }
+            _rbmShield = rbm; _guard414 = g;
         }
 
         private static float Bonus(PerkObject p, bool primary)
@@ -287,7 +324,7 @@ namespace Armoury
         private static float Durability(Settings s, Agent v, bool onBack, out bool ac, out bool cap, out bool pav)
         {
             ac = false; cap = false; pav = false;
-            if (s == null || !s.PerkShieldsAfterRbm || v == null || !v.IsHuman) return 1f;
+            if (s == null || !s.PerkShieldsAfterRbm || !_rbmShield || v == null || !v.IsHuman) return 1f;
             var acp = _arrowCatcher;
             if (acp == null) return 1f;
             float m = 1f;
@@ -300,20 +337,34 @@ namespace Armoury
             return m;
         }
 
-        /// <summary>Postfiks na ComputeBlowDamageOnShield (po prefiksie RBM / ciele gry, przed ShieldGuard 414): obrazenia tarczy / mnoznik wytrzymalosci.</summary>
-        private static void ShieldPostfix(ref AttackInformation attackInformation, ref AttackCollisionData attackCollisionData, ref int inflictedDamage)
+        /// <summary>Postfiks na ComputeBlowDamageOnShield (po prefiksie RBM / ciele gry, przed ShieldGuard 414): obrazenia tarczy / mnoznik wytrzymalosci.
+        /// Recenzja 506: zapamietuje dla FieldCraft zwrot zuzycia T(was) / T(now), gdzie T = to, co zrobi z liczba 414 (obciecie do int).</summary>
+        private static void ShieldPostfix(ref AttackInformation attackInformation, ref AttackCollisionData attackCollisionData, WeaponComponentData attackerWeapon, ref int inflictedDamage)
         {
+            _hitVictim = null; _hitUndo = 1f;
             try
             {
                 if (inflictedDamage <= 0) return;
                 bool ac, cap, pav;
-                float m = Durability(Settings.Current, attackInformation.VictimAgent, attackCollisionData.CollidedWithShieldOnBack, out ac, out cap, out pav);
+                var s = Settings.Current;
+                var v = attackInformation.VictimAgent;
+                float m = Durability(s, v, attackCollisionData.CollidedWithShieldOnBack, out ac, out cap, out pav);
                 if (!(m > 1f)) return;
                 int was = inflictedDamage;
                 int now = (int)(was / m + 0.5f);
                 if (now < 1) now = 1;                                                       // trafienie zostaje trafieniem (jak ShieldGuard - bez zera z dzielenia)
                 if (now > was) now = was;
                 inflictedDamage = now;
+                // zwrot zuzycia: ile z liczby zostanie po 414 bez perka i z perkiem (ta sama regula co ShieldGuard.SoftenMissile)
+                int tw = was, tn = now;
+                if (_guard414 && s.ShieldMissileGuardEnabled && attackCollisionData.IsMissile)
+                {
+                    int kind;
+                    float pct = ShieldGuard.Classify(s, attackerWeapon, out kind);
+                    if (kind != ShieldGuard.KindPiercing && pct < 1f) { tw = (int)(was * pct); tn = (int)(now * pct); }
+                }
+                _hitVictim = v;
+                _hitUndo = tn > 0 ? (float)tw / tn : 1f;                                  // tn = 0: tarcza w bitwie nic nie wziela, FieldCraft nic nie liczy (raw 0)
                 _shN++; _shIn += was; _shOut += now;
                 if (ac) _shAc++;
                 if (cap) _shCap++;
@@ -322,10 +373,21 @@ namespace Armoury
             catch (Exception e) { Count("Perk506.ShieldPostfix", e); }
         }
 
-        /// <summary>FieldCraft.OnAgentHit (zuzycie tarczy w ksiedze bohatera): mnoznik do surowego zuzycia z obrazen tarczy. Oddaje mnoznik wytrzymalosci
-        /// (obrazenia przyszly juz podzielone przez ShieldPostfix - bez tego dowodca ArrowCatcher cialby zuzycie, a osobisty liczylby sie dwa razy)
-        /// i mnozy przez ciecia perkow: ArrowCatcher -25%, Pavise na plecach -25%. 1 = bez zmian.</summary>
-        internal static float ShieldWearFactor(Agent victim, bool onBack)
+        /// <summary>FieldCraft.OnAgentHit (zuzycie tarczy w ksiedze bohatera), PRZED granica wytrzymalosci tarczy (414): oddaje to, co ShieldPostfix
+        /// zabral z obrazen w tym samym ciosie - liczone po obcieciu 414 (T(was) / T(now)), wiec dowodca ArrowCatcher zuzycia nie zmienia,
+        /// a osobisty / Pavise nie licza sie dwa razy. Jednorazowe (czysci zapis). 1 = bez zmian.</summary>
+        internal static float ShieldWearUndo(Agent victim)
+        {
+            if (victim == null || _hitVictim != victim) return 1f;
+            float u = _hitUndo;
+            _hitVictim = null; _hitUndo = 1f;
+            if (!_shieldPatched || !(u > 0f)) return 1f;
+            _undoN++; _undoSum += u;
+            return u;
+        }
+
+        /// <summary>FieldCraft.OnAgentHit, PO granicy wytrzymalosci tarczy: ciecia zuzycia perkow - ArrowCatcher -25%, Pavise na plecach -25%. 1 = bez zmian.</summary>
+        internal static float ShieldWearCut(Agent victim, bool onBack)
         {
             try
             {
@@ -333,13 +395,13 @@ namespace Armoury
                 bool ac, cap, pav;
                 float m = Durability(s, victim, onBack, out ac, out cap, out pav);
                 if (!(m > 1f)) return 1f;
-                float f = _shieldPatched ? m : 1f;
+                float f = 1f;
                 if (ac) f *= 1f - Math.Max(0f, Math.Min(0.9f, s.ArrowCatcherShieldWearCut));
                 if (pav) f *= 1f - Math.Max(0f, Math.Min(0.9f, s.PaviseBackShieldWearCut));
-                _wearN++; _wearSum += f;
+                if (f < 1f) { _wearN++; _wearSum += f; }
                 return f;
             }
-            catch (Exception e) { Count("Perk506.ShieldWearFactor", e); return 1f; }
+            catch (Exception e) { Count("Perk506.ShieldWearCut", e); return 1f; }
         }
 
         // ---------------- 2: ShieldWall po RBM ----------------
@@ -375,7 +437,8 @@ namespace Armoury
         {
             _armHuman = 0; _armHorse = 0; _armHumanBefore = 0f; _armHumanAfter = 0f; _armHorseBefore = 0f; _armHorseAfter = 0f;
             _shN = 0; _shAc = 0; _shCap = 0; _shPav = 0; _shIn = 0; _shOut = 0;
-            _swSet = 0; _wearN = 0; _wearSum = 0f;
+            _swSet = 0; _wearN = 0; _wearSum = 0f; _undoN = 0; _undoSum = 0f;
+            _hitVictim = null; _hitUndo = 1f;
             _errs = 0; _errsLogged = 0;
         }
 
@@ -383,7 +446,7 @@ namespace Armoury
 
         private static void Flush(Mission m)
         {
-            if (_armHuman == 0 && _armHorse == 0 && _shN == 0 && _swSet == 0 && _wearN == 0 && _errs == 0) { Reset(); return; }
+            if (_armHuman == 0 && _armHorse == 0 && _shN == 0 && _swSet == 0 && _wearN == 0 && _undoN == 0 && _errs == 0) { Reset(); return; }
             string kind = "?";
             try { kind = MissionTeams.Kind(m); } catch { }
             Log.Info("Perki pancerza i tarcz (506): koniec misji (" + kind + ") | latki " + _patched + "/" + _wanted
@@ -391,7 +454,9 @@ namespace Armoury
                      + "), konie " + _armHorse + " (" + Avg(_armHorseBefore, _armHorse) + " -> " + Avg(_armHorseAfter, _armHorse) + ")"
                      + " | tarcze: ciosy z ulga " + _shN + " (ArrowCatcher osobisty " + _shAc + ", dowodcy " + _shCap + ", Pavise na plecach " + _shPav
                      + "; obrazenia tarcz " + _shIn + " -> " + _shOut + ")"
-                     + " | zuzycie tarcz bohaterow z perkiem: " + _wearN + " wpisow (sredni mnoznik x" + (_wearN > 0 ? F(_wearSum / _wearN) : "-") + ")"
+                     + " | zuzycie tarcz bohaterow: zwrot wytrzymalosci " + _undoN + " (sredni x" + (_undoN > 0 ? F(_undoSum / _undoN) : "-") + "), ciecie perkow "
+                     + _wearN + " (sredni x" + (_wearN > 0 ? F(_wearSum / _wearN) : "-") + ")"
+                     + (_rbmShield ? "" : " | tarcze: prefiks RBM nieobecny - nieczynne")
                      + " | ShieldWall: przeliczen oslony w scianie tarcz " + _swSet + (_rbmStats ? "" : " (postfiks RBM nieobecny - nieczynne)")
                      + " | potkniecia " + _errs + ".");
             Reset();
@@ -409,6 +474,7 @@ namespace Armoury
                 Reset();
                 RefreshPerks();
                 RefreshRbm();
+                RefreshShieldState();
             }
 
             protected override void OnEndMission()
