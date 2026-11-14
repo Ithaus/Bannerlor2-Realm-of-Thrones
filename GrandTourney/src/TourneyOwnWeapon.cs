@@ -3,6 +3,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace GrandTourney
 {
@@ -18,7 +19,8 @@ namespace GrandTourney
     /// z ciosem, tarcze, luki, strzaly, kusze, belty. Tu postfiks z Priority.Last i HarmonyAfter("com.rbmt") - biegnie PO RBM.
     ///
     /// Regula (tylko gracz, tylko TournamentFightMissionController - arena treningowa to inny kontroler, nie ruszana):
-    ///  - wlasna bron = pierwsza bron biala ze slotow 0-3 BattleEquipment: najpierw jednoreczna / dwureczna, gdy brak - drzewce;
+    ///  - wlasna bron = bron biala ze slotow 0-3 BattleEquipment: najpierw dwureczna, potem jednoreczna, potem drzewce (recenzja 498);
+    ///    w meczu konnym (kon w MatchEquipment) pomijana bron z RequiresNoMount - gdy nic nie zostaje, bron meczu bez zmian (linia w logu);
     ///    tylko bron wrecz (IsMeleeWeapon, cios albo pchniecie > 0), bez rzucanych, lukow, kusz, amunicji, tarcz; brak - nic (linia w logu);
     ///  - w MatchEquipment: pierwszy slot z jednoreczna / dwureczna -> wlasna bron (tarcza, drzewce, luk, kon zostaja; dwureczna przy tarczy
     ///    dozwolona); zestaw bez jednorecznej / dwurecznej (np. sama wlocznia z tarcza) -> wlasna bron do pierwszego pustego slotu 0-3;
@@ -33,7 +35,7 @@ namespace GrandTourney
         private static int _stumbles;
         private static int _swaps;
 
-        private static bool On { get { var s = Settings.Current; return s != null && s.TourneyOwnMeleeWeapon; } }
+        private static bool On { get { var s = Settings.Current; return s != null && s.Enabled && s.TourneyOwnMeleeWeapon; } }
 
         private static void Stumble(string where, Exception e)
         {
@@ -54,7 +56,8 @@ namespace GrandTourney
                                              Priority.Last, null, new[] { RbmTourneyHarmonyId }, null);
                 h.Patch(m, postfix: post);
                 Log.Info(P + "latka 1/1 (TournamentFightMissionController.PrepareForMatch, postfiks Priority.Last po " + RbmTourneyHarmonyId
-                         + "); klucz TourneyOwnMeleeWeapon=" + (On ? "TAK" : "NIE") + ".");
+                         + "); klucz TourneyOwnMeleeWeapon=" + (On ? "TAK" : "NIE")
+                         + " (przed MCM - stan z MCM w kazdej linii meczu).");
             }
             catch (Exception e) { Stumble("ApplyAll", e); }
         }
@@ -75,18 +78,49 @@ namespace GrandTourney
             return it != null && (it.ItemType == ItemObject.ItemTypeEnum.OneHandedWeapon || it.ItemType == ItemObject.ItemTypeEnum.TwoHandedWeapon);
         }
 
-        /// <summary>Wlasna bron gracza: najpierw jednoreczna / dwureczna, potem drzewce (sloty 0-3, w kolejnosci).</summary>
-        private static EquipmentElement OwnWeapon(Equipment eq)
+        /// <summary>Bron, ktorej nie da sie uzyc z konia (ItemUsage z RequiresNoMount, np. czesc dwurecznych toporow i dlugich drzewcow).</summary>
+        private static bool NoMount(ItemObject it)
         {
+            var w = it != null ? it.PrimaryWeapon : null;
+            if (w == null || string.IsNullOrEmpty(w.ItemUsage)) return false;
+            return (MBItem.GetItemUsageSetFlags(w.ItemUsage) & ItemObject.ItemUsageSetFlags.RequiresNoMount) != 0;
+        }
+
+        private static readonly ItemObject.ItemTypeEnum[] Order =
+        {
+            ItemObject.ItemTypeEnum.TwoHandedWeapon, ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.Polearm
+        };
+
+        /// <summary>Wlasna bron gracza (sloty 0-3): recenzja 498 - najpierw dwureczna (przyklad Jeffa: "jak nosze miecz dwureczny"),
+        /// potem jednoreczna, potem drzewce. Mecz konny (mounted): pomijamy bron z RequiresNoMount. noMountSkipped - czy cos odrzucil kon.</summary>
+        private static EquipmentElement OwnWeapon(Equipment eq, bool mounted, out bool noMountSkipped)
+        {
+            noMountSkipped = false;
             if (eq == null) return EquipmentElement.Invalid;
-            for (int pass = 0; pass < 2; pass++)
+            foreach (var type in Order)
                 for (int i = 0; i < 4; i++)
                 {
                     var el = eq[(EquipmentIndex)i];
-                    if (el.IsEmpty || !IsMelee(el.Item)) continue;
-                    if (pass == 0 ? IsSidearmType(el.Item) : el.Item.ItemType == ItemObject.ItemTypeEnum.Polearm) return el;
+                    if (el.IsEmpty || el.Item.ItemType != type || !IsMelee(el.Item)) continue;
+                    if (mounted && NoMount(el.Item)) { noMountSkipped = true; continue; }
+                    return el;
                 }
             return EquipmentElement.Invalid;
+        }
+
+        /// <summary>Kandydaci (bron biala gracza w slotach 0-3) do linii logu.</summary>
+        private static string Candidates(Equipment eq)
+        {
+            var sb = new System.Text.StringBuilder();
+            if (eq == null) return "";
+            for (int i = 0; i < 4; i++)
+            {
+                var el = eq[(EquipmentIndex)i];
+                if (el.IsEmpty || !IsMelee(el.Item)) continue;
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(Name(el));
+            }
+            return sb.ToString();
         }
 
         private static string Name(EquipmentElement el)
@@ -109,10 +143,14 @@ namespace GrandTourney
                         var me = p.MatchEquipment;
                         var hero = Hero.MainHero;
                         if (me == null || hero == null) return;
-                        var own = OwnWeapon(hero.BattleEquipment);
+                        bool mounted = !me[EquipmentIndex.Horse].IsEmpty;
+                        bool noMountSkipped;
+                        var own = OwnWeapon(hero.BattleEquipment, mounted, out noMountSkipped);
                         if (own.IsEmpty)
                         {
-                            Log.Info(P + "gracz nie ma wlasnej broni bialej w ekwipunku bojowym (sloty 0-3) - bron meczu bez zmian.");
+                            Log.Info(P + (noMountSkipped
+                                ? "mecz konny, wlasna bron biala [" + Candidates(hero.BattleEquipment) + "] nie do uzycia z siodla - bron meczu bez zmian [" + Kit(me) + "]."
+                                : "gracz nie ma wlasnej broni bialej w ekwipunku bojowym (sloty 0-3) - bron meczu bez zmian."));
                             return;
                         }
                         int slot = -1;
@@ -140,7 +178,10 @@ namespace GrandTourney
                         me.AddEquipmentToSlotWithoutAgent((EquipmentIndex)slot, new EquipmentElement(own.Item, own.ItemModifier));
                         _swaps++;
                         Log.Info(P + "mecz gracza, slot " + slot + ": " + (insert ? "pusty -> wstawiona " : Name(old) + " -> ") + Name(own)
-                                 + " | zestaw meczu po zmianie [" + Kit(me) + "] | podmian w sesji " + _swaps + ", potkniec " + _stumbles + ".");
+                                 + " | wybrana z [" + Candidates(hero.BattleEquipment) + "]" + (mounted ? ", mecz konny" : "")
+                                 + (noMountSkipped ? " (pominieta bron nie do uzycia z siodla)" : "")
+                                 + " | zestaw meczu po zmianie [" + Kit(me) + "] | podmian w sesji " + _swaps + ", potkniec " + _stumbles
+                                 + ", klucz TourneyOwnMeleeWeapon=TAK.");
                         return;
                     }
                     catch (Exception e) { Stumble("PrepareForMatch.p", e); }

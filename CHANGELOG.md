@@ -23,7 +23,14 @@ Klucz NIE: postfiks wychodzi na pierwszej linii, bron meczu jak dotad.
 (g) Kon w szablonie (turniej konny): wlasna dwureczna bron albo drzewce bez uzycia z konia bedzie w zestawie tak jak w bitwie - gra sama nie pozwoli jej dobyc z siodla. Nie filtrujemy tego.
 W grze sprawdzic w GrandTourney-*.log: linia "latka 1/1" przy starcie i przy kazdym meczu gracza "slot N: <bron RBM> -> <miecz gracza>". W walce: dwureczny miecz gracza z jego modyfikatorem, tarcza / wlocznia / luk jak dawal RBM. Po turnieju ekwipunek gracza bez zmian.
 
-**Status:** DO SPRAWDZENIA (zbudowane, commit na galezi noc/498-turniej-wlasna-bron; nie wgrane).
+**Recenzja 498 (2 przeglady, 4 uwagi drobne - wszystkie prawdziwe, wszystkie poprawione):**
+- (r1) Mecz konny: wlasna bron z RequiresNoMount (ItemUsage, MBItem.GetItemUsageSetFlags) zastepowala uzywalny miecz zestawu - gracz zostawal z sama lanca. Teraz gdy w MatchEquipment jest kon, taka bron jest pomijana przy wyborze (bierze sie nastepna wlasna bron uzywalna z siodla); gdy nie ma zadnej - zestaw meczu bez zmian i linia "mecz konny, wlasna bron biala [...] nie do uzycia z siodla - bron meczu bez zmian [...]". To zastepuje punkt (g) wyzej.
+- (r2) Wybor wlasnej broni: byla pierwsza jednoreczna/dwureczna wedlug slotu (zapasowy miecz w slocie 0 wygrywal z dwurecznym w slocie 2). Teraz kolejnosc: dwureczna, potem jednoreczna, potem drzewce (przyklad Jeffa: "jak nosze miecz dwureczny"); linia podmiany ma "wybrana z [kandydaci]". Do decyzji Jeffa, jesli woli inna regule (np. wedlug wartosci).
+- (r3) Wlasciwosc On pomijala glowny wylacznik Settings.Enabled - teraz `s.Enabled && s.TourneyOwnMeleeWeapon`, jak TourneyWounds / TourneyRansom.
+- (r4) Linia startu pokazywala klucz sprzed MCM (McmSettings.Apply dopiero w OnGameStart) - dopisek "(przed MCM ...)"; stan klucza w chwili meczu na koncu kazdej linii podmiany ("klucz TourneyOwnMeleeWeapon=TAK").
+Kontrola po poprawkach: MBItem.GetItemUsageSetFlags to wywolanie silnika (MBAPI) - wolane tylko w meczu (misja trwa), w try per uczestnik (potkniecie, bez wylacznika). Reszta (kopia MatchEquipment, kolejnosc po RBM, ArenaNoWear, TourneyRansom) bez zmian.
+
+**Status:** DO SPRAWDZENIA (zbudowane z poprawkami recenzji, galaz noc/498-turniej-wlasna-bron; nie wgrane).
 
 ## 497-q: fach - cel ze stolem / F okregu (zboze W); pomiar 490 - rozjazd rak osobno od czynnikow (zywiec)
 
