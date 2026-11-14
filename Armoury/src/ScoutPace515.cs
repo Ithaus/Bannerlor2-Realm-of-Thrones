@@ -36,7 +36,7 @@ namespace Armoury
 
         // liczniki doby (watki rownolegle - Interlocked; sumy w tysiecznych)
         private static long _bind, _withPerk, _player, _sumPerkM, _lostBeforeM, _lostAfterM, _curM, _lifted;
-        private static long _nPath, _nDesert, _nNight, _nDay, _nUncanny, _nForced, _nTracker, _nCall;
+        private static long _nPath, _nDesert, _nNight, _nDay, _nUncanny, _nForced, _nTracker, _nCall, _nBkPath;
         private static int _stumbles, _dStumbles;
         private static volatile string _sample = "-";   // ostatnie wywolanie gracza (tylko log)
         // recenzja 515: liczniki tylko na probce (co 16. wywolanie na watek, jak HorseState.SpeedBegin) - bez Interlocked przy kazdym wywolaniu goracej sciezki
@@ -56,7 +56,7 @@ namespace Armoury
             Interlocked.Exchange(ref _sumPerkM, 0); Interlocked.Exchange(ref _lostBeforeM, 0); Interlocked.Exchange(ref _lostAfterM, 0);
             Interlocked.Exchange(ref _curM, 0); Interlocked.Exchange(ref _lifted, 0);
             Interlocked.Exchange(ref _nPath, 0); Interlocked.Exchange(ref _nDesert, 0); Interlocked.Exchange(ref _nNight, 0); Interlocked.Exchange(ref _nDay, 0);
-            Interlocked.Exchange(ref _nUncanny, 0); Interlocked.Exchange(ref _nForced, 0); Interlocked.Exchange(ref _nTracker, 0); Interlocked.Exchange(ref _nCall, 0);
+            Interlocked.Exchange(ref _nUncanny, 0); Interlocked.Exchange(ref _nForced, 0); Interlocked.Exchange(ref _nTracker, 0); Interlocked.Exchange(ref _nCall, 0); Interlocked.Exchange(ref _nBkPath, 0);
             _dStumbles = 0;
         }
 
@@ -78,6 +78,10 @@ namespace Armoury
             var probe = new ExplainedNumber(1f);
             var scout = mp.EffectiveScout;
             var army0 = mp.Army;
+            // scalenie 514+515: BK Sjofarandi Pathfinder (Perk514.SpeedPost, +3% las / plaza dla wodza) podnosi sufit jak perki gry (515.md, zasada 0)
+            float bkPath = Perk514.PathShare(mp);
+            if (bkPath > 0f) { probe.AddFactor(bkPath); mask |= 256; }
+            if (scout == null && bkPath > 0f) return Math.Max(0f, probe.ResultNumber - 1f);
             if (scout == null && (army0 == null || army0.LeaderParty == null || army0.LeaderParty == mp)) return 0f;   // recenzja 515: tanie odrzucenie
             if (scout != null)
             {
@@ -164,6 +168,7 @@ namespace Armoury
                 if ((mask & 32) != 0) Interlocked.Increment(ref _nForced);
                 if ((mask & 64) != 0) Interlocked.Increment(ref _nTracker);
                 if ((mask & 128) != 0) Interlocked.Increment(ref _nCall);
+                if ((mask & 256) != 0) Interlocked.Increment(ref _nBkPath);
                 // predkosc gry bez perkow: wynik / (1 + F) x (1 + F - premia) - czesc wyniku, ktora daly perki
                 float f = 1f + sumOfFactors;
                 float natural = f > 0.01f ? current / f * Math.Max(0.01f, f - share) : current / (1f + share);
@@ -189,7 +194,7 @@ namespace Armoury
                 var s = Settings.Current;
                 Log.Info(P + "start sesji | klucz Scout Perks Lift March Cap " + (s != null && s.ScoutPerksLiftMarchCap ? "TAK" : "NIE (sam pomiar)")
                          + " | kolumna MarchPace " + (s != null && s.MarchPaceEnabled ? "TAK" : "NIE - sufitu brak, perki dzialaja jak w grze")
-                         + " | perki: Pathfinder, DesertBorn, NightRunner, DayTraveler, UncannyInsight, ForcedMarch, Tracker (druga), CallToArms; pominiete Unburdened"
+                         + " | perki: Pathfinder, DesertBorn, NightRunner, DayTraveler, UncannyInsight, ForcedMarch, Tracker (druga), CallToArms, BK Sjofarandi Pathfinder (514); pominiete Unburdened"
                          + " (kara ladunku w bazie) | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -212,7 +217,7 @@ namespace Armoury
                               + " -> po podniesieniu " + (Interlocked.Read(ref _lostAfterM) / 1000.0 / n).ToString("0.00", Inv) + " jedn. mapy"
                               + ", podniesien " + Interlocked.Read(ref _lifted)
                               + " | perki: Pathfinder " + _nPath + ", DesertBorn " + _nDesert + ", NightRunner " + _nNight + ", DayTraveler " + _nDay
-                              + ", UncannyInsight " + _nUncanny + ", ForcedMarch " + _nForced + ", Tracker " + _nTracker + ", CallToArms " + _nCall
+                              + ", UncannyInsight " + _nUncanny + ", ForcedMarch " + _nForced + ", Tracker " + _nTracker + ", CallToArms " + _nCall + ", BK Pathfinder " + _nBkPath
                             : "")
                          + " | " + _sample + " | potkniecia doby " + _dStumbles + " (od startu " + _stumbles + ").");
             }

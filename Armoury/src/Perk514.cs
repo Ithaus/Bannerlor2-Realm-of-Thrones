@@ -540,6 +540,17 @@ namespace Armoury
             catch (Exception e) { Stumble("SpeedPost", e); }
         }
 
+        /// <summary>Scalenie 514+515 (515.md, Jeff: jeden perk predkosci = jedna zasada): premia SpeedPost dla ScoutPace515.PerkShare - te same warunki
+        /// (klucz BkPerkHalvesLifestyle, wodz partii z perkiem, las / plaza pod partia); 0 = brak premii. Tylko odczyt, bez licznikow 514.</summary>
+        internal static float PathShare(TaleWorlds.CampaignSystem.Party.MobileParty mp)
+        {
+            if (!LifeOn || mp == null) return 0f;
+            var h = mp.LeaderHero;
+            if (h == null || !Has(h, BPath)) return 0f;
+            var tt = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(mp.CurrentNavigationFace);
+            return tt == TerrainType.Forest || tt == TerrainType.Beach ? 0.03f : 0f;
+        }
+
         /// <summary>NavalDLCMapVisibilityModel.GetPartySpottingRange (po BK): BK dodaje SeaEyes +8% zawsze, opis mowi "noca" - za dnia zdjete.</summary>
         public static void SpotPost(TaleWorlds.CampaignSystem.Party.MobileParty __0, ref ExplainedNumber __result)
         {
