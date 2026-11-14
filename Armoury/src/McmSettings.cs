@@ -816,6 +816,14 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int AiHealingRegenPercent { get; set; } = 100;
 
+        [SettingPropertyBool("Heal Only At Rest", HintText = "your party (you, your companions and your wounded men) heals at the full rate only while at rest: standing still, camped, asleep or in a town, castle or village. On the march - riding or sailing - wounds barely mend (Moving Heal Percent of the rate). Starvation still hurts the same. AI parties are not affected. Off = wounds mend in the saddle as before", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool HealOnlyAtRest { get; set; } = true;
+
+        [SettingPropertyInteger("Moving Heal Percent", 0, 100, "0", HintText = "how much of the daily healing rate your party keeps while on the march, in percent (10 = a tenth: a hard ride does not mend wounds; 100 = no difference between marching and resting). Only with Heal Only At Rest", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int MovingHealPercent { get; set; } = 10;
+
         [SettingPropertyBool("Prisoner Care Xp", HintText = "whoever tends your party's wounded also tends your wounded prisoners and learns Medicine from it: each prisoner who recovers gives your surgeon (or you, if no one holds the surgeon's post) Medicine experience the same way your own wounded men do - more for higher tier prisoners, double while resting in a town or village. Prisoners heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day), never halved by Healing Regen Percent - or as fast as your own men with Prisoners Heal Like Your Men. Off = no Medicine for prisoners, as before", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool PrisonerCareXp { get; set; } = true;
@@ -13427,6 +13435,8 @@ namespace Armoury
             s.VolunteerRegenPercent = VolunteerRegenPercent;
             s.HealingRegenPercent = HealingRegenPercent;
             s.AiHealingRegenPercent = AiHealingRegenPercent;
+            s.HealOnlyAtRest = HealOnlyAtRest;
+            s.MovingHealPercent = MovingHealPercent;
             s.PrisonerCareXp = PrisonerCareXp;
             s.PrisonersHealLikeYourMen = PrisonersHealLikeYourMen;
             s.PrisonerCareXpPercent = PrisonerCareXpPercent;

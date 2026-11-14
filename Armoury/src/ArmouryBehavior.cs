@@ -803,6 +803,9 @@ namespace Armoury
         private readonly bool _p6DrogiReset = P6DrogiReset();
         private static bool P6DrogiReset() { try { AiRoadRoutes.Reset(); } catch (Exception e) { Log.Error("P6DrogiReset", e); } return true; }
         // p6-spichlerz (R3-06f): zakup dnia i liczniki spichlerza miejskiego od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
+        // 500 (leczenie tylko w spoczynku): liczniki linii doby od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6)
+        private readonly bool _p500Reset = P500Reset();
+        private static bool P500Reset() { try { SlowHealing.Reset(); } catch (Exception e) { Log.Error("P500Reset", e); } return true; }
         private readonly bool _p6SpichlerzReset = P6SpichlerzReset();
         private static bool P6SpichlerzReset() { try { TownGranary.Reset(); } catch (Exception e) { Log.Error("P6SpichlerzReset", e); } return true; }
         // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
@@ -1728,6 +1731,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TroopSelfMend.Hourly", delegate { try { TroopSelfMend.Hourly(); } catch { } }));
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TourneyPay.Hourly", delegate { try { TourneyPay.Hourly(); } catch (Exception e) { Log.Error("TourneyPay.Hourly", e); } }));   // TP: splata dlugow osad w pierwszej godzinie po starcie sesji (potem nic)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TownInns.Hourly", delegate { try { TownInns.Hourly(); } catch (Exception e) { Log.Error("TownInns.Hourly", e); } }));   // KA: koniec premii karczmy o zmierzchu, godziny gojenia w dobrym domu
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("SlowHealing.Hourly", delegate { SlowHealing.Hourly(); }));   // 500: godziny marszu / spoczynku gracza i linia doby leczenia (wyjatki liczy sam)
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, TownInns.OnPlayerExchange);   // KA: handel gracza w miescie noclegu przy premii cen (tylko licznik linii doby)
             // sw-zajazdy: dojazd do zajazdu przy szlaku (4 razy na sekunde, jedna partia - klucz RoadsideInns) i ksiega plotek (zdarzenia swiata - klucz InnGossip)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { RoadsideInns.Tick(); });
