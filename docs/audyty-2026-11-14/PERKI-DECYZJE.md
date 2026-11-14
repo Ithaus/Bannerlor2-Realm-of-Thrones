@@ -40,3 +40,8 @@ Nowe efekty 16, 20, 21, 23, 25a, 25b: zaakceptowane.
 - Nosze (501): Jeff "tak zrob nosze".
 - Jeff 14.11: "lordowie stoja az sie wylecza a potem jada do zamku bo tam sie szybciej wylecza" -> 500-b (po 500-a): AI ciezko poturbowane (lord HP <= 10 albo duzy udzial rannych) staje obozem; po podleczeniu (lord > 15 HP, czesc rannych wstala) jedzie do najblizszej swojej/sojuszniczej twierdzy dokonczyc leczenie. Uzyc HeroWounds.Ai (juz wiezie rannego lorda do twierdzy). Kolizje: StrategicCampaignAI, BK, NightRest AI.
 - Jeff 14.11: "to dobrze ze wojna sie spowolni, dodaj tez zeby AI wiedzialo ze rany sa powazne i zeby lordowie jak glupi nie biegali i ryzykowali gdy to niepotrzebne" -> 500-b rozszerzone: ranny lord / poturbowana partia ostrozniejsza w decyzjach mapy (nie szuka bitew, nie goni, unika silniejszych, nie dolacza do ryzykownych akcji, chetniej odchodzi do twierdzy); ostroznosc rosnie z ranami (HP lorda, udzial rannych). Zwiazane: pamiec "AI walczy o zycie".
+
+## Potwierdzenia 14.11 (czwarta runda)
+30 CavalryTactics (+30% do formuly BK dla konnych ochotnikow w osadach rodu): ok.
+43 perki predkosci Scouting (pomiar, potem perk podnosi sufit kolumny): ok. 44 BeastWhisperer (tylko zwykle konie/juczne, rzadziej): ok. 45 ForcedMarch/Unburdened XP zostawic: ok. 46 CallToArms jak 43: ok.
+47 DashAndSlash po RBM: ok. 48 NoRestForTheWicked XP: ok. 49 RansomBroker do naszego okupu (placi rod jenca): ok. 50 Manhunter po BK (placi kupiec): ok. 51 RogueExtraordinaire zostawic: ok.
