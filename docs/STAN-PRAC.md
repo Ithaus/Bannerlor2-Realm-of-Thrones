@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 ~17:40 - WGRANIE 233 (seria perkow 503-515 scalona, BEZ autotestu - Jeff: "ja bede gral i na moim logu bedziesz sprawdzac, to bedzie test, ty tylko wgraj")
+
+- Armoury b6b4d17a, RealisticCaptivity 6a264c5c, CrashScribe cc460f88 = galaz noc/scal-perki e46a8c9a (linia 232 + 503 XP perkow, 504 bledy BK + 504-a Tutor, 505-515). GrandTourney/ForgeView bez zmian. Kopie przed: .bak-2026-11-14-przed-wgranie233, Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie233 i -przed). Statusy w CHANGELOG (gal. noc/scal-perki) jeszcze DO SPRAWDZENIA - ustawic po logu Jeffa.
+- W toku (nastepne wgranie): decyzje D1/D3/D5-D9/D12-D14/D16 (workflow, galezie noc/d-walka, noc/d-gospodarka -> scalenie do noc/scal-perki), D2/D4/D10/D11/D15 (noc/d-reszta; D10 po nim dopisac sufit RBM x1.10), 500-b lordowie ranni (noc/500b-ai-ranni + E1-E4).
+- Do sprawdzenia w logu Jeffa: linie startu 502-515 (lista w raporcie scalenia: "Perki XP (503)", "Bledy perkow BK (504)", "Perki XP x waga (505)", "Perki pancerza i tarcz (506)", "Sila ciosu perkow (507)", "Perki werbunku (508)", "Praca jencow (509)", 510-515), potkniecia, BKROTLog.txt bez bledow latek com.jeff.armoury.*.
+
 ## STAN 14.11 16:20 - WGRANIE 232 (500 leczenie w spoczynku, 500-a AI/jency/morze, 501 nosze, 502 P1 podwojne perki BK)
 
 - Armoury.dll cbe0cc9a, RealisticCaptivity.dll d38000dd, CrashScribe.dll 8de73f55 = galaz noc/367c-jeniec-po-odejsciu 315ef30a (= noc/500a-leczenie-ai-jency-morze + cherry-pick P1). GrandTourney, ForgeView bez zmian (231). Kopie przed: .bak-2026-11-14-przed-wgranie232, C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie232 i -przed).
