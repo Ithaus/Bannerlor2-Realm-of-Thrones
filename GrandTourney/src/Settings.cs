@@ -65,6 +65,16 @@ namespace GrandTourney
         // Jeff 20.10 ok. 12:00: "nie musisz sztucznie zmniejszac ... jak nie maja kasy, to ich zbroje, bo nie moga placic z czego czego nie maja" -> domyslnie 1 (pelna wartosc)
         public float TourneyRansomShare = 1f;              // with Tourney Ransom: the ransom of the lists as a share of the worth of the horse and armour in their present state (1 = the full worth); the vanquished pays only from what he and his house really have, and yields the pieces he cannot pay for
 
+        // --- Wounds of the lists ---
+        // 491 (Jeff 14.11): rany przechodza miedzy walkami i po turnieju; krzywa odpoczynku 10->50, 50->75, 75->90%, powalony 40%, atletyka; smierc domyslnie wylaczona ("AI bohaterowie nie gina")
+        public bool TourneyWoundsCarry = true;             // blows taken in the lists stay with the fighter: each fight starts from the health left after the last one plus a short rest (ended at 10% -> start at 50%, 50% -> 75%, 75% -> 90%; knocked down -> 40%), and you and the AI leave the tourney with the health of your last fight. Off = everyone starts every fight at full health as before
+        public float TourneyRecoveryAthleticsBonus = 0.15f; // how much athletics speeds the rest between fights: at most this share of health more at 400 athletics (100 athletics = none, below 100 = less)
+        public int TourneyKnockoutStartPct = 40;           // health (percent) a knight knocked down in the lists starts his next fight with, and leaves the tourney with, before athletics
+        public bool TourneyDeathAiHeroes = false;          // a lord, wanderer or companion knocked down from nearly spent health by a heavy blow may die of it after the tourney (story characters, rulers and last of house spared through Armoury). Off = nobody dies in the lists
+        public int TourneyDeathChancePct = 3;              // with tourney deaths: chance (percent) that such a knock-down is mortal
+        public int TourneyDeathMaxHpPct = 10;              // with tourney deaths: only a knight with at most this much health (percent) left before the blow can die of it
+        public bool TourneyDeathPlayer = false;            // the same mortal chance applies to you (death of the main character - heir or game over)
+
         public bool LogEnabled = true;                     // write a log file in the module folder
 
         // --- Payment messages ---

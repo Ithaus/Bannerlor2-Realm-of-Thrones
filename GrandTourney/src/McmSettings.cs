@@ -180,6 +180,34 @@ namespace GrandTourney
         [SettingPropertyGroup("The lists themselves")]
         public float TourneyRansomShare { get; set; } = 1f;
 
+        [SettingPropertyBool("Tourney Wounds Carry", HintText = "blows taken in the lists stay with the fighter: each fight starts from the health left after the last one plus a short rest (ended at 10% -> start at 50%, 50% -> 75%, 75% -> 90%; knocked down -> 40%), more athletics heals faster, and you and the AI leave the tourney with the health of your last fight - the more battered, the weaker in the next. Off = everyone starts every fight at full health as before (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Wounds of the lists")]
+        public bool TourneyWoundsCarry { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Tourney Recovery Athletics Bonus", 0.00f, 0.50f, "0.00", HintText = "how much athletics speeds the rest between fights: this share of health more at 400 athletics, none at 100, less below 100 (start of a fight always between 25% and 100%) (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Wounds of the lists")]
+        public float TourneyRecoveryAthleticsBonus { get; set; } = 0.15f;
+
+        [SettingPropertyInteger("Tourney Knockout Start Pct", 1, 100, "0", HintText = "health (percent) a knight knocked down in the lists starts his next fight with, and leaves the tourney with, before athletics (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Wounds of the lists")]
+        public int TourneyKnockoutStartPct { get; set; } = 40;
+
+        [SettingPropertyBool("Tourney Death AI Heroes", HintText = "a lord, wanderer or companion knocked down from nearly spent health by a heavy blow may die of it after the tourney - blunt weapons still kill; story characters, rulers and last of house are spared and Armoury's yearly limit on deaths applies. Off = nobody dies in the lists, wounds still carry (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Wounds of the lists")]
+        public bool TourneyDeathAiHeroes { get; set; } = false;
+
+        [SettingPropertyInteger("Tourney Death Chance Pct", 0, 100, "0", HintText = "with tourney deaths: chance (percent) that such a knock-down is mortal (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Wounds of the lists")]
+        public int TourneyDeathChancePct { get; set; } = 3;
+
+        [SettingPropertyInteger("Tourney Death Max Hp Pct", 1, 100, "0", HintText = "with tourney deaths: only a knight with at most this much health (percent) left before the blow can die of it (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Wounds of the lists")]
+        public int TourneyDeathMaxHpPct { get; set; } = 10;
+
+        [SettingPropertyBool("Tourney Death Player", HintText = "the same mortal chance applies to you (death of the main character - heir or game over). Off = you are never killed in the lists (takes effect after loading a save)", RequireRestart = false)]
+        [SettingPropertyGroup("Wounds of the lists")]
+        public bool TourneyDeathPlayer { get; set; } = false;
+
         [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("The lists themselves")]
         public bool LogEnabled { get; set; } = true;
@@ -232,6 +260,13 @@ namespace GrandTourney
             s.TourneyRansom = TourneyRansom;
             s.TourneyRansomKnockerOnly = TourneyRansomKnockerOnly;
             s.TourneyRansomShare = TourneyRansomShare;
+            s.TourneyWoundsCarry = TourneyWoundsCarry;
+            s.TourneyRecoveryAthleticsBonus = TourneyRecoveryAthleticsBonus;
+            s.TourneyKnockoutStartPct = TourneyKnockoutStartPct;
+            s.TourneyDeathAiHeroes = TourneyDeathAiHeroes;
+            s.TourneyDeathChancePct = TourneyDeathChancePct;
+            s.TourneyDeathMaxHpPct = TourneyDeathMaxHpPct;
+            s.TourneyDeathPlayer = TourneyDeathPlayer;
             s.LogEnabled = LogEnabled;
             s.PlayerPaymentReasons = PlayerPaymentReasons;
         }
