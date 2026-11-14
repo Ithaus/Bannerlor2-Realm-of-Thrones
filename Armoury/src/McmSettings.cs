@@ -808,7 +808,7 @@ namespace Armoury
         [SettingPropertyGroup("The slow muster")]
         public int VolunteerRegenPercent { get; set; } = 100;
 
-        [SettingPropertyInteger("Healing Regen Percent", 0, 200, "0", HintText = "wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla). Your prisoners are not slowed by this: they heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day), or as fast as your own men with Prisoners Heal Like Your Men", RequireRestart = false)]
+        [SettingPropertyInteger("Healing Regen Percent", 0, 200, "0", HintText = "wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla). Your prisoners are not slowed by this: they heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day), or as fast as your own men with Prisoners Heal Like Your Men - on the march they mend slowly like everyone else (Heal Only At Rest)", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int HealingRegenPercent { get; set; } = 50;
 
@@ -816,13 +816,17 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int AiHealingRegenPercent { get; set; } = 100;
 
-        [SettingPropertyBool("Heal Only At Rest", HintText = "your party (you, your companions and your wounded men) heals at the full rate only while at rest: standing still, camped, asleep or in a town, castle or village. On the march - riding or sailing - wounds barely mend (Moving Heal Percent of the rate). Starvation still hurts the same. AI parties are not affected. Off = wounds mend in the saddle as before", RequireRestart = false)]
+        [SettingPropertyBool("Heal Only At Rest", HintText = "your party (you, your companions, your wounded men and your wounded prisoners) heals at the full rate only while at rest: standing still, camped, asleep, at sea (you rest aboard while the ship sails) or in a town, castle or village. On the march over land wounds barely mend (Moving Heal Percent of the rate). Starvation still hurts the same. AI parties follow the same rule with Ai Heal Only At Rest. Off = wounds mend in the saddle as before, for everyone", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool HealOnlyAtRest { get; set; } = true;
 
         [SettingPropertyInteger("Moving Heal Percent", 0, 100, "0", HintText = "how much of the daily healing rate your party keeps while on the march, in percent (10 = a tenth: a hard ride does not mend wounds; 100 = no difference between marching and resting). Only with Heal Only At Rest", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int MovingHealPercent { get; set; } = 10;
+
+        [SettingPropertyBool("Ai Heal Only At Rest", HintText = "AI parties - lords, bandits, caravans - and their prisoners heal by the same rule as yours: the full rate only at rest (standing still, camped for the night, at sea or in a settlement), Moving Heal Percent of it on the march over land. Wounded armies take longer to recover, so wars slow down. Only with Heal Only At Rest. Off = AI parties heal on the march as before", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool AiHealOnlyAtRest { get; set; } = true;
 
         [SettingPropertyBool("Litter Enabled", HintText = "you lie on a litter when you are nearly dead: at or below Litter Hp Threshold hit points, or with a grave wound (Hero Wounds). Your men carry you and the party moves at Litter Speed Percent of its pace until you are back above Litter Hp Release and the grave wound has passed. You cannot gallop away from an encounter while on a litter. In someone else's army or at sea you are simply carried along - no slowdown. AI parties are not affected. Off = you ride however badly hurt, as before", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
@@ -13457,6 +13461,7 @@ namespace Armoury
             s.AiHealingRegenPercent = AiHealingRegenPercent;
             s.HealOnlyAtRest = HealOnlyAtRest;
             s.MovingHealPercent = MovingHealPercent;
+            s.AiHealOnlyAtRest = AiHealOnlyAtRest;
             s.LitterEnabled = LitterEnabled;
             s.LitterHpThreshold = LitterHpThreshold;
             s.LitterHpRelease = LitterHpRelease;

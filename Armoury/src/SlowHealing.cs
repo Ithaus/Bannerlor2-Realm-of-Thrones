@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -56,22 +57,30 @@ namespace Armoury
                     if (m2 != null && harmony.Patch(m2, postfix: new HarmonyMethod(typeof(SlowHealing), nameof(RestPostfixHeroes)) { priority = Priority.Low - 1 }) != null) rest++;
                 }
                 catch (Exception e) { Log.Error("SlowHealing.Rest", e); }
-                Log.Info("Leczenie w spoczynku (500): " + (s.HealOnlyAtRest ? "TAK" : "NIE") + " - druzyna gracza w marszu " + Math.Max(0, Math.Min(100, s.MovingHealPercent))
-                         + "% stawki, w spoczynku (postoj / oboz / sen / osada) pelna | AI bez zmian | jency pomijani | " + rest + "/2 metod.");
+                Log.Info("Leczenie w spoczynku (500/500-a): " + (s.HealOnlyAtRest ? "TAK" : "NIE") + " - w marszu ladem " + Math.Max(0, Math.Min(100, s.MovingHealPercent))
+                         + "% stawki, w spoczynku (postoj / oboz / sen / osada / morze i przejscie lad-morze) pelna | druzyna gracza i jej jency | AI z jencami "
+                         + (s.HealOnlyAtRest && s.AiHealOnlyAtRest ? "TAK" : "NIE") + " (klucz Ai Heal Only At Rest) | " + rest + "/2 metod.");
                 if (s.HealingRegenPercent == 100 && s.AiHealingRegenPercent == 100)
-                { Log.Info("SlowHealing: 100%/100% - vanilla tempo gojenia, patch spi (jency pomijani TAK, 318b)."); return; }
+                { Log.Info("SlowHealing: 100%/100% - vanilla tempo gojenia, patch spi (jency bez Healing Regen TAK, 318b; marsz 500-a osobno)."); return; }
                 int patched = 0;
                 // poprawka po audycie TOWARY 3: Priority.Low (200) - PO postfiksie BK (400, wpinany w OnGameStart, czyli po nas) i przed StarvePostfix
                 // (Last): warunek "kara - nie lagodzic" widzi juz kare BK za glod w oblezonej osadzie (dotad AddFactor gracza mnozyl ja przez pol)
                 if (m1 != null) { harmony.Patch(m1, postfix: new HarmonyMethod(typeof(SlowHealing), "SlowPostfix") { priority = Priority.Low }); patched++; }
                 if (m2 != null) { harmony.Patch(m2, postfix: new HarmonyMethod(typeof(SlowHealing), "SlowPostfix") { priority = Priority.Low }); patched++; }
                 Log.Info("SlowHealing: gojenie na mapie - gracz " + s.HealingRegenPercent
-                         + "%, AI " + s.AiHealingRegenPercent + "% (" + patched + "/2 metod) | jency pomijani TAK (318b).");
+                         + "%, AI " + s.AiHealingRegenPercent + "% (" + patched + "/2 metod) | jency bez Healing Regen TAK (318b; marsz 500-a osobno).");
             }
             catch (Exception e) { Log.Error("SlowHealing.ApplyAll", e); }
         }
 
-        // ---------------- 500: leczenie tylko w spoczynku ----------------
+        // ---------------- 500: leczenie tylko w spoczynku (500-a: takze AI, jency, morze = spoczynek) ----------------
+        // 500-a (Jeff 14.11): "plywanie statkiem to nie marsz, przeciez statek moze plynac a ja moge odpoczywac w kajucie", "jency i partie Ai tez maja miec
+        // tn sam efekt", "to dobrze ze wojna sie spowolni". Morze i przejscie lad/morze (IsMoving gry i tak false w przejsciu) = spoczynek - gracz, cudza
+        // armia (stan przywodcy) i AI; tratwa (wynik ujemny szeregowych) bez zmian. Jency (isPrisoners) tez ciete - w druzynie gracza i AI; loch osady
+        // (partia osady, MobileParty == null) i garnizon (CurrentSettlement) = spoczynek. Partie AI (wszystkie MobileParty: lordowie, bandyci, karawany,
+        // wiesniacy, milicja, garnizony) - gra leczy je w OnQuarterDailyPartyTick (4 x na dobe, healFrequencyPerDay 4), wiec 4 probki stanu na dobe.
+        // Ta sama stawka MovingHealPercent (jedna zasada na jedno zjawisko); osobny wylacznik AiHealOnlyAtRest. AI bez rannych / bez bohaterow w danym
+        // rosterze - wyjscie po odczycie licznika rostera (pole), bez testu ruchu. Zero alokacji (liczniki statyczne, Stopwatch.GetTimestamp).
         // Jeff 14.11: "leczenie po bitwie jest mozliwe tylko w obozie, nie moge jechac na koniu i leczyc sie w trakcie jazdy". Druzyna GRACZA
         // (bohaterowie i ranni szeregowi, nie jency) w marszu dostaje MovingHealPercent dodatniej stawki; spoczynek = partia stoi (IsMoving gracza =
         // !IsMainPartyWaiting: oboz NightRest/BK, menu oczekiwania, postoj), jest w osadzie albo spi w menu snu. Morze w ruchu = marsz.
@@ -81,48 +90,98 @@ namespace Armoury
         // kolejnosci AddFactor (SlowHealing, perki, Naval Resilience); rozpiska pokazuje ubytek w punktach (wzor TownInns.HealPostfix).
         private static readonly TextObject _marchText = new TextObject("{=armMarchHeal}Marching (no rest)", null);
         private static int _stumbles, _cutsReg, _cutsHero;
-        private static int _hMove, _hRest, _day = -1, _hp0 = -1, _w0 = -1;
+        private static int _hMove, _hRest, _hSea, _day = -1, _hp0 = -1, _w0 = -1, _cutsPris;
         private static float _dueHero;
+        // 500-a doba AI (watek glowny: PartyHealCampaignBehavior, UI): wywolania, pominiete (nic do leczenia), ciete (marsz), spoczynek (w tym morze)
+        private static int _aiCalls, _aiSkip, _aiMarch, _aiRest, _aiSea, _aiMarchWndHero, _aiPrisCuts;
+        private static float _aiCutReg, _aiCutHp, _aiCutHpWnd;
+        private static long _aiTicks;
 
-        internal static void Reset() { _stumbles = 0; _cutsReg = 0; _cutsHero = 0; _hMove = 0; _hRest = 0; _day = -1; _hp0 = -1; _w0 = -1; _dueHero = 0f; }
+        internal static void Reset()
+        {
+            _stumbles = 0; _cutsReg = 0; _cutsHero = 0; _cutsPris = 0; _hMove = 0; _hRest = 0; _hSea = 0; _day = -1; _hp0 = -1; _w0 = -1; _dueHero = 0f;
+            ResetAi();
+        }
+
+        private static void ResetAi() { _aiCalls = 0; _aiSkip = 0; _aiMarch = 0; _aiRest = 0; _aiSea = 0; _aiMarchWndHero = 0; _aiPrisCuts = 0; _aiCutReg = 0f; _aiCutHp = 0f; _aiCutHpWnd = 0f; _aiTicks = 0; }
 
         /// <summary>500: partia gracza jest W MARSZU (nie odpoczywa): rusza sie po mapie (ladem albo morzem), poza osada. Sen w menu = SetMoveModeHold,
         /// czyli IsMainPartyWaiting (recenzja 500: bez flagi NightRest.SleepingNow - bywa nieaktualna i dawala pelna stawke w jezdzie).
         /// Gracz doczepiony do CUDZEJ armii: wlasne IsMoving (ComputeIsWaiting z wlasnych celow, nieaktualnych u doczepionego - DoAiPathMode
         /// wychodzi od razu) nic nie mowi - stan przywodcy, jak sama gra (MobileParty: IsMoving || Army.LeaderParty.IsMoving).</summary>
-        internal static bool PlayerMarching(MobileParty mp)
+        internal static bool PlayerMarching(MobileParty mp) { return Marching(mp); }
+
+        /// <summary>500-a: partia (gracz albo AI) W MARSZU LADEM. Spoczynek: osada, oblezenie, bitwa, postoj, przejscie lad/morze (IsMoving gry = false),
+        /// MORZE (IsCurrentlyAtSea - statek plynie, ludzie odpoczywaja), oboz nocny AI (NightRest.IsCamping). Czlonek armii doczepiony (AttachedTo) - stan
+        /// przywodcy (wlasne cele doczepionego sa nieaktualne; gra: IsMoving || Army.LeaderParty.IsMoving). IsMoving AI = IsActive, poza przejsciem, osada,
+        /// bitwa i oblezeniem, Position != MoveTargetPoint; gracza = !IsMainPartyWaiting (poza przejsciem). Bez alokacji.</summary>
+        internal static bool Marching(MobileParty mp)
         {
             if (mp == null || mp.CurrentSettlement != null) return false;
             var army = mp.Army;
             if (army != null && mp.AttachedTo != null && army.LeaderParty != null && army.LeaderParty != mp)
             {
                 var L = army.LeaderParty;
-                // IsMoving AI = Position != MoveTargetPoint i samo wyklucza osade, oblezenie, bitwe; oboz nocny AI (NightRest) = spoczynek
-                return L.CurrentSettlement == null && L.BesiegedSettlement == null && L.MapEvent == null && L.IsMoving && !NightRest.IsCamping(L);
+                // IsMoving AI = Position != MoveTargetPoint i samo wyklucza osade, oblezenie, bitwe, przejscie; morze i oboz nocny AI (NightRest) = spoczynek
+                return L.CurrentSettlement == null && L.BesiegedSettlement == null && L.MapEvent == null && L.IsMoving && !L.IsCurrentlyAtSea && !NightRest.IsCamping(L);
             }
-            return mp.IsMoving;
+            if (!mp.IsMoving || mp.IsCurrentlyAtSea) return false;
+            return mp == MobileParty.MainParty || !NightRest.IsCamping(mp);   // gracz w obozie stoi (IsMainPartyWaiting) - IsCamping tylko dla AI
         }
 
-        public static void RestPostfixRegulars(PartyBase __0, bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result) { if (RestCut(__0, __1, ref __result)) _cutsReg++; }
-        public static void RestPostfixHeroes(PartyBase __0, bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result) { if (RestCut(__0, __1, ref __result)) _cutsHero++; }
+        public static void RestPostfixRegulars(PartyBase __0, bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result) { if (RestCut(__0, __1, false, ref __result) && __0 == PartyBase.MainParty) _cutsReg++; }
+        public static void RestPostfixHeroes(PartyBase __0, bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result) { if (RestCut(__0, __1, true, ref __result) && __0 == PartyBase.MainParty) _cutsHero++; }
 
-        private static bool RestCut(PartyBase party, bool prisoners, ref TaleWorlds.CampaignSystem.ExplainedNumber r)
+        /// <summary>500 / 500-a: ciecie marszu. Gracz: zawsze (czlonkowie i jency - UI pokazuje stawke, PrisonerCare 319a liczy roznice swoi - jency z obu
+        /// pocietych wartosci, wiec dodatek jencow tez x p). AI: tylko gdy w tym rosterze jest co leczyc (ranni szeregowi / bohaterowie) - dla wyniku gry
+        /// bez roznicy (gra zeruje akumulator szeregowych bez rannych, zdrowych bohaterow nie leczy), a test ruchu tylko tam, gdzie ma sens.</summary>
+        private static bool RestCut(PartyBase party, bool prisoners, bool heroes, ref TaleWorlds.CampaignSystem.ExplainedNumber r)
         {
+            bool ai = false;
+            long t0 = 0;
             try
             {
-                if (prisoners || party == null || party != PartyBase.MainParty) return false;   // jency - ryczalt gry (jak 318b); AI bez zmian
+                if (party == null) return false;
                 var s = Settings.Current;
                 if (s == null || !s.HealOnlyAtRest) return false;
+                var mp = party.MobileParty;
+                if (mp == null) return false;                                               // osada (loch, partia osady) - spoczynek
+                if (party != PartyBase.MainParty)
+                {
+                    if (!s.AiHealOnlyAtRest) return false;
+                    ai = true; t0 = Stopwatch.GetTimestamp(); _aiCalls++;
+                    var ro = prisoners ? party.PrisonRoster : party.MemberRoster;
+                    if (ro == null || (heroes ? ro.TotalHeroes <= 0 : ro.TotalWoundedRegulars <= 0)) { _aiSkip++; return false; }
+                }
                 int pct = Math.Max(0, Math.Min(100, s.MovingHealPercent));
                 if (pct >= 100) return false;
                 if (r.ResultNumber <= 0f) return false;                                     // kara (glod, tratwa) - bez zmian
-                if (!PlayerMarching(party.MobileParty)) return false;
+                if (!Marching(mp))
+                {
+                    if (ai) { _aiRest++; if (mp.IsCurrentlyAtSea) _aiSea++; }
+                    return false;
+                }
                 float b = r.BaseNumber;
                 if (b <= 0f) return false;
+                float before = r.ResultNumber;
                 r.Add(-b * (1f - pct / 100f), _marchText);
+                if (prisoners) { if (ai) _aiPrisCuts++; else _cutsPris++; }
+                if (ai)
+                {
+                    _aiMarch++;
+                    float cut = before - r.ResultNumber;
+                    if (!heroes) _aiCutReg += cut;
+                    else
+                    {
+                        _aiCutHp += cut;
+                        var ro = prisoners ? party.PrisonRoster : party.MemberRoster;
+                        if (ro != null && ro.TotalWoundedHeroes > 0) { _aiMarchWndHero++; _aiCutHpWnd += cut; }
+                    }
+                }
                 return true;
             }
             catch (Exception e) { if (++_stumbles <= 3) Log.Error("SlowHealing.RestCut", e); return false; }
+            finally { if (ai) _aiTicks += Stopwatch.GetTimestamp() - t0; }
         }
 
         /// <summary>500: tik godzinowy (ArmouryBehavior) - godzina marszu / spoczynku gracza, nalezne HP bohaterow (stawka modelu / 24) i raz na dobe linia logu.
@@ -140,15 +199,25 @@ namespace Armoury
                 else if (day != _day)
                 {
                     if (s.HealOnlyAtRest)
-                        Log.Info("Leczenie w spoczynku (500): doba " + _day + " - gracz marsz " + _hMove + " h / spoczynek " + _hRest + " h | HP " + _hp0 + " -> " + h.HitPoints
+                    {
+                        Log.Info("Leczenie w spoczynku (500): doba " + _day + " - gracz marsz " + _hMove + " h / spoczynek " + _hRest + " h (w tym morze " + _hSea + " h) | HP " + _hp0 + " -> " + h.HitPoints
                                  + "/" + h.MaxHitPoints + (h.IsWounded ? " (ranny)" : "") + " | nalezne bohaterom " + _dueHero.ToString("0.0") + " HP | ranni szeregowi " + _w0
                                  + " -> " + mp.MemberRoster.TotalWoundedRegulars + " | wywolania modelu z cieciem marszu (gra, UI, pomiar): szeregowi " + _cutsReg + ", bohaterowie " + _cutsHero
-                                 + " | marsz " + Math.Max(0, Math.Min(100, s.MovingHealPercent)) + "% | potkniecia " + _stumbles);
+                                 + " (w tym jency " + _cutsPris + ") | marsz " + Math.Max(0, Math.Min(100, s.MovingHealPercent)) + "% | potkniecia " + _stumbles);
+                        if (s.AiHealOnlyAtRest)
+                            Log.Info("Leczenie w spoczynku (500-a): doba " + _day + " - AI: wywolania modelu " + _aiCalls + " (nic do leczenia " + _aiSkip + ") | z rannymi/bohaterami: marsz (ciete) "
+                                     + _aiMarch + ", spoczynek " + _aiRest + " (w tym morze " + _aiSea + ") | gra leczy AI 4 x na dobe - partii ok. marsz " + (_aiMarch / 4) + " / spoczynek " + (_aiRest / 4)
+                                     + " (wywolania / 4, czlonkowie i jency, szeregowi i bohaterowie osobno) | sciete stawki dobowe: szeregowi " + _aiCutReg.ToString("0.0")
+                                     + " (ok. " + (_aiCutReg / 4f).ToString("0.0") + " rannych mniej wyleczonych), bohaterowie " + _aiCutHp.ToString("0") + " HP (ok. " + (_aiCutHp / 4f).ToString("0")
+                                     + " HP; partie z rannym bohaterem HP<=20: " + _aiMarchWndHero + " wywolan, " + (_aiCutHpWnd / 4f).ToString("0") + " HP) | jency AI ciec " + _aiPrisCuts
+                                     + " | czas latki AI " + (_aiTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00") + " ms | marsz " + Math.Max(0, Math.Min(100, s.MovingHealPercent)) + "% | potkniecia " + _stumbles);
+                    }
                     _day = day; _hp0 = h.HitPoints; _w0 = mp.MemberRoster.TotalWoundedRegulars;
-                    _hMove = 0; _hRest = 0; _cutsReg = 0; _cutsHero = 0; _dueHero = 0f;
+                    _hMove = 0; _hRest = 0; _hSea = 0; _cutsReg = 0; _cutsHero = 0; _cutsPris = 0; _dueHero = 0f;
+                    ResetAi();
                 }
                 bool march = PlayerMarching(mp);
-                if (march) _hMove++; else _hRest++;
+                if (march) _hMove++; else { _hRest++; if (mp.IsCurrentlyAtSea && mp.IsActive) _hSea++; }
                 if (mp.Party != null && mp.MapEvent == null && mp.IsActive)   // recenzja 500: gra leczy tylko partie czynna (TryHealOrWoundParty) - niewola, sluzba ROT bez naleznych
                 {
                     float rate = mp.Party.HealingRateForMemberHeroes;   // czynny model z calym lancuchem (to samo co gra w tej godzinie)
