@@ -72,3 +72,4 @@ D2: przepuscic WSZYSTKIE znizki werbunku przez podloge BK; pokazac na przykladzi
 D10: "nie sa wystarczajaco szybkie" - premie predkosci konia z perkow moga przekraczac sufit RBM.
 D11: wersja realna - po przegranej wlasne perki (PreventiveMedicine, WalkItOff) daja najwyzej 10 HP (albo inny efekt).
 D15: Lithurgy trwala u wszystkich - jedna zasada.
+D10 korekta (Jeff 14.11): "moga ale max o 10% limitu RBM" - premia perkow moze podniesc predkosc konia najwyzej do sufitu RBM x 1.10 (nadpisuje wersje bez sufitu z workflow d-reszta - poprawic po jego zakonczeniu).
