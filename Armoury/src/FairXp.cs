@@ -61,7 +61,7 @@ namespace Armoury
                 // ucza dalej, ale za cwierc stawki - dloniom tez cos sie nalezy.
                 int hp = Math.Max(1, attackedTroop.MaxHitPoints());
                 float weight = (Math.Min(damage, hp) + (isFatal ? hp : 0)) / 30f;
-                __result.AddFactor(MBMath.ClampFloat(weight, 0.25f, 8f) - 1f);
+                __result.AddFactor(XpMultiply505.Factor(ref __result, MBMath.ClampFloat(weight, 0.25f, 8f)));   // 505: waga mnozy perki (nie dodaje sie do nich)
             }
             catch { }
         }
