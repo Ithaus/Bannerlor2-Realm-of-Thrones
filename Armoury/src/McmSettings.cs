@@ -5367,17 +5367,29 @@ namespace Armoury
         [SettingPropertyGroup("Weight of coin")]
         public bool MoneyWeightEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Money Penny Percent", 0, 100, "0", HintText = "share of the value of a purse held in silver pennies (1.4 g for 1 gold). With groats and nobles it sets how heavy a purse is; the three are taken as parts of their sum", RequireRestart = false)]
+        [SettingPropertyInteger("Money Penny Percent", 0, 100, "0", HintText = "in Westeros: share of the value of a purse held in silver pennies (1.4 g for 1 gold). With groats and nobles it sets how heavy a purse is; the three are taken as parts of their sum", RequireRestart = false)]
         [SettingPropertyGroup("Weight of coin")]
         public int MoneyPennyPercent { get; set; } = 10;
 
-        [SettingPropertyInteger("Money Groat Percent", 0, 100, "0", HintText = "share of the value of a purse held in silver groats (3.9 g for 4 gold)", RequireRestart = false)]
+        [SettingPropertyInteger("Money Groat Percent", 0, 100, "0", HintText = "in Westeros: share of the value of a purse held in silver groats (3.9 g for 4 gold) - the silver stag is the coin of the realm", RequireRestart = false)]
         [SettingPropertyGroup("Weight of coin")]
-        public int MoneyGroatPercent { get; set; } = 60;
+        public int MoneyGroatPercent { get; set; } = 70;
 
-        [SettingPropertyInteger("Money Noble Percent", 0, 100, "0", HintText = "share of the value of a purse held in gold nobles (7.8 g for 80 gold). More gold = a lighter purse: 10/60/30 makes 179000 gold weigh about 135 kg", RequireRestart = false)]
+        [SettingPropertyInteger("Money Noble Percent", 0, 100, "0", HintText = "in Westeros: share of the value of a purse held in gold nobles (7.8 g for 80 gold) - gold dragons are rare. More gold = a lighter purse: 10/70/20 makes 179000 gold weigh about 151 kg", RequireRestart = false)]
         [SettingPropertyGroup("Weight of coin")]
-        public int MoneyNoblePercent { get; set; } = 30;
+        public int MoneyNoblePercent { get; set; } = 20;
+
+        [SettingPropertyInteger("Money Essos Penny Percent", 0, 100, "0", HintText = "in Essos (east of the Narrow Sea): share of the value of a purse held in silver pennies (1.4 g for 1 gold). A party's purse follows the side of the sea it is on", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public int MoneyEssosPennyPercent { get; set; } = 10;
+
+        [SettingPropertyInteger("Money Essos Groat Percent", 0, 100, "0", HintText = "in Essos: share of the value of a purse held in silver groats (3.9 g for 4 gold)", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public int MoneyEssosGroatPercent { get; set; } = 45;
+
+        [SettingPropertyInteger("Money Essos Noble Percent", 0, 100, "0", HintText = "in Essos: share of the value of a purse held in gold nobles (7.8 g for 80 gold) - the rich trading Free Cities pay in gold, so a purse there is lighter: 10/45/45 makes 179000 gold weigh about 111 kg", RequireRestart = false)]
+        [SettingPropertyGroup("Weight of coin")]
+        public int MoneyEssosNoblePercent { get; set; } = 45;
 
         [SettingPropertyFloatingInteger("Money Weight Step Kg", 0.5f, 20f, "0.0", HintText = "the weight of a purse is brought up to date once an hour, when it has changed by this many kilograms", RequireRestart = false)]
         [SettingPropertyGroup("Weight of coin")]
@@ -15070,6 +15082,9 @@ namespace Armoury
             s.MoneyPennyPercent = MoneyPennyPercent;
             s.MoneyGroatPercent = MoneyGroatPercent;
             s.MoneyNoblePercent = MoneyNoblePercent;
+            s.MoneyEssosPennyPercent = MoneyEssosPennyPercent;   // 522
+            s.MoneyEssosGroatPercent = MoneyEssosGroatPercent;
+            s.MoneyEssosNoblePercent = MoneyEssosNoblePercent;
             s.MoneyWeightStepKg = MoneyWeightStepKg;
             s.LordPurseDays = LordPurseDays;
             s.LordPurseFlat = LordPurseFlat;

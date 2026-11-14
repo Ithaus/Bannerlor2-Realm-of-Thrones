@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 522: zloto w sakiewce wedlug strony Waskiego Morza - Westeros wiecej srebra (10/70/20), Essos wiecej zlota (10/45/45) - Armoury (klucze MoneyEssosPennyPercent / MoneyEssosGroatPercent / MoneyEssosNoblePercent, nowe domyslne Westeros MoneyGroatPercent 70 / MoneyNoblePercent 20)
+
+**Problem:** Jeff, czat 14.11, odpowiedz na pytania po 521 (pytanie 4: udzial zlota w sakiewce zalezny od Essos / Westeros): "4. tak". W 521 sklad sakiewki byl jeden dla calego swiata (10/60/30 -> 179 000 zl = 135.0 kg).
+
+**Przyczyna:** 521 liczyl jedno `_kgPerGold` z trzech kluczy MCM dla kazdej partii (MoneyWeight.KgPerGold).
+
+**Zmiana:**
+- Armoury/src/MoneyWeight.cs (619 -> 668 linii):
+  - `KgPerGold(Settings, bool essos)` - dwa sklady: Westeros = Money Penny / Groat / Noble Percent (domyslnie 10/70/20 -> 0.842 kg na 1000 zl, 179 000 zl = 150.7 kg), Essos = Money Essos Penny / Groat / Noble Percent (10/45/45 -> 0.623 kg na 1000 zl, 179 000 zl = 111.5 kg). Lore: w Westeros srebrny jelen to moneta krolestwa, zloty smok rzadki; Wolne Miasta (Braavos, Volantis, Pentos) zyja z handlu morskiego i placa zlotem. Suma 0 - sklad domyslny danej strony.
+  - strona = ta sama zasada co bron Dothrakow (313): `DothrakiArms.EssosAt(pozycja)` = kultura najblizszego miasta albo zamku (PeopleBook.CultureAtCalibration) na liscie MountLaw.IsEssosCulture (Braavos town_EN5 ma kulture empire = Essos - sprawdzone w ROT-Map settlements.xml). Bez nowego rozroznienia krain.
+  - `SideRefresh` w tiku godzinowym (watek glowny): strona odczytywana raz na dobe na partie, TYLKO partie niosace monete (Carried > 0); pamiec `_essos` (ConcurrentDictionary) czyta postfiks wagi (`KgOf`, brak wpisu = Westeros). Pierwszy odczyt partii po starcie / zmianie MCM: partia w Essos dostaje UpdateVersionNo (Pull przeliczyl ja jeszcze skladem Westeros). Przeprawa przez morze: zmiana strony zmienia kubelek wagi -> UpdateVersionNo jak w 521 (opoznienie najwyzej doba).
+  - linia doby: kg liczone per partia jej skladem; nowy odcinek "strony morza (522): Westeros N partii (zl, kg/1000 zl), Essos N partii (...), odczyty strony N"; przy graczu "(Essos)" / "(Westeros)". Linia startu sesji: oba sklady i 179 000 zl w kg dla kazdej strony. Okno wplaty do skarbca liczy kg skladem strony gracza.
+  - `Prune` czysci `_essos` / `_sideDay` martwych partii; `Reset` czysci miedzy kampaniami.
+- Settings.cs / McmSettings.cs (recznie): 3 nowe klucze Money Essos Penny / Groat / Noble Percent (10/45/45), domyslne Westeros Groat 60 -> 70, Noble 30 -> 20; opisy po angielsku "in Westeros" / "in Essos".
+
+**Ryzyko / co sprawdzic:**
+- Regresje: ten sam postfiks wagi i ta sama sciezka kubelkow co 521 - zmieniony tylko mnoznik kg/zl per partia. Lup z lorda (LootPostfix), wierzyciele (CoverPlayerDebt), skarbiec, ksiega pieniadza - nie czytaja kg (bez zmian). Zloto nie powstaje ani nie znika - zmiana tylko wagi.
+- Koszt: EssosAt przeglada wszystkie miasta i zamki (OutlawLaw.Nodes) na partie raz na dobe - tylko w watku glownym; postfiks (bywa rownolegle) tylko TryGetValue.
+- MCM: Jeff nie ma w Armoury.json kluczy Money* (grep 14.11: tylko LordPurseOnlyToVictor) - nowe domyslne zadzialaja. Jesli kiedys zapisze 10/60/30, zostanie stary Westeros.
+- W logu: linia startu "sklad sakiewki (522, wedlug strony morza): Westeros ... 179 000 zl = 150.7 kg); Essos ... 179 000 zl = 111.5 kg)"; linia doby "strony morza (522): Westeros ... Essos ..." - Essos > 0 partii (Wolne Miasta, Dothrakowie), odczyty strony ok. liczby partii z moneta.
+- Build Armoury 0 bledow. NIE WGRANE (gra Jeffa moze byc wlaczona).
+
+**Status:** DO SPRAWDZENIA (galaz noc/522-zloto-krain, na noc/scal-perki 12e3ca1e).
+
 ## 521: waga pieniedzy - moneta w udzwigu partii (gracz i AI), sklad sakiewki pensy / grosze / noble, lordowie AI niosa tylko sakiewke robocza, skarbiec gracza w twierdzy i w Banku Zelaznym - Armoury (klucze MoneyWeightEnabled, PlayerVaultEnabled i 7 innych)
 
 **Problem:** Jeff, czat 14.11: "I PIENIADZE MAJA WAZYC ILE WAZY 179K zlota w tym sa oczywiscie pennies srebrne i zlote". Po propozycji (1 zl = 1 pens; pens 1.4 g, grosz 4 pensy 3.9 g, nobel 80 pensow 7.8 g; mieszanka 10/60/30 -> 179 000 zl ok. 135 kg; pieniadze w udzwigu; skarbiec; AI tez) Jeff: "1 tak, 2 tak, 3 lordowie nie woza ze soba 3 milionow maja skarbiec i tam trzymaja zloto lub gdzies". Dotad zloto nic nie wazylo (gra: DefaultInventoryCapacityModel.CalculateTotalWeightCarried = suma wag przedmiotow), a skarbca rodu do odlozenia zlota nie bylo (Clan.Gold = Hero.Gold glowy rodu; Bank Zelazny tylko pozycza).

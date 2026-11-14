@@ -23,8 +23,8 @@ namespace Armoury
     /// 3 lordowie nie woza ze soba 3 milionow maja skarbiec i tam trzymaja zloto lub gdzies").
     ///
     /// (1) Sklad sakiewki: 1 zl = 1 pens (HistoricalPrices). Pens srebrny 1.4 g, grosz (4 pensy) 3.9 g, nobel zloty (80 pensow) 7.8 g. Udzial wartosci
-    ///     w sakiewce z MCM (Money Penny / Groat / Noble Percent, domyslnie 10 / 60 / 30, normowane do sumy) -> gramy na zl (domyslnie 0.754 g/zl,
-    ///     179 000 zl = 135 kg). Mennica (CrownMint) nie trzyma skladu monety w obiegu (liczniki sztuk tylko z doby) - sklad staly z ustawien.
+    ///     w sakiewce z MCM (Money Penny / Groat / Noble Percent, normowane do sumy; 521: 10 / 60 / 30 = 0.754 g/zl, 179 000 zl = 135 kg; od 522 Westeros
+    ///     10 / 70 / 20 i osobny sklad Essos - punkt 6). Mennica (CrownMint) nie trzyma skladu monety w obiegu (liczniki sztuk tylko z doby) - sklad staly z ustawien.
     /// (2) Waga w udzwigu: postfiks DefaultInventoryCapacityModel.CalculateTotalWeightCarried (DeclaredMethod - pulapka 15.10) dopisuje pozycje "Coin".
     ///     NavalDLC wola model domyslny (BaseModel) - dziala tez na morzu. Predkosc bierze wage z MobileParty.TotalWeightCarried (kara ladunku -0.02 x
     ///     waga/udzwig, przeciazenie -0.4 x nadwyzka/udzwig) - bez wlasnej latki predkosci.
@@ -42,6 +42,12 @@ namespace Armoury
     ///     bez twierdz - do sakiewki gracza. Wylaczony klucz: wplat nie ma, wyplata zostaje (zloto nie utyka).
     ///     Menu: zwykle menu "town"/"castle" (nie menu oczekiwania), wybor kwoty MultiSelectionInquiry, bez SwitchToMenu w opcji.
     /// (5) Linia startu sesji i linia doby w Armoury.log ("Waga pieniedzy (521)"). Bledy liczone (potkniecia), bez globalnego wylacznika.
+    /// (6) 522 (Jeff 14.11, pytanie 4 po 521: "tak"): sklad sakiewki zalezy od strony Waskiego Morza, na ktorej jest partia. Westeros - srebrne jelenie,
+    ///     zloty smok rzadki: Money Penny / Groat / Noble Percent (domyslnie 10 / 70 / 20 -> 0.842 g/zl, 179 000 zl = 150.7 kg). Essos - Wolne Miasta,
+    ///     handel morski, zloto w obiegu (honory Braavos, Volantis): Money Essos Penny / Groat / Noble Percent (domyslnie 10 / 45 / 45 -> 0.623 g/zl,
+    ///     179 000 zl = 111.5 kg). Strona = ta sama zasada co bron Dothrakow (DothrakiArms.EssosAt: kultura najblizszego miasta albo zamku z kalibracji,
+    ///     lista MountLaw.IsEssosCulture; Braavos ma kulture empire = Essos). Odczyt raz na dobe na partie niosaca monete w tiku godzinowym (watek glowny,
+    ///     przeglad miast i zamkow), postfiks czyta tylko pamiec (brak wpisu = Westeros). Zmiana strony zmienia kubelek wagi -> UpdateVersionNo jak dotad.
     /// </summary>
     internal static class MoneyWeight
     {
@@ -60,7 +66,11 @@ namespace Armoury
         private static readonly Dictionary<MobileParty, int> _wageDay = new Dictionary<MobileParty, int>();            // doba odczytu zoldu (watek glowny)
         private static readonly Dictionary<MobileParty, int> _bucket = new Dictionary<MobileParty, int>();             // ostatni kubelek wagi (watek glowny)
         private static string _sig = "";                    // podpis ustawien - zmiana = odswiezenie wszystkich partii raz
-        private static volatile float _kgPerGold;            // kg na 1 zl (z ustawien, liczone w watku glownym)
+        private static volatile float _kgPerGold;            // kg na 1 zl w Westeros (z ustawien, liczone w watku glownym)
+        private static volatile float _kgPerGoldEssos;       // 522: kg na 1 zl w Essos
+        private static readonly ConcurrentDictionary<MobileParty, bool> _essos = new ConcurrentDictionary<MobileParty, bool>();   // 522: partia w Essos (postfiks czyta rownolegle)
+        private static readonly Dictionary<MobileParty, int> _sideDay = new Dictionary<MobileParty, int>();          // 522: doba odczytu strony (watek glowny)
+        private static int _sideReads;                       // 522: odczyty strony w dobie
         private static volatile bool _on, _noLord;
         private static volatile int _days = 30, _flat = 5000;
 
@@ -80,7 +90,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _vault.Clear(); _wage.Clear(); _wageDay.Clear(); _bucket.Clear(); _sig = "";
+            _vault.Clear(); _wage.Clear(); _wageDay.Clear(); _bucket.Clear(); _sig = ""; _essos.Clear(); _sideDay.Clear(); _sideReads = 0;
             _post = _postCoin = 0; _touch = _wageReads = _stumbles = _parStumbles = 0; _dIn = _dOut = _dInN = _dOutN = 0;
             _lostSiege = _moved = 0; _lostSiegeGold = _movedGold = 0; _day = -1; _err.Clear();
             _debtTakeN = _lootCutN = 0; _debtTake = _lootCut = 0;
@@ -93,13 +103,38 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ ustawienia
-        /// <summary>kg na 1 zl ze skladu sakiewki (udzial wartosci pensow / groszy / nobli, normowany do sumy; suma 0 - sklad domyslny 10/60/30).</summary>
-        internal static double KgPerGold(Settings s)
+        /// <summary>kg na 1 zl ze skladu sakiewki (udzial wartosci pensow / groszy / nobli, normowany do sumy). 522: essos - sklad Essos, inaczej Westeros;
+        /// suma 0 - sklad domyslny tej strony (Westeros 10/70/20, Essos 10/45/45).</summary>
+        internal static double KgPerGold(Settings s, bool essos)
         {
-            double p = Math.Max(0, s.MoneyPennyPercent), g = Math.Max(0, s.MoneyGroatPercent), n = Math.Max(0, s.MoneyNoblePercent);
+            double p, g, n;
+            if (essos) { p = Math.Max(0, s.MoneyEssosPennyPercent); g = Math.Max(0, s.MoneyEssosGroatPercent); n = Math.Max(0, s.MoneyEssosNoblePercent); }
+            else { p = Math.Max(0, s.MoneyPennyPercent); g = Math.Max(0, s.MoneyGroatPercent); n = Math.Max(0, s.MoneyNoblePercent); }
             double sum = p + g + n;
-            if (sum <= 0) { p = 10; g = 60; n = 30; sum = 100; }
+            if (sum <= 0) { if (essos) { p = 10; g = 45; n = 45; } else { p = 10; g = 70; n = 20; } sum = 100; }
             return (p * GPenny + g * GGroat + n * GNoble) / sum / 1000.0;
+        }
+
+        /// <summary>522: kg na 1 zl dla partii - wedlug strony z pamieci (brak wpisu = Westeros). Bywa wolane rownolegle - tylko odczyt.</summary>
+        private static double KgOf(MobileParty mp) { return InEssos(mp) ? _kgPerGoldEssos : _kgPerGold; }
+
+        private static bool InEssos(MobileParty mp) { bool e; return mp != null && _essos.TryGetValue(mp, out e) && e; }
+
+        /// <summary>522: strona partii (DothrakiArms.EssosAt - kultura najblizszego miasta albo zamku) odswiezana raz na dobe albo przy braku wpisu. Watek glowny.</summary>
+        private static void SideRefresh(MobileParty mp, int day)
+        {
+            int sd;
+            if (_sideDay.TryGetValue(mp, out sd) && day - sd < 1) return;
+            bool e;
+            try { e = DothrakiArms.EssosAt(mp.Position.ToVec2()); } catch { e = false; }
+            _essos[mp] = e;
+            _sideDay[mp] = day; _sideReads++;
+        }
+
+        /// <summary>522: czy gracz jest teraz w Essos (okno skarbca, linia doby). Watek glowny.</summary>
+        private static bool PlayerEssos()
+        {
+            try { var mp = MobileParty.MainParty; return mp != null && DothrakiArms.EssosAt(mp.Position.ToVec2()); } catch { return false; }
         }
 
         /// <summary>Przepisanie ustawien do pol czytanych rownolegle; zmiana podpisu = wszystkie partie raz do przeliczenia. Watek glowny.</summary>
@@ -108,11 +143,12 @@ namespace Armoury
             bool on = s != null && s.MoneyWeightEnabled;
             _on = on;
             if (s == null) return;
-            _kgPerGold = (float)KgPerGold(s);
+            _kgPerGold = (float)KgPerGold(s, false);
+            _kgPerGoldEssos = (float)KgPerGold(s, true);
             _noLord = s.MoneyWeightPartiesWithoutLord;
             _days = Math.Max(0, s.LordPurseDays);
             _flat = Math.Max(0, s.LordPurseFlat);
-            string sig = (on ? "1" : "0") + "|" + _kgPerGold.ToString("0.########", CultureInfo.InvariantCulture) + "|" + (_noLord ? 1 : 0) + "|" + _days + "|" + _flat + "|" + Step(s);
+            string sig = (on ? "1" : "0") + "|" + _kgPerGold.ToString("0.########", CultureInfo.InvariantCulture) + "|" + _kgPerGoldEssos.ToString("0.########", CultureInfo.InvariantCulture) + "|" + (_noLord ? 1 : 0) + "|" + _days + "|" + _flat + "|" + Step(s);
             if (sig == _sig) return;
             bool first = _sig.Length == 0;
             _sig = sig;
@@ -241,7 +277,7 @@ namespace Armoury
                 bool lp; long whole;
                 long g = Carried(__0, out lp, out whole);
                 if (g <= 0) return;
-                float kg = (float)(g * (double)_kgPerGold);
+                float kg = (float)(g * KgOf(__0));
                 if (kg <= 0f) return;
                 __result.Add(kg, Txt);
                 Interlocked.Increment(ref _postCoin);
@@ -267,9 +303,11 @@ namespace Armoury
             try { var cm = Campaign.Current != null ? Campaign.Current.Models.InventoryCapacityModel : null; model = cm != null ? cm.GetType().Name : "brak"; } catch { }
             long vt = TotalNow();
             Log.Info(P + "start sesji | klucz " + (s != null && s.MoneyWeightEnabled ? "TAK" : "NIE") + " (Money Weight Enabled)"
-                     + (s != null ? " | sklad sakiewki: pensy " + s.MoneyPennyPercent + "% / grosze " + s.MoneyGroatPercent + "% / noble " + s.MoneyNoblePercent + "% wartosci -> "
-                                    + (KgPerGold(s) * 1000.0).ToString("0.000", CultureInfo.InvariantCulture) + " kg na 1000 zl (179 000 zl = "
-                                    + (KgPerGold(s) * 179000.0).ToString("0.0", CultureInfo.InvariantCulture) + " kg)"
+                     + (s != null ? " | sklad sakiewki (522, wedlug strony morza): Westeros pensy " + s.MoneyPennyPercent + "% / grosze " + s.MoneyGroatPercent + "% / noble " + s.MoneyNoblePercent + "% wartosci -> "
+                                    + (KgPerGold(s, false) * 1000.0).ToString("0.000", CultureInfo.InvariantCulture) + " kg na 1000 zl (179 000 zl = "
+                                    + (KgPerGold(s, false) * 179000.0).ToString("0.0", CultureInfo.InvariantCulture) + " kg); Essos pensy " + s.MoneyEssosPennyPercent + "% / grosze "
+                                    + s.MoneyEssosGroatPercent + "% / noble " + s.MoneyEssosNoblePercent + "% -> " + (KgPerGold(s, true) * 1000.0).ToString("0.000", CultureInfo.InvariantCulture)
+                                    + " kg na 1000 zl (179 000 zl = " + (KgPerGold(s, true) * 179000.0).ToString("0.0", CultureInfo.InvariantCulture) + " kg)"
                                     + " | sakiewka lorda AI: " + s.LordPurseFlat + " zl + " + s.LordPurseDays + " dni zoldu (reszta w skarbcu ksiegowo)"
                                     + " | partie bez wodza " + (s.MoneyWeightPartiesWithoutLord ? "TAK" : "NIE") + " | krok odswiezenia " + Step(s).ToString("0.#", CultureInfo.InvariantCulture) + " kg"
                                     + " | skarbiec gracza " + (s.PlayerVaultEnabled ? "TAK" : "NIE") : "")
@@ -306,11 +344,13 @@ namespace Armoury
                         }
                         bool lp; long whole;
                         long g = Carried(mp, out lp, out whole);
-                        int b = g > 0 ? (int)Math.Floor(g * (double)_kgPerGold / step) : 0;
+                        if (g > 0) SideRefresh(mp, day);   // 522: strona morza raz na dobe, tylko partie niosace monete
+                        int b = g > 0 ? (int)Math.Floor(g * KgOf(mp) / step) : 0;
                         int old;
                         // pierwszy odczyt - waga juz z moneta (Pull przeliczyl wszystkie); recenzja 521: partia lorda AI byla liczona przed odczytem zoldu
                         // (sakiewka = sama LordPurseFlat) - raz przeliczyc z zoldem (start sesji, zmiana MCM, nowa partia lorda)
-                        if (!_bucket.TryGetValue(mp, out old)) { _bucket[mp] = b; if (lp) Touch(mp); continue; }
+                        // 522: partia w Essos takze - Pull przeliczyl ja przed odczytem strony (sklad Westeros)
+                        if (!_bucket.TryGetValue(mp, out old)) { _bucket[mp] = b; if (lp || InEssos(mp)) Touch(mp); continue; }
                         if (old == b) continue;
                         _bucket[mp] = b;
                         Touch(mp);
@@ -329,6 +369,9 @@ namespace Armoury
             dead.Clear();
             foreach (var kv in _wageDay) if (kv.Key == null || !kv.Key.IsActive || !kv.Key.IsLordParty) dead.Add(kv.Key);
             foreach (var mp in dead) { if (mp == null) continue; _wageDay.Remove(mp); int x; _wage.TryRemove(mp, out x); }
+            dead.Clear();
+            foreach (var kv in _sideDay) if (kv.Key == null || !kv.Key.IsActive) dead.Add(kv.Key);
+            foreach (var mp in dead) { if (mp == null) continue; _sideDay.Remove(mp); bool x; _essos.TryRemove(mp, out x); }
         }
 
         private static string Kg(double kg) { return kg.ToString("0.0", CultureInfo.InvariantCulture); }
@@ -336,14 +379,13 @@ namespace Armoury
         private static void DayLine(Settings s)
         {
             Prune();
-            double k = _kgPerGold;
             var sb = new StringBuilder(P + "doba " + _day + " | klucz " + (_on ? "TAK" : "NIE"));
             var mp = MobileParty.MainParty;
             var hero = Hero.MainHero;
             if (mp != null && hero != null && mp.IsActive)
             {
                 long g = Math.Max(0, hero.Gold);
-                double coin = _on ? g * k : 0;
+                double coin = _on ? g * KgOf(mp) : 0;
                 float w = mp.TotalWeightCarried;
                 int cap = mp.InventoryCapacity;
                 double over = Math.Max(0, w - cap);
@@ -353,26 +395,32 @@ namespace Armoury
                 double dIn = Math.Min(w, cap) - Math.Min(w0, cap);
                 double dOver = Math.Max(0, w - cap) - Math.Max(0, w0 - cap);
                 double pen = cap > 0 ? (0.02 * dIn + 0.4 * dOver) / cap : 0;
-                sb.Append(" | gracz: ").Append(g).Append(" zl = ").Append(Kg(coin)).Append(" kg; ladunek ").Append(Kg(w)).Append(" / udzwig ").Append(cap).Append(" kg")
+                sb.Append(" | gracz (").Append(InEssos(mp) ? "Essos" : "Westeros").Append("): ").Append(g).Append(" zl = ").Append(Kg(coin)).Append(" kg; ladunek ").Append(Kg(w)).Append(" / udzwig ").Append(cap).Append(" kg")
                   .Append(over > 0 ? " - PRZECIAZENIE " + Kg(over) + " kg (z monety " + Kg(fromCoin) + ")" : "")
                   .Append("; kara predkosci od monety ok. -").Append((pen * 100).ToString("0.0", CultureInfo.InvariantCulture)).Append("%; predkosc ").Append(mp.Speed.ToString("0.00", CultureInfo.InvariantCulture));
             }
-            int lords = 0; long lCar = 0, lWhole = 0, lMax = 0; string lMaxN = "";
-            int cars = 0, bands = 0, vils = 0, oth = 0; long cG = 0, bG = 0, vG = 0, oG = 0;
+            int lords = 0; long lCar = 0, lWhole = 0, lMax = 0; string lMaxN = ""; double lKg = 0, lMaxKg = 0;
+            int cars = 0, bands = 0, vils = 0, oth = 0; long cG = 0; double cK = 0, bK = 0, vK = 0, oK = 0;
+            int nEs = 0, nWe = 0; long gEs = 0, gWe = 0;   // 522: partie niosace monete po stronach morza (bez gracza)
             foreach (var p in MobileParty.All)
             {
                 if (p == null || !p.IsActive || p == mp) continue;
                 bool lp; long whole;
                 long g = Carried(p, out lp, out whole);
-                if (lp) { lords++; lCar += g; lWhole += whole; if (g > lMax) { lMax = g; lMaxN = p.LeaderHero != null ? p.LeaderHero.Name.ToString() : "?"; } continue; }
+                double kp = KgOf(p);
+                if (g > 0) { if (InEssos(p)) { nEs++; gEs += g; } else { nWe++; gWe += g; } }
+                if (lp) { lords++; lCar += g; lKg += g * kp; lWhole += whole; if (g > lMax) { lMax = g; lMaxKg = g * kp; lMaxN = p.LeaderHero != null ? p.LeaderHero.Name.ToString() : "?"; } continue; }
                 if (g <= 0) continue;
-                if (p.IsCaravan) { cars++; cG += g; } else if (p.IsBandit) { bands++; bG += g; } else if (p.IsVillager) { vils++; vG += g; } else { oth++; oG += g; }
+                if (p.IsCaravan) { cars++; cG += g; cK += g * kp; } else if (p.IsBandit) { bands++; bK += g * kp; } else if (p.IsVillager) { vils++; vK += g * kp; } else { oth++; oK += g * kp; }
             }
-            sb.Append(" | lordowie AI: ").Append(lords).Append(" partii, niosa ").Append(lCar).Append(" zl (").Append(Kg(lCar * k)).Append(" kg, srednio ")
-              .Append(Kg(lords > 0 ? lCar * k / lords : 0)).Append(" kg), w skarbcach ksiegowo ").Append(lWhole - lCar).Append(" zl; najciezsza sakiewka ")
-              .Append(lMax).Append(" zl (").Append(Kg(lMax * k)).Append(" kg, ").Append(lMaxN).Append(")");
-            sb.Append(" | bez wodza: karawany ").Append(cars).Append(" (").Append(cG).Append(" zl, ").Append(Kg(cG * k)).Append(" kg), bandy ").Append(bands).Append(" (").Append(Kg(bG * k))
-              .Append(" kg), tabory wsi ").Append(vils).Append(" (").Append(Kg(vG * k)).Append(" kg), inne ").Append(oth).Append(" (").Append(Kg(oG * k)).Append(" kg)");
+            sb.Append(" | lordowie AI: ").Append(lords).Append(" partii, niosa ").Append(lCar).Append(" zl (").Append(Kg(lKg)).Append(" kg, srednio ")
+              .Append(Kg(lords > 0 ? lKg / lords : 0)).Append(" kg), w skarbcach ksiegowo ").Append(lWhole - lCar).Append(" zl; najciezsza sakiewka ")
+              .Append(lMax).Append(" zl (").Append(Kg(lMaxKg)).Append(" kg, ").Append(lMaxN).Append(")");
+            sb.Append(" | bez wodza: karawany ").Append(cars).Append(" (").Append(cG).Append(" zl, ").Append(Kg(cK)).Append(" kg), bandy ").Append(bands).Append(" (").Append(Kg(bK))
+              .Append(" kg), tabory wsi ").Append(vils).Append(" (").Append(Kg(vK)).Append(" kg), inne ").Append(oth).Append(" (").Append(Kg(oK)).Append(" kg)");
+            sb.Append(" | strony morza (522): Westeros ").Append(nWe).Append(" partii (").Append(gWe).Append(" zl, ").Append((_kgPerGold * 1000.0).ToString("0.000", CultureInfo.InvariantCulture))
+              .Append(" kg/1000 zl), Essos ").Append(nEs).Append(" partii (").Append(gEs).Append(" zl, ").Append((_kgPerGoldEssos * 1000.0).ToString("0.000", CultureInfo.InvariantCulture))
+              .Append(" kg/1000 zl), odczyty strony ").Append(_sideReads);
             sb.Append(" | skarbce gracza ").Append(TotalNow()).Append(" zl w ").Append(_vault.Count(kv => kv.Value > 0)).Append(" miejscach; wplaty ").Append(_dInN).Append(" (").Append(_dIn)
               .Append(" zl), wyplaty ").Append(_dOutN).Append(" (").Append(_dOut).Append(" zl)");
             if (_debtTakeN > 0) sb.Append(", wierzyciele ze skarbcow ").Append(_debtTakeN).Append(" razy (").Append(_debtTake).Append(" zl)");
@@ -382,7 +430,7 @@ namespace Armoury
             sb.Append(" | postfiks ").Append(post).Append(" wywolan (z moneta ").Append(pc).Append("), odswiezenia wagi ").Append(_touch).Append(", odczyty zoldu ").Append(_wageReads)
               .Append(" | potkniecia ").Append(_stumbles).Append(", rownolegle ").Append(ps).Append('.');
             Log.Info(sb.ToString());
-            _touch = _wageReads = _stumbles = 0; _dIn = _dOut = _dInN = _dOutN = 0; _lostSiege = _moved = 0; _lostSiegeGold = _movedGold = 0;
+            _touch = _wageReads = _stumbles = _sideReads = 0; _dIn = _dOut = _dInN = _dOutN = 0; _lostSiege = _moved = 0; _lostSiegeGold = _movedGold = 0;
             _debtTakeN = _lootCutN = 0; _debtTake = _lootCut = 0;
         }
 
@@ -475,7 +523,7 @@ namespace Armoury
                 if (amt > 0 && seen.Add(amt)) opts.Add(new InquiryElement(amt, amt + " gold" + (share >= 1f ? " (all)" : ""), null));
             }
             var s = Settings.Current;
-            double kgPer = s != null ? KgPerGold(s) : 0;
+            double kgPer = s != null ? KgPerGold(s, PlayerEssos()) : 0;
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                 "Treasury", "You carry " + have + " gold, about " + Kg(have * kgPer) + " kg of silver and gold. How much will you leave in " + where + "?"
                 + " Coin left here is safe from the road but can only be taken back here. Your creditors can still claim it.", opts, true, 1, 1, "Leave it", "Cancel",

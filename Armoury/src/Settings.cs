@@ -2020,9 +2020,13 @@ namespace Armoury
         public float DebasementMintExtra = 0.1f;           // while a realm has the Debasement of the Currency policy, its mints strike this much more coin from the same metal (lighter, baser coin) and the crown keeps the extra; the old daily share of town purses for the crown stays as it was
         // 521 (Jeff 14.11: "I PIENIADZE MAJA WAZYC"): waga monety w udzwigu partii, sakiewka robocza lordow AI, skarbiec gracza - MoneyWeight.cs
         public bool MoneyWeightEnabled = true;   // coin has weight: the gold a party carries counts towards its load like any goods (a silver penny 1.4 g is 1 gold, a groat 3.9 g is 4, a gold noble 7.8 g is 80), so a heavy purse slows you down and can overburden you. AI lords carry only a working purse (Lord Purse Flat + Lord Purse Days of wages) - the rest of their wealth lies in their treasury. Off = coin weighs nothing, as before
-        public int MoneyPennyPercent = 10;   // share of the value of a purse held in silver pennies (1.4 g for 1 gold). With groats and nobles it sets how heavy a purse is; the three are taken as parts of their sum
-        public int MoneyGroatPercent = 60;   // share of the value of a purse held in silver groats (3.9 g for 4 gold)
-        public int MoneyNoblePercent = 30;   // share of the value of a purse held in gold nobles (7.8 g for 80 gold). More gold = a lighter purse: 10/60/30 makes 179000 gold weigh about 135 kg
+        public int MoneyPennyPercent = 10;   // in Westeros: share of the value of a purse held in silver pennies (1.4 g for 1 gold). With groats and nobles it sets how heavy a purse is; the three are taken as parts of their sum
+        public int MoneyGroatPercent = 70;   // in Westeros: share of the value of a purse held in silver groats (3.9 g for 4 gold) - the silver stag is the coin of the realm
+        public int MoneyNoblePercent = 20;   // in Westeros: share of the value of a purse held in gold nobles (7.8 g for 80 gold) - gold dragons are rare. More gold = a lighter purse: 10/70/20 makes 179000 gold weigh about 151 kg
+        // 522 (Jeff 14.11, pytanie 4 po 521: "tak"): sklad sakiewki w Essos - MoneyWeight.cs
+        public int MoneyEssosPennyPercent = 10;   // in Essos (east of the Narrow Sea): share of the value of a purse held in silver pennies (1.4 g for 1 gold)
+        public int MoneyEssosGroatPercent = 45;   // in Essos: share of the value of a purse held in silver groats (3.9 g for 4 gold)
+        public int MoneyEssosNoblePercent = 45;   // in Essos: share of the value of a purse held in gold nobles (7.8 g for 80 gold) - the rich trading Free Cities pay in gold, so a purse there is lighter: 10/45/45 makes 179000 gold weigh about 111 kg
         public float MoneyWeightStepKg = 2f;   // the weight of a purse is brought up to date once an hour, when it has changed by this many kilograms
         public int LordPurseDays = 30;   // an AI lord carries this many days of his party's wages in his purse (plus Lord Purse Flat); the rest of his house's gold lies in his treasury and weighs nothing on the road
         public int LordPurseFlat = 5000;   // gold an AI lord carries above his days of wages
