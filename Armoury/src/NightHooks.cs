@@ -79,6 +79,8 @@ namespace Armoury
             Part(sb, "smierc czy rana w symulacji (436)", RoutHold.SiteBanner, () => SimFate436.ApplyInCampaign(_h));   // 436: transpiler na MapEventSide.ApplySimulationDamageToSelectedTroop
             sb.Append(" | ");
             Part(sb, "iglica w miekki pancerz (423b)", RoutHold.SiteBanner, () => BodkinSoft423.ApplyInCampaign(_h));   // 423b: prefiks przed RBM na ComputeBlowDamage - pancerz x procent / 50 dla strzaly / beltu Pierce w nie-plytowy korpus
+            sb.Append(" | ");
+            Part(sb, "pancerz i tarcze z perkow (506)", RoutHold.SiteBanner, () => Perk506.ApplyInCampaign(_h));   // 506: postfiksy po RBM (pancerz po 415, tarcza przed 414, ShieldWall po RBM)
             sb.Append('.');
             Log.Info(sb.ToString());
         }
