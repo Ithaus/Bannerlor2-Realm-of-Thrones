@@ -9112,6 +9112,19 @@ namespace Armoury
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool FixPrincelyArbiterWage { get; set; } = true;
 
+        // 514 (perki): polowki perkow BK z opisow
+        [SettingPropertyBool("Bk Perk Halves Court", HintText = "Banner Kings perks of Lordship, Scholarship and Theology do what their descriptions say: Aristocratic Rites (court grace +4%, +8% as ruler; one more vassal), Rogue Connections (hired companies 10% keener to join and stay, earnest money 5% cheaper), Traditionalist and Military Administration (militarism +1 and +2 points, not a fraction of a point), Diplomatic Ties (foreign rulers aim at 3 more relation with you - Banner Kings never moves relations with the player, so only lords gain from it), Peer Review (books teach twice the skill experience), Polyglot (languages learned half again as fast), Lithurgy (now and then +1 relation with a preacher of your fiefs). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Banner Kings perks as described (514)")]
+        public bool BkPerkHalvesCourt { get; set; } = true;
+
+        [SettingPropertyBool("Bk Perk Halves Lifestyle", HintText = "Banner Kings lifestyle perks on the map do what their descriptions say: Sea-Toughness (party morale +5%, food -5%), Sea Commander (party size +8, renown from victories +10%), Inspirer (halves the Kheshig morale penalty for men of other cultures), Ghazw (mounts +12%, not 10%), Honor Guard (one more recruitment level with notables), Helmsman (bad morale fades 10% faster), Pathfinder (+3% speed in forests and on beaches), Sea-Eyes (the +8% sight only at night), Tour de Calradia (double the tournament bet), Crowds' Favorite (double tournament renown). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Banner Kings perks as described (514)")]
+        public bool BkPerkHalvesLifestyle { get; set; } = true;
+
+        [SettingPropertyBool("Bk Perk Halves Battle", HintText = "Banner Kings lifestyle perks in battle do what their descriptions say: Shieldwall (you and the infantry of your formation deal 8% more and take 5% less melee damage), Coastal Hunter (you and the archers of your formation: bows 6% more damage, 4% more accurate), Ranger (your bow damage +8%), Shield Brother (your party's infantry in a shield wall takes 4% less melee damage), Boarding Fury (your melee damage +12% below half health). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Banner Kings perks as described (514)")]
+        public bool BkPerkHalvesBattle { get; set; } = true;
+
         [SettingPropertyBool("Patch Target Guard", HintText = "Fix hooks aimed at an inherited rule: when Armoury, CrashScribe, Realistic Captivity, Grand Tourney or ForgeView hooks a game rule by hand after Armoury has loaded, through a mod's model that only inherits that rule (like the Banner Kings smithing cost), the hook and its later removal are moved onto the class that really holds the rule, and a hook already in place there is not added a second time. Without it the game's patching tool refuses such a hook, the Banner Kings - Realm of Thrones patch hides the refusal, and the feature silently does nothing (this is how wood at the anvil failed). Hooks of other mods are only counted in the log, never changed. Off = only report such hooks in the log", RequireRestart = false)]
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool PatchTargetGuard { get; set; } = false;
@@ -15533,6 +15546,9 @@ namespace Armoury
             s.FixBkrotWageChain = FixBkrotWageChain;
             s.FixBkrotWageSeaCut = FixBkrotWageSeaCut;
             s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
+            s.BkPerkHalvesCourt = BkPerkHalvesCourt;   // 514 (perki)
+            s.BkPerkHalvesLifestyle = BkPerkHalvesLifestyle;
+            s.BkPerkHalvesBattle = BkPerkHalvesBattle;
             s.PatchTargetGuard = PatchTargetGuard;
             s.GentryNamesFallback = GentryNamesFallback;
             s.CombatAiRealistic = CombatAiRealistic;

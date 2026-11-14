@@ -115,6 +115,7 @@ namespace Armoury
                 // MissileHitCallback / ChargeDamageCallback i postfiks CalculateDamage - TU, obok ChargeTemperPatch, zanim JIT skompiluje wolajacych; wlasny try.
                 // Recenzja P6: klucz Friendly Fire wylaczony przy starcie gry (plik MCM) = ApplyAll nic nie wpina (sprawdza sam)
                 try { FriendlyFire.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FriendlyFire.ApplyAll", e); }
+                try { Perk514.ApplyMission(_harmony); } catch (Exception e) { Log.Error("Perk514.ApplyMission", e); }   // 514 (perki 82/86/89/90/97): obrazenia, celnosc luku i HP koni z perkow stylow BK - TU, przed JIT wolajacych CalculateDamage; klucze na zywo
                 // 484 (Jeff 13.11 "wygladam jak jez"): schowek MissileHitCallback + decyzja HandleMissileCollisionReaction (Priority.First, przed RBM); wlasny try
                 try { StuckMissiles484.ApplyAll(_harmony); } catch (Exception e) { Log.Error("StuckMissiles484.ApplyAll", e); }
                 TravellerGoods36.ApplyAll(_harmony);   // 3.6: wedrowcy BK bez towaru, rudy i drewna z niczego (postfiks po CastleSteel - Priority.Low)
