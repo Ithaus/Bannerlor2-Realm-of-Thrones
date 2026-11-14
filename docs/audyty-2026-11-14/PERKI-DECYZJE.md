@@ -62,3 +62,8 @@ Potwierdzenia: 60-68 (medycyna) ok, 69 Resilience (+30% opatrunku po wygranej bi
 Potwierdzenia 14.11: 78-105 ok (teologia, style zycia BK, NavalDLC - wedlug propozycji; 102 podlaczyc DLC pod modele BK). Jeff: "rob po kolei".
 Kolejnosc wdrozen: podwojne perki BK -> XP z perkow (RBM) -> latki bledow BK -> pancerz/tarcze po RBM -> RecruitCost -> budowy (+ praca jencow) -> okupy i zloto z platnikiem -> kuznia -> reszta.
 - Jeff 14.11: premie perkow XP (i InspiringLeader, Naval) maja MNOZYC wynik FairXp, nie dodawac sie do jego wagi ("tak, mnozyc"). Zmiana po 504 (FairXp.cs: waga obrazen jako mnoznik na koncu albo wyciagnac czynniki perkow i pomnozyc). Kolizja: 503 PerkXp503 (warunek "perki juz w wyniku").
+
+## Decyzje D1-D16 (Jeff 14.11, po serii 505-515)
+D1 mnozenie XP takze arena i turniej: TAK. D3 jency: pol porcji (TAK - glod oslabia prace; smierc/ucieczki - zgodnie z propozycja). D5 ShipwrightsHand: rekrut z ochotnikow miasta. D6 IronMaker: (c) przekucie lupy stratne, perk zmniejsza strate. D7 PracticalSmith: zbroje/luki o 25% krocej (nie o polowe). D8 Breeder: pasza przez caly rok. D9 Pavise: tez ciosy wrecz w tarcze na plecach. D12 WalkItOff obu: sumuja sie do 75%. D13 BushDoctor: tez w samej wsi. D14 DiplomaticTies gracza: +1 relacji z obcymi wladcami raz w tygodniu. D16 amunicja NavalDLC: odzysk (jak 512).
+D4 RapidDevelopment - Jeff: "jak przejmuje wrogie warsztaty nikomu nic nie place, to wojna; warsztatow osob, z ktorymi nie tocze wojny, nie zabieram" -> zdobywca NIE placi; nowy efekt do propozycji (odczyt).
+D2, D10, D11, D15 - Jeff prosi o wyjasnienie na przykladzie.
