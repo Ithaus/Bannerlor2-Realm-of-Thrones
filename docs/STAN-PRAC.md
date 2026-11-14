@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 ~17:25 - WGRANIE 234 (cala seria: 503-518 + 500-b z E1-E4), bez autotestu - test = gra Jeffa
+
+- Armoury 5cfbaad5, RealisticCaptivity fdff144e, CrashScribe 18e87a94 = galaz noc/scal-perki c23396ca (233 + decyzje D1-D16: 516 D1/D9/D16, 517 D3/D5-D8/D12-D14, 518 D2/D4/D10(+sufit RBM x1.10)/D11/D15; 500-b ranni lordowie AI + E1 obrona z szansa i w zasiegu 12 h, E2 sojusznik, E3 postoj od 20 HP (wyjscie > 30), E4 wodz armii tylko ostroznosc). Kopie przed: .bak-2026-11-14-przed-wgranie234, Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie234 i -przed).
+- Statusy w CHANGELOG (noc/scal-perki) 503-518 i 500-b: DO SPRAWDZENIA - ustawic WGRANE 234 po logu Jeffa. noc/scal-perki jeszcze NIE przewiniete na noc/367c-jeniec-po-odejsciu (zrobic po potwierdzeniu w logu).
+- Otwarte pytania: D16b (kolczany/tarcze okretu - odzysk?), D7b (bron z ekranu kowalstwa gry tez -25%?), 509 (ucieczki przy pracy), 513 (ten sam blad Resilience w WoundedLords318), 512 (pasza - zrobiona przez D8).
+- Po sesji Jeffa sprawdzic: linie startu 502-518 i 500-b, potkniecia, BKROTLog.txt (latki com.jeff.armoury.*), linie doby 500-a/500-b (postoj, twierdza, ostroznosc), czas doby (s/dobe) wobec 21.7.
+
 ## STAN 14.11 ~17:40 - WGRANIE 233 (seria perkow 503-515 scalona, BEZ autotestu - Jeff: "ja bede gral i na moim logu bedziesz sprawdzac, to bedzie test, ty tylko wgraj")
 
 - Armoury b6b4d17a, RealisticCaptivity 6a264c5c, CrashScribe cc460f88 = galaz noc/scal-perki e46a8c9a (linia 232 + 503 XP perkow, 504 bledy BK + 504-a Tutor, 505-515). GrandTourney/ForgeView bez zmian. Kopie przed: .bak-2026-11-14-przed-wgranie233, Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie233 i -przed). Statusy w CHANGELOG (gal. noc/scal-perki) jeszcze DO SPRAWDZENIA - ustawic po logu Jeffa.
