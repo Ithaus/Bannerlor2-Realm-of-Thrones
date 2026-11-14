@@ -55,6 +55,7 @@ namespace GrandTourney
                 ClosedListsPatch.ApplyAll(_harmony);
                 NoblesFightPatch.ApplyAll(_harmony);
                 TourneyRansom.ApplyAll(_harmony);   // R3-04a: wykup konia i zbroi pokonanego
+                TourneyWounds.ApplyAll(_harmony);   // 491: rany szranek miedzy walkami i po turnieju
             }
             catch (Exception e) { Log.Error("OnBeforeInitialModuleScreenSetAsRoot", e); }
         }
@@ -64,6 +65,7 @@ namespace GrandTourney
         {
             base.OnApplicationTick(dt);
             TourneyRansom.AppTick();
+            TourneyWounds.AppTick();   // 491: po wykupie - HP i (wylaczone domyslnie) smierci
         }
 
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
@@ -76,6 +78,7 @@ namespace GrandTourney
                 McmSettings.Apply();
                 starter.AddBehavior(new TourneyBehavior());
                 starter.AddBehavior(new TourneyRansomBehavior());   // R3-04a
+                starter.AddBehavior(new TourneyWoundsBehavior());   // 491
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

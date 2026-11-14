@@ -114,6 +114,11 @@ namespace GrandTourney
             get { var s = Settings.Current; return s != null && s.Enabled && s.TourneyRansom; }
         }
 
+        // 491: stan dla ran szranek (TourneyWounds) - tylko odczyt
+        internal static bool Skipping => _skipping;
+        internal static bool CallingOff => _callOffDepth > 0;
+        internal static bool Busy => _offers.Count > 0 || _popupOpen || _missionBouts.Count > 0;
+
         private static void Stumble(string where, Exception e)
         {
             _stumbles++; _stumblesDay++;
