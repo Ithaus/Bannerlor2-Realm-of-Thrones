@@ -40,6 +40,24 @@
 - Build Armoury 0 bledow. NIE WGRANE (gra Jeffa moze byc wlaczona); nie testowane w grze. CHANGELOG 49595 -> 49636 linii (bez uciecia).
 
 **Status:** DO SPRAWDZENIA (galaz noc/527-drogi-siec z origin/noc/scal-perki 4f0c93c3).
+### Recenzja 527 (galaz noc/527-drogi-siec-fix -> noc/527-drogi-siec)
+
+Recenzja (git diff 4f0c93c3..213f06f8) bez bledow grozacych crashem; watek z puli (BuildDraft bez obiektow gry), laczniki w Dijkstrze / udziale drogi / punktach patrolu, kalibracja 527-c, liczniki rozstajow - sprawdzone, bez zmian. Prawdziwe uwagi poprawione:
+- **Koszt planowania (medium).** Log 237 juz 54.73 ms / dobe (prog 50), z 1949 planow 1542 konczylo sie tanio w malym kawalku; po polaczeniu kawalkow Dijkstra idzie po calej sieci (9149 wezlow) do kosztu L bez limitu. Nowy limit MaxPops = 3000 wyjetych wezlow na plan: po limicie najlepsze zejscie znalezione dotad (dalej te same progi MinRoadShare / nadklad / kalibracja) albo trasa gry (RouteOther). W linii doby: "527-fix przeszukania sieci N, sr. wyjetych wezlow X na przeszukanie, limit 3000 z zejsciem znalezionym dotad M" oraz limit bez zejscia osobno w "bez drogi w zasiegu". Wygiete laczniki dokladaja silnik tylko na wybranym lancuchu (jak wygiete krawedzie drog) - bez zmian.
+- **Kruskal przed siatka gry (medium).** Gdy Finish wycial mostek, pozostali kandydaci tej samej pary skladowych byli juz pominieci. Teraz dla kazdej pary skladowych (stan sprzed mostkow) z mostkiem dokladany jest jeden ZAPASOWY - nastepny najkrotszy kandydat z innego konca lamanej. Najwyzej tyle krawedzi co mostkow; w logu "mostki ... N + zapasowe M", "wyciete przez siatke gry" liczy wszystkie mostki. Wezlow bram nie ruszalem (do 12 lamanych na twierdze - kazda lamana ma wlasny lacznik, zapas nie ma sensu).
+- **Etykieta "siec nie dochodzi do R od celu" (low).** Rozbite: odciecie kosztem trasy gry L (przerwanie na pk > L albo krawedz ponad L), strefy przepraw, limit 3000; "siec ... nie dochodzi" zostaje tylko dla przeszukania, ktore wyczerpalo kawalek bez zadnego z tych powodow. Suma = "bez drogi w zasiegu" (pole czytane przez sprawdz_logi.py bez zmian).
+- **Coverage (low).** "w sieci" i "polaczone z traktem" licza teraz tylko DROGE (wezly na drodze, krawedzie drog, rzut 527-b) - porownywalne z logiem 237; wezel bramy lezy pod brama i zaliczal kazda twierdze z droga do HubR. Osobno "polaczone z traktem tylko przez lacznik 527"; lista "bez polaczenia z traktem" = ani droga, ani lacznikiem.
+- **Dlugosci Valyrii / szlakow karawan w logu (low).** Krawedzie podzialu odcinka traktu (punkt dodatkowy na drodze, Draft.Nodes0) nie sa doliczane do ValLength / CarLength. Tylko log.
+
+Odrzucone / bez zmian w kodzie:
+- **Scalenie CHANGELOG ze scal-perki (low)** - prawda, ale to krok scalania, nie tej galezi: przy scalaniu do noc/scal-perki wpis 527 (z ta recenzja) nad 525/526, liczba linii scal-perki + dlugosc wpisu 527, sprawdzic ogon pliku.
+- **Uwaga o watku z puli** (budowa 18 ms, nowa siec o godzine pozniej) - prawda, szkody brak; zostawione, bo czesc geometryczna 527 (szukanie najblizszych lamanych dla ok. 5600 koncow i 227 twierdz) nie byla mierzona i moze byc wieksza niz 18 ms; czas obu czesci jest w linii sieci - jesli maly, mozna wrocic do budowy w jednym kroku.
+
+Pliki: Armoury/src/AiRoadRoutes.cs (2061 -> 2132). Bez nowych kluczy MCM. Nic co klatke. Build Armoury 0 bledow. NIE WGRANE, nie testowane w grze. CHANGELOG 49636 -> 49654 linii.
+
+Do sprawdzenia w logu: "sr. wyjetych wezlow" (jesli blisko 3000 i duzo "z zejsciem znalezionym dotad" - limit za ciasny), "koszt: planowanie ms/dobe" wobec 54.73 ms, "zapasowe" i "wyciete przez siatke gry", Coverage (droga) wobec logu 237: miasta 80/27, zamki 120/45.
+
+**Status recenzji:** DO SPRAWDZENIA.
 
 ## 524: ranni AI a glod - koniec twierdzy przy glodzie / zamku bez zapasu, bez podbicia zamkow dla glodnych, bez wejscia do zamku bez jedzenia, limit Fort nie przed koncem loza HW - Armoury (500-b)
 
