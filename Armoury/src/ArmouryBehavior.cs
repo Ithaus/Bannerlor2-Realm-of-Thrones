@@ -820,6 +820,8 @@ namespace Armoury
         // 500-b (AI ranni): stan partii (postoj / twierdza), migawka i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak 501)
         private readonly bool _p500bReset = P500bReset();
         private static bool P500bReset() { try { AiWounded500b.Reset(); } catch (Exception e) { Log.Error("P500bReset", e); } return true; }
+        private readonly bool _p530Reset = P530Reset();
+        private static bool P530Reset() { try { AttackOdds530.Reset(); } catch (Exception e) { Log.Error("P530Reset", e); } return true; }
         // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
         private readonly bool _p6a7Reset = P6a7Reset();
         private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
@@ -1752,6 +1754,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("Litter501.Hourly", delegate { Litter501.Hourly(); }));   // 501: stan noszy gracza (HP / loze Grave), godziny na noszach i linia doby (wyjatki liczy sam)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("Perk513.Hourly", delegate { Perk513.Hourly(); }));   // 513: linia doby "Perki leczenia (513)" (wyjatki liczy sam)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("AiWounded500b.Hourly", delegate { try { AiWounded500b.Hourly(); } catch (Exception e) { Log.Error("AiWounded500b.Hourly", e); } }));   // 500-b: stan poturbowanych partii AI (postoj / twierdza), migawka ostroznosci, linia doby
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("AttackOdds530.Hourly", delegate { try { AttackOdds530.Hourly(); } catch (Exception e) { Log.Error("AttackOdds530.Hourly", e); } }));   // 530: nowa pamiec sil co godzine, linia doby "Przewaga lokalna (530)"
             CampaignEvents.OnPlayerBattleEndEvent.AddNonSerializedListener(this, Litter501.OnPlayerBattleEnd);   // 501: HP gracza po bitwie - nosze od razu, nie po godzinie (tylko bitwy gracza)
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, TownInns.OnPlayerExchange);   // KA: handel gracza w miescie noclegu przy premii cen (tylko licznik linii doby)
             // sw-zajazdy: dojazd do zajazdu przy szlaku (4 razy na sekunde, jedna partia - klucz RoadsideInns) i ksiega plotek (zdarzenia swiata - klucz InnGossip)
@@ -2715,6 +2718,7 @@ namespace Armoury
             Litter501.SessionStart();   // 501: linia startu "Nosze (501)" (wyjatki liczy sam)
             try { Perk513.EnsureHooks(); } catch (Exception e) { Log.Error("Perk513.EnsureHooks", e); }   // 513: perki leczenia - latki w kampanii (raz na proces), linia startu "Perki leczenia (513)"
             try { AiWounded500b.SessionStart(); } catch (Exception e) { Log.Error("AiWounded500b.SessionStart", e); }   // 500-b: latki (postoj High, ostroznosc 55, inicjatywa) raz na proces, linia startu "AI ranni (500-b)"
+            try { AttackOdds530.SessionStart(); } catch (Exception e) { Log.Error("AttackOdds530.SessionStart", e); }   // 530: atak AI tylko z przewaga, sojusznicy celu z innych krolestw liczeni (inicjatywa VeryLow, mysl 52), linia startu "Przewaga lokalna (530)"
             try { SiegePhantomLift.SessionStart(); } catch (Exception e) { Log.Error("SiegePhantomLift.SessionStart", e); }   // OB6 (noc-drobne): linia "Oboz bez sily (OB6): start sesji", pamiec serii od zera
             try { SiegeWalls.SessionStart(); } catch (Exception e) { Log.Error("SiegeWalls.SessionStart", e); }   // mury oblezen: linia startowa (modele, latki, wlasciciele latek Harmony) - PO Seal31.EnsureHooks
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
