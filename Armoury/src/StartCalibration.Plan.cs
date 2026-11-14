@@ -129,6 +129,7 @@ namespace Armoury
             var woodKg = 0.0; KsItem wi; if (inp.Items.TryGetValue("hardwood", out wi)) woodKg = wi.Kg * inp.Sigma;
             var seenV = new HashSet<Village>();   // ROT-Map: dwie osady na jednym Village (Kurbok/Guntak, Thupak/Volug) - okreg raz, pierwszy w Settlement.All (jak ksiega wiosek)
             var tst = new List<Settlement>(120); var distMk = new Dictionary<string, Settlement>(StringComparer.Ordinal);   // KS-R3 krok 5: miasta wejscia i miasto targowe okregu
+            _vf497N = 0;   // 497: okregi z czynnikami gry w tym wejsciu
             try { Buildings338Ports.PlanBegin(); } catch { }   // 338c: suma ryb portow BK w tym Planie (linia doby 'Budynki (338) zamki')
             foreach (var r in recs)
             {
@@ -158,6 +159,7 @@ namespace Armoury
                                 var d = new KsDistrict { Id = r.St.StringId + "#pola", Type = "town_fields", Land = land, Market = tl.Market, People = 0, Wf = wf, Area = tl.Area, TownFields = true };
                                 for (int k = 0; k < 20; k++)
                                     d.Blocks.Add(new KsBlock { Uid = tl.Main[k].Uid, Share = 0.05, Area = tl.Area * 0.05, Main = true, Block0 = false, Start = "garden", O = tl.Main[k].O });
+                                if (Vf497Input(d)) _vf497N++;   // 497: czynniki gry po Planie (pola mieszczan - rok urodzaju)
                                 inp.Districts.Add(d); distMk[d.Id] = r.St;
                                 info.TF++;
                             }
@@ -191,6 +193,7 @@ namespace Armoury
                     kd.Alpha = VilAlphaFor(v);                            // recenzja 17.10: alfa tej wsi z pomiaru (dekret pana); -1 - alfa rynku
                     if (inp.FachOn) FachInput(kd, v, type, inp);          // m106-wozy P1: zajecie typu, glowny towar i baza gry na targ
                     BuildBlocks(kd, ld, v, type, info.Layout, side, info);
+                    if (Vf497Input(kd)) _vf497N++;   // 497: czynniki gry po Planie (rok urodzaju, ziemia, ScaleRates)
                     inp.Districts.Add(kd);
                     try { distMk[kd.Id] = TradeTownOf(v); } catch { }
                     info.Vil++;
@@ -733,7 +736,7 @@ namespace Armoury
             {
             mk = new double[ItemCount]; tf = new double[ItemCount]; own = new double[ItemCount]; kcal = 0; need = 0; nd = 0;
             var live = BuildLive(r, inp, false);
-            var p490 = new double[2 * 2 * G490 * 3];   // 490: sam pomiar (Plan wedlug rynku i grupy towaru - odbior bez sum z watku roboczego)
+            var p490 = new double[2 * 2 * G490 * P490K];   // 490: sam pomiar (Plan wedlug rynku i grupy towaru - odbior bez sum z watku roboczego)
             foreach (var ld in live)
             {
                 var res = ComputeDistrict(ld, false, null);

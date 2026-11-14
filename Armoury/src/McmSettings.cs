@@ -11108,6 +11108,10 @@ namespace Armoury
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsPlanEqSteadyBest { get; set; } = true;
 
+        [SettingPropertyBool("Ks Plan Knows Village Factors", HintText = "with Start Calibration: the weekly plan knows what the game adds to a village crop after the plan - the harvest year, tired land and the village buildings and roads that scale its market rates - so it gives hands to what the villages really deliver (no grain glut in Westeros). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
+        public bool KsPlanKnowsVillageFactors { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Ks Switch Food Shelf Band", 1.00f, 10.00f, "0.0", HintText = "with Ks Switch Food Shelves: how far the stalls may move a food price in the switch rule (3 = up to three times up or down)", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public float KsSwitchFoodShelfBand { get; set; } = 3.0f;
@@ -15985,6 +15989,7 @@ namespace Armoury
             s.KsFoodHandsWithA7 = KsFoodHandsWithA7;
             s.KsSwitchFoodShelves = KsSwitchFoodShelves;
             s.KsPlanEqSteadyBest = KsPlanEqSteadyBest;
+            s.KsPlanKnowsVillageFactors = KsPlanKnowsVillageFactors;
             s.KsSwitchFoodShelfBand = KsSwitchFoodShelfBand;
             s.BloomeryColliers = BloomeryColliers;
             s.BanditLimitPerHideout = BanditLimitPerHideout;

@@ -25,6 +25,9 @@ namespace Armoury
         // kroki gry w DistResult.S490 [k * G490 + g]: 0 Produce, 1 po dodatkach przed zima, 2 x sama zima, 3 x zima x rece, 4 po roku urodzaju / ziemi / zamowieniach,
         // 5 wlasny stol (Own), 6 na targ (Market)
         private const int K490 = 7;
+        // 497: pola Planu na (rynek, wsie/pola, grupe): 0 produkcja, 1 zjedzone, 2 na targ, 3 produkcja x czynniki gry (Vf497), 4 na targ z czynnikami
+        private const int P490K = 5;
+        private static int _vf497N;
         private static int _r490St;
 
         private static int G490Of(int i)
@@ -69,18 +72,23 @@ namespace Armoury
             S490Snap(res.S490, 6, res.MarketKg, kgT, 1.0);
         }
 
-        /// <summary>490 (watek roboczy albo glowny): Plan - okreg ld z rachunkiem bez czynnikow: [((m * 2 + tf) * G490 + g) * 3 + k], k 0 produkcja, 1 zjedzone, 2 na targ (szt./d).</summary>
+        /// <summary>490 (watek roboczy albo glowny): Plan - okreg ld z rachunkiem bez czynnikow: [((m * 2 + tf) * G490 + g) * P490K + k], k 0 produkcja, 1 zjedzone, 2 na targ (szt./d);
+        /// 497: k 3 produkcja x czynnik gry towaru (KsDistrict.VfItem - to, co Plan zaklada), 4 na targ z czynnikami = max(0, produkcja x F - zjedzone). Bez czynnikow 3 = 0, 4 = 2.</summary>
         private static void P490Add(LiveDist ld, DistResult res, double[] a, double[] kgT)
         {
             if (ld == null || res == null || a == null || kgT == null) return;
             double sig = Math.Max(1, DailyLife.KsSigma);
-            int o = ((ld.Market == 0 ? 0 : 1) * 2 + (ld.TF ? 1 : 0)) * G490 * 3;
+            int o = ((ld.Market == 0 ? 0 : 1) * 2 + (ld.TF ? 1 : 0)) * G490 * P490K;
+            var vf = ld.K != null ? ld.K.VfItem : null;   // 497: tablica z watku glownego (tylko odczyt)
             for (int g = 0; g < G490; g++)
                 foreach (int i in G490Ix[g])
                 {
                     if (i >= kgT.Length || !(kgT[i] > 0)) continue;
                     double d = sig * kgT[i];
-                    a[o + g * 3] += Math.Max(0.0, res.Prod[i]) / d; a[o + g * 3 + 1] += Math.Max(0.0, res.Own[i]) / d; a[o + g * 3 + 2] += Math.Max(0.0, res.MarketKg[i]) / d;
+                    int q = o + g * P490K;
+                    a[q] += Math.Max(0.0, res.Prod[i]) / d; a[q + 1] += Math.Max(0.0, res.Own[i]) / d; a[q + 2] += Math.Max(0.0, res.MarketKg[i]) / d;
+                    double f = vf != null && i < vf.Length ? vf[i] : 1.0, pf = Math.Max(0.0, res.Prod[i]) * f;   // 497
+                    a[q + 3] += pf / d; a[q + 4] += (vf != null ? Math.Max(0.0, pf - Math.Max(0.0, res.Own[i])) : Math.Max(0.0, res.MarketKg[i])) / d;
                 }
         }
 
@@ -160,12 +168,14 @@ namespace Armoury
                         int o = (m * 2 + tf) * K490 * G490;
                         Func<int, double> Sx = k => st[o + k * G490 + g];
                         sb.Append(g == 0 ? ": " : "; ").Append(G490Name[g]).Append(':');
-                        double pm = double.NaN;
+                        double pm = double.NaN, pmf = double.NaN;
                         if (P != null)
                         {
-                            int p = ((m * 2 + tf) * G490 + g) * 3;
+                            int p = ((m * 2 + tf) * G490 + g) * P490K;
                             pm = P[p + 2];
-                            sb.Append(" Plan produkcja ").Append(P[p].ToString("0.0", inv)).Append(", zjedzone ").Append(P[p + 1].ToString("0.0", inv)).Append(", na targ ").Append(pm.ToString("0.0", inv));
+                            sb.Append(" Plan produkcja ").Append(P[p].ToString("0.0", inv)).Append(", zjedzone ").Append(P[p + 1].ToString("0.0", inv)).Append(", na targ ").Append(pm.ToString("0.0", inv))
+                              .Append(" (497 z czynnikami gry: produkcja ").Append(P[p + 3].ToString("0.0", inv)).Append(", na targ ").Append(P[p + 4].ToString("0.0", inv)).Append(')');
+                            pmf = P[p + 4];
                         }
                         else sb.Append(" Plan brak");
                         double s1 = Sx(1), s3 = Sx(3);
@@ -189,10 +199,13 @@ namespace Armoury
                         if (pm > 1e-9)
                             sb.Append(" (wobec Planu na targ: gra na targ ").Append((Sx(6) / pm).ToString("0.00", inv)).Append(", po stawce ").Append((last / pm).ToString("0.00", inv))
                               .Append(", ksiega ").Append(days > 0 ? (lg / pm).ToString("0.00", inv) : "-").Append(')');
+                        if (pmf > 1e-9) sb.Append(" (497: ksiega wobec Planu na targ z czynnikami ").Append(days > 0 ? (lg / pmf).ToString("0.00", inv) : "-").Append(')');
                     }
                 }
             sb.Append(" | okregow bez rachunku 490 (przed pierwszym przeliczeniem po wczytaniu) ").Append(noRes).Append(", wsi nie Normal albo bez targu ").Append(notNormal)
               .Append(" | Plan: ").Append(P != null ? "z watku roboczego albo odbioru" : "brak (potkniecie albo Plan bez sum)").Append(r != null ? ", potkniecia Planu " + r.P490St : "")
+              .Append(" | 497 czynniki gry w Planie: ").Append(SwVf497 ? "TAK" : "NIE").Append(", okregow z czynnikami w wejsciu ").Append(_vf497N).Append(", potkniecia ").Append(_vf497St)
+              .Append(", rachunki zimowe: czynniki zostawione ").Append(_vf497Kept).Append(", odbudowane bez zimy ").Append(_vf497Rebuilt)
               .Append(" | potkniecia pomiaru ").Append(_r490St).Append(" | gra bez zmian.");
             return sb.ToString();
         }

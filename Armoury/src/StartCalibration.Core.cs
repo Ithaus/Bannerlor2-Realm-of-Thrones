@@ -637,6 +637,7 @@ namespace Armoury
                 {
                     double wH, sub, cl, W;
                     BlockOutput(d, b, c, outv, out wH, out sub, out cl, out W);
+                    if (d.Vf != null) ApplyVf(d.Vf, outv);                // 497: czynniki gry po Planie (rok urodzaju, ziemia, ScaleRates) - klucz NIE: Vf null
                     x.W[i] = W; x.WH[i] = wH;
                     pb.Add(i); pc.Add(c); pm.Add(d.Market);
                     lp.Add(Math.Max(1e-6, LandEff(b, c, d.Type)));
