@@ -39,7 +39,9 @@ namespace Armoury
     ///        Gracz i AI ta sama regula (dotad: AI 0 przez SmallGold TradePerkGiftsAiOff, gracz z niczego). Wpiecie: SmallGold.GivePrefix (ten sam okno i dopasowanie).
     ///  104 PerkNavalPortGoldPaid: NavalDLC ShipTradeCampaignBehavior.OnSettlementEntered (:428-458): Salvage - licznik cel miasta +40 za kazdy konwoj (z niczego),
     ///        ShipwrightsHand - rekrut do zalogi z niczego. Teraz: Salvage placi kasa konwoju (najwyzej tyle, ile ma; jak myto Tollgates w RealPayer),
-    ///        ShipwrightsHand wylaczony (licznik "rekrut z niczego - nie dany"). MerchantPrince i MasterShipwright juz placi nadwyzka portu (181 ShipTradeThroughPort,
+    ///        ShipwrightsHand wylaczony (licznik "rekrut z niczego - nie dany"); D5 (Jeff 14.11 "tak z miasta", klucz PerkShipwrightsHandVolunteer): zamiast niego
+    ///        ochotnik notabla MIASTA do zalogi droga autowerbunku gry (HandVolunteer - slot notabla, ksiega ludzi, oplata werbunku rodu pana do notabla).
+    ///        MerchantPrince i MasterShipwright juz placi nadwyzka portu (181 ShipTradeThroughPort,
     ///        ShipsToPort181.P_Between) - bez zmian.
     ///  67 PerkVeterinarianHorses: druga premia Veterinarian (gra CampaignBattleRecoveryBehavior.cs:83-104: 50% szansy na konia ze wzorca za kazdego zabitego
     ///        konnego - kon z niczego, obok koni zwracanych przez HorseFate) wylaczona; zamiast niej padly kon partii z perkiem (chirurg, nie na morzu) z szansa
@@ -68,6 +70,8 @@ namespace Armoury
         private static int _insN, _insShort, _rapidN, _rapidShort, _rapidPlayerPays;
         private static long _insDue, _insPaid, _rapidDue, _rapidPaid;
         private static int _salvN, _salvShort, _handN, _handTroops;
+        // D5 (Jeff 14.11 "D5 - tak z miasta"): ShipwrightsHand bierze ochotnika miasta - liczniki doby
+        private static int _handVolN, _handVolMen, _handVolNoVol, _handVolBlocked;
         private static long _salvDue, _salvPaid;
         private static int _vetSaved, _vetLost, _vetGameOff, _vetGameRiders;
         private static int _stumbles;
@@ -377,11 +381,80 @@ namespace Armoury
                 if (gov.GetPerkValue(_pHand) && st.MapFaction != null && st.MapFaction.BasicTroop != null)
                 {
                     int wage = Campaign.Current.Models.PartyWageModel.GetCharacterWage(st.MapFaction.BasicTroop);
-                    if (st.GarrisonWagePaymentLimit > wage + 5) { _handN++; _handTroops += Math.Max(0, MathF.Round(_pHand.SecondaryBonus)); }   // gra by dopisala (najwyzej tyle)
+                    if (st.GarrisonWagePaymentLimit > wage + 5)   // warunek gry (NavalDLC :450-453)
+                    {
+                        int want = Math.Max(0, MathF.Round(_pHand.SecondaryBonus));
+                        _handN++; _handTroops += want;   // gra by dopisala z niczego (najwyzej tyle)
+                        if (HandVolOn && want > 0) HandVolunteer(st, want);   // D5: zamiast tego ochotnik notabla miasta
+                    }
                 }
                 return false;
             }
             catch (Exception e) { Stumble("NavalEnteredPrefix", e); return true; }
+        }
+
+        // ================================================================ D5: ShipwrightsHand - ochotnik miasta zamiast rekruta z niczego
+        internal static bool HandVolOn { get { var s = S; return s != null && s.PerkNavalPortGoldPaid && s.PerkShipwrightsHandVolunteer; } }
+
+        [ThreadStatic] private static Town _handCapTown;
+        [ThreadStatic] private static int _handCap;
+        private static MethodInfo _miAutoRec;
+        private static bool _autoRecTried;
+
+        /// <summary>D5: czy notabl MIASTA (nie wsi) ma ochotnika w slotach, ktore zaloga moze wziac (MaximumIndexGarrisonCanRecruitFromHero - jak gra).
+        /// Gra ustawia liste werbunku zalogi od notabli miasta, potem wsi - przy limicie 1 pierwszy jest ochotnik miasta.</summary>
+        private static bool TownHasVolunteer(Settlement st)
+        {
+            var vm = Campaign.Current.Models.VolunteerModel;
+            foreach (var h in st.Notables)
+            {
+                if (h == null || !h.IsAlive || h.VolunteerTypes == null) continue;
+                int max = Math.Min(vm.MaximumIndexGarrisonCanRecruitFromHero(st, h), h.VolunteerTypes.Length);
+                for (int i = 0; i < max; i++) if (h.VolunteerTypes[i] != null) return true;
+            }
+            return false;
+        }
+
+        /// <summary>D5: ShipwrightsHand - "want" ochotnikow notabli miasta do zalogi droga autowerbunku gry (GarrisonRecruitmentCampaignBehavior.TickAutoRecruitmentGarrisonChange,
+        /// odbiciem - jak zaloga frontu 326c): slot notabla oprozniony (ksiega ludzi A5Pre/A5Post zdejmuje czlowieka z DOM), oplata werbunku rodu pana
+        /// (AutoRecruitmentExpenses -> notabl, GarrisonRecruitFee), limity gry (zold zalogi, miejsce) dzialaja; limit sztuk = perk (postfiks HandCapPostfix).
+        /// Bez ochotnika w miescie, w krainie bez wolnych rak (FreeHands), w bitwie / oblezeniu, przy pustej kiesie rodu - nikt (licznik). Nie rzuca.</summary>
+        private static void HandVolunteer(Settlement st, int want)
+        {
+            try
+            {
+                if (st.Party == null || st.Party.MapEvent != null || st.Party.SiegeEvent != null || st.IsUnderSiege) { _handVolBlocked++; return; }   // warunek gry dla werbunku zalog
+                var clan = st.OwnerClan;
+                if (clan == null || clan.Leader == null || clan.Gold <= 0) { _handVolBlocked++; return; }   // jak 326c: werbunek szedlby na kredyt bez pokrycia
+                if (FreeHands.Braked(st)) { _handVolBlocked++; return; }                                  // kraina bez wolnych rak nie oddaje ludzi ponad tempo gry
+                if (!TownHasVolunteer(st)) { _handVolNoVol++; return; }
+                if (!_autoRecTried)
+                {
+                    _autoRecTried = true;
+                    _miAutoRec = AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickAutoRecruitmentGarrisonChange", new[] { typeof(Town) });
+                }
+                var beh = Campaign.Current.GetCampaignBehavior<GarrisonRecruitmentCampaignBehavior>();
+                if (_miAutoRec == null || beh == null) { _handVolBlocked++; return; }
+                var g = st.Town.GarrisonParty;
+                int before = g != null ? g.MemberRoster.TotalManCount : 0;
+                _handCapTown = st.Town; _handCap = want;
+                ArmsFromPeople.FrontGarrisonCall = true;   // dodatkowe wywolanie poza doba A5 - bez licznikow A5/K8 (jak 326c)
+                try { _miAutoRec.Invoke(beh, new object[] { st.Town }); }
+                finally { ArmsFromPeople.FrontGarrisonCall = false; _handCapTown = null; _handCap = 0; }
+                g = st.Town.GarrisonParty;
+                int d = (g != null ? g.MemberRoster.TotalManCount : 0) - before;
+                if (d > 0) { _handVolN++; _handVolMen += d; } else _handVolBlocked++;
+            }
+            catch (Exception e) { Stumble("HandVolunteer", e); }
+        }
+
+        /// <summary>D5: postfiks GarrisonRecruitmentCampaignBehavior.GetAutoRecruitmentGarrisonChangeExplainedNumber - tylko w wywolaniu HandVolunteer tej twierdzy:
+        /// najwyzej tylu ochotnikow, ilu daje perk (LimitMax tylko obniza; limity gry - zold, miejsce, limit dzienny - zostaja). Poza tym nic.</summary>
+        public static void HandCapPostfix(Town __0, ref ExplainedNumber __result)
+        {
+            if (_handCap <= 0 || __0 == null || !ReferenceEquals(__0, _handCapTown)) return;
+            try { if (__result.ResultNumber > _handCap) __result.LimitMax(_handCap); }
+            catch (Exception e) { Stumble("HandCapPostfix", e); }
         }
 
         // ================================================================ 67: Veterinarian
@@ -440,6 +513,10 @@ namespace Armoury
             Patch("NavalDLC Salvage / ShipwrightsHand (ShipTradeCampaignBehavior.OnSettlementEntered)",
                   nt != null ? AccessTools.DeclaredMethod(nt, "OnSettlementEntered", new[] { typeof(MobileParty), typeof(Settlement), typeof(Hero) }) : null,
                   nameof(NavalEnteredPrefix), null, Priority.Normal);
+            // D5: limit ochotnikow ShipwrightsHand w wywolaniu autowerbunku zalogi (Last - po latkach 364 i K8, LimitMax tylko obniza)
+            Patch("D5 ShipwrightsHand - limit ochotnikow (GarrisonRecruitmentCampaignBehavior.GetAutoRecruitmentGarrisonChangeExplainedNumber)",
+                  AccessTools.DeclaredMethod(typeof(GarrisonRecruitmentCampaignBehavior), "GetAutoRecruitmentGarrisonChangeExplainedNumber", new[] { typeof(Town) }),
+                  null, nameof(HandCapPostfix), Priority.Last);
             // 67
             Patch("Veterinarian - kon ze wzorca (CampaignBattleRecoveryBehavior.RecoverMountWithChance)",
                   AccessTools.DeclaredMethod(typeof(CampaignBattleRecoveryBehavior), "RecoverMountWithChance"), nameof(VetGamePrefix), null, Priority.Normal);
@@ -497,7 +574,9 @@ namespace Armoury
                 sb.Append(" | Rapid Development od nowego pana: ").Append(_rapidN).Append(", nalezne ").Append(_rapidDue).Append(", zaplacone ").Append(_rapidPaid).Append(" (niedoplata ").Append(_rapidShort)
                   .Append(", placil gracz ").Append(_rapidPlayerPays).Append(')');
                 sb.Append(" | NavalDLC Salvage z kasy konwoju: ").Append(_salvN).Append(", nalezne ").Append(_salvDue).Append(", zaplacone ").Append(_salvPaid).Append(" (niedoplata ").Append(_salvShort)
-                  .Append("); ShipwrightsHand - rekrut z niczego nie dany: ").Append(_handN).Append(" wjazdow, do ").Append(_handTroops).Append(" ludzi");
+                  .Append("); ShipwrightsHand - rekrut z niczego nie dany: ").Append(_handN).Append(" wjazdow, do ").Append(_handTroops).Append(" ludzi")
+                  .Append("; ochotnik miasta (D5, ").Append(HandVolOn ? "tak" : "nie").Append("): wzieto ").Append(_handVolMen).Append(" ludzi przy ").Append(_handVolN)
+                  .Append(" wjazdach, bez ochotnika w miescie ").Append(_handVolNoVol).Append(", zablokowane (bitwa/oblezenie, pusta kiesa rodu, kraina bez wolnych rak, limity gry) ").Append(_handVolBlocked);
                 sb.Append(" | Veterinarian: kon ze wzorca nie dany ").Append(_vetGameOff).Append(" razy (zabitych konnych ").Append(_vetGameRiders).Append("); padle konie partii z perkiem - ranne, wrocily ")
                   .Append(_vetSaved).Append(", padly ").Append(_vetLost);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
@@ -531,6 +610,7 @@ namespace Armoury
             _insDisband = 0;
             _insN = _insShort = _rapidN = _rapidShort = _rapidPlayerPays = 0; _insDue = _insPaid = _rapidDue = _rapidPaid = 0;
             _salvN = _salvShort = _handN = _handTroops = 0; _salvDue = _salvPaid = 0;
+            _handVolN = _handVolMen = _handVolNoVol = _handVolBlocked = 0;
             _vetSaved = _vetLost = _vetGameOff = _vetGameRiders = 0;
             _stumbles = 0;
         }

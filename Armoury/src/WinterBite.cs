@@ -35,6 +35,7 @@ namespace Armoury
     {
         private static readonly TextObject _txtWinter = new TextObject("{=!}Winter");
         private static readonly TextObject _txtHorses = new TextObject("{=!}Horses eat fodder in winter");   // E4/1
+        private static readonly TextObject _txtFodder = new TextObject("{=!}Animals eat fodder");             // D8: pasza poza zima
         private static int _lastSeason = -1;
 
         internal static bool WinterNow()
@@ -190,7 +191,17 @@ namespace Armoury
             {
                 if (FoodChain.BaseFromChain(__instance)) return;
                 var s = Settings.Current;
-                if (s == null || !WinterNow() || party == null) return;
+                if (s == null || party == null) return;
+                if (!WinterNow())
+                {
+                    // D8 (Jeff 14.11 "D8 - a"): zwierzeta jedza pasze przez caly rok - poza zima FodderOutsideWinterShare pelnej paszy (ta sama regula HorseFeed:
+                    // step bez paszy, na pustyni i w sniegu tylko roznica ponad pasze BK)
+                    if (!WinterRealm.YearOn) return;
+                    int yWhy, yRiders, yHerd; float yNeed, yBk;
+                    float yFeed = WinterRealm.HorseFeed(party, 1f, false, out yWhy, out yNeed, out yBk, out yRiders, out yHerd);
+                    if (yFeed > 0f) __result.Add(-yFeed, _txtFodder);
+                    return;
+                }
                 float realm = WinterRealm.OfParty(party);
                 int why, riders, herd; float need, bk;
                 float horse = WinterRealm.HorseFeed(party, realm, out why, out need, out bk, out riders, out herd);   // na pustyni / w sniegu przy paszy BK - tylko roznica

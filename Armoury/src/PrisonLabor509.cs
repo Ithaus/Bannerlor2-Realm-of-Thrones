@@ -38,6 +38,14 @@ namespace Armoury
     ///    DefaultSettlementFoodModel.CalculateTownFoodStocksChange (BK wola baze jawnie, ROT przekazuje dalej - jak Famine/PeopleMarket) - pozycja "Prisoners"
     ///    = -(jency x DungeonPrisonerFoodShare) / NumberOfMenOnGarrisonToEatOneFood (gra: jeniec w partii je pol porcji - 0.5; zaloga 1/20).
     ///    Zywnosc z zapasow osady (Food), jak zaloga - przy braku BK dokupuje z targu (EconomyPatches), oblezenie bez dostaw (SiegeWalls2 - postfiks Last po nas).
+    ///  - GLOD (D3, Jeff 14.11: "D3 - tak, pol porcji"; PERKI-DECYZJE.md: "glod oslabia prace; smierc/ucieczki - zgodnie z propozycja"; tylko przy DungeonPrisonersEat -
+    ///    jency jedza z tych samych zapasow, wiec gloduja razem z nimi): twierdza z Food 0 (gra Settlement.IsStarving) - (a) jency pracuja
+    ///    PrisonLaborHungryWorkPercent (50%) zwyklej premii (Share - jedna liczba dla punktow, dymka i wypadkow); (b) po tygodniu laski (PrisonHungerGraceDays 7
+    ///    kolejnych dob glodu - ta sama laska co glod zalogi GL SiegeWalls2.SiegeStarveGraceDays) co dobe ginie PrisonHungerDeathPercent (5%, jak
+    ///    SiegeStarveLossPercent zalogi) szeregowych jencow lochu (najpierw ranni; bez bohaterow - gra ich nie glodzi, bez Innych - nie jedza): zdjeci z lochu,
+    ///    ksiega ludzi FDieHunger, komunikat dla lochu gracza; (c) ucieczek z glodu NIE ma (propozycja 509 pkt 4: praca i loch bez nowych ucieczek - mury
+    ///    i straz te same; ucieczka przez mur GL dotyczy zalogi oblezonej twierdzy, nie jencow). Licznik dob glodu - stan sesji (slownik osad, czyszczony
+    ///    przy nowej kampanii); po wczytaniu zapisu laska liczy sie od nowa (najwyzej tydzien zwloki, bez zapisu).
     /// Ekonomia: praca jencow to prawdziwa praca (wiecej punktow z tych samych pieniedzy pana), oplacona jedzeniem osady - nic z niczego, bez zlota.
     /// Potkniecia liczone (Interlocked), blad do logu raz na miejsce - bez globalnego wylacznika. Nic co klatke (postfiksy modeli - tylko petla po rosterze lochu).
     /// Linie: "Praca jencow (509): start sesji ..." i co dobe "Praca jencow (509): dzien N ...".
@@ -55,6 +63,10 @@ namespace Armoury
         // liczniki doby (blok dobowy, watek glowny)
         private static int _dSt, _dStPerk, _dWorkers, _dInjured, _dDead, _dEaters, _dEatSt;
         private static double _dPctSum, _dFood;
+        // D3: glod lochu - kolejne doby glodu twierdzy (StringId osady -> doby; stan sesji, czyszczony przy nowej kampanii) i liczniki doby
+        private static readonly System.Collections.Generic.Dictionary<string, int> _hungerDays = new System.Collections.Generic.Dictionary<string, int>();
+        private static Campaign _hungerCamp;
+        private static int _dHungrySt, _dHungryGrace, _dHungryWork, _dHungerDead;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.PrisonLabor; } }
         internal static bool FoodOn { get { var s = Settings.Current; return s != null && s.DungeonPrisonersEat; } }
@@ -107,9 +119,19 @@ namespace Armoury
                 perk = PerkGov(town);
                 float per = Math.Max(0f, perk ? s.PrisonLaborPercentForcedLabor : s.PrisonLaborPercentPerPrisoner);
                 float pct = Math.Min(Math.Max(0f, s.PrisonLaborMaxPercent), workers * per) / 100f;
+                pct *= HungerWork(town);   // D3: glodni jency (Food 0 przy DungeonPrisonersEat) pracuja slabiej - jedna liczba dla punktow, dymka i wypadkow
                 return pct > 0f && !float.IsNaN(pct) && !float.IsInfinity(pct) ? pct : 0f;
             }
             catch (Exception e) { Stumble("Share", e); return 0f; }
+        }
+
+        /// <summary>D3: mnoznik pracy jencow twierdzy - 1, a przy glodzie (DungeonPrisonersEat i Food 0, gra Settlement.IsStarving) PrisonLaborHungryWorkPercent / 100. Czyste.</summary>
+        internal static float HungerWork(Town town)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.DungeonPrisonersEat || town == null || town.Settlement == null || !town.Settlement.IsStarving) return 1f;
+            float f = s.PrisonLaborHungryWorkPercent / 100f;
+            return float.IsNaN(f) ? 1f : Math.Max(0f, Math.Min(1f, f));
         }
 
         /// <summary>Punkty jencow do podstawy (pana + przyspieszenie zlotem) osady objetej rozliczeniem - wolane z BuildFunding.EngExtra (liniowe w podstawie). Czyste.</summary>
@@ -228,10 +250,82 @@ namespace Armoury
                 Log.Info(P + "start sesji | Prison Labor " + (s.PrisonLabor ? "tak" : "nie") + ": robotnik +" + s.PrisonLaborPercentPerPrisoner.ToString("0.###", inv) + "% punktow doby (ForcedLabor zarzadcy na miejscu +"
                          + s.PrisonLaborPercentForcedLabor.ToString("0.###", inv) + "%), najwyzej +" + s.PrisonLaborMaxPercent.ToString("0", inv) + "%; rana " + s.PrisonLaborInjuryPercent.ToString("0.###", inv)
                          + "%/dobe, smierc " + s.PrisonLaborDeathPercent.ToString("0.####", inv) + "%/dobe na robotnika | Dungeon Prisoners Eat " + (s.DungeonPrisonersEat ? "tak" : "nie")
-                         + " (jeniec x" + s.DungeonPrisonerFoodShare.ToString("0.##", inv) + " porcji zalogi), postfiks jedzenia " + _note + " | perki budowy zarzadcy (Perk Build Speed On Paid Work) "
+                         + " (jeniec x" + s.DungeonPrisonerFoodShare.ToString("0.##", inv) + " porcji zalogi), postfiks jedzenia " + _note
+                         + " | glod lochu (D3, przy Food 0): praca x" + HungerShareText(s) + ", po " + Math.Max(0, s.PrisonHungerGraceDays) + " dobach laski umiera "
+                         + s.PrisonHungerDeathPercent.ToString("0.##", inv) + "%/dobe szeregowych jencow, ucieczek z glodu brak | perki budowy zarzadcy (Perk Build Speed On Paid Work) "
                          + (s.PerkBuildSpeedOnPaidWork ? "tak" : "nie") + ", Architectural Commissions z kasy osady " + (s.ArchitecturalCommissionsTownPays ? "tak" : "nie") + " (" + Perk509.Note + ").");
             }
             catch { }
+        }
+
+        private static string HungerShareText(Settings s)
+        {
+            float f = s.PrisonLaborHungryWorkPercent / 100f;
+            return (float.IsNaN(f) ? 1f : Math.Max(0f, Math.Min(1f, f))).ToString("0.##", CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>D3: szeregowi jency lochu, ktorzy moga umrzec z glodu (bez bohaterow i Innych; zdrowi i ranni). Czyste.</summary>
+        private static int Starvable(TroopRoster pr)
+        {
+            int n = 0;
+            for (int i = 0; i < pr.Count; i++)
+            {
+                var ch = pr.GetCharacterAtIndex(i);
+                if (ch == null || ch.IsHero || PeopleBook.IsWight(ch)) continue;
+                n += pr.GetElementNumber(i);
+            }
+            return n;
+        }
+
+        /// <summary>D3: zgon z glodu - najpierw ranny (wazony liczba rannych), inaczej zdrowy (HitHealthy). false - nie bylo kogo.</summary>
+        private static bool StarveOne(TroopRoster roster)
+        {
+            int wounded = 0;
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var ch = roster.GetCharacterAtIndex(i);
+                if (ch == null || ch.IsHero || PeopleBook.IsWight(ch)) continue;
+                wounded += roster.GetElementWoundedNumber(i);
+            }
+            if (wounded > 0)
+            {
+                int pick = MBRandom.RandomInt(wounded);
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var ch = roster.GetCharacterAtIndex(i);
+                    if (ch == null || ch.IsHero || PeopleBook.IsWight(ch)) continue;
+                    int k = roster.GetElementWoundedNumber(i);
+                    if (k <= 0) continue;
+                    if (pick >= k) { pick -= k; continue; }
+                    roster.AddToCounts(ch, -1, false, -1);
+                    return true;
+                }
+            }
+            return HitHealthy(roster, true) != null;
+        }
+
+        /// <summary>D3 (blok doby, osada st z lochem): licznik kolejnych dob glodu i zgony po tygodniu laski. Wolane tylko przy DungeonPrisonersEat.</summary>
+        private static void HungerDay(Settlement st, Settings s)
+        {
+            string id = st.StringId ?? "";
+            var pr = st.Party != null ? st.Party.PrisonRoster : null;
+            if (!st.IsStarving || pr == null || Starvable(pr) <= 0) { _hungerDays.Remove(id); return; }
+            int days;
+            _hungerDays.TryGetValue(id, out days);
+            days++;
+            _hungerDays[id] = days;
+            _dHungrySt++;
+            if (days <= Math.Max(0, s.PrisonHungerGraceDays)) { _dHungryGrace++; return; }
+            int regs = Starvable(pr);
+            float pct = float.IsNaN(s.PrisonHungerDeathPercent) ? 0f : Math.Max(0f, Math.Min(100f, s.PrisonHungerDeathPercent));
+            int die = Math.Min(regs, MBRandom.RoundRandomized(regs * pct / 100f));
+            int dead = 0;
+            for (int n = 0; n < die; n++) { if (!StarveOne(pr)) break; dead++; }
+            if (dead <= 0) return;
+            try { PeopleBook.DieShares(PeopleBook.Take(pr, dead, PeopleBook.FDieHunger), PeopleBook.FDieHunger); } catch (Exception e) { Stumble("PeopleBook(glod)", e); }
+            _dHungerDead += dead;
+            if (st.OwnerClan == Clan.PlayerClan)
+                Log.Player((dead == 1 ? "A prisoner" : dead + " prisoners") + " starved to death in the dungeon of " + st.Name + " - its food stores are empty.", true);
         }
 
         // ------------------------------------------------------------ doba
@@ -259,8 +353,11 @@ namespace Armoury
         internal static void Daily()
         {
             _dSt = _dStPerk = _dWorkers = _dInjured = _dDead = _dEaters = _dEatSt = 0; _dPctSum = _dFood = 0;
+            _dHungrySt = _dHungryGrace = _dHungryWork = _dHungerDead = 0;
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
+            if (!ReferenceEquals(_hungerCamp, Campaign.Current)) { _hungerDays.Clear(); _hungerCamp = Campaign.Current; }   // D3: stan jednej kampanii nie przecieka do drugiej
+            if (!s.DungeonPrisonersEat || !_foodWired) _hungerDays.Clear();                                                // D3: jency nie jedza - nie gloduja
             foreach (var st in Settlement.All)
             {
                 if (st == null || !st.IsFortification || st.Town == null) continue;
@@ -271,6 +368,11 @@ namespace Armoury
                     float eat = EatOf(town, out eaters);
                     if (eat > 0f && _foodWired) { _dEatSt++; _dEaters += eaters; _dFood += eat; }
                     if (st.Party == null) continue;
+                    // D3: glod lochu - doby glodu i zgony po tygodniu laski (tylko gdy jency jedza z zapasow twierdzy); praca ponizej (Share) juz oslabiona
+                    if (s.DungeonPrisonersEat && _foodWired)
+                    {
+                        try { HungerDay(st, s); } catch (Exception e) { Stumble("HungerDay", e); }
+                    }
                     int w; bool pk;
                     float pct = Share(town, out w, out pk);   // bitwa, oblezenie, !PaidConstruction - 0 (Share)
                     if (!(pct > 0f) || w <= 0) continue;
@@ -278,6 +380,7 @@ namespace Armoury
                     // albo moc gry w lennie bez rozliczenia); pan nic nie oplacil = robot nie ma = ani premii, ani ran, ani smierci
                     if (!(BuildFunding.LaborBase(town) > 0f)) continue;
                     _dSt++; _dWorkers += w; _dPctSum += pct; if (pk) _dStPerk++;
+                    if (HungerWork(town) < 1f) _dHungryWork++;   // D3: twierdza z glodnymi robotnikami
                     var pr = st.Party.PrisonRoster;
                     int hurt = Math.Min(w, MBRandom.RoundRandomized(w * Math.Max(0f, s.PrisonLaborInjuryPercent) / 100f));
                     int die = Math.Min(w - hurt, MBRandom.RoundRandomized(w * Math.Max(0f, s.PrisonLaborDeathPercent) / 100f));
@@ -302,7 +405,9 @@ namespace Armoury
                 Log.Info(P + "dzien " + (int)CampaignTime.Now.ToDays + " | Prison Labor " + (s.PrisonLabor ? "tak" : "nie") + ": twierdz z budowa i pracujacymi jencami " + _dSt
                          + " (z ForcedLabor zarzadcy " + _dStPerk + "), robotnikow " + _dWorkers + ", srednia premia +" + (_dSt > 0 ? (100.0 * _dPctSum / _dSt).ToString("0.0", inv) : "0.0")
                          + "% punktow doby; rannych przy pracy " + _dInjured + ", zmarlych " + _dDead + " | jedzenie lochow (Dungeon Prisoners Eat " + (s.DungeonPrisonersEat && _foodWired ? "tak" : "nie")
-                         + "): twierdz " + _dEatSt + ", jencow " + _dEaters + ", zjadaja " + _dFood.ToString("0.0", inv) + " Food/dobe | Perk509: " + Perk509.DayLine() + "; potkniecia " + err + ".");
+                         + "): twierdz " + _dEatSt + ", jencow " + _dEaters + ", zjadaja " + _dFood.ToString("0.0", inv) + " Food/dobe"
+                         + " | glod lochu (D3): twierdz z Food 0 i jencami " + _dHungrySt + " (w tygodniu laski " + _dHungryGrace + "), z glodnymi robotnikami (praca x" + HungerShareText(s) + ") " + _dHungryWork
+                         + ", zmarlych z glodu " + _dHungerDead + " | Perk509: " + Perk509.DayLine() + "; potkniecia " + err + ".");
             }
             catch (Exception e) { Log.Error("PrisonLabor509.Daily(linia)", e); }
         }

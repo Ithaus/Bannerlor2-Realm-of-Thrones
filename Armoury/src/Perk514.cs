@@ -403,7 +403,7 @@ namespace Armoury
         /// <summary>BKRelationsModel.CalculateModifiers(relacje wlasciciela, cel): cel relacji +3 dla pary "obcy wladca - posiadacz perka" Z OBU STRON
         /// (recenzja 514: relacja jest jedna na pare, a BK dryfuje ja z obu stron - z jednej strony +3 dawalo ok. +0.5, bo posiadacz perka sciagal ja
         /// z powrotem do swojego celu; jego HeroRelations obejmuje przywodcow wszystkich krolestw). 1) wlasciciel = wladca, cel = obcy posiadacz perka;
-        /// 2) wlasciciel = posiadacz perka, cel = obcy wladca. BK nie przesuwa relacji z GRACZEM - u gracza perk nie zmienia nic.</summary>
+        /// 2) wlasciciel = posiadacz perka, cel = obcy wladca. BK nie przesuwa relacji z GRACZEM - u gracza dziala D14 (TiesWeekly: +1 na tydzien do celu BK).</summary>
         public static void RelModPost(object __0, Hero __1, object __result)
         {
             if (!CourtOn || PDipTies == null || __0 == null || __1 == null || _relHero == null || _relModCtor == null) return;
@@ -423,6 +423,76 @@ namespace Armoury
                 Interlocked.Increment(ref dRelMod);
             }
             catch (Exception e) { Stumble("RelModPost", e); }
+        }
+
+        // ============================================================ D14: DiplomaticTies gracza - +1 relacji z obcymi wladcami raz w tygodniu
+        // Jeff 14.11 "D14 - tak": BK HeroRelations.UpdateRelations pomija Hero.MainHero (relacje z graczem nie dryfuja do celu), wiec cel +3 z RelModPost
+        // nic graczowi nie dawal. Teraz: raz na 7 dob (doba % 7 == 0), gdy GRACZ ma perk - kazdy wladca obcego krolestwa (Kingdom.All, nie wyeliminowane,
+        // nie krolestwo gracza) +1 relacji z graczem, ale tylko gdy relacja jest PONIZEJ celu BK tego wladcy wobec gracza (BKRelationsBehavior.GetRelations(wladca)
+        // .GetRelationsTarget(gracz) - ten sam cel, do ktorego BK dryfuje lordow, z +3 perka) - nigdy ponad cel. Bez zlota; relacja przez ChangeRelationAction (jak BK).
+        private static MethodInfo _relGetBeh, _relGetRels, _relTarget;
+        private static bool _relTried;
+        private static object _relBeh;
+        private static Campaign _relBehCamp;
+        private static int _sTiesUp, _sTiesAtTarget;   // licznik ostatniego tygodnia (linia doby)
+        private static string _tiesLast = "-";
+
+        private static object RelBehavior()
+        {
+            if (!_relTried)
+            {
+                _relTried = true;
+                try
+                {
+                    var tBeh = AccessTools.TypeByName("BannerKings.Behaviours.Relations.BKRelationsBehavior");
+                    var tHr = AccessTools.TypeByName("BannerKings.Behaviours.Relations.HeroRelations");
+                    var mGet = typeof(Campaign).GetMethod("GetCampaignBehavior", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+                    _relGetBeh = tBeh != null && mGet != null ? mGet.MakeGenericMethod(tBeh) : null;
+                    _relGetRels = tBeh != null ? AccessTools.Method(tBeh, "GetRelations", new[] { typeof(Hero) }) : null;
+                    _relTarget = tHr != null ? AccessTools.Method(tHr, "GetRelationsTarget", new[] { typeof(Hero) }) : null;
+                }
+                catch (Exception e) { Stumble("RelBehavior(odbicie)", e); }
+            }
+            if (_relGetBeh == null || _relGetRels == null || _relTarget == null || Campaign.Current == null) return null;
+            if (!ReferenceEquals(_relBehCamp, Campaign.Current)) { _relBeh = _relGetBeh.Invoke(Campaign.Current, null); _relBehCamp = Campaign.Current; }
+            return _relBeh;
+        }
+
+        /// <summary>D14: blok doby (Daily) - raz na 7 dob. Klucz DiplomaticTiesPlayerWeekly i CourtOn. Kazdy wladca we wlasnym try (potkniecia, bez wylacznika).</summary>
+        private static void TiesWeekly(int day)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.DiplomaticTiesPlayerWeekly || !CourtOn || PDipTies == null || day % 7 != 0) return;
+            var me = Hero.MainHero;
+            if (me == null || !me.IsAlive || !SkillPerk(me, PDipTies)) return;
+            var beh = RelBehavior();
+            if (beh == null) { _tiesLast = "dzien " + day + ": BRAK odbicia BK (BKRelationsBehavior / HeroRelations.GetRelationsTarget)"; return; }
+            var myKingdom = me.Clan != null ? me.Clan.Kingdom : null;
+            int up = 0, atTarget = 0, rulers = 0;
+            var names = new List<string>();
+            foreach (var k in Kingdom.All)
+            {
+                try
+                {
+                    if (k == null || k.IsEliminated || k == myKingdom) continue;
+                    var ruler = k.Leader;
+                    if (ruler == null || !ruler.IsAlive || ruler == me) continue;
+                    rulers++;
+                    var rels = _relGetRels.Invoke(beh, new object[] { ruler });
+                    if (rels == null) continue;
+                    int target = (int)_relTarget.Invoke(rels, new object[] { me });
+                    int now = ruler.GetRelation(me);
+                    if (now >= target) { atTarget++; continue; }
+                    TaleWorlds.CampaignSystem.Actions.ChangeRelationAction.ApplyRelationChangeBetweenHeroes(ruler, me, 1, false);
+                    up++;
+                    if (names.Count < 5) names.Add(ruler.Name + " " + now + "->" + ruler.GetRelation(me) + " (cel " + target + ")");
+                }
+                catch (Exception e) { Stumble("TiesWeekly(wladca)", e); }
+            }
+            _sTiesUp += up; _sTiesAtTarget += atTarget;
+            _tiesLast = "dzien " + day + ": wladcow obcych " + rulers + ", +1 relacji " + up + ", juz na celu BK albo wyzej " + atTarget + (names.Count > 0 ? " (" + string.Join(", ", names.ToArray()) + ")" : "");
+            if (up > 0) Log.Player("Diplomatic Ties: your standing with " + up + (up == 1 ? " foreign ruler" : " foreign rulers") + " rose a little this week.", false);
+            Log.Info(P + "D14 Diplomatic Ties gracza (tydzien): " + _tiesLast + " | sesja: +1 razem " + _sTiesUp + ".");
         }
 
         // ============================================================ 77 PeerReview, Polyglot
@@ -608,6 +678,7 @@ namespace Armoury
         /// i co kilka tygodni sciaga relacje do swojego celu (w nim BK juz ma druga premie Lithurgy). Trwale tylko u gracza (BK pomija MainHero).</summary>
         internal static void Daily(int day)
         {
+            try { TiesWeekly(day); } catch (Exception e) { Stumble("Daily(D14 Ties)", e); }   // D14: DiplomaticTies gracza - raz w tygodniu
             if (CourtOn && PLith != null)
             {
                 try

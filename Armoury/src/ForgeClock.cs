@@ -172,9 +172,10 @@ namespace Armoury
                 if (!found) return;
                 int spent = Math.Max(0, _stam - Forge.Stamina(_hero));
                 bag.AddToCounts(fresh, -1);
-                float h = WorkHours(_item, 1, HoursOf(spent));   // C5: dni kowala z warsztatu AI (wylaczone - godziny z ekranu BK)
+                int spentHours = Perk511.HoursStamina(spent, _hero);   // D7: godziny lawy z PracticalSmith o 25% krocej (stamina pobrana przez BK dalej o polowe)
+                float h = WorkHours(_item, 1, HoursOf(spentHours));   // C5: dni kowala z warsztatu AI (wylaczone - godziny z ekranu BK)
                 Queue(_item, fresh.ItemModifier, 1, h);
-                NoteQueued(_item, 1, h, HoursOf(spent));
+                NoteQueued(_item, 1, h, HoursOf(spent));   // D7: "dawne" godziny = miara BK (stamina pobrana / 6) - SkipBkWait odejmuje je od odsiadki BK
             }
             catch (Exception e) { Log.Error("ForgeClock.CraftPost", e); }
             finally { _item = null; }

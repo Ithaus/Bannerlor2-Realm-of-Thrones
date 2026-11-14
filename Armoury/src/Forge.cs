@@ -666,9 +666,10 @@ namespace Armoury
                 if (ForgeClock.On && TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement != null)
                 {
                     // wpis 83: na lawe kowala, wydanie po godzinach z ekranu BK (stamina / 6)
-                    float fh = ForgeClock.WorkHours(item, made, ForgeClock.HoursOf(stamPerk));   // C5: dni kowala z warsztatu AI x sztuk serii (wylaczone - stamina / 6; 511: stamina po perkach, jak zakladka BK)
+                    int stamHours = Perk511.HoursStamina(stamPerk, hero);   // D7: godziny lawy z PracticalSmith o 25% krocej (stamina dalej o polowe)
+                    float fh = ForgeClock.WorkHours(item, made, ForgeClock.HoursOf(stamHours));   // C5: dni kowala z warsztatu AI x sztuk serii (wylaczone - stamina / 6; 511: stamina po perkach, jak zakladka BK)
                     ForgeClock.Queue(item, quality, made, fh);
-                    ForgeClock.NoteQueued(item, made, fh, ForgeClock.HoursOf(stamPerk));
+                    ForgeClock.NoteQueued(item, made, fh, ForgeClock.HoursOf(stamPerk));   // D7: "dawne" godziny = stamina pobrana / 6 (licznik _bkQueued jak dotad)
                     if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId)) ArmouryBehavior.Legends.Add(item.StringId);
                     RangedLore.OnCrafted(item, hero);   // m96-wzory: losowanie wedlug reki kowala przy kowadle
                     SmithXp.Tag(SmithXpRule.SourceOf(item));   // 305d

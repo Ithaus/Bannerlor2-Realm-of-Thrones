@@ -38,7 +38,7 @@ namespace Armoury
     ///    przypiac, pominiete (decyzja Jeffa).
     /// D. 33 BREEDER: prefiks na latce ROT (ROT.HarmonyPatches.Dragon.FoodConsumptionBehaviorPatch.Prefix) - zamiast niej: tylko na ladzie, partia nie glodna,
     ///    co najmniej para TEGO SAMEGO gatunku (kon, wielblad, owca, krowa, swinia...; muly bezplodne), bez smokow, slonii, mamutow, rydwanow i unikatow;
-    ///    mlode = sztuka rodzicow; mlode jedza jak reszta stada (WinterRealm.AnimalNeed liczy kazde zwierze w taborze).
+    ///    mlode = sztuka rodzicow; mlode jedza jak reszta stada (WinterRealm.AnimalNeed liczy kazde zwierze w taborze; D8 - przez caly rok, AnimalsEatAllYear).
     /// E. 44 BEASTWHISPERER: prefiks na ROT.CampaignBehaviors.ROTDragonBehavior.DailyTickParty - zamiast niej: ten sam teren (step, rownina) i perk zwiadowcy,
     ///    szansa x BeastWhispererChanceFactor, tylko zwykle konie wierzchowe i juczne (bez rumakow bojowych, egzotyki, smokow, unikatow, rzeczy nie na handel).
     /// Bledy liczone (potkniecia), bez wylacznika. Stan: tylko liczniki doby. Linie: "Perki amunicji i zwierzat (512): start sesji" i "... dzien N".

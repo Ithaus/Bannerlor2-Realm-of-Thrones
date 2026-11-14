@@ -335,12 +335,39 @@ namespace Armoury
         /// tylko roznica ponad nia (w zimie pasza = wieksza z E4/1 i BK).</summary>
         internal static float HorseFeed(MobileParty party, float realm, out int why, out float need, out float bk, out int riders, out int herd)
         {
+            return HorseFeed(party, realm, true, out why, out need, out bk, out riders, out herd);
+        }
+
+        /// <summary>D8 (Jeff 14.11 "D8 - a": zwierzeta jedza pasze przez caly rok): udzial pelnej paszy poza zima (AnimalsEatAllYear, FodderOutsideWinterShare); 0 - wylaczone.</summary>
+        internal static float YearShare
+        {
+            get
+            {
+                var s = Settings.Current;
+                if (s == null || !s.AnimalsEatAllYear || float.IsNaN(s.FodderOutsideWinterShare)) return 0f;
+                return MBMath.ClampFloat(s.FodderOutsideWinterShare, 0f, 1f);
+            }
+        }
+
+        internal static bool YearOn { get { return YearShare > 0f; } }
+
+        /// <summary>Jak wyzej; winter = false - pora poza zima (D8): udzial YearShare bez krainy. W zimie udzial = wiekszy z (WinterHorseFeedShare x kraina) i YearShare -
+        /// zima nigdy lzejsza niz reszta roku (kraina bez zimy / ciepla placi co najmniej roczna pasze). Przy AnimalsEatAllYear wylaczonym - jak dotad.</summary>
+        internal static float HorseFeed(MobileParty party, float realm, bool winter, out int why, out float need, out float bk, out int riders, out int herd)
+        {
             why = WhyOff; need = 0f; bk = 0f; riders = 0; herd = 0;
             var s = Settings.Current;
-            if (s == null || !s.WinterHorsesEat || party == null) return 0f;
-            float share = MBMath.ClampFloat(s.WinterHorseFeedShare, 0f, 1f);
+            if (s == null || party == null) return 0f;
+            float year = YearShare;
+            float share = 0f;
+            if (winter && s.WinterHorsesEat)
+            {
+                float ws = MBMath.ClampFloat(s.WinterHorseFeedShare, 0f, 1f);
+                if (ws > 0f && realm <= 0f && year <= 0f) { why = WhyNoRealm; return 0f; }
+                share = ws * Math.Max(0f, realm);
+            }
+            if (year > share) share = year;   // D8: pasza roczna - poza zima jedyna, w zimie dolna granica
             if (share <= 0f) return 0f;
-            if (realm <= 0f) { why = WhyNoRealm; return 0f; }
             try
             {
                 var f = FeedInfo();
@@ -350,7 +377,7 @@ namespace Armoury
                 int bkAt = f.BkFeeds ? BkFeedAt(party, terrain) : 0;   // (najpierw teren pod partia, potem pogoda w miejscu partii)
                 need = AnimalNeed(party, f, false, out riders, out herd);
                 if (need <= 0f) { why = WhyNoAnimals; return 0f; }
-                float own = need * share * realm;
+                float own = need * share;
                 if (bkAt == 0) { why = WhyFed; return own; }
                 // tam karmi BK (w CalculateDailyFoodConsumptionf, ta sama ExplainedNumber co nasza baza) - doplacamy tylko roznice;
                 // BkNeed idzie przez BkAnimalPostfix - przy BkAnimalFeedPerHead to juz pasza po glowie (wariant (a)), bez podwojnej paszy;
@@ -474,7 +501,14 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("FeedText", e); }
-            if (!WinterBite.WinterNow()) { Interlocked.Exchange(ref _stumblesDay, 0); return; }
+            if (!WinterBite.WinterNow())
+            {
+                // D8: poza zima linia paszy rocznej (tylko gdy klucz czynny i latka jedzenia WinterBite stoi)
+                try { var s2 = Settings.Current; if (YearOn && s2 != null && s2.WinterBiteEnabled) Log.Info(YearLine()); }
+                catch (Exception e) { Stumble("YearLine", e); }
+                Interlocked.Exchange(ref _stumblesDay, 0);
+                return;
+            }
             try { Log.Info(Line()); }
             catch (Exception e) { Stumble("Line", e); }
             Interlocked.Exchange(ref _stumblesDay, 0);
@@ -589,5 +623,36 @@ namespace Armoury
         }
 
         private static string Pct(double sum, int n) { return n > 0 ? (100.0 * sum / n).ToString("0.0", Inv) + "%" : "-"; }
+
+        /// <summary>D8: linia doby poza zima - pasza roczna (ten sam rachunek co WinterBite.FoodPostfix poza zima, stan w chwili odczytu).</summary>
+        private static string YearLine()
+        {
+            long t0 = Stopwatch.GetTimestamp();
+            var fm = Campaign.Current.Models.MobilePartyFoodConsumptionModel;
+            int eat = 0, fed = 0, fedPlayer = 0; long riders = 0, herd = 0;
+            double feed = 0, needFed = 0;
+            var why = new int[WhyCount];
+            foreach (var mp in MobileParty.All)
+            {
+                try
+                {
+                    if (mp == null || !mp.IsActive || fm == null || !fm.DoesPartyConsumeFood(mp)) continue;
+                    eat++;
+                    int w, r, h; float need, bkp;
+                    float x = HorseFeed(mp, 1f, false, out w, out need, out bkp, out r, out h);
+                    why[w]++;
+                    if (x <= 0f) continue;
+                    fed++; feed += x; needFed += need; riders += r; herd += h;
+                    if (mp == MobileParty.MainParty) fedPlayer++;
+                }
+                catch (Exception e) { Stumble("YearLine(partia)", e); }
+            }
+            return "Pasza przez caly rok (D8, Animals Eat All Year " + YearShare.ToString("0.00", Inv) + " pelnej paszy poza zima): dzien " + ((int)CampaignTime.Now.ToDays - 1)
+                   + " | partii jedzacych " + eat + ", z pasza " + fed + (fedPlayer > 0 ? " (w tym gracz)" : "") + " (konnych " + riders + ", zwierzat w taborach " + herd + "), +"
+                   + feed.ToString("0.0", Inv) + " jedzenia/d razem przed mnoznikami (pelna pasza tych partii " + needFed.ToString("0.0", Inv) + "/d)"
+                   + " | bez paszy: step " + why[WhySteppe] + ", pustynia (pasza BK nie mniejsza) " + why[WhyDesert] + ", snieg/zamiec (pasza BK nie mniejsza) " + why[WhySnow]
+                   + ", bez zwierzat " + why[WhyNoAnimals] + "; doplata roznicy ponad pasze BK: pustynia " + why[WhyTopDesert] + ", snieg/zamiec " + why[WhyTopSnow]
+                   + " | potkniecia dzis " + Volatile.Read(ref _stumblesDay) + " | czas " + ((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv) + " ms.";
+        }
     }
 }
