@@ -13,12 +13,16 @@ namespace Armoury
     /// i zjezdzie pogrzebu 407 (130), przed wetami 50 / 48 / 45 i przed Last (LordEscort, CrossingLaw, SiegeWalls2.ThinkPost, CanonWarWatch).
     ///
     /// Dotyczy: partia lorda AI (nie gracz, nie rod gracza), ktorej WODZ ma czynny wpis w ksiedze ran (Serious albo Grave).
+    /// 500-b E1 (Jeff 14.11 "tak ale tylko gdy ma to sens i jest szansa ze wygra"): obrona zagrozonej osady rodu tylko z szansa wygranej
+    /// (AiWounded500b.DefendOk: osada do AiWoundedDefendMaxHours h jazdy i zdrowi partii + partie polowe strony osady, bez garnizonu, >= AiWoundedDefendEdgePercent
+    /// x napastnicy); bez tego ta opcja -1 i partia jedzie do twierdzy. Inicjatywa takiej partii: Snap.Road - ta sama bramka szansy co postoj.
+    /// 500-b E2 (Jeff "tak"): po twierdzach rodu i frakcji - najblizsza twierdza krolestwa SOJUSZNICZEGO (Kingdom.AlliedKingdoms gry 1.4.8; BK MakeAlliance pusty).
     /// Pomija (zadnej zmiany ocen): armia, bitwa, oblezenie (oblega albo stoi w oblezonej osadzie), DoNotChangeBehavior, morze, glod, wodz czynnego
     /// oblezenia fabuly ROT (SiegePhantomLift.StoryLeaderOf), wodz potrzebny fabule (StoryGuard.Needed) na mniej niz 14 dni przed jego wydarzeniem.
     /// Dzialanie (wzor ArmsFirst.ThinkPostfix): opcje szukajace bitwy - oblezenie, szturm, rabunek, obrona cudzej osady, poscig / zaczepka partii, kazda opcja
-    /// zwolujaca armie - dostaja -1; obrona osady wlasnego rodu zostaje, a gdy jest ZAGROZONA (ArmsFirst.IsOwnDefend), partia nie dostaje wyjazdu.
-    /// Cel: partia stojaca w nieoblezonej twierdzy swojej frakcji zostaje w niej; inaczej najblizsza nieoblezona twierdza RODU, a gdy rod zadnej nie ma
-    /// (albo zadna nie ma drogi ladowej) - najblizsza twierdza frakcji. Ocena GoToSettlement (droga ladowa) = max(ArmsFirst.FloorScore, 1.1 x najlepsza inna
+    /// zwolujaca armie - dostaja -1; obrona osady wlasnego rodu zostaje, a gdy jest ZAGROZONA (ArmsFirst.IsOwnDefend) i jest szansa (E1), partia nie dostaje
+    /// wyjazdu. Cel: partia stojaca w nieoblezonej twierdzy swojej frakcji (albo sojusznika) zostaje w niej; inaczej najblizsza nieoblezona twierdza RODU,
+    /// a gdy rod zadnej nie ma (albo zadna nie ma drogi ladowej) - najblizsza twierdza frakcji, potem sojusznika (E2). Ocena GoToSettlement (droga ladowa) = max(ArmsFirst.FloorScore, 1.1 x najlepsza inna
     /// opcja po naszych -1); wyniku &lt;= -1 (cudza blokada) nie podnosimy, twierdza z taka blokada nie jest kandydatem. Cel trzymany 24 h (bez wahadla).
     /// 408-p: do ZAMKU tylko z zapasem jedzenia >= prog gry (12 dni) - inaczej w tej mysli bez wyjazdu (gra jedzie po zapasy); obrona osady rodu ze zwolaniem
     /// armii nie wstrzymuje wyjazdu; LordEscort 223 i IronSiege 334e pytaja RestingParty (bez dolaczania do armii, jazdy za silniejszym, zwolywania).
@@ -30,7 +34,7 @@ namespace Armoury
         private const int AiRoadChecks = 3;         // ile najblizszych twierdz sprawdzamy droga ladowa (model odleglosci)
         private const double AiHoldHours = 24.0;    // tyle godzin trzymamy raz wybrana twierdze
 
-        private sealed class AiPick { public Settlement Fort; public double H; public bool Own; }
+        private sealed class AiPick { public Settlement Fort; public double H; public byte Tier; }   // Tier: 0 rod, 1 frakcja, 2 sojusznik (E2)
 
         private static string _aiHook = "nie probowano";
         private static readonly Dictionary<MobileParty, AiPick> _aiPick = new Dictionary<MobileParty, AiPick>();
@@ -40,12 +44,13 @@ namespace Armoury
         private static readonly List<KeyValuePair<Settlement, float>> _aiCand = new List<KeyValuePair<Settlement, float>>(16);
         private static int _aiOrders, _aiInside, _aiOff, _aiNoFort, _aiOwnDef, _aiSea, _aiStarve, _aiStory, _aiNeed, _aiVeto, _aiSessOrders;
         private static int _aiFood;   // 408-p: bez wyjazdu do zamku - zapas jedzenia ponizej progu gry (partia najpierw kupuje w miescie / wsi)
+        private static int _aiDefLost, _aiAlly;   // E1: obrona osady rodu bez szansy -1; E2: cel u sojusznika
 
         private static void AiReset()
         {
             _aiPick.Clear(); _aiSaid.Clear(); _aiDay.Clear(); _aiCopy.Clear(); _aiCand.Clear();
             _aiOrders = _aiInside = _aiOff = _aiNoFort = _aiOwnDef = _aiSea = _aiStarve = _aiStory = _aiNeed = _aiVeto = _aiSessOrders = 0;
-            _aiFood = 0;
+            _aiFood = 0; _aiDefLost = _aiAlly = 0;
         }
 
         /// <summary>408-p: partia lorda AI, ktora regula 408 TERAZ prowadzi do twierdzy (klucze, wodz w ksiedze ran, nie rod gracza, nie armia, nie morze / glod,
@@ -53,7 +58,10 @@ namespace Armoury
         /// taka partia nie jest dolaczana do armii, nie jedzie za silniejszym i nie zwoluje armii - jedna zasada na rannego wodza. Watek glowny (mysl AI).</summary>
         internal static bool RestingParty(MobileParty party)
         {
-            if (_n == 0 || party == null) return false;
+            if (party == null) return false;
+            // 500-b: poturbowana partia w postoju albo w drodze do twierdzy - ta sama zasada (te same wyjatki morza i glodu co lozu nizej)
+            if (AiWounded500b.Resting(party) && !party.IsCurrentlyAtSea && !party.Party.IsStarving) return true;
+            if (_n == 0) return false;
             try
             {
                 if (!party.IsLordParty || party.IsMainParty || party.Army != null) return false;
@@ -94,7 +102,7 @@ namespace Armoury
         }
 
         /// <summary>Opcja szukajaca bitwy albo zwolujaca armie. Obrona osady wlasnego rodu zostaje (takze niezagrozonej - patrol przy swoich).</summary>
-        private static bool AiIsBattle(in AIBehaviorData d, Clan clan)
+        internal static bool AiIsBattle(in AIBehaviorData d, Clan clan)   // 500-b: ta sama lista opcji bitwy w ostroznosci (AiWounded500b.CautionPostfix)
         {
             if (d.WillGatherArmy) return true;
             switch (d.AiBehavior)
@@ -146,33 +154,74 @@ namespace Armoury
             return best;
         }
 
-        /// <summary>Twierdza spoczynku: ta, w ktorej partia stoi (swojej frakcji, bez oblezenia); inaczej najblizsza rodu, potem frakcji. Null = brak.</summary>
-        private static Settlement AiFort(MobileParty party, Clan clan, HashSet<Settlement> blocked, out bool own, out float road)
+        /// <summary>E2: twierdza "swoja" dla rannego - tej samej frakcji albo krolestwa sojuszniczego (Kingdom.IsAllyWith gry, bez wojny). Odczyt pol.</summary>
+        internal static bool FriendlyFort(Settlement st, IFaction f)
         {
-            own = false; road = 0f;
+            if (st == null || f == null || !st.IsFortification) return false;
+            var sf = st.MapFaction;
+            if (sf == null) return false;
+            if (sf == f) return true;
+            var k = f as Kingdom; var sk = sf as Kingdom;
+            return k != null && sk != null && !sk.IsEliminated && k.IsAllyWith(sk) && !f.IsAtWarWith(sk);
+        }
+
+        /// <summary>Twierdza spoczynku: ta, w ktorej partia stoi (swojej frakcji albo sojusznika, bez oblezenia); inaczej najblizsza rodu, potem frakcji,
+        /// potem sojusznika (E2: z najblizszej twierdzy kazdego krolestwa sojuszniczego ta o krotszej drodze modelu gry). tier 0 rod, 1 frakcja, 2 sojusznik. Null = brak.</summary>
+        private static Settlement AiFort(MobileParty party, Clan clan, HashSet<Settlement> blocked, out byte tier, out float road)
+        {
+            tier = 1; road = 0f;
             var f = party.MapFaction;
             if (f == null || clan == null) return null;
             var at = party.CurrentSettlement;
-            if (at != null && at.IsFortification && !at.IsUnderSiege && at.MapFaction == f && (blocked == null || !blocked.Contains(at)))
-            { own = at.OwnerClan == clan; return at; }
+            if (at != null && !at.IsUnderSiege && FriendlyFort(at, f) && (blocked == null || !blocked.Contains(at)))
+            { tier = at.OwnerClan == clan ? (byte)0 : at.MapFaction == f ? (byte)1 : (byte)2; return at; }
             double now = CampaignTime.Now.ToHours;
             AiPick pick;
-            if (_aiPick.TryGetValue(party, out pick) && pick.Fort != null && now - pick.H < AiHoldHours && !pick.Fort.IsUnderSiege && pick.Fort.MapFaction == f
+            if (_aiPick.TryGetValue(party, out pick) && pick.Fort != null && now - pick.H < AiHoldHours && !pick.Fort.IsUnderSiege && FriendlyFort(pick.Fort, f)
                 && (blocked == null || !blocked.Contains(pick.Fort)))
-            { own = pick.Own; road = -1f; return pick.Fort; }
+            { tier = pick.Tier; road = -1f; return pick.Fort; }
             var bw = ArmsFirst.Beyond();
             bool pBeyond = false;
             if (bw != null) { try { pBeyond = bw(party.GetPosition2D); } catch { bw = null; } }
             var fort = AiNearest(party, clan.Fiefs, f, blocked, bw, pBeyond, out road);
-            own = fort != null;
-            if (fort == null)
+            tier = 0;
+            var k = f as Kingdom;
+            if (fort == null && k != null) { fort = AiNearest(party, k.Fiefs, f, blocked, bw, pBeyond, out road); tier = 1; }
+            if (fort == null && k != null && k.AlliedKingdoms != null && k.AlliedKingdoms.Count > 0)
             {
-                var k = f as Kingdom;
-                if (k != null) fort = AiNearest(party, k.Fiefs, f, blocked, bw, pBeyond, out road);
+                // E2: sojusznik - najblizsza twierdza kazdego krolestwa sojuszniczego (AiNearest porownuje z MapFaction sojusznika), wygrywa krotsza droga
+                float bestRoad = float.MaxValue;
+                var allies = k.AlliedKingdoms;
+                for (int i = 0; i < allies.Count; i++)
+                {
+                    var ak = allies[i];
+                    if (ak == null || ak == k || ak.IsEliminated || f.IsAtWarWith(ak)) continue;
+                    float r;
+                    var cand = AiNearest(party, ak.Fiefs, ak, blocked, bw, pBeyond, out r);
+                    if (cand != null && r < bestRoad) { bestRoad = r; fort = cand; }
+                }
+                if (fort != null) { road = bestRoad; tier = 2; }
             }
             if (fort == null) { _aiPick.Remove(party); return null; }
             if (pick == null) _aiPick[party] = pick = new AiPick();
-            pick.Fort = fort; pick.H = now; pick.Own = own;
+            pick.Fort = fort; pick.H = now; pick.Tier = tier;
+            return fort;
+        }
+
+        /// <summary>500-b (recenzja): ta sama twierdza, ktora potem wybierze 408 (AiFort: stoi w swojej, inaczej najblizsza RODU, potem FRAKCJI, potem SOJUSZNIKA; do AiRoadChecks
+        /// kandydatow z droga ladowa; wybor trzymany AiHoldHours w _aiPick - wiec 408 pojedzie do tej samej). road = droga modelu gry (0 = stoi w niej).
+        /// Bez listy blokad 408 (cudze -1 zna dopiero mysl) - rzadka roznica, 408 wtedy wybiera inna. Watek glowny. Moze rzucic (wolajacy liczy potkniecia).</summary>
+        internal static Settlement AiRestFort(MobileParty party, out byte tier, out float road)
+        {
+            tier = 1; road = -1f;
+            if (party == null) return null;
+            var fort = AiFort(party, party.ActualClan, null, out tier, out road);
+            if (fort != null && road < 0f)
+            {
+                // wybor z pamieci (road -1) - droga od nowa
+                float lr;
+                road = Campaign.Current.Models.MapDistanceModel.GetDistance(party, fort, false, MobileParty.NavigationType.Default, out lr);
+            }
             return fort;
         }
 
@@ -180,15 +229,18 @@ namespace Armoury
         /// (regula w opisie pliku). Pusta ksiega = jedno porownanie. Nie rzuca.</summary>
         public static void AiRestPostfix(MobileParty party, PartyThinkParams partyThinkParams)
         {
-            if (_n == 0) return;
+            if (_n == 0 && !AiWounded500b.AnyFort) return;
             try
             {
                 if (party == null || partyThinkParams == null || !party.IsLordParty || party.IsMainParty) return;
                 var lh = party.LeaderHero;
-                Row r;
-                if (lh == null || !_bed.TryGetValue(lh, out r)) return;
+                Row r = null;
+                if (lh == null) return;
                 var s = Settings.Current;
-                if (s == null || !s.HeroWoundsEnabled || !s.HeroWoundsLordsRest) return;
+                if (s == null) return;
+                // 500-b: partia w stanie Fort (poturbowana - po postoju albo z twierdza blisko) jedzie ta sama regula, takze bez wpisu w ksiedze ran
+                bool bed = _n != 0 && s.HeroWoundsEnabled && s.HeroWoundsLordsRest && _bed.TryGetValue(lh, out r);
+                if (!bed && !AiWounded500b.WantsFort(party)) return;
                 var clan = party.ActualClan;
                 if (lh == Hero.MainHero || clan == null || clan == Clan.PlayerClan) return;
                 if (party.Army != null || party.MapEvent != null || party.BesiegedSettlement != null || party.SiegeEvent != null) return;
@@ -208,6 +260,7 @@ namespace Armoury
                 // odczyt PRZED naszymi -1: zagrozona osada wlasnego rodu i twierdze zablokowane przez latki przed nami (wynik <= -1, np. CrossingLaw)
                 float ownDef = -1f;
                 HashSet<Settlement> blocked = null;
+                List<AIBehaviorData> lost = null;   // E1: obrony osady rodu bez szansy
                 bool unready = ArmsFirst.Unready(party);   // p9 (postfiks 100, przed nami) dal juz -1 opcjom bitwy - to nie jest blokada twierdzy
                 _aiCopy.Clear();
                 for (int i = 0; i < scores.Count; i++)
@@ -215,7 +268,12 @@ namespace Armoury
                     var e = scores[i];
                     _aiCopy.Add(e);
                     // 408-p: bez wariantu "zbierz armie obronna" - te opcje za chwile sami gasimy (AiIsBattle: WillGatherArmy), nie moze wiec wstrzymac wyjazdu
-                    if (!e.Item1.WillGatherArmy && ArmsFirst.IsOwnDefend(in e.Item1, clan)) { if (e.Item2 > ownDef) ownDef = e.Item2; }
+                    if (!e.Item1.WillGatherArmy && ArmsFirst.IsOwnDefend(in e.Item1, clan) && e.Item2 > -1f)
+                    {
+                        // E1: obrona tylko z szansa wygranej; bez szansy opcja -1 (nizej), partia jedzie do twierdzy
+                        if (AiWounded500b.DefendOk(party, e.Item1.Party as Settlement, s)) { if (e.Item2 > ownDef) ownDef = e.Item2; }
+                        else (lost ?? (lost = new List<AIBehaviorData>(2))).Add(e.Item1);
+                    }
                     if (e.Item2 > -1f) continue;
                     var bs = e.Item1.Party as Settlement;
                     if (bs == null || !bs.IsFortification) continue;
@@ -233,10 +291,12 @@ namespace Armoury
                     _aiOff++;
                 }
                 _aiCopy.Clear();
+                if (lost != null) foreach (var d in lost) { partyThinkParams.SetBehaviorScore(in d, -1f); _aiDefLost++; }
                 if (ownDef >= 0f) { _aiOwnDef++; return; }   // obrona zagrozonej osady rodu - ta opcja zostaje, bez wyjazdu (jak ArmsFirst)
-                bool own; float road;
-                var fort = AiFort(party, clan, blocked, out own, out road);
+                byte tier; float road;
+                var fort = AiFort(party, clan, blocked, out tier, out road);
                 if (fort == null) { _aiNoFort++; return; }
+                if (tier == 2) _aiAlly++;
                 if (!fort.IsTown)
                 {
                     // 408-p: w zamku nikt partii lorda nie karmi (gra i BK kupuja jedzenie tylko w miescie / wsi), a nasza ocena przebijalaby wizyte gry po
@@ -278,8 +338,8 @@ namespace Armoury
                     if (!_aiSaid.TryGetValue(pid, out last) || last != code)
                     {
                         _aiSaid[pid] = code;
-                        Log.Info(Tag + "partia " + pid + " (wodz " + Nm(lh) + " " + r.Id + ", " + GradeName(r.Grade) + ", zostalo " + Math.Max(1, r.Left) + " dni loza) "
-                                 + (here ? "zostaje w twierdzy " : "jedzie do twierdzy ") + fort.StringId + " (" + (own ? "rodu" : "frakcji")
+                        Log.Info(Tag + "partia " + pid + " (wodz " + Nm(lh) + (r != null ? " " + r.Id + ", " + GradeName(r.Grade) + ", zostalo " + Math.Max(1, r.Left) + " dni loza" : ", poturbowana partia (500-b)") + ") "
+                                 + (here ? "zostaje w twierdzy " : "jedzie do twierdzy ") + fort.StringId + " (" + (tier == 0 ? "rodu" : tier == 1 ? "frakcji" : "sojusznika " + (fort.MapFaction != null ? fort.MapFaction.StringId : "?"))
                                  + (here ? "" : road >= 0f ? ", droga " + road.ToString("F0", Inv) : ", cel z ostatniej doby")
                                  + ") | ocena " + nv.ToString("F2", Inv) + " = max(" + ArmsFirst.FloorScore.ToString("0.0#", Inv) + ", " + AiEdge.ToString("0.0#", Inv)
                                  + " x najlepsza inna " + other.ToString("F2", Inv) + ").");
@@ -292,11 +352,11 @@ namespace Armoury
         /// <summary>Ogon linii doby "Rany (HW)".</summary>
         private static string AiDayText()
         {
-            int skips = _aiOff + _aiNoFort + _aiOwnDef + _aiSea + _aiStarve + _aiStory + _aiNeed + _aiVeto + _aiFood;
+            int skips = _aiOff + _aiNoFort + _aiOwnDef + _aiSea + _aiStarve + _aiStory + _aiNeed + _aiVeto + _aiFood + _aiDefLost;
             if (_aiOrders == 0 && skips == 0) return " | partie do twierdzy 0";
             return " | partie do twierdzy " + _aiDay.Count + " (ocen wyjazdu " + _aiOrders + ", z tego stojac w murach " + _aiInside + "; opcje bitwy -1: " + _aiOff
-                   + "; bez wyjazdu: brak twierdzy " + _aiNoFort + ", obrona osady rodu " + _aiOwnDef + ", cel zawetowany " + _aiVeto + ", malo jedzenia na zamek " + _aiFood + "; pominiete: morze " + _aiSea
-                   + ", glod " + _aiStarve + ", wodz oblezenia fabuly " + _aiStory + ", przed wydarzeniem fabuly " + _aiNeed + "; sesja ocen " + _aiSessOrders + ")";
+                   + "; bez wyjazdu: brak twierdzy " + _aiNoFort + ", obrona osady rodu " + _aiOwnDef + " (bez szansy -1: " + _aiDefLost + "), cel zawetowany " + _aiVeto + ", malo jedzenia na zamek " + _aiFood + "; pominiete: morze " + _aiSea
+                   + ", glod " + _aiStarve + ", wodz oblezenia fabuly " + _aiStory + ", przed wydarzeniem fabuly " + _aiNeed + "; cel u sojusznika " + _aiAlly + "; sesja ocen " + _aiSessOrders + ")";
         }
 
         /// <summary>Koniec doby ran: liczniki doby od zera, pamiec celu i logu tylko dla partii z wodzem nadal na lozu.</summary>
@@ -304,7 +364,7 @@ namespace Armoury
         {
             try
             {
-                _aiOrders = _aiInside = _aiOff = _aiNoFort = _aiOwnDef = _aiSea = _aiStarve = _aiStory = _aiNeed = _aiVeto = _aiFood = 0;
+                _aiOrders = _aiInside = _aiOff = _aiNoFort = _aiOwnDef = _aiSea = _aiStarve = _aiStory = _aiNeed = _aiVeto = _aiFood = _aiDefLost = _aiAlly = 0;
                 _aiDay.Clear();
                 if (_aiPick.Count == 0 && _aiSaid.Count == 0) return;
                 if (_n == 0) { _aiPick.Clear(); _aiSaid.Clear(); return; }

@@ -164,6 +164,9 @@ namespace Armoury
             return ArmedStrength.IsLow(mp);
         }
 
+        /// <summary>500-b: bramki armii - niegotowa (p9) ALBO poturbowana partia (AiWounded500b: postoj / jazda do twierdzy / ostroznosc >= progu armii).</summary>
+        internal static bool ArmyOut(MobileParty mp) { return Unready(mp) || AiWounded500b.ArmyOut(mp); }
+
         /// <summary>Stac go na sprzet: podglad budzetu zakupow brakow (AiGear.BudgetPreview - wzor TryBuyCore; z miastem - rezerwa napraw z materialem tego miasta,
         /// jak TryBuyCore) >= min(braki do progu gotowosci, PiecesUnit) sztuk po wczorajszej sredniej cenie zakupow AI (najmniej MinNeed). Recenzja p9 (uwaga 4): nie
         /// pelne braki naraz - AiGear kupuje raz na dobe AiGearBudgetPercent kiesy, a partia z postepem zostaje w miescie kolejne doby; prog "jedna wizyta pokrywa
@@ -676,8 +679,8 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.AiArmsBeforeBattle) return;
-                if (Unready(__0))
+                if (s == null || (!s.AiArmsBeforeBattle && !s.AiWoundedRestEnabled && !s.AiWoundedCaution)) return;   // 500-b: bramka takze dla poturbowanych
+                if (ArmyOut(__0))
                 {
                     if (__result || (__1 != null && __1.Count > 0)) Note(_vLead, __0);
                     __result = false;
@@ -689,7 +692,7 @@ namespace Armoury
                 for (int i = __1.Count - 1; i >= 0; i--)
                 {
                     var m = __1[i];
-                    if (m != null && Unready(m)) { __1.RemoveAt(i); Note(_vMember, m); removed++; }
+                    if (m != null && ArmyOut(m)) { __1.RemoveAt(i); Note(_vMember, m); removed++; }
                 }
                 if (__result && __1.Count == 0) __result = false;
                 // recenzja p9 (uwaga 2), zapas na brak haka przed progiem: baza gry sprawdzila prog sily z niegotowymi - liczymy go od nowa tym samym wzorem
@@ -719,21 +722,21 @@ namespace Armoury
         public static void DisbandPostfix(MobileParty __0, ref bool __result)
         {
             if (_inCreate <= 0 || __result || __0 == null) return;
-            try { if (Unready(__0)) { __result = true; Note(_vPre, __0); } } catch (Exception e) { Stumble("DisbandPostfix", e); }
+            try { if (ArmyOut(__0)) { __result = true; Note(_vPre, __0); } } catch (Exception e) { Stumble("DisbandPostfix", e); }
         }
 
         /// <summary>Postfiks BK MobilePartyExtensions.IsAvailableForArmies: niegotowa partia nie idzie na wezwanie (BK CallBannersGoal gracza i AI, partie rodu BK).</summary>
         public static void AvailPostfix(MobileParty __0, ref bool __result)
         {
             if (!__result) return;
-            try { if (Unready(__0)) { __result = false; Note(_vAvail, __0); } } catch (Exception e) { Stumble("AvailPostfix", e); }
+            try { if (ArmyOut(__0)) { __result = false; Note(_vAvail, __0); } } catch (Exception e) { Stumble("AvailPostfix", e); }
         }
 
         /// <summary>Postfiks czynnego CheckPartyEligibility (okno armii gracza): niegotowa partia - false z napisem po angielsku.</summary>
         public static void EligPostfix(MobileParty __0, ref TextObject __1, ref bool __result)
         {
             if (!__result) return;
-            try { if (Unready(__0)) { __result = false; __1 = NotArmedText; Note(_vElig, __0); } } catch (Exception e) { Stumble("EligPostfix", e); }
+            try { if (ArmyOut(__0)) { __result = false; __1 = Unready(__0) ? NotArmedText : AiWounded500b.ArmyText; Note(_vElig, __0); } } catch (Exception e) { Stumble("EligPostfix", e); }
         }
 
         // ------------------------------------------------------------ start sesji i linia
