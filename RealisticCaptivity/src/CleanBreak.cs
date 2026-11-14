@@ -229,6 +229,7 @@ namespace RealisticCaptivity
                 try { if (MobileParty.MainParty.IsCurrentlyAtSea) return false; } catch { }
                 if (!CleanBreak.PartyAllMounted(MobileParty.MainParty)) return false;
                 if (CleanBreak.PartyAnyMounted(mp)) return false;              // maja konie - gonia uczciwie
+                if (ArmouryBridge.PlayerOnLitter) return false;                // 501 (Armoury): gracz na noszach - nie odjezdza galopem, zasady gry (tabor, straz tylna)
                 return true;
             }
             catch { return false; }

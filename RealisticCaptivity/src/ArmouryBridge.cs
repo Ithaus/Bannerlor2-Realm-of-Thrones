@@ -81,5 +81,27 @@ namespace RealisticCaptivity
 
         /// <summary>Czy Armoury z UniqueSpoils jest wczytane (linia logu n20).</summary>
         internal static bool UniqueKnown { get { ResolveUnique(); return _isUnique != null; } }
+
+        // 501 (Armoury, nosze): gracz lezy na noszach (HP <= progu albo loze Grave) - nie odjezdza galopem ze spotkania (HorseFlight, MountedGetaway).
+        // Armoury.Litter501.PlayerCarried() - internal static, odbiciem (bez twardej zaleznosci); bez Armoury albo przy bledzie = nie lezy (jak dotad).
+        private static bool _lTried;
+        private static MethodInfo _carried;
+        private static int _lStumbles;
+
+        internal static bool PlayerOnLitter
+        {
+            get
+            {
+                if (!_lTried)
+                {
+                    _lTried = true;
+                    try { var t = AccessTools.TypeByName("Armoury.Litter501"); if (t != null) _carried = AccessTools.DeclaredMethod(t, "PlayerCarried"); }
+                    catch (Exception e) { Log.Error("ArmouryBridge.ResolveLitter", e); }
+                }
+                if (_carried == null) return false;
+                try { return (bool)_carried.Invoke(null, null); }
+                catch (Exception e) { if (_lStumbles++ == 0) Log.Error("ArmouryBridge.PlayerOnLitter", e); return false; }
+            }
+        }
     }
 }

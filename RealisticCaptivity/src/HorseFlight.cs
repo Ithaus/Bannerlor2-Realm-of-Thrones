@@ -99,6 +99,13 @@ namespace RealisticCaptivity
                 if (c != null && c.MountedEncounterFlight && AllMounted()
                     && PlayerEncounter.Current != null && PlayerEncounter.Battle != null)
                 {
+                    // 501 (Armoury, nosze): lezacy gracz nie odjezdza galopem - zasady gry (straz tylna); odmowa gry z czytelnym powodem
+                    if (ArmouryBridge.PlayerOnLitter)
+                    {
+                        if (base.CanPlayerGetAwayFromEncounter(out explanation)) return true;
+                        explanation = new TextObject("{=!}You lie on a litter - you cannot gallop away, and you have too few men to leave a rear guard.");
+                        return false;
+                    }
                     int need = EnemyRiders(PlayerEncounter.Current.PlayerSide, PlayerEncounter.Battle);
                     if (need <= HealthyRegulars())
                     {
@@ -118,7 +125,7 @@ namespace RealisticCaptivity
             try
             {
                 var c = Settings.Current;
-                if (c != null && c.MountedEncounterFlight && AllMounted())
+                if (c != null && c.MountedEncounterFlight && AllMounted() && !ArmouryBridge.PlayerOnLitter)   // 501: na noszach - straz tylna gry
                 {
                     int need = EnemyRiders(playerBattleSide, mapEvent);
                     if (need <= HealthyRegulars()) return need;   // 0 przed piechota

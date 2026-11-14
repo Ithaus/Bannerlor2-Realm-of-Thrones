@@ -2082,6 +2082,14 @@ namespace Armoury
         /// </summary>
         internal static void SpeedPostfix(MobileParty __0, ref ExplainedNumber __result)
         {
+            SpeedCore(__0, ref __result);
+            // 501 (Litter501.cs): nosze gracza - na KONCU (po premii / karach snu, karczmy, kufli, marszu forsownym), procent wyniku, raz na lancuch;
+            // niezalezne od NightRestEnabled (wlasny klucz LitterEnabled); bez noszy - jedno porownanie flagi
+            Litter501.Speed(__0, ref __result);
+        }
+
+        private static void SpeedCore(MobileParty __0, ref ExplainedNumber __result)
+        {
             try
             {
                 var mobileParty = __0;

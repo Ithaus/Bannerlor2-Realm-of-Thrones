@@ -824,6 +824,26 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int MovingHealPercent { get; set; } = 10;
 
+        [SettingPropertyBool("Litter Enabled", HintText = "you lie on a litter when you are nearly dead: at or below Litter Hp Threshold hit points, or with a grave wound (Hero Wounds). Your men carry you and the party moves at Litter Speed Percent of its pace until you are back above Litter Hp Release and the grave wound has passed. You cannot gallop away from an encounter while on a litter. In someone else's army or at sea you are simply carried along - no slowdown. AI parties are not affected. Off = you ride however badly hurt, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool LitterEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Litter Hp Threshold", 1, 50, "0", HintText = "at or below this many hit points you are too weak to ride and are carried on a litter. Only with Litter Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int LitterHpThreshold { get; set; } = 10;
+
+        [SettingPropertyInteger("Litter Hp Release", 1, 60, "0", HintText = "you get off the litter only above this many hit points (and with no grave wound) - a gap above the threshold so a point of healing does not flip you on and off. Never below the threshold. Only with Litter Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int LitterHpRelease { get; set; } = 15;
+
+        [SettingPropertyInteger("Litter Speed Percent", 10, 100, "0", HintText = "how fast your party moves while carrying you on a litter, in percent of its pace (50 = half; 100 = no slowdown). Only with Litter Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int LitterSpeedPercent { get; set; } = 50;
+
+        [SettingPropertyInteger("Litter Speed Percent Sledges", 10, 100, "0", HintText = "how fast your party moves with you on a litter when your surgeon (or you, without a surgeon) has the Sledges perk: sledges halve the slowdown of carrying the wounded, as the perk does in the game (75 = a quarter slower instead of half). Only with Litter Enabled", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public int LitterSpeedPercentSledges { get; set; } = 75;
+
         [SettingPropertyBool("Prisoner Care Xp", HintText = "whoever tends your party's wounded also tends your wounded prisoners and learns Medicine from it: each prisoner who recovers gives your surgeon (or you, if no one holds the surgeon's post) Medicine experience the same way your own wounded men do - more for higher tier prisoners, double while resting in a town or village. Prisoners heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day), never halved by Healing Regen Percent - or as fast as your own men with Prisoners Heal Like Your Men. Off = no Medicine for prisoners, as before", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool PrisonerCareXp { get; set; } = true;
@@ -13437,6 +13457,11 @@ namespace Armoury
             s.AiHealingRegenPercent = AiHealingRegenPercent;
             s.HealOnlyAtRest = HealOnlyAtRest;
             s.MovingHealPercent = MovingHealPercent;
+            s.LitterEnabled = LitterEnabled;
+            s.LitterHpThreshold = LitterHpThreshold;
+            s.LitterHpRelease = LitterHpRelease;
+            s.LitterSpeedPercent = LitterSpeedPercent;
+            s.LitterSpeedPercentSledges = LitterSpeedPercentSledges;
             s.PrisonerCareXp = PrisonerCareXp;
             s.PrisonersHealLikeYourMen = PrisonersHealLikeYourMen;
             s.PrisonerCareXpPercent = PrisonerCareXpPercent;
