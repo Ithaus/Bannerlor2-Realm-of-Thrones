@@ -75,3 +75,7 @@ D15: Lithurgy trwala u wszystkich - jedna zasada.
 D10 korekta (Jeff 14.11): "moga ale max o 10% limitu RBM" - premia perkow moze podniesc predkosc konia najwyzej do sufitu RBM x 1.10 (nadpisuje wersje bez sufitu z workflow d-reszta - poprawic po jego zakonczeniu).
 500-b decyzje (Jeff 14.11): E1 lord w postoju broni wlasnej osady tylko gdy ma sens i jest szansa wygrac; E2 skrot moze prowadzic do twierdzy sojusznika - tak; E3 postoj AI od progu rannego gry ok. 20 HP (nie 10); E4 wodz armii ranny - tylko ostroznosc w ataku (bez rozwiazywania armii).
 Jeff 14.11 po WGRANIU 234: D16b kolczany/bron miotana/tarcze okretu - odzysk po wygranej bitwie morskiej: TAK; D7b bron z ekranu kowalstwa gry tez -25% (nie o polowe): TAK; 509 praca jencow zwieksza szanse ucieczki: TAK.
+
+## Drogi 520 i waga pieniedzy - decyzje Jeffa 14.11
+520: Valyria tez +30% (nie 50); odsiecz drogami - tak, gdy nie wolniej; drogami trzymaja sie patrole i milicja ("bo bandyci poluja przeciez na kupcow i karawany"), lordowie patrolujacy ziemie - nie wymuszac.
+Waga pieniedzy (521): 1 sklad sakiewki - tak (propozycja: pensy/srebro/zloto, udzial zlota wedlug mennicy); 2 zloto w skarbcu - tak; 3 "lordowie nie woza ze soba 3 milionow, maja skarbiec i tam trzymaja zloto lub gdzies" - AI lordowie wioza tylko sakiewke robocza, reszta w skarbcu.
