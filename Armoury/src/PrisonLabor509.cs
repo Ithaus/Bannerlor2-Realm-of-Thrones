@@ -32,7 +32,8 @@ namespace Armoury
     ///    wynik modelu gry. Jency nie pracuja bez robot: bez punktow pana (0) premii nie ma - jency nosza i kopia przy oplaconych murarzach i materiale.
     ///  - WYPADKI (blok doby, robotnicy z rana tej doby juz nie pracuja): kazdy robotnik z szansa PrisonLaborInjuryPercent (0.2%/dobe) idzie w rannych
     ///    (leczy go gra - PartyHealCampaignBehavior.OnDailyTickSettlement), z szansa PrisonLaborDeathPercent (0.01%/dobe) ginie: zdjety z lochu,
-    ///    ksiega ludzi PeopleBook (DieShares, przyczyna FDieOthers), komunikat dla lochu gracza.
+    ///    ksiega ludzi PeopleBook (DieShares, przyczyna FDieWork "wypadki przy pracy jencow"), komunikat dla lochu gracza. Wypadki tylko przy prawdziwej pracy:
+    ///    PaidConstruction wlaczone, osada nie w bitwie i nie oblezona, podstawa premii tej doby > 0 (BuildFunding.LaborBase).
     ///  - JEDZENIE (klucz DungeonPrisonersEat; wszyscy jency lochu twierdzy, takze bohaterowie i bezczynni, bez Innych): postfiks na
     ///    DefaultSettlementFoodModel.CalculateTownFoodStocksChange (BK wola baze jawnie, ROT przekazuje dalej - jak Famine/PeopleMarket) - pozycja "Prisoners"
     ///    = -(jency x DungeonPrisonerFoodShare) / NumberOfMenOnGarrisonToEatOneFood (gra: jeniec w partii je pol porcji - 0.5; zaloga 1/20).
@@ -91,7 +92,9 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.PrisonLabor || town == null || town.Settlement == null || !town.Settlement.IsFortification) return 0f;
+                if (s == null || !s.PrisonLabor || !BuildFunding.On || town == null || town.Settlement == null || !town.Settlement.IsFortification) return 0f;
+                // 509 recenzja: oblezenie (gra nie buduje - BuildingsCampaignBehavior:106) i bitwa w osadzie - jency nie pracuja (ta sama zasada co wypadki w Daily)
+                if (town.Settlement.IsUnderSiege || (town.Settlement.Party != null && town.Settlement.Party.MapEvent != null)) return 0f;
                 var q = town.BuildingsInProgress;
                 if (q == null || q.Count == 0) return 0f;
                 var head = q.Peek();
@@ -143,7 +146,9 @@ namespace Armoury
                 if (v <= 0) return v;
                 int w; bool pk;
                 float pct = Share(town, out w, out pk);
-                return pct > 0f ? v + (int)Math.Round(v * pct) : v;
+                if (!(pct > 0f)) return v;
+                int add = (int)Math.Round(v * pct);
+                return Math.Max(v, Math.Min(v + add, 100));   // 509 recenzja: ta sama granica co BK LimitMax(100) w mocy z opisem (AddGame) - obie drogi daja to samo
             }
             catch (Exception e) { Stumble("AddGameInt", e); return v; }
         }
@@ -265,10 +270,13 @@ namespace Armoury
                     int eaters;
                     float eat = EatOf(town, out eaters);
                     if (eat > 0f && _foodWired) { _dEatSt++; _dEaters += eaters; _dFood += eat; }
-                    if (st.Party == null || st.Party.MapEvent != null) continue;   // osada w bitwie - ta doba bez robot
+                    if (st.Party == null) continue;
                     int w; bool pk;
-                    float pct = Share(town, out w, out pk);
+                    float pct = Share(town, out w, out pk);   // bitwa, oblezenie, !PaidConstruction - 0 (Share)
                     if (!(pct > 0f) || w <= 0) continue;
+                    // 509 recenzja: wypadki i liczniki tylko tam, gdzie jency naprawde pracowali - podstawa premii tej doby > 0 (punkty pana + przyspieszenie zlotem
+                    // albo moc gry w lennie bez rozliczenia); pan nic nie oplacil = robot nie ma = ani premii, ani ran, ani smierci
+                    if (!(BuildFunding.LaborBase(town) > 0f)) continue;
                     _dSt++; _dWorkers += w; _dPctSum += pct; if (pk) _dStPerk++;
                     var pr = st.Party.PrisonRoster;
                     int hurt = Math.Min(w, MBRandom.RoundRandomized(w * Math.Max(0f, s.PrisonLaborInjuryPercent) / 100f));
@@ -278,7 +286,7 @@ namespace Armoury
                     for (int n = 0; n < hurt; n++) { if (HitHealthy(pr, false) == null) break; _dInjured++; }
                     if (dead > 0)
                     {
-                        try { PeopleBook.DieShares(PeopleBook.Take(pr, dead, PeopleBook.FDieOthers), PeopleBook.FDieOthers); } catch (Exception e) { Stumble("PeopleBook", e); }
+                        try { PeopleBook.DieShares(PeopleBook.Take(pr, dead, PeopleBook.FDieWork), PeopleBook.FDieWork); } catch (Exception e) { Stumble("PeopleBook", e); }   // 509 recenzja: wlasna przyczyna FDieWork (FDieOthers = "Inni")
                         _dDead += dead;
                         if (st.OwnerClan == Clan.PlayerClan)
                             Log.Player((dead == 1 ? "A prisoner" : dead + " prisoners") + " died in an accident at the works of " + st.Name + ".", true);
