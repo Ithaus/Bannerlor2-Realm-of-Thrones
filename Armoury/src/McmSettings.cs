@@ -13468,6 +13468,10 @@ namespace Armoury
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
         public bool BannerFirstRollNeedsMelee { get; set; } = true;
 
+        [SettingPropertyBool("Banner Missile Half Roll", HintText = "With Banner First Roll Needs Melee: while a lord leads a company or before it has come to blows, men struck down by arrows and bolts do not count towards its rolls to break - arrows alone do not break a lord's host. But once arrows have killed or wounded half of the company, it rolls once for panic, as at half its men lost. Losses in melee count as before. Off = every loss counts from a third of losses on, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
+        public bool BannerMissileHalfRoll { get; set; } = true;
+
         [SettingPropertyBool("Banner Event Roll By Loss", HintText = "With Banner Companies: when a company's standard or its commander falls, its men weigh how many of them have already fallen, not the game's morale - the roll is no longer skipped while morale stays above 50. How the battle stands still counts, so a winning company rarely breaks. Off = the roll only below morale 50, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
         public bool BannerEventRollByLoss { get; set; } = true;
@@ -17116,6 +17120,7 @@ namespace Armoury
             s.BannerBreakEarly = BannerBreakEarly;
             s.BannerBreakEarlyChance = BannerBreakEarlyChance;
             s.BannerFirstRollNeedsMelee = BannerFirstRollNeedsMelee;
+            s.BannerMissileHalfRoll = BannerMissileHalfRoll;
             s.BannerEventRollByLoss = BannerEventRollByLoss;
             s.PursuitDelegatedFormations = PursuitDelegatedFormations;
             s.PursuitStartNearVictims = PursuitStartNearVictims;

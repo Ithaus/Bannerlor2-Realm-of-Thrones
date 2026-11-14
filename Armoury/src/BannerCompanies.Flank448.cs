@@ -152,6 +152,31 @@ namespace Armoury
             _hOn = false;
             lock (_hq) { _hIn.Clear(); _hWork.Clear(); }
             _nb.Clear(); _nbHit.Clear(); _nbPos.Clear(); _nbGen = 0;
+            _lastMissile.Clear();   // 529-a
+        }
+
+        // 529-a (klucz BannerMissileHalfRoll): czlowiek kompanii -> ostatni cios z obrazeniami byl pociskiem (zapis przy ciosie, glowny watek - OneHit);
+        // tylko ludzie z _mem, czyszczone z misja (Clear448)
+        private readonly Dictionary<Agent, bool> _lastMissile = new Dictionary<Agent, bool>();
+
+        /// <summary>529-a: ludzie kompanii wybici z szeregu przez pocisk - polegli / nieprzytomni (nieczynni) albo ranni w odwrocie 143, ktorych ostatni
+        /// cios z obrazeniami byl pociskiem. Panika (bez rany od pocisku jako przyczyny) i ucieczka nie sa liczone - to straty "inne".</summary>
+        private int MissileOut(Company co)
+        {
+            if (_lastMissile.Count == 0) return 0;
+            var k = RoutHold.Live;
+            int n = 0;
+            for (int i = 0; i < co.Men.Count; i++)
+            {
+                var a = co.Men[i];
+                bool mi;
+                if (a == null || !_lastMissile.TryGetValue(a, out mi) || !mi) continue;
+                if (!a.IsActive()) { n++; continue; }
+                bool wd = false;
+                try { wd = k != null && k.Withdrawing(a); } catch { wd = false; }
+                if (wd) n++;
+            }
+            return n;
         }
 
         /// <summary>448: koniec misji - przepelnienie kolejki do licznika linii.</summary>
@@ -197,6 +222,13 @@ namespace Armoury
             Company co;
             // 529 (klucz BannerFirstRollNeedsMelee): cios wrecz od wroga z obrazeniami - zwarcie kompanii ofiary i kompanii napastnika (przed odsiewem 448,
             // ktory pomija bohaterow, zlamanych i panike - zwarcie to fakt pola, nie rzut); tylko odczyt _mem, glowny watek
+            // 529-a: rodzaj ostatniego ciosu z obrazeniami czlowieka kompanii (pocisk / wrecz) - przed odsiewem (polegly i ranny tez); klucz NIE - bez zapisu
+            if (v != null && c != null && c.BannerMissileHalfRoll && _mem.ContainsKey(v))
+            {
+                bool was;
+                if (!_lastMissile.TryGetValue(v, out was) && h.Missile) BannerCompanies.MissileHitMen++;
+                _lastMissile[v] = h.Missile;
+            }
             if (!h.Missile && v != null && h.A != null)
             {
                 var hit = h.A.IsMount && h.A.RiderAgent != null ? h.A.RiderAgent : h.A;

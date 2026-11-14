@@ -135,6 +135,9 @@ namespace Armoury
         // 529 (klucz BannerFirstRollNeedsMelee): rzut 1/6 odlozony - kompanie (pierwszy powod: prowadzi bohater / bez zwarcia), takty odlozenia, odlozone, ktore
         // jednak rzucily przy 1/6; kompanie, ktore doszly do zwarcia
         internal static int EarlyHeldLord, EarlyHeldNoMelee, EarlyHeldTicks, EarlyHeldRolled, MeleeCompanies;
+        // 529-a (klucz BannerMissileHalfRoll): rzuty przy 1/2 strat od ostrzalu (liczba, zalamania, suma padlych od pocisku przy rzucie), kompanie i takty,
+        // w ktorych straty od ostrzalu obnizyly krok rzutu udzialu strat (pod lordem / przed zwarciem), ludzie kompanii z ostatnim ciosem od pocisku
+        internal static int MissileHalfRolls, MissileHalfBreaks, MissileHeldCompanies, MissileHeldTicks, MissileHalfOutSum, MissileHitMen;
         // recenzja 529: kompanie bez wlasnego sztandaru wstrzasniete upadkiem sztandaru swojej grupy (StdGroup) i ich zalamania; rzuty upadku sierzanta
         // z waga Peak / BannerStandardSize (suma wag, liczba)
         internal static int StdGroupRolls, StdGroupBreaks, SgtRolls; internal static float SgtWSum;
@@ -158,6 +161,7 @@ namespace Armoury
             EarlyRolls = EarlyBreaks = EmptyBroken = RanksPanicSkip = RanksWithdrawSkip = ShareNoRoll = EmptyWait = BreakShareN = 0; EarlyPSum = BreakShareSum = 0f;
             EventRolls = EventBreaks = 0; EventShareSum = EventPSum = 0f;
             EarlyHeldLord = EarlyHeldNoMelee = EarlyHeldTicks = EarlyHeldRolled = MeleeCompanies = 0;
+            MissileHalfRolls = MissileHalfBreaks = MissileHeldCompanies = MissileHeldTicks = MissileHalfOutSum = MissileHitMen = 0;
             StdGroupRolls = StdGroupBreaks = SgtRolls = 0; SgtWSum = 0f;
             Reset318();
             Reset448();
@@ -216,6 +220,7 @@ namespace Armoury
             public Dir448 D;                               // 448: wynik ciosow z tylu / z boku i przerwy (null do pierwszego trafienia z boku / tylu)
             public bool Melee;                             // 529: kompania doszla do zwarcia (cios wrecz z obrazeniami zadany albo przyjety przez jej czlowieka - OneHit)
             public int EarlyHeld;                          // 529: rzut 1/6 odlozony - 0 nie, 1 prowadzi bohater, 2 bez zwarcia (pierwszy powod, licznik kompanii raz)
+            public bool MissileHalfDone, MissileHeld;      // 529-a: rzut przy 1/2 strat od ostrzalu juz byl; straty od ostrzalu obnizyly krok rzutu (licznik kompanii raz)
         }
 
         private BannerBearerLogic _bbl;
@@ -754,25 +759,68 @@ namespace Armoury
                     // rzut przy pierwszej 1/6 strat czeka, dopoki prowadzi ja bohater strony (Leadership: wlasny dowodca albo bohater w szyku / w 60 m) albo
                     // dopoki nie doszla do zwarcia - krok nie zapisany, rzut w pierwszym takcie bez obu warunkow, jesli strata nadal 1/6; od 2/6 bez zmian
                     bool held = false;
-                    if (early && k == 1 && k > co.LossStep && c.BannerFirstRollNeedsMelee)
+                    // 529-a (klucz BannerMissileHalfRoll; Jeff 14.11: ostrzal sam nie lamie armii lorda, ale przy 1/2 strat od ostrzalu - rzut na panike):
+                    // dotad 529 wstrzymywal tylko krok 1/6 - od 2/6 sam ostrzal dawal rzuty takze kompanii pod lordem i przed zwarciem. Teraz pod lordem /
+                    // przed zwarciem krok rzutu liczony ze strat BEZ strat od pociskow (ostatni cios z obrazeniami - zapis w OneHit, MissileOut); raz, gdy
+                    // polegli i ranni w odwrocie od pocisku siegna 1/2 Peak (i nie bylo jeszcze rzutu od 1/2) - rzut jak dla straty 1/2 (czynnik 1, udzial 0.5),
+                    // krok zapisany na 3/6. Po zwarciu bez lorda wszystkie straty jak dotad (krok z calych strat).
+                    int kr = k;            // krok rzutu (pod oslona - bez strat od ostrzalu)
+                    float lr = lost;       // udzial strat do M w rzucie
+                    if (early && k > co.LossStep && c.BannerFirstRollNeedsMelee)
                     {
                         int hb;
                         Leadership(co, out hb);
                         int why = hb <= 1 ? 1 : (!co.Melee ? 2 : 0);
-                        if (why > 0)
+                        if (why > 0 && c.BannerMissileHalfRoll)
+                        {
+                            int mo = MissileOut(co);
+                            if (co.LossStep < 3 && !co.MissileHalfDone && mo * 2 >= co.Peak)
+                            {
+                                InRanksLive(co, true);   // pominieci w szeregu - licznik linii tylko przy rzucie
+                                if (Roll(co, 1f, c, now, true, 0.5f, 3))
+                                {
+                                    co.MissileHalfDone = true;
+                                    BannerCompanies.MissileHalfRolls++; BannerCompanies.MissileHalfOutSum += mo;
+                                    if (co.Broken) BannerCompanies.MissileHalfBreaks++;
+                                    co.LossStep = 3;
+                                    co.ThirdDone = true;
+                                    if (!co.HalfDone) { co.HalfDone = true; BannerCompanies.Half++; }
+                                    BannerCompanies.ShareStep[3]++;   // B307-2: rzutow udzialu = suma koszykow 2/6..5/6
+                                }
+                                else if (AnyAbleLater(co)) BannerCompanies.EmptyWait++;   // jak rzut udzialu: ponowiony w nastepnym takcie
+                                else
+                                {
+                                    co.MissileHalfDone = true;
+                                    co.LossStep = 3;
+                                    if (!co.Broken) { co.Broken = true; BannerCompanies.EmptyBroken++; }
+                                }
+                                return;   // ostatni krok TickOne - nic wiecej w tym takcie
+                            }
+                            lr = lost - (float)mo / co.Peak;
+                            if (lr < 0f) lr = 0f;
+                            kr = (int)(lr * 6f + 0.0001f);
+                            if (kr > 5) kr = 5;
+                            if (kr < k && kr <= co.LossStep)
+                            {
+                                BannerCompanies.MissileHeldTicks++;
+                                if (!co.MissileHeld) { co.MissileHeld = true; BannerCompanies.MissileHeldCompanies++; }
+                            }
+                        }
+                        if (why > 0 && kr == 1 && kr > co.LossStep)
                         {
                             held = true;
                             BannerCompanies.EarlyHeldTicks++;
                             if (co.EarlyHeld == 0) { co.EarlyHeld = why; if (why == 1) BannerCompanies.EarlyHeldLord++; else BannerCompanies.EarlyHeldNoMelee++; }
                         }
                     }
+                    k = kr;
                     if (!held && k >= first && k > co.LossStep)
                     {
                         if (!early) co.LossStep = k;   // klucz NIE: krok zapisany przed rzutem jak dotad (bez rzutu - krok stracony)
                         if (early) InRanksLive(co, true);   // pominieci w szeregu - licznik linii tylko przy rzucie
                         int src = k == 1 ? 5 : 3;
                         float factor = k == first ? 0.5f : 1f;
-                        bool rolled = Roll(co, factor, c, now, true, lost, src);
+                        bool rolled = Roll(co, factor, c, now, true, lr, src);
                         if (rolled)
                         {
                             if (src == 5 && co.EarlyHeld > 0) BannerCompanies.EarlyHeldRolled++;   // 529: odlozony rzut 1/6 jednak sie odbyl (raz - krok zapisany nizej)
@@ -1552,6 +1600,11 @@ namespace Armoury
               .Append(", bez zwarcia ").Append(BannerCompanies.EarlyHeldNoMelee).Append("), taktow odlozenia ").Append(BannerCompanies.EarlyHeldTicks)
               .Append(", odlozone, ktore rzucily przy 1/6 ").Append(BannerCompanies.EarlyHeldRolled).Append(", kompanii w zwarciu ").Append(BannerCompanies.MeleeCompanies)
               .Append(" z ").Append(BannerCompanies.Companies).Append(", stan bitwy najwyzej x").Append(BannerCompanies.StateHigh.ToString("0.00", inv305))
+              .Append("; rzut przy 1/2 strat od ostrzalu (529-a) ").Append(c305 != null && c305.BannerMissileHalfRoll ? "TAK" : "NIE")
+              .Append(": rzutow ").Append(BannerCompanies.MissileHalfRolls).Append(" (zalaman ").Append(BannerCompanies.MissileHalfBreaks)
+              .Append(", sr. padlych od pocisku ").Append(BannerCompanies.MissileHalfRolls > 0 ? ((float)BannerCompanies.MissileHalfOutSum / BannerCompanies.MissileHalfRolls).ToString("0.0", inv305) : "-")
+              .Append("), kompanii bez rzutu za straty od ostrzalu ").Append(BannerCompanies.MissileHeldCompanies).Append(" (taktow ").Append(BannerCompanies.MissileHeldTicks)
+              .Append("), ludzi z pierwszym ciosem od pocisku ").Append(BannerCompanies.MissileHitMen)
               .Append("; recenzja 529: rzuty grupy sztandaru ").Append(BannerCompanies.StdGroupRolls).Append(" (zalaman ").Append(BannerCompanies.StdGroupBreaks)
               .Append("), rzuty sierzanta ").Append(BannerCompanies.SgtRolls).Append(" (sr. waga ").Append(BannerCompanies.SgtRolls > 0 ? (BannerCompanies.SgtWSum / BannerCompanies.SgtRolls).ToString("0.00", inv305) : "-")
               .Append("), rzuty SASIAD z waga ").Append(BannerCompanies.NbWN529).Append(" (sr. waga ").Append(BannerCompanies.NbWN529 > 0 ? (BannerCompanies.NbWSum529 / BannerCompanies.NbWN529).ToString("0.00", inv305) : "-").Append(')')
