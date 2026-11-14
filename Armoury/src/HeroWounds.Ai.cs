@@ -53,7 +53,9 @@ namespace Armoury
         /// taka partia nie jest dolaczana do armii, nie jedzie za silniejszym i nie zwoluje armii - jedna zasada na rannego wodza. Watek glowny (mysl AI).</summary>
         internal static bool RestingParty(MobileParty party)
         {
-            if (_n == 0 || party == null) return false;
+            if (party == null) return false;
+            if (AiWounded500b.Resting(party)) return true;   // 500-b: poturbowana partia w postoju albo w drodze do twierdzy - ta sama zasada
+            if (_n == 0) return false;
             try
             {
                 if (!party.IsLordParty || party.IsMainParty || party.Army != null) return false;
@@ -94,7 +96,7 @@ namespace Armoury
         }
 
         /// <summary>Opcja szukajaca bitwy albo zwolujaca armie. Obrona osady wlasnego rodu zostaje (takze niezagrozonej - patrol przy swoich).</summary>
-        private static bool AiIsBattle(in AIBehaviorData d, Clan clan)
+        internal static bool AiIsBattle(in AIBehaviorData d, Clan clan)   // 500-b: ta sama lista opcji bitwy w ostroznosci (AiWounded500b.CautionPostfix)
         {
             if (d.WillGatherArmy) return true;
             switch (d.AiBehavior)
@@ -180,15 +182,18 @@ namespace Armoury
         /// (regula w opisie pliku). Pusta ksiega = jedno porownanie. Nie rzuca.</summary>
         public static void AiRestPostfix(MobileParty party, PartyThinkParams partyThinkParams)
         {
-            if (_n == 0) return;
+            if (_n == 0 && !AiWounded500b.AnyFort) return;
             try
             {
                 if (party == null || partyThinkParams == null || !party.IsLordParty || party.IsMainParty) return;
                 var lh = party.LeaderHero;
-                Row r;
-                if (lh == null || !_bed.TryGetValue(lh, out r)) return;
+                Row r = null;
+                if (lh == null) return;
                 var s = Settings.Current;
-                if (s == null || !s.HeroWoundsEnabled || !s.HeroWoundsLordsRest) return;
+                if (s == null) return;
+                // 500-b: partia w stanie Fort (poturbowana - po postoju albo z twierdza blisko) jedzie ta sama regula, takze bez wpisu w ksiedze ran
+                bool bed = _n != 0 && s.HeroWoundsEnabled && s.HeroWoundsLordsRest && _bed.TryGetValue(lh, out r);
+                if (!bed && !AiWounded500b.WantsFort(party)) return;
                 var clan = party.ActualClan;
                 if (lh == Hero.MainHero || clan == null || clan == Clan.PlayerClan) return;
                 if (party.Army != null || party.MapEvent != null || party.BesiegedSettlement != null || party.SiegeEvent != null) return;
@@ -278,7 +283,7 @@ namespace Armoury
                     if (!_aiSaid.TryGetValue(pid, out last) || last != code)
                     {
                         _aiSaid[pid] = code;
-                        Log.Info(Tag + "partia " + pid + " (wodz " + Nm(lh) + " " + r.Id + ", " + GradeName(r.Grade) + ", zostalo " + Math.Max(1, r.Left) + " dni loza) "
+                        Log.Info(Tag + "partia " + pid + " (wodz " + Nm(lh) + (r != null ? " " + r.Id + ", " + GradeName(r.Grade) + ", zostalo " + Math.Max(1, r.Left) + " dni loza" : ", poturbowana partia (500-b)") + ") "
                                  + (here ? "zostaje w twierdzy " : "jedzie do twierdzy ") + fort.StringId + " (" + (own ? "rodu" : "frakcji")
                                  + (here ? "" : road >= 0f ? ", droga " + road.ToString("F0", Inv) : ", cel z ostatniej doby")
                                  + ") | ocena " + nv.ToString("F2", Inv) + " = max(" + ArmsFirst.FloorScore.ToString("0.0#", Inv) + ", " + AiEdge.ToString("0.0#", Inv)
