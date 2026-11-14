@@ -67,3 +67,8 @@ Kolejnosc wdrozen: podwojne perki BK -> XP z perkow (RBM) -> latki bledow BK -> 
 D1 mnozenie XP takze arena i turniej: TAK. D3 jency: pol porcji (TAK - glod oslabia prace; smierc/ucieczki - zgodnie z propozycja). D5 ShipwrightsHand: rekrut z ochotnikow miasta. D6 IronMaker: (c) przekucie lupy stratne, perk zmniejsza strate. D7 PracticalSmith: zbroje/luki o 25% krocej (nie o polowe). D8 Breeder: pasza przez caly rok. D9 Pavise: tez ciosy wrecz w tarcze na plecach. D12 WalkItOff obu: sumuja sie do 75%. D13 BushDoctor: tez w samej wsi. D14 DiplomaticTies gracza: +1 relacji z obcymi wladcami raz w tygodniu. D16 amunicja NavalDLC: odzysk (jak 512).
 D4 RapidDevelopment - Jeff: "jak przejmuje wrogie warsztaty nikomu nic nie place, to wojna; warsztatow osob, z ktorymi nie tocze wojny, nie zabieram" -> zdobywca NIE placi; nowy efekt do propozycji (odczyt).
 D2, D10, D11, D15 - Jeff prosi o wyjasnienie na przykladzie.
+D4 (Jeff): przy zdobyciu miasta warsztaty notabli/gang leaderow i osob, z ktorymi nie ma wojny - zostaja; warsztat wrogiego lorda - zdobywca przejmuje bez zaplaty. RapidDevelopment: wlasciciel z perkiem "zdazyl wywiezc zloto" (kapital warsztatu wraca do niego) - "dobry pomysl".
+D2: przepuscic WSZYSTKIE znizki werbunku przez podloge BK; pokazac na przykladzie.
+D10: "nie sa wystarczajaco szybkie" - premie predkosci konia z perkow moga przekraczac sufit RBM.
+D11: wersja realna - po przegranej wlasne perki (PreventiveMedicine, WalkItOff) daja najwyzej 10 HP (albo inny efekt).
+D15: Lithurgy trwala u wszystkich - jedna zasada.
