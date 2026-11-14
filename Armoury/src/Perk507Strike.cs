@@ -75,7 +75,7 @@ namespace Armoury
             IHigh = 10, IFennid = 11, IDrengr = 12, IKlibT = 13, IKlibD = 14, ISweep = 15, IEquites = 16, IAdapt = 17, ICamel = 18, IOutrider = 19;
         private static readonly int[] _dHit = new int[20];
         private static int _dMelee, _dMeleeUp, _dMissileUp, _dHorse;
-        private static int _dSpdN, _dOverCap; private static float _dSpdGain, _dSpdPct;   // D10 (526): przeliczenia konia z premia predkosci (suma m/s i % ponad predkosc RBM), z tego ponad sufit RBM
+        private static int _dSpdN, _dOverCap; private static float _dSpdGain, _dSpdPct;   // D10 (526): przeliczenia konia z premia predkosci (suma m/s i % ponad predkosc RBM), z tego premia przebila sufit RBM (spd0 <= sufit < v)
         private static double _dMeleeRatio, _dMissileRatio;
 
         // ---- BK (odbiciem, leniwie)
@@ -487,7 +487,7 @@ namespace Armoury
                     if (v > spd0)
                     {
                         _dSpdN++; _dSpdGain += v - spd0; _dSpdPct += 100f * (v / spd0 - 1f);
-                        if (rbm && v > cap) _dOverCap++;
+                        if (rbm && v > cap && spd0 <= cap) _dOverCap++;   // recenzja 526: tylko gdy to premia przebila sufit (kon RBM juz ponad sufitem - nie liczony)
                     }
                 }
                 if (any) _dHorse++;
@@ -615,7 +615,7 @@ namespace Armoury
                     Log.Info(P + "dzien " + day + " | wolan ciosu wrecz po RBM " + _dMelee + ", z premia predkosci " + _dMeleeUp
                              + (_dMeleeUp > 0 ? " (sila x" + F2(_dMeleeRatio / _dMeleeUp) + " srednio)" : "")
                              + " | pociski z RunningThrow " + _dMissileUp + (_dMissileUp > 0 ? " (x" + F2(_dMissileRatio / _dMissileUp) + ")" : "")
-                             + " | przeliczen koni z premia " + _dHorse + (_dSpdN > 0 ? " (premia predkosci " + _dSpdN + ", srednio +" + F2(_dSpdGain / _dSpdN) + " m/s = +" + F2(_dSpdPct / _dSpdN) + "%, ponad sufit RBM " + _dOverCap + " - D10)" : "")
+                             + " | przeliczen koni z premia " + _dHorse + (_dSpdN > 0 ? " (premia predkosci " + _dSpdN + ", srednio +" + F2(_dSpdGain / _dSpdN) + " m/s = +" + F2(_dSpdPct / _dSpdN) + "%, premia przebila sufit RBM " + _dOverCap + " - D10)" : "")
                              + " | per perk (trafienia/przeliczenia): " + (parts.Count > 0 ? string.Join(", ", parts) : "-")
                              + " | potkniecia doby " + _dStumbles + " (razem " + _stumbles + ").");
                 }

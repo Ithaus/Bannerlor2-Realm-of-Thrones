@@ -9,7 +9,7 @@
 **Zmiana:** Armoury/src/Perk507Strike.cs:
 - premie predkosci perkow (SweepingWind gry przy RBM, BK JawwalCamelMaster 8%, KheshigOutrider 5%) SUMOWANE (dotad mnozone), wynik = min(spd0 x (1 + suma), spd0 x 1.10) - spd0 = predkosc konia wedlug RBM; sufit RBM nie gra roli (klucz PerkMountOverCap). Np. kon RBM 12 m/s + SweepingWind 5% = 12.60 m/s (dotad 12.00); CamelMaster + Outrider = 13% -> 10% = 13.20.
 - klucz wylaczony: jak 507 - przy RBM ponad sufit przyciecie do max(spd0, sufit).
-- licznik doby: `przeliczen koni z premia N (premia predkosci K, srednio +X m/s = +Y%, ponad sufit RBM Z - D10)`.
+- licznik doby: `przeliczen koni z premia N (premia predkosci K, srednio +X m/s = +Y%, premia przebila sufit RBM Z - D10)` (po recenzji: Z = tylko przypadki spd0 <= sufit < v).
 - Settings.cs / McmSettings.cs: opis PerkMountOverCap (po angielsku) wedlug nowej reguly; wartosc domyslna bez zmian (true).
 
 **Ryzyko / co sprawdzic (zasada 0; CHANGELOG 49595 -> 49617 linii):**
@@ -21,6 +21,10 @@
 - Build Armoury 0 bledow. NIE WGRANE (gra Jeffa moze byc wlaczona).
 
 **Status:** DO SPRAWDZENIA (galaz noc/526-kon-d10, na noc/scal-perki 4f0c93c3).
+
+**Recenzja 526:**
+- (low, PRAWDZIWE - poprawione) licznik "ponad sufit RBM" liczyl kazde przeliczenie z v > sufit, takze konie, ktore RBM juz ustawil ponad sufitem (log 237: 16 na 16) - nic nie mowil o tym, kiedy to premia perka przebija sufit. Teraz `if (rbm && v > cap && spd0 <= cap) _dOverCap++`, etykieta linii doby "premia przebila sufit RBM Z". Tylko log, dzialanie gry bez zmian. Build Armoury 0 bledow.
+- Reszta recenzji (HorsePostfix wedlug decyzji Jeffa, idempotencja od spd0, klucz wylaczony jak 507, HorseWind, liczniki zerowane w ResetDay) - bez uwag, nic do zmiany.
 
 ## 524: ranni AI a glod - koniec twierdzy przy glodzie / zamku bez zapasu, bez podbicia zamkow dla glodnych, bez wejscia do zamku bez jedzenia, limit Fort nie przed koncem loza HW - Armoury (500-b)
 
