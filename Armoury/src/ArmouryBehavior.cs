@@ -3018,8 +3018,8 @@ namespace Armoury
 
         private void OnDailyTickBodyInner()
         {
-            try { Cost174.Daily(); } catch (Exception e) { Log.Error("Cost174.Daily", e); } DayProfile.Lap("Cost174.Daily");
-            try { Perk511.Daily(); } catch (Exception e) { Log.Error("Perk511.Daily", e); }   // 511 (perki kuzni): linia doby i przyciecie ksiegi wlasnej roboty do sakw   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
+            try { Cost174.Daily(); } catch (Exception e) { Log.Error("Cost174.Daily", e); } DayProfile.Lap("Cost174.Daily");   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
+            try { Perk511.Daily(); } catch (Exception e) { Log.Error("Perk511.Daily", e); } DayProfile.Lap("Perk511.Daily");   // 511 (perki kuzni): linia doby i przyciecie ksiegi wlasnej roboty do sakw i wyposazenia
             try { PerfD2.Daily(); } catch (Exception e) { Log.Error("PerfD2.Daily", e); } DayProfile.Lap("PerfD2.Daily");   // perf-d2d3: linia "Szybkosc doby (perf-d2d3)" za okres od poprzedniego taktu (tylko log) i straznik podatku miast raz na dobe   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
             try { StoryGuard.Daily(); } catch (Exception e) { Log.Error("StoryGuard.Daily", e); } DayProfile.Lap("StoryGuard.Daily");   // 396: straz fabuly PIERWSZA w dobie (przed zaraza, murami, lochem) - przeliczenie 32 postaci, linia doby tylko gdy cos zaszlo
             try { HeroWounds.Daily(); } catch (Exception e) { Log.Error("HeroWounds.Daily", e); } DayProfile.Lap("HeroWounds.Daily");   // 401: ksiega ran po strazy fabuly, przed zaraza - termin loza, wstajacy, linia "Rany (HW): dzien"

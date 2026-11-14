@@ -121,7 +121,8 @@ namespace Armoury
                 int crudeFromOre = Math.Max(1, (int)Math.Round(oW * crude / iW * (ironMaker ? 1.25f : 1f)));
                 yield return new Crafting.RefiningFormula(CraftingMaterials.Wood, 1, CraftingMaterials.Iron1, 0, CraftingMaterials.Charcoal, coalFromWood);
                 // E6/R1 (214): lupa jest juz zelazem z dymarki przy kopalni (oW = 15 kg surowki) - kuznia gracza tylko ja przekuwa na sztaby surowki:
-                // masa lupy / masa sztaby (30), jeden wegiel na zgrzanie; bez premii IronMaker (perk dawal wiecej surowki z RUDY - z lupy metalu nie przybywa)
+                // masa lupy / masa sztaby (30), jeden wegiel na zgrzanie; 511 (Jeff 14.11, pkt 40): IronMaker x (1 + IronMakerBloomBonus) - UWAGA: ponad mase lupy
+                // (36 sztab = 18 kg z 15 kg), decyzja Jeffa w docs/changelog-oczekuje/511.md; IronMakerBloomBonus = 0 przywraca stare 30 (cala masa lupy)
                 if (Bloomery.IsBloom(oi)) yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron1, Perk511.BloomBars(Math.Max(1, (int)Math.Round(oW / iW)), weaponsmith));   // 511 (perki): IronMaker +20% sztab z lupy
                 else yield return new Crafting.RefiningFormula(CraftingMaterials.IronOre, 1, CraftingMaterials.Charcoal, coalPerOre, CraftingMaterials.Iron1, crudeFromOre);
                 yield return new Crafting.RefiningFormula(CraftingMaterials.Iron1, 5, CraftingMaterials.Charcoal, 1, CraftingMaterials.Iron2, 4);

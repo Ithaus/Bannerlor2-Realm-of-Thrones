@@ -29,8 +29,8 @@ namespace Armoury
     ///  40 IronMaker (gra): lupa -> sztaby surowki przy kuzni gracza x (1 + IronMakerBloomBonus); ruda (lupa) zuzywa sie dalej jedna na przepis.
     ///  42 ArtisanSmith (gra, PartyLeader): kara handlowa przy sprzedazy zbroi, luku i amunicji WYKUTYCH przez gracza - ten sam wzor co gra dla broni z ekranu
     ///     (AddFactor PrimaryBonus = -50% na czlonie 1.5 + 0.25 x (Tierf - 1)). Gra przyjmuje tylko ItemObject - co jest "nasze", mowi KSIEGA wykutych sztuk
-    ///     (id przedmiotu -> sztuk; zapis arm_perk511): dopisuje Forge.Deliver/Finish/Smith, zdejmuje sprzedaz (PlayerInventoryExchangeEvent) i doba (nie wiecej,
-    ///     niz gracz ma w sakwach). Wycena: postfiks DeclaredMethod DefaultTradeItemPriceFactorModel.GetTradePenalty (Priority.First - przed postfiksem BK
+    ///     (id przedmiotu -> sztuk; zapis arm_perk511): dopisuje Forge.Deliver/Finish/Smith, zdejmuje sprzedaz (PlayerInventoryExchangeEvent, isTrading) i doba (nie wiecej,
+    ///     niz gracz ma w sakwach i na bohaterach partii; suma wszystkich stosow). Perk tylko, gdy caly zapas wzoru w sakwach jest w ksiedze (recenzja 511). Wycena: postfiks DeclaredMethod DefaultTradeItemPriceFactorModel.GetTradePenalty (Priority.First - przed postfiksem BK
     ///     i 300b; BKROT wola base, wiec Default liczy raz) mnozy wynik przez (num - 0.5 x T) / num, num = czlony gry przed mnoznikami (wynik jest liniowy w num).
     ///  92 BK ArtisanCraftsman: Forge.RollQuality - 5% (SecondaryBonus perka BK) szansy na jakosc o stopien wyzsza (jak BK GetModifierForCraftedItem), potem
     ///     sufit wedlug tieru jak dotad.
@@ -226,14 +226,54 @@ namespace Armoury
             catch (Exception e) { Stumble("Made", e); }
         }
 
-        /// <summary>Ile sztuk tego przedmiotu w sakwach gracza to jego robota (ksiega, nie wiecej niz w sakwach).</summary>
-        internal static int OursInBag(ItemObject it)
+        /// <summary>Sztuk w sakwach gracza - SUMA wszystkich stosow (GetItemNumber gry liczy tylko pierwszy stos, a nasze wyroby maja rozne jakosci;
+        /// jak ArmourQuality.TotalOf).</summary>
+        private static int BagCount(ItemObject it)
+        {
+            var mp = MobileParty.MainParty;
+            var r = mp != null ? mp.ItemRoster : null;
+            if (it == null || r == null) return 0;
+            int n = 0;
+            for (int i = 0; i < r.Count; i++) { var el = r.GetElementCopyAtIndex(i); if (el.EquipmentElement.Item == it) n += el.Amount; }
+            return n;
+        }
+
+        /// <summary>Wyposazenie bohaterow partii gracza (bojowe i cywilne) - zalozona wlasna sztuka nie wypada z ksiegi. it == null: wszystko do slownika.</summary>
+        private static int WornCount(ItemObject it, Dictionary<ItemObject, int> all)
+        {
+            int n = 0;
+            var mp = MobileParty.MainParty;
+            if (mp == null || mp.MemberRoster == null) return 0;
+            foreach (var tr in mp.MemberRoster.GetTroopRoster())
+            {
+                var h = tr.Character != null ? tr.Character.HeroObject : null;
+                if (h == null) continue;
+                var sets = new[] { h.BattleEquipment, h.CivilianEquipment };
+                for (int s = 0; s < sets.Length; s++)
+                {
+                    var eq = sets[s];
+                    if (eq == null) continue;
+                    for (int i = 0; i < (int)EquipmentIndex.NumEquipmentSetSlots; i++)
+                    {
+                        var el = eq[i];
+                        if (el.IsEmpty || el.Item == null) continue;
+                        if (all != null) { int c; all.TryGetValue(el.Item, out c); all[el.Item] = c + 1; }
+                        else if (el.Item == it) n++;
+                    }
+                }
+            }
+            return n;
+        }
+
+        /// <summary>Recenzja 511: perk tylko, gdy CALY zapas tego wzoru w sakwach to wlasna robota. Wlasnych w sakwach = ksiega - zalozone (ostroznie: zalozona
+        /// sztuka liczy sie jako wlasna); sakwy maja wiecej (mieszany stos z lupami) - bez perka dla calego wzoru (wycena dostaje tylko ItemObject).</summary>
+        internal static bool AllOursInBag(ItemObject it)
         {
             int c;
-            if (it == null || !_made.TryGetValue(it.StringId, out c) || c <= 0) return 0;
-            var mp = MobileParty.MainParty;
-            int have = mp != null && mp.ItemRoster != null ? mp.ItemRoster.GetItemNumber(it) : 0;
-            return Math.Min(c, have);
+            if (it == null || !_made.TryGetValue(it.StringId, out c) || c <= 0) return false;
+            int have = BagCount(it);
+            if (have <= 0) return false;
+            return have <= Math.Max(0, c - WornCount(it, null));
         }
 
         /// <summary>Postfiks (Priority.First) DefaultTradeItemPriceFactorModel.GetTradePenalty: perk ArtisanSmith dla sprzedazy wlasnej roboty gracza.</summary>
@@ -246,7 +286,7 @@ namespace Armoury
                 if (s == null || !s.PerkArtisanSmithOwnWork || !Ledgerable(__0)) return;
                 var perk = DefaultPerks.Crafting.ArtisanSmith;
                 if (perk == null || !__1.HasPerk(perk)) return;
-                if (OursInBag(__0) <= 0) return;
+                if (!AllOursInBag(__0)) return;   // recenzja 511: mieszany stos (wlasne + lupy) - bez perka
                 // czlony gry przed mnoznikami (DefaultTradeItemPriceFactorModel.GetTradePenalty 1.4.8) - sprzedaz, nie karawana, nie kon
                 float t = 1.5f + Math.Max(0f, __0.Tierf - 1f) * 0.25f;
                 float num = 0.06f + t;
@@ -263,12 +303,13 @@ namespace Armoury
             catch (Exception e) { Stumble("PenaltyPostfix", e); }
         }
 
-        /// <summary>PlayerInventoryExchangeEvent: sprzedane sztuki z ksiegi schodza.</summary>
+        /// <summary>PlayerInventoryExchangeEvent: SPRZEDANE (isTrading) sztuki z ksiegi schodza. Odlozenie do schowka / towarzysza bez handlu ksiegi nie rusza
+        /// (przyciecie doby i tak zdejmie, czego nie ma w sakwach ani na bohaterach).</summary>
         internal static void OnPlayerExchange(List<(ItemRosterElement, int)> purchased, List<(ItemRosterElement, int)> sold, bool isTrading)
         {
             try
             {
-                if (sold == null || _made.Count == 0) return;
+                if (!isTrading || sold == null || _made.Count == 0) return;
                 foreach (var x in sold)
                 {
                     var it = x.Item1.EquipmentElement.Item;
@@ -276,7 +317,7 @@ namespace Armoury
                     if (it == null || !_made.TryGetValue(it.StringId, out c) || c <= 0) continue;
                     int n = Math.Min(c, Math.Max(0, x.Item1.Amount));
                     if (n <= 0) continue;
-                    if (isTrading) _dSoldOurs += n;
+                    _dSoldOurs += n;
                     if (c - n > 0) _made[it.StringId] = c - n; else _made.Remove(it.StringId);
                 }
             }
@@ -343,11 +384,23 @@ namespace Armoury
                 var mp = MobileParty.MainParty;
                 if (mp != null && mp.ItemRoster != null && _made.Count > 0)
                 {
+                    // recenzja 511: sakwy (suma wszystkich stosow - GetItemNumber liczy tylko pierwszy) + wyposazenie bohaterow partii, jeden przebieg
+                    var held = new Dictionary<ItemObject, int>();
+                    var r = mp.ItemRoster;
+                    for (int i = 0; i < r.Count; i++)
+                    {
+                        var el = r.GetElementCopyAtIndex(i);
+                        var ei = el.EquipmentElement.Item;
+                        if (ei == null || el.Amount <= 0) continue;
+                        int c; held.TryGetValue(ei, out c); held[ei] = c + el.Amount;
+                    }
+                    WornCount(null, held);
                     var keys = new List<string>(_made.Keys);
                     foreach (var k in keys)
                     {
                         var it = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(k);
-                        int have = it != null ? mp.ItemRoster.GetItemNumber(it) : 0;
+                        int have = 0;
+                        if (it != null) held.TryGetValue(it, out have);
                         if (have <= 0) _made.Remove(k);
                         else if (_made[k] > have) _made[k] = have;
                     }
@@ -360,7 +413,7 @@ namespace Armoury
                          + ", BK Smith " + (ResolveBk() && BkHas(hero, _bkSmith) ? "tak" : "nie") + "), sztuk przy kowadle " + _dPieces + ", stamina przepisu " + _dStamRaw + " -> pobrana " + _dStamNow
                          + " | stawka kuzni x" + HireFactor().ToString("0.00", Inv)
                          + " | IronMaker " + (Has(hero, DefaultPerks.Crafting.IronMaker) ? "tak" : "nie") + " (lupa +" + (S.IronMakerBloomBonus * 100f).ToString("0", Inv) + "%)"
-                         + " | ksiega wlasnej roboty: dopisane " + _dMade + ", sprzedane " + _dSoldOurs + ", w sakwach " + ours + " (" + _made.Count + " wzorow), wyceny z ArtisanSmith " + _dPriced
+                         + " | ksiega wlasnej roboty: dopisane " + _dMade + ", sprzedane " + _dSoldOurs + ", w sakwach i na bohaterach " + ours + " (" + _made.Count + " wzorow), wyceny z ArtisanSmith " + _dPriced
                          + " | BK Craftsman: losowan " + _dQualRolls + ", w gore " + _dQualUp
                          + " | potkniecia " + _dErrors + ".");
             }
