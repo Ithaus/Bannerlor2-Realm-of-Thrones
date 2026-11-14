@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 ~19:45 - WGRANIE 236 (521 waga pieniedzy), bez autotestu - test = gra Jeffa (235 jeszcze nie grane)
+
+- Armoury.dll f0aa81ec = noc/scal-perki 12e3ca1e (235 + 521). Reszta bez zmian. Kopie: .bak-2026-11-14-przed-wgranie236, Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie236 i -przed).
+- 521: waga monet w udzwigu (pozycja "Coin"; mieszanka 10/60/30 -> 0.754 kg na 1000 zl; 179 000 zl = 135 kg); lord AI - waga tylko sakiewki roboczej (5000 + 30 dni zoldu), lup z lorda AI najwyzej ta sakiewka; skarbiec gracza: wplata/wyplata w menu wlasnego miasta/zamku i depozyt w Braavos (przy IronBank); wierzyciele siegaja do skarbcow.
+- Decyzje czekajace: skarbiec utraconej osady (szturm -> zdobywca), lokata w Banku z odsetkami, waga kies karawan i band, udzial zlota Essos/Westeros, wierzyciele a skarbce w zamkach.
+
 ## STAN 14.11 ~19:00 - WGRANIE 235 (519 + 520 drogi + 520-a), bez autotestu - test = gra Jeffa
 
 - Armoury.dll 8ae696f0 + ModuleData/arm_map_roads_valyria.tsv 2e17142a (odswiezony roads_md5 - rodzaje drog czynne) = noc/scal-perki 66a8271b. RC/CrashScribe/GrandTourney bez zmian (234). Armoury.json: MapRoadSpeedPercent 15 -> 30 (kopia Armoury.json.bak-2026-11-14-przed-wgranie235). Kopie DLL/tsv/json: .bak-2026-11-14-przed-wgranie235, Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie235 i -przed).
