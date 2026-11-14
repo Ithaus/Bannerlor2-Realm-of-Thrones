@@ -803,11 +803,11 @@ namespace Armoury
         private readonly bool _p6DrogiReset = P6DrogiReset();
         private static bool P6DrogiReset() { try { AiRoadRoutes.Reset(); } catch (Exception e) { Log.Error("P6DrogiReset", e); } return true; }
         // p6-spichlerz (R3-06f): zakup dnia i liczniki spichlerza miejskiego od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak inwest)
+        private readonly bool _p6SpichlerzReset = P6SpichlerzReset();
+        private static bool P6SpichlerzReset() { try { TownGranary.Reset(); } catch (Exception e) { Log.Error("P6SpichlerzReset", e); } return true; }
         // 500 (leczenie tylko w spoczynku): liczniki linii doby od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6)
         private readonly bool _p500Reset = P500Reset();
         private static bool P500Reset() { try { SlowHealing.Reset(); } catch (Exception e) { Log.Error("P500Reset", e); } return true; }
-        private readonly bool _p6SpichlerzReset = P6SpichlerzReset();
-        private static bool P6SpichlerzReset() { try { TownGranary.Reset(); } catch (Exception e) { Log.Error("P6SpichlerzReset", e); } return true; }
         // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
         private readonly bool _p6a7Reset = P6a7Reset();
         private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }

@@ -48,9 +48,14 @@ namespace Armoury
                     Log.Info("SlowHealing: glod rani " + s.StarvationWoundPercent + "% skladu dziennie (vanilla 25%).");
                 }
                 // 500: leczenie w spoczynku - wlasny postfiks, wpinany ZAWSZE (klucz HealOnlyAtRest czytany na zywo), takze przy 100/100 ponizej
+                // recenzja 500: wlasny try - Harmony przy bledzie rzuca, a wywrotka latki 500 nie moze odciac SlowPostfix ponizej (HealingRegenPercent)
                 int rest = 0;
-                if (m1 != null && harmony.Patch(m1, postfix: new HarmonyMethod(typeof(SlowHealing), nameof(RestPostfixRegulars)) { priority = Priority.Low - 1 }) != null) rest++;
-                if (m2 != null && harmony.Patch(m2, postfix: new HarmonyMethod(typeof(SlowHealing), nameof(RestPostfixHeroes)) { priority = Priority.Low - 1 }) != null) rest++;
+                try
+                {
+                    if (m1 != null && harmony.Patch(m1, postfix: new HarmonyMethod(typeof(SlowHealing), nameof(RestPostfixRegulars)) { priority = Priority.Low - 1 }) != null) rest++;
+                    if (m2 != null && harmony.Patch(m2, postfix: new HarmonyMethod(typeof(SlowHealing), nameof(RestPostfixHeroes)) { priority = Priority.Low - 1 }) != null) rest++;
+                }
+                catch (Exception e) { Log.Error("SlowHealing.Rest", e); }
                 Log.Info("Leczenie w spoczynku (500): " + (s.HealOnlyAtRest ? "TAK" : "NIE") + " - druzyna gracza w marszu " + Math.Max(0, Math.Min(100, s.MovingHealPercent))
                          + "% stawki, w spoczynku (postoj / oboz / sen / osada) pelna | AI bez zmian | jency pomijani | " + rest + "/2 metod.");
                 if (s.HealingRegenPercent == 100 && s.AiHealingRegenPercent == 100)
@@ -81,10 +86,20 @@ namespace Armoury
 
         internal static void Reset() { _stumbles = 0; _cutsReg = 0; _cutsHero = 0; _hMove = 0; _hRest = 0; _day = -1; _hp0 = -1; _w0 = -1; _dueHero = 0f; }
 
-        /// <summary>500: partia gracza jest W MARSZU (nie odpoczywa): rusza sie po mapie (ladem albo morzem), poza osada i poza menu snu.</summary>
+        /// <summary>500: partia gracza jest W MARSZU (nie odpoczywa): rusza sie po mapie (ladem albo morzem), poza osada. Sen w menu = SetMoveModeHold,
+        /// czyli IsMainPartyWaiting (recenzja 500: bez flagi NightRest.SleepingNow - bywa nieaktualna i dawala pelna stawke w jezdzie).
+        /// Gracz doczepiony do CUDZEJ armii: wlasne IsMoving (ComputeIsWaiting z wlasnych celow, nieaktualnych u doczepionego - DoAiPathMode
+        /// wychodzi od razu) nic nie mowi - stan przywodcy, jak sama gra (MobileParty: IsMoving || Army.LeaderParty.IsMoving).</summary>
         internal static bool PlayerMarching(MobileParty mp)
         {
-            if (mp == null || mp.CurrentSettlement != null || NightRest.SleepingNow) return false;
+            if (mp == null || mp.CurrentSettlement != null) return false;
+            var army = mp.Army;
+            if (army != null && mp.AttachedTo != null && army.LeaderParty != null && army.LeaderParty != mp)
+            {
+                var L = army.LeaderParty;
+                // IsMoving AI = Position != MoveTargetPoint i samo wyklucza osade, oblezenie, bitwe; oboz nocny AI (NightRest) = spoczynek
+                return L.CurrentSettlement == null && L.BesiegedSettlement == null && L.MapEvent == null && L.IsMoving && !NightRest.IsCamping(L);
+            }
             return mp.IsMoving;
         }
 
@@ -134,7 +149,7 @@ namespace Armoury
                 }
                 bool march = PlayerMarching(mp);
                 if (march) _hMove++; else _hRest++;
-                if (mp.Party != null && mp.MapEvent == null)
+                if (mp.Party != null && mp.MapEvent == null && mp.IsActive)   // recenzja 500: gra leczy tylko partie czynna (TryHealOrWoundParty) - niewola, sluzba ROT bez naleznych
                 {
                     float rate = mp.Party.HealingRateForMemberHeroes;   // czynny model z calym lancuchem (to samo co gra w tej godzinie)
                     _dueHero += rate / 24f;
