@@ -60,7 +60,7 @@ namespace GrandTourney
         private static string _pendingLog;
 
         // liczniki doby
-        private static int _tourneysMis, _tourneysSim, _heroesHurt, _heroesSkipped, _koRolls, _killed, _refused, _deferredDrop, _setStart;
+        private static int _tourneysMis, _tourneysSim, _heroesHurt, _heroesSkipped, _koRolls, _killed, _refused, _deferredDrop, _setStart, _forfeitSkip;
         private static int _stumbles, _stumblesDay;
         private static bool _patched;
 
@@ -89,7 +89,7 @@ namespace GrandTourney
 
         private static void ClearDay()
         {
-            _tourneysMis = _tourneysSim = _heroesHurt = _heroesSkipped = _koRolls = _killed = _refused = _deferredDrop = _setStart = 0;
+            _tourneysMis = _tourneysSim = _heroesHurt = _heroesSkipped = _koRolls = _killed = _refused = _deferredDrop = _setStart = _forfeitSkip = 0;
             _stumblesDay = 0;
         }
 
@@ -318,6 +318,20 @@ namespace GrandTourney
                 CheckMission();
                 var winners = new List<TournamentParticipant>(__instance.Winners);
                 bool skipping = TourneyRansom.Skipping;
+                // 491-p (recenzja): rezygnacja gracza (Leave -> EndTournamentViaLeave -> SkipMatch -> Simulate zdejmuje cala druzyne gracza bez walki)
+                // to nie powalenie. Druzyna gracza: kto stoi - HP z agenta, kogo nie bylo w walce - bez zmian i bez liczenia walki.
+                // Walkower: walka bez agentow, w ktorej poza druzyna gracza zostaje jedna druzyna - jej zwyciezcy tez nie walczyli.
+                TournamentTeam plTeam = null;
+                foreach (var p in __instance.Participants)
+                    if (p != null && p.Character == CharacterObject.PlayerCharacter) { plTeam = p.Team; break; }
+                bool forfeit = skipping && plTeam != null;
+                bool walkover = false;
+                if (forfeit)
+                {
+                    int others = 0;
+                    foreach (var t in __instance.Teams) if (t != null && t != plTeam) others++;
+                    walkover = others <= 1;
+                }
                 foreach (var p in __instance.Participants)
                 {
                     try
@@ -327,7 +341,13 @@ namespace GrandTourney
                         bool won = winners.Contains(p);
                         bool ko; float end;
                         var a = AgentOf(p);
-                        if (r.Ko) { ko = true; end = 0f; }
+                        if (forfeit && !r.Ko && (p.Team == plTeam || (walkover && won && a == null)))
+                        {
+                            if (a != null && a.IsActive() && a.HealthLimit > 0f)
+                            { ko = false; end = MathF.Clamp(a.Health / a.HealthLimit, 0.01f, 1f); }
+                            else { _forfeitSkip++; r.Ko = false; r.Spawned = false; continue; }   // nie walczyl - zapis bez zmian
+                        }
+                        else if (r.Ko) { ko = true; end = 0f; }
                         else if (a != null && a.IsActive() && a.HealthLimit > 0f && (won || !skipping))
                         { ko = false; end = MathF.Clamp(a.Health / a.HealthLimit, 0.01f, 1f); }
                         else if (won)
@@ -433,7 +453,7 @@ namespace GrandTourney
             {
                 _tourneysMis++;
                 _pendingLog = P + "turniej " + (_misTown ?? "?") + ": walk " + _misMatches + ", uczestnikow z HP " + all + ", bohaterow " + heroes
-                              + ", start walki ustawiony " + _setStart + " razy, HP po turnieju:" + sb + " | smierci w kolejce " + _deaths.Count;
+                              + ", start walki ustawiony " + _setStart + " razy, rezygnacja/walkower bez zmiany " + _forfeitSkip + ", HP po turnieju:" + sb + " | smierci w kolejce " + _deaths.Count;
                 Log.Info(_pendingLog);
             }
             _recs.Clear(); _preHit.Clear(); _mis = null; _misTown = null; _misMatches = 0;
