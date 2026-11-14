@@ -2429,6 +2429,8 @@ namespace Armoury
         public float TournamentXpPercent = 50f;            // tournament bouts teach this share of the battle rate (vanilla 33, RBM 100)
         public bool BattleXpScalesWithDamage = true;       // real battles: XP follows the damage dealt and a kill pays double - not a flat fee per swing
         // 503 (P2 audytu perkow): RBM gubi premie perkow do XP z bitwy (ExplainedNumber przez MethodInfo.Invoke) - PerkXp503.cs dolicza je metoda gry
+        // 505 (perki): waga obrazen FairXp mnozy premie perkow XP (XpMultiply505.cs) zamiast dodawac sie do nich
+        public bool CombatXpPerksMultiply = true;          // battle experience: the damage weight multiplies the perk bonuses (perks, Inspiring Leader, naval bonus) instead of being added to them, so a +10% perk gives +10% on every blow, kills included. Off = added as before (a +10% perk gave about +2% on a kill)
         public bool PerkXpFix = true;                      // RBM drops the perk bonuses to battle experience (Trainer, Lead by Example, Corps-a-corps, Baptised in Blood, Resourceful, Mounted Crossbowman, Bulls Eye, No Rest for the Wicked, and the governor perks Projectile Deflection and Guards for the garrison). On = they count again, exactly as the game adds them. Off = as before, without them
         // E8/P1 (243, PLAN 8.1a): ksiega umiejetnosci - tylko log (SkillLedger.cs): co dobe "Umiejetnosci (E8/P1)" (surowe XP bohaterow wedlug grupy, umiejetnosci i zrodla)
         // i "XP wojska (E8/P1)", co 7 dob "Poziomy lordow (E8/P1)"; latki-liczniki wpinane w kampanii tylko przy wlaczonym kluczu (off od startu = zadnej latki)

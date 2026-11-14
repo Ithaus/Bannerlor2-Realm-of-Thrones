@@ -6376,6 +6376,11 @@ namespace Armoury
         [SettingPropertyGroup("The worth of a lesson")]
         public bool BattleXpScalesWithDamage { get; set; } = true;
 
+        // 505 (perki)
+        [SettingPropertyBool("Combat Xp Perks Multiply", HintText = "battle experience: the damage weight multiplies the perk bonuses (perks, Inspiring Leader, naval bonus) instead of being added to them, so a +10% perk gives +10% on every blow, kills included. Off = added as before (a +10% perk gave about +2% on a kill)", RequireRestart = false)]
+        [SettingPropertyGroup("The worth of a lesson")]
+        public bool CombatXpPerksMultiply { get; set; } = true;
+
         [SettingPropertyBool("Perk Xp Fix", HintText = "RBM drops the perk bonuses to battle experience (Trainer, Lead by Example, Corps-a-corps, Baptised in Blood, Resourceful, Mounted Crossbowman, Bulls Eye, No Rest for the Wicked, and the governor perks Projectile Deflection and Guards for the garrison). On = they count again, exactly as the game adds them. Off = as before, without them", RequireRestart = false)]
         [SettingPropertyGroup("The worth of a lesson")]
         public bool PerkXpFix { get; set; } = true;
@@ -14849,6 +14854,7 @@ namespace Armoury
             s.ArenaXpPercent = ArenaXpPercent;
             s.TournamentXpPercent = TournamentXpPercent;
             s.BattleXpScalesWithDamage = BattleXpScalesWithDamage;
+            s.CombatXpPerksMultiply = CombatXpPerksMultiply;   // 505 (perki)
             s.PerkXpFix = PerkXpFix;
             s.SkillLedgerLog = SkillLedgerLog;
             s.ShotXpFair = ShotXpFair;
