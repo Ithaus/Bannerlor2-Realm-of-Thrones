@@ -34,7 +34,7 @@ W grze: po turnieju z udzialem gracza w Armoury.log jedna linia "Zuzycie turniej
 - PRAWDA, poprawione (drobny): hint ArenaNoWear wymienial turniej bez zastrzezenia -> "a tournament (unless Tourney Gear Wear is on)" (oba pliki).
 - PRAWDA, poprawione: zdanie (e) "zle przypisanie nie jest mozliwe" bylo za mocne - przepisane.
 - Kontrola calosci poprawki: pola GrandTourney pisane tylko w postfiksie PrepareForMatch (przed spawnem agentow meczu) i czytane w OnAgentHit tej samej misji; kazdy nastepny PrepareForMatch je nadpisuje; mecz bez gracza (ogladany po odpadnieciu) zeruje pola - gracz wtedy nie walczy. Regula wyboru broni 498 bez zmian (TourneyOwnWeapon wstawia jak w f63efa0d), dochodza tylko przypisania pol. Odrzuconych uwag: brak.
-**Status:** DO SPRAWDZENIA (zbudowane, galaz noc/499-turniej-zuzycie z f63efa0d; nie wgrane).
+**Status:** WGRANE 231 (14.11 ~15:15, po autotescie at-499b: 8/8 dob, bitwy 3/5, arena, 23 bledy cudze, 0 potkniec - turnieju autotest nie gra, sprawdzic w grze; Armoury 161df0fa, GrandTourney 8a85e9cd).
 
 ## 498: GrandTourney - w turnieju bron drugorzedna gracza to jego wlasna bron biala (klucz TourneyOwnMeleeWeapon)
 
@@ -66,7 +66,7 @@ W grze sprawdzic w GrandTourney-*.log: linia "latka 1/1" przy starcie i przy kaz
 - (r4) Linia startu pokazywala klucz sprzed MCM (McmSettings.Apply dopiero w OnGameStart) - dopisek "(przed MCM ...)"; stan klucza w chwili meczu na koncu kazdej linii podmiany ("klucz TourneyOwnMeleeWeapon=TAK").
 Kontrola po poprawkach: MBItem.GetItemUsageSetFlags to wywolanie silnika (MBAPI) - wolane tylko w meczu (misja trwa), w try per uczestnik (potkniecie, bez wylacznika). Reszta (kopia MatchEquipment, kolejnosc po RBM, ArenaNoWear, TourneyRansom) bez zmian.
 
-**Status:** DO SPRAWDZENIA (zbudowane z poprawkami recenzji, galaz noc/498-turniej-wlasna-bron; nie wgrane).
+**Status:** WGRANE 231 (14.11 ~15:15, po autotescie at-499b: 8/8 dob, bitwy 3/5, arena, 23 bledy cudze, 0 potkniec - turnieju autotest nie gra, sprawdzic w grze; Armoury 161df0fa, GrandTourney 8a85e9cd).
 
 ## 497-q: fach - cel ze stolem / F okregu (zboze W); pomiar 490 - rozjazd rak osobno od czynnikow (zywiec)
 
