@@ -1523,6 +1523,7 @@ namespace Armoury
                     else sb.Append(pv.Missing).Append(pv.Missing == 1 ? " kit slot empty - " : " kit slots empty - ").Append(KitPreview.EmptyDetail(pv, 4)).Append('.');
                     sb.Append("\n\n");
                 }
+                int emptyDespite = 0;
                 foreach (var type in QuartermasterLaw.KitTypes)
                 {
                     int count = 0, worn = 0;
@@ -1552,6 +1553,7 @@ namespace Armoury
                         if (count == 0 && pvNeed <= 0) continue;
                         sb.Append(type).Append(": ").Append(count).Append(" on hand");
                         if (pvNeed > 0) sb.Append(" / ").Append(pvNeed).Append(" in the battle kit").Append(pvEmpty > 0 ? "  EMPTY " + pvEmpty : "");
+                        if (pvEmpty > 0 && count >= pvNeed) emptyDespite++;   // recenzja 525: puste mimo pelnych stojakow - przypis pod lista
                     }
                     else
                     {
@@ -1571,6 +1573,11 @@ namespace Armoury
                     }
                     sb.Append("\n");
                 }
+                // recenzja 525: "25 on hand / 25 in the battle kit EMPTY 3" bez slowa wyjasnienia to ten sam rozjazd, o ktory pytal Jeff - przyczyny z podgladu
+                // (KitPreview.Why: inna klasa broni, umiejetnosc/kultura, sztuki nie do wydania, dodatki u innych) sa w oknie armii
+                if (emptyDespite > 0)
+                    sb.Append("\nEMPTY with enough on the racks: those pieces are not handed to the men who lack them (another kind of weapon, skill or culture,"
+                              + " pieces never handed out, or spare kit given to other men) - Review the army in camp gives the reason for each troop.\n");
                 int all, allCost, can, canCost, disc;
                 if (MarketRule)
                 {

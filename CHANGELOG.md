@@ -23,6 +23,18 @@
 
 **Status:** DO SPRAWDZENIA (galaz noc/525-qm, nie wgrane)
 
+### Recenzja 525 (galaz noc/525-rec -> noc/525-qm)
+
+Sprawdzone w kodzie: tozsamosc `Open` - kazda sztuka bez pary zapelnia dokladnie jeden brak, dopoki sa braki, wiec zapelnionych min(Weapons, Extra) = Replaced i suma Open == Gaps.Missing (KitGaps.Compare); podglad liczy tylko zdrowych bez bohaterow (`ch.IsHero` pominiety - jak "fit men"), konni osobno (Foot / NoSaddle - nie wchodza do Missing ani do EMPTY), bron dwureczna bez tarczy - wzorzec po SkillsDecide nie ma tarczy, wiec tarcza nie jest liczona; zbrojownia DTE - ten sam przebieg rozdzielacza co okno; przy otwartej zbrojowni (Escrow) Gate podgladu zwraca niedostepny -> raport i ksiega wracaja do papieru (jak ShortageLines). Meldunek QM: regex Q316-3 (`QM: N kit slots empty ... and M riders on foot`) czyta nowy format (dopisek w nawiasie stoi PO czesci z jezdzcami). Bez regresji: CountNeeds / WornFor (zuzycie, straz wydawania), kolor 316d (liczby miss/foot bez zmian), linia bitwy 133c.
+
+Poprawki:
+- **Raport "Muster the men's kit": EMPTY przy pelnych stojakach bez slowa wyjasnienia** (log 22:22: tarcza polka 25, potrzeba 25, a w podgladzie puste sloty tarczy) - to ten sam rozjazd, o ktory pytal Jeff. Pod lista przypis (tylko gdy jakis typ ma EMPTY przy `on hand >= in the battle kit`): "EMPTY with enough on the racks: those pieces are not handed to the men who lack them (another kind of weapon, skill or culture, pieces never handed out, or spare kit given to other men) - Review the army in camp gives the reason for each troop." - przyczyny te same co KitPreview.Why (inna klasa broni, Fail, Barred/Black, Spares).
+- **Strona typu przy Open == 0**: "Melee weapon: 0 of 31 empty (19 more filled with another kind of weapon)" czytalo sie jak 19 pustych - teraz "0 of 31 empty - 19 filled with another kind of weapon."
+
+Pliki: Armoury/src/SmithMenu.cs, Armoury/src/KitPreview.cs. Build Armoury 0 bledow. NIE WGRANE (gra Jeffa wlaczona), w grze nie sprawdzone.
+
+**Status recenzji:** DO SPRAWDZENIA.
+
 ## 524: ranni AI a glod - koniec twierdzy przy glodzie / zamku bez zapasu, bez podbicia zamkow dla glodnych, bez wejscia do zamku bez jedzenia, limit Fort nie przed koncem loza HW - Armoury (500-b)
 
 **Problem:** Jeff, czat 14.11 "sprawdz logi" (do 500-b: "lordowie stoja az sie wylecza a potem jada do zamku bo tam sie szybciej wylecza", pamiec "AI walczy o zycie"). Log Armoury-2026-11-14_19-28-01.log: Nocna Straz wchodzi w stan Fort w ZAMKU i zamiast leczyc - traci ludzi: `lord_5_17_party_1 (wodz Jon Snow, HP 169/169, ranni 145/361 = 40%) -> TWIERDZA (stoi w castle_N5, ranni 40%)` (21:35:13), po 10 dobach `ranni 325/361 = 90%) TWIERDZA -> KONIEC (limit 10 dob, 24 h bez wejscia, po 10.0 dob)` (21:55:54), po 24 h znowu `ranni 343/361 = 95%) -> TWIERDZA (stoi w castle_B7` (21:59:49), potem 100% i znow castle_N5. Linia doby 108900: "do twierdzy 15 ... koniec twierdzy 2 (limit 10 dob 2) ... wejscia wstrzymane (24 h ...) 28". Dzicy: `-> BEZ POSTOJU (postoj niebezpieczny: glod, ...)` (np. 19:32:10 Dunsen HP 1/100) albo z twierdza - do miasta 39-88 h jazdy glodni (-19 HP / dobe poza osada).

@@ -1170,7 +1170,9 @@ namespace Armoury
                 if (t.Short[c] <= 0) continue;
                 // 525: puste po zastapieniu (suma rodzajow == puste sloty typu); reszta braku tego rodzaju - zapelniona inna bronia
                 sb.Append("\n\n").Append(Cap(KitGaps.NameEn(c))).Append(": ").Append(t.Open[c]).Append(" of ").Append(t.Need[c]).Append(" empty");
-                if (t.Short[c] > t.Open[c]) sb.Append(" (").Append(t.Short[c] - t.Open[c]).Append(" more filled with another kind of weapon)");
+                // recenzja 525: przy Open == 0 bez "more" ("0 of 31 empty (19 more ...)" czytalo sie jak 19 pustych)
+                if (t.Short[c] > t.Open[c])
+                    sb.Append(t.Open[c] > 0 ? " (" : " - ").Append(t.Short[c] - t.Open[c]).Append(t.Open[c] > 0 ? " more filled with another kind of weapon)" : " filled with another kind of weapon");
                 sb.Append('.');
                 if (c == KitGaps.SideArm) sb.Append(" (The second weapon of the kit.)");
                 var why = t.Why[c];
