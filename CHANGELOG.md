@@ -15,7 +15,7 @@
 - Review the army, wiersz glowny: `Kit for the next battle: 31 slots empty - side-arm (melee) 24, shield 3` -> `Kit for the next battle: 31 kit slots empty - side-arm (melee) 24, shield 3, other 4`; `no slot empty` -> `no kit slot empty`. Podpowiedz + `Same number as the QM report and the armoury; the map's readiness bar counts another way.`
 - Opis listy typow: `31 kit slots empty,` -> `31 kit slots empty for the next battle,`.
 - Wiersz typu: `Spearmen x12: 6 empty - arrows 6` -> `Spearmen x12: 6 of 31 empty slots - arrows 6` (przy wiecej rodzajach `, other N`). Stara jednoargumentowa `RowTitle(t)` zostaje (bez calosci: `6 empty slots`).
-- Strona typu: `6 kit slots go empty.` -> `6 of the 31 kit slots empty for the next battle are in this troop.`; `Shield: 3 of 12 empty` -> `Shield: 3 empty of 12 in their kit`; akapit o pasku DTE: `The armoury readiness bar on the map counts the wounded too and leaves out spare kit, so its numbers differ.` -> `The armoury readiness bar on the map ("Most needed equipment: N missing") counts by its own rule: one melee weapon a man, no side-arm, no spare kit, the wounded too, and only the one kind it lacks most - so its number is not the kit slots empty here.`
+- Strona typu: `6 kit slots go empty.` -> `6 of the 31 kit slots empty for the next battle are in this troop.`; `Shield: 3 of 12 empty` -> `Shield: 3 empty of 12 in their kit`; akapit o pasku DTE: `The armoury readiness bar on the map counts the wounded too and leaves out spare kit, so its numbers differ.` -> `The armoury readiness bar on the map ("Most needed equipment: TYPE (N missing)") counts by its own rule: one melee weapon a man, no side-arm, no spare kit, the wounded too, and only the one kind it lacks most - so its number is not the kit slots empty here.`
 - Last battle (wiersz): `Last battle: 6 kit slots empty, 2 riders on foot (40 men)` -> `Last battle: 6 kit slots were empty, 2 riders fought on foot (40 men)`.
 - Zbrojownia "Muster the men's kit": `Next battle (34 fit men): 31 kit slots empty - 25 of 34 fit men lack: ...` -> `Kit for the next battle: 31 kit slots empty (side-arm (melee) 24, ...; 25 of 34 fit men short).`; wiersz typu `... / 25 in the battle kit  EMPTY 3` -> `... EMPTY 3 of 31`; przypis `EMPTY with enough on the racks (EMPTY n of the kit slots empty for the next battle): ...`.
 - "Order kit" podpowiedz: `The men go short: Shield 3 empty, OneHanded 20 empty, ...` -> `The men go short: 31 kit slots empty for the next battle (Shield 3, ...)`; lista: `Shield: 25 of 25 - short 3` -> `Shield: 25 of 25 - 3 of 31 empty` (dlugi zapis `- EMPTY 3 of 31`), podpowiedz `3 of the 31 kit slots empty for the next battle are of this kind (as in Review the army).` Papier (podglad niedostepny) - `short` / `SHORT` jak dotad.
@@ -29,6 +29,14 @@
 - Build Armoury 0 bledow. Gra Jeffa wlaczona - NIE wgrane, w grze nie sprawdzone.
 
 **Status:** DO SPRAWDZENIA (galaz noc/532-qm-jedna, nie wgrane).
+
+**Recenzja 532 (poprawki, galaz noc/532-qm-jedna):**
+- `KindsSum(open, n, total)`: reszta "other N" liczona od liczby z TEGO SAMEGO napisu (Missing z `GarrisonKit.Missing`), nie od sumy `Open`. Przy rozjezdzie (`Result.Bad` - `g.Missing != miss`) rodzaje dalej sumuja sie do naglowka. Wolajacy: EmptyDetail (r.Missing), MainTitle (r.Missing), RowTitle (t.Missing).
+- Akapit o pasku DTE: cytat poprawiony na prawdziwy napis DTE `Most needed equipment: TYPE (N missing)` (std_module_strings_xml.xml DTE, `armory_readiness_shortage`); dotad `N missing` bez TYPE i nawiasu.
+- Order kit, krotki napis z podgladu: `Shield: 25 of 25 - 3 of 31 empty` (dwa "of" z inna caloscia obok siebie - ten sam rodzaj zamieszania, o ktory pytal Jeff) -> `Shield: racks 25 / kit 25 - EMPTY 3 of 31` (te same slowa co raport zbrojowni). Papier bez zmian (`Shield: 25 of 25 - short 3`).
+- Raport zbrojowni: znaczenie `EMPTY n of N` osobnym zdaniem pod lista zawsze, gdy sa puste sloty: `EMPTY n of 31: n of the 31 kit slots empty for the next battle are of this kind.`; przypis o pelnych stojakach znow bez nawiasu (`EMPTY with enough on the racks: ...`).
+- Sprawdzone: wszystkie miejsca z liczba pustych slotow uzywaja `Result.Missing` (QM, wiersz glowny, opis listy, strona typu, zbrojownia, Order kit); liczby czesci zawsze z "of N" albo w nawiasie po N; "Last battle" w czasie przeszlym. Nie sprawdzone: typy przedmiotow spoza `QuartermasterLaw.KitTypes` (np. Sling/Pistol) - wtedy "EMPTY n of N" po typach nie zsumuje sie do N; w ROT nie spotkane.
+- Build Armoury 0 bledow. NIE wgrane (gra Jeffa wlaczona), w grze nie sprawdzone.
 
 ## 529: panika kompanii - kompania 10 ludzi (sztandary jak dotad, jeden na 50), bez rzutu 1/6 strat pod okiem lorda albo przed zwarciem, stan bitwy najwyzej x1.25 - Armoury (BannerCompanies)
 

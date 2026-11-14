@@ -1576,8 +1576,11 @@ namespace Armoury
                 }
                 // recenzja 525: "25 on hand / 25 in the battle kit EMPTY 3" bez slowa wyjasnienia to ten sam rozjazd, o ktory pytal Jeff - przyczyny z podgladu
                 // (KitPreview.Why: inna klasa broni, umiejetnosc/kultura, sztuki nie do wydania, dodatki u innych) sa w oknie armii
+                // recenzja 532: znaczenie "EMPTY n of N" osobnym zdaniem przy kazdym EMPTY (dotad wcisniete w nawias przypisu o pelnych stojakach)
+                if (pvOk && pv.Missing > 0)
+                    sb.Append("\nEMPTY n of ").Append(pv.Missing).Append(": n of the ").Append(pv.Missing).Append(" kit slots empty for the next battle are of this kind.\n");
                 if (emptyDespite > 0)
-                    sb.Append("\nEMPTY with enough on the racks (EMPTY n of the kit slots empty for the next battle): those pieces are not handed to the men who lack them (another kind of weapon, skill or culture,"
+                    sb.Append("\nEMPTY with enough on the racks: those pieces are not handed to the men who lack them (another kind of weapon, skill or culture,"
                               + " pieces never handed out, or spare kit given to other men) - Review the army in camp gives the reason for each troop.\n");
                 int all, allCost, can, canCost, disc;
                 if (MarketRule)
@@ -1696,10 +1699,11 @@ namespace Armoury
                     bool horse = type == ItemObject.ItemTypeEnum.Horse;
                     // 532: z podgladu "EMPTY n of N" (czesc pustych slotow nastepnej bitwy, jak raport zbrojowni); z papieru "SHORT n" jak dotad
                     string lackL = lack > 0 ? (byPv ? "  - EMPTY " + lack + " of " + pv.Missing : "  - SHORT " + lack) : "";
-                    string lackS = lack > 0 ? (byPv ? " - " + lack + " of " + pv.Missing + " empty" : " - short " + lack) : "";
+                    // recenzja 532: krotki napis z podgladu "racks 25 / kit 25 - EMPTY 3 of 31" (dotad "25 of 25 - 3 of 31 empty": dwa "of" z inna caloscia obok siebie)
+                    string lackS = lack > 0 ? (byPv ? " - EMPTY " + lack + " of " + pv.Missing : " - short " + lack) : "";
                     string label = KitName(type) + "   (racks " + have + " / need " + need + ")" + lackL;
                     // n20-napisy: krotszy zapis stanu stojakow, pelne slowa w podpowiedzi
-                    label = ShortLabels.Pick(KitName(type) + ": " + have + " of " + need + lackS, label);
+                    label = ShortLabels.Pick(byPv ? KitName(type) + ": racks " + have + " / kit " + need + lackS : KitName(type) + ": " + have + " of " + need + lackS, label);
                     string more = byPv
                         ? (lack > 0 ? lack + " of the " + pv.Missing + " kit slots empty for the next battle are of this kind (as in Review the army)." : "No slot of this kind goes empty in the next battle - spares never hurt.")
                         : (lack > 0 ? "The men lack " + lack + " of these." : "Fully stocked - spares never hurt.");

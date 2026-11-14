@@ -666,14 +666,16 @@ namespace Armoury
         {
             // 532 (Jeff 14.11 "missing 6, a potem 20 pare - to ile?"): najpierw rodzaje SLOTOW, ktore sumuja sie do liczby pustych slotow (reszta jako "other N",
             // nie "and more"), dopiero potem ilu LUDZI - dotad "25 of 34 fit men lack: ... and more" mieszalo ludzi ze slotami
-            string k = KindsSum(r.Open, kinds);
+            string k = KindsSum(r.Open, kinds, r.Missing);
             string s = (k.Length > 0 ? k + "; " : "") + r.MenShort + " of " + r.Men + (r.Men == 1 ? " fit man short" : " fit men short");
             if (r.Bare > 0) s += ", " + r.Bare + (r.Bare == 1 ? " man gets no weapon from the armoury" : " men get no weapon from the armoury");
             return s;
         }
 
-        /// <summary>532: najwyzej n rodzajow z liczbami pustych slotow, reszta jednym "other N" - liczby zawsze sumuja sie do sumy tablicy (puste sloty).</summary>
-        internal static string KindsSum(int[] open, int n)
+        /// <summary>532: najwyzej n rodzajow z liczbami pustych slotow, reszta jednym "other N" - liczby sumuja sie do total (puste sloty naglowka).
+        /// Recenzja 532: reszta liczona od total (Missing z GarrisonKit.Missing), nie od sumy tablicy - przy rozjezdzie (Result.Bad) rodzaje dalej sumuja sie
+        /// do liczby w tym samym napisie; total &lt; 0 - suma tablicy.</summary>
+        internal static string KindsSum(int[] open, int n, int total = -1)
         {
             string k = KitGaps.TopKinds(open, n, true, false, true);
             var v = new List<int>();
@@ -682,6 +684,7 @@ namespace Armoury
             v.Sort((a, b) => b.CompareTo(a));
             int shown = 0;
             for (int i = 0; i < v.Count && i < n; i++) shown += v[i];
+            if (total >= 0) all = total;
             if (all > shown) k += (k.Length > 0 ? ", " : "") + "other " + (all - shown);
             return k;
         }
@@ -1113,7 +1116,7 @@ namespace Armoury
             if (r.Men <= 0) return "Kit for the next battle: no fit soldiers in your party";
             if (r.Missing <= 0 && r.Foot <= 0) return "Kit for the next battle: full kit (" + r.Men + (r.Men == 1 ? " man)" : " men)");
             if (r.Missing <= 0) return "Kit for the next battle: no kit slot empty, " + r.Foot + (r.Foot == 1 ? " rider on foot" : " riders on foot");
-            string k = KindsSum(r.Open, 2);   // 525: rodzaje po zastapieniu; 532: reszta jako "other N" - liczby sumuja sie do pustych slotow (jak meldunek QM)
+            string k = KindsSum(r.Open, 2, r.Missing);   // 525: rodzaje po zastapieniu; 532: reszta jako "other N" - liczby sumuja sie do pustych slotow (jak meldunek QM)
             return "Kit for the next battle: " + r.Missing + (r.Missing == 1 ? " kit slot empty" : " kit slots empty") + (k.Length > 0 ? " - " + k : "");
         }
 
@@ -1148,7 +1151,7 @@ namespace Armoury
             if (t.Men <= 0) return head + " - all wounded";
             if (t.Missing <= 0 && t.Foot <= 0) return head + " - full kit";
             if (t.Missing <= 0) return head + ": " + t.Foot + (t.Foot == 1 ? " rider on foot" : " riders on foot");
-            string k = KindsSum(t.Open, 1);   // 525: jak MainTitle; 532: reszta "other N"
+            string k = KindsSum(t.Open, 1, t.Missing);   // 525: jak MainTitle; 532: reszta "other N"
             return head + ": " + t.Missing + (total > 0 ? " of " + total + " empty slots" : t.Missing == 1 ? " empty slot" : " empty slots") + (k.Length > 0 ? " - " + k : "");
         }
 
@@ -1232,7 +1235,7 @@ namespace Armoury
             sb.Append("\n\nThe men handed out last get the gaps; in a siege or a hideout every rider fights on foot.");
             // recenzja 133: zdania z podpowiedzi wiersza glownego (dymek za waski) - losowy pancerz wzorca (K7) i pasek DTE (decyzja (h)); osobny akapit (Paginate)
             sb.Append("\n\nArmour of the kit is picked at random within the troop's band, so single pieces can differ from one look to the next."
-                      + " The armoury readiness bar on the map (\"Most needed equipment: N missing\") counts by its own rule: one melee weapon a man, no side-arm,"
+                      + " The armoury readiness bar on the map (\"Most needed equipment: TYPE (N missing)\") counts by its own rule: one melee weapon a man, no side-arm,"
                       + " no spare kit, the wounded too, and only the one kind it lacks most - so its number is not the kit slots empty here.");
             return sb.ToString();
         }
