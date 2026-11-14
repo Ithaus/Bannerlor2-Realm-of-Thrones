@@ -40,7 +40,7 @@ namespace Armoury
             if (pv == null || !pv.Ok || pv.Rows.Count == 0) { OpenMain(false); return; }
             var rows = new List<InquiryElement>();
             foreach (var t in pv.Rows)
-                rows.Add(new InquiryElement(t.Id, KitPreview.RowTitle(t), TroopPortrait(t.Troop), t.Men > 0, KitPreview.RowHint(t)));
+                rows.Add(new InquiryElement(t.Id, KitPreview.RowTitle(t, pv.Missing), TroopPortrait(t.Troop), t.Men > 0, KitPreview.RowHint(t)));
             rows.Add(new InquiryElement("~unused", KitPreview.UnusedTitle(pv), null, true, "What is left in the troops' armoury after the hand-out, and why no man took it."));
             bool photo = WindowPhotos.Active;   // paczka 132: okno proby zdjec - przyciski bez skutku
             MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Kit for the next battle", KitPreview.ListDesc(pv), rows, true, 1, 1, "Look", "Back",
@@ -105,8 +105,9 @@ namespace Armoury
             else
             {
                 var parts = new List<string>();
-                if (a.Missing > 0) parts.Add(a.Missing + (a.Missing == 1 ? " kit slot empty" : " kit slots empty"));
-                if (foot > 0) parts.Add(foot + (foot == 1 ? " rider on foot" : " riders on foot"));
+                // 532: czas przeszly - liczba ostatniej bitwy nie myli sie z pustymi slotami nastepnej
+                if (a.Missing > 0) parts.Add(a.Missing + (a.Missing == 1 ? " kit slot was empty" : " kit slots were empty"));
+                if (foot > 0) parts.Add(foot + (foot == 1 ? " rider fought on foot" : " riders fought on foot"));
                 title = "Last battle: " + string.Join(", ", parts.ToArray()) + " (" + a.Men + (a.Men == 1 ? " man)" : " men)");
             }
             // recenzja 133: dymek gry ma ok. 33 znaki na linie - krotko; K16 (kolejnosc przydzialow) jednym zdaniem, pelne wyjasnienie na ostatnim akapicie strony

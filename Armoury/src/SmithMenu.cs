@@ -1518,9 +1518,9 @@ namespace Armoury
                 bool pvOk = pv != null;
                 if (pvOk)
                 {
-                    sb.Append("Next battle (").Append(pv.Men).Append(pv.Men == 1 ? " fit man" : " fit men").Append("): ");
-                    if (pv.Missing <= 0) sb.Append("no kit slot empty.");
-                    else sb.Append(pv.Missing).Append(pv.Missing == 1 ? " kit slot empty - " : " kit slots empty - ").Append(KitPreview.EmptyDetail(pv, 4)).Append('.');
+                    // 532: te same slowa co meldunek QM i "Review the army" ("N kit slots empty for the next battle")
+                    if (pv.Missing <= 0) sb.Append("Kit for the next battle: no kit slot empty (").Append(pv.Men).Append(pv.Men == 1 ? " fit man)." : " fit men).");
+                    else sb.Append("Kit for the next battle: ").Append(pv.Missing).Append(pv.Missing == 1 ? " kit slot empty (" : " kit slots empty (").Append(KitPreview.EmptyDetail(pv, 4)).Append(").");
                     sb.Append("\n\n");
                 }
                 int emptyDespite = 0;
@@ -1552,7 +1552,8 @@ namespace Armoury
                         // 525: sztuki wzorca bitwy i puste sloty tego typu z podgladu (suma EMPTY po typach == puste sloty meldunku)
                         if (count == 0 && pvNeed <= 0) continue;
                         sb.Append(type).Append(": ").Append(count).Append(" on hand");
-                        if (pvNeed > 0) sb.Append(" / ").Append(pvNeed).Append(" in the battle kit").Append(pvEmpty > 0 ? "  EMPTY " + pvEmpty : "");
+                        // 532: "EMPTY 3 of 31" - czesc pustych slotow nastepnej bitwy, nie osobna liczba
+                        if (pvNeed > 0) sb.Append(" / ").Append(pvNeed).Append(" in the battle kit").Append(pvEmpty > 0 ? "  EMPTY " + pvEmpty + " of " + pv.Missing : "");
                         if (pvEmpty > 0 && count >= pvNeed) emptyDespite++;   // recenzja 525: puste mimo pelnych stojakow - przypis pod lista
                     }
                     else
@@ -1575,6 +1576,9 @@ namespace Armoury
                 }
                 // recenzja 525: "25 on hand / 25 in the battle kit EMPTY 3" bez slowa wyjasnienia to ten sam rozjazd, o ktory pytal Jeff - przyczyny z podgladu
                 // (KitPreview.Why: inna klasa broni, umiejetnosc/kultura, sztuki nie do wydania, dodatki u innych) sa w oknie armii
+                // recenzja 532: znaczenie "EMPTY n of N" osobnym zdaniem przy kazdym EMPTY (dotad wcisniete w nawias przypisu o pelnych stojakach)
+                if (pvOk && pv.Missing > 0)
+                    sb.Append("\nEMPTY n of ").Append(pv.Missing).Append(": n of the ").Append(pv.Missing).Append(" kit slots empty for the next battle are of this kind.\n");
                 if (emptyDespite > 0)
                     sb.Append("\nEMPTY with enough on the racks: those pieces are not handed to the men who lack them (another kind of weapon, skill or culture,"
                               + " pieces never handed out, or spare kit given to other men) - Review the army in camp gives the reason for each troop.\n");
@@ -1635,12 +1639,16 @@ namespace Armoury
                     var pv = KitPreview.ForArmoury();
                     if (pv != null)
                     {
-                        shortages = new List<string>();
+                        // 532: naglowek z ta sama liczba co meldunek QM ("N kit slots empty for the next battle"), typy jako jej czesci
+                        var byType = new List<string>();
                         foreach (var type in QuartermasterLaw.KitTypes)
                         {
                             int pn, pe;
-                            if (KitPreview.ByType(pv, type, out pn, out pe) && pe > 0) shortages.Add(KitName(type) + " " + pe + " empty");
+                            if (KitPreview.ByType(pv, type, out pn, out pe) && pe > 0) byType.Add(KitName(type) + " " + pe);
                         }
+                        shortages = new List<string>();
+                        if (pv.Missing > 0) shortages.Add(pv.Missing + (pv.Missing == 1 ? " kit slot empty for the next battle" : " kit slots empty for the next battle")
+                                                          + (byType.Count > 0 ? " (" + string.Join(", ", byType.ToArray()) + ")" : ""));
                         if (pv.Foot > 0) shortages.Add(pv.Foot + (pv.Foot == 1 ? " rider on foot" : " riders on foot"));
                     }
                 }
@@ -1689,12 +1697,15 @@ namespace Armoury
                     if (need <= 0) continue;
                     lackOf[type] = lack;
                     bool horse = type == ItemObject.ItemTypeEnum.Horse;
-                    string label = KitName(type) + "   (racks " + have + " / need " + need + ")"
-                                 + (lack > 0 ? "  - SHORT " + lack : "");
+                    // 532: z podgladu "EMPTY n of N" (czesc pustych slotow nastepnej bitwy, jak raport zbrojowni); z papieru "SHORT n" jak dotad
+                    string lackL = lack > 0 ? (byPv ? "  - EMPTY " + lack + " of " + pv.Missing : "  - SHORT " + lack) : "";
+                    // recenzja 532: krotki napis z podgladu "racks 25 / kit 25 - EMPTY 3 of 31" (dotad "25 of 25 - 3 of 31 empty": dwa "of" z inna caloscia obok siebie)
+                    string lackS = lack > 0 ? (byPv ? " - EMPTY " + lack + " of " + pv.Missing : " - short " + lack) : "";
+                    string label = KitName(type) + "   (racks " + have + " / need " + need + ")" + lackL;
                     // n20-napisy: krotszy zapis stanu stojakow, pelne slowa w podpowiedzi
-                    label = ShortLabels.Pick(KitName(type) + ": " + have + " of " + need + (lack > 0 ? " - short " + lack : ""), label);
+                    label = ShortLabels.Pick(byPv ? KitName(type) + ": racks " + have + " / kit " + need + lackS : KitName(type) + ": " + have + " of " + need + lackS, label);
                     string more = byPv
-                        ? (lack > 0 ? lack + " of these kit slots will go empty in the next battle (as in Review the army)." : "No slot of this kind goes empty in the next battle - spares never hurt.")
+                        ? (lack > 0 ? lack + " of the " + pv.Missing + " kit slots empty for the next battle are of this kind (as in Review the army)." : "No slot of this kind goes empty in the next battle - spares never hurt.")
                         : (lack > 0 ? "The men lack " + lack + " of these." : "Fully stocked - spares never hurt.");
                     elements.Add(new InquiryElement(type, label, null, !horse,
                         ShortLabels.Hint(byPv ? "On the racks " + have + ", the battle kit of your fit men holds " + need + "." : "On the racks " + have + ", the men need " + need + ".",

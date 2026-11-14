@@ -664,10 +664,29 @@ namespace Armoury
         /// no weapon from the armoury". Rodzaje po zastapieniu (Open) - sumuja sie do liczby pustych slotow (Missing).</summary>
         internal static string EmptyDetail(Result r, int kinds)
         {
-            string k = KitGaps.TopKinds(r.Open, kinds, true, true, true);
-            string s = r.MenShort + " of " + r.Men + (r.Men == 1 ? " fit man lacks" : " fit men lack") + (k.Length > 0 ? ": " + k : "");
-            if (r.Bare > 0) s += "; " + r.Bare + (r.Bare == 1 ? " man gets no weapon from the armoury" : " men get no weapon from the armoury");
+            // 532 (Jeff 14.11 "missing 6, a potem 20 pare - to ile?"): najpierw rodzaje SLOTOW, ktore sumuja sie do liczby pustych slotow (reszta jako "other N",
+            // nie "and more"), dopiero potem ilu LUDZI - dotad "25 of 34 fit men lack: ... and more" mieszalo ludzi ze slotami
+            string k = KindsSum(r.Open, kinds, r.Missing);
+            string s = (k.Length > 0 ? k + "; " : "") + r.MenShort + " of " + r.Men + (r.Men == 1 ? " fit man short" : " fit men short");
+            if (r.Bare > 0) s += ", " + r.Bare + (r.Bare == 1 ? " man gets no weapon from the armoury" : " men get no weapon from the armoury");
             return s;
+        }
+
+        /// <summary>532: najwyzej n rodzajow z liczbami pustych slotow, reszta jednym "other N" - liczby sumuja sie do total (puste sloty naglowka).
+        /// Recenzja 532: reszta liczona od total (Missing z GarrisonKit.Missing), nie od sumy tablicy - przy rozjezdzie (Result.Bad) rodzaje dalej sumuja sie
+        /// do liczby w tym samym napisie; total &lt; 0 - suma tablicy.</summary>
+        internal static string KindsSum(int[] open, int n, int total = -1)
+        {
+            string k = KitGaps.TopKinds(open, n, true, false, true);
+            var v = new List<int>();
+            int all = 0;
+            foreach (int c in KitGaps.Order) if (open[c] > 0) { v.Add(open[c]); all += open[c]; }
+            v.Sort((a, b) => b.CompareTo(a));
+            int shown = 0;
+            for (int i = 0; i < v.Count && i < n; i++) shown += v[i];
+            if (total >= 0) all = total;
+            if (all > shown) k += (k.Length > 0 ? ", " : "") + "other " + (all - shown);
+            return k;
         }
 
         private static bool Take(Dictionary<ItemObject, int> d, ItemObject it)
@@ -1096,9 +1115,9 @@ namespace Armoury
             if (r == null || !r.Ok) return "Kit for the next battle (not available)";
             if (r.Men <= 0) return "Kit for the next battle: no fit soldiers in your party";
             if (r.Missing <= 0 && r.Foot <= 0) return "Kit for the next battle: full kit (" + r.Men + (r.Men == 1 ? " man)" : " men)");
-            if (r.Missing <= 0) return "Kit for the next battle: no slot empty, " + r.Foot + (r.Foot == 1 ? " rider on foot" : " riders on foot");
-            string k = KitGaps.TopKinds(r.Open, 2, true, false, true);   // 525: rodzaje po zastapieniu - liczby zawsze (suma == Missing)
-            return "Kit for the next battle: " + r.Missing + (r.Missing == 1 ? " slot empty" : " slots empty") + (k.Length > 0 ? " - " + k : "");
+            if (r.Missing <= 0) return "Kit for the next battle: no kit slot empty, " + r.Foot + (r.Foot == 1 ? " rider on foot" : " riders on foot");
+            string k = KindsSum(r.Open, 2, r.Missing);   // 525: rodzaje po zastapieniu; 532: reszta jako "other N" - liczby sumuja sie do pustych slotow (jak meldunek QM)
+            return "Kit for the next battle: " + r.Missing + (r.Missing == 1 ? " kit slot empty" : " kit slots empty") + (k.Length > 0 ? " - " + k : "");
         }
 
         /// <summary>Podpowiedz wiersza glownego okna (recenzja 133: dymek gry ma ok. 33 znaki na linie - dwa zdania; losowy pancerz wzorca (K7) i pasek DTE (h)
@@ -1106,7 +1125,9 @@ namespace Armoury
         internal static string MainHint(Result r)
         {
             if (r == null || !r.Ok) return r != null && r.Why != null ? r.Why : "Not available now.";
-            return "Worked out as the battle hands kit out: armoury, skill, culture, saddle. " + r.Wounded + (r.Wounded == 1 ? " wounded man is" : " wounded are") + " not counted.";
+            // 532: ta sama liczba co meldunek QM i zbrojownia; pasek DTE na mapie ("N missing") liczy inaczej - jedno zdanie, zeby nikt nie bral jego liczby za te
+            return "Worked out as the battle hands kit out: armoury, skill, culture, saddle. " + r.Wounded + (r.Wounded == 1 ? " wounded man is" : " wounded are") + " not counted."
+                   + " Same number as the QM report and the armoury; the map's readiness bar counts another way.";
         }
 
         /// <summary>Opis okna listy typow (najwyzej ok. 5 linii - lekcja 109.1).</summary>
@@ -1115,20 +1136,23 @@ namespace Armoury
             int kinds = 0;
             foreach (var t in r.Rows) if (t.Men > 0) kinds++;
             return r.Men + " fit men of " + kinds + (kinds == 1 ? " kind" : " kinds") + ", handed out from the troops' armoury as for a battle in the field: "
-                   + r.Missing + (r.Missing == 1 ? " kit slot empty, " : " kit slots empty, ") + r.Foot + (r.Foot == 1 ? " rider on foot." : " riders on foot.")
+                   + r.Missing + (r.Missing == 1 ? " kit slot empty for the next battle, " : " kit slots empty for the next battle, ") + r.Foot + (r.Foot == 1 ? " rider on foot." : " riders on foot.")
                    + " Pick a kind of troop to see what they lack and why.";
         }
 
         /// <summary>Wiersz typu na liscie (recenzja 133: wiersz z portretem ma 2 linie, ok. 60 znakow - "Name xN: 6 empty - arrows 6", jeden rodzaj; jezdzcy
         /// pieszo przy pustych slotach - w podpowiedzi; liczba przy rodzaju tylko bez zastapien, jak MainTitle).</summary>
-        internal static string RowTitle(TypeRow t)
+        internal static string RowTitle(TypeRow t) { return RowTitle(t, -1); }
+
+        /// <summary>532: total - puste sloty calej druzyny (Result.Missing); wiersz typu mowi "6 of 31 empty slots", zeby liczba typu nie udawala calosci.</summary>
+        internal static string RowTitle(TypeRow t, int total)
         {
             string head = t.Name + " x" + t.Men;
             if (t.Men <= 0) return head + " - all wounded";
             if (t.Missing <= 0 && t.Foot <= 0) return head + " - full kit";
             if (t.Missing <= 0) return head + ": " + t.Foot + (t.Foot == 1 ? " rider on foot" : " riders on foot");
-            string k = KitGaps.TopKinds(t.Open, 1, true, false, true);   // 525: jak MainTitle
-            return head + ": " + t.Missing + " empty" + (k.Length > 0 ? " - " + k : "");
+            string k = KindsSum(t.Open, 1, t.Missing);   // 525: jak MainTitle; 532: reszta "other N"
+            return head + ": " + t.Missing + (total > 0 ? " of " + total + " empty slots" : t.Missing == 1 ? " empty slot" : " empty slots") + (k.Length > 0 ? " - " + k : "");
         }
 
         /// <summary>Podpowiedz wiersza typu: pierwsza przyczyna najwiekszego braku (przy pustych slotach i jezdzcach pieszo - najpierw ilu pieszo).</summary>
@@ -1162,14 +1186,17 @@ namespace Armoury
             if (t.Missing <= 0 && t.Foot <= 0) sb.Append("\nEvery man gets each piece of the kit his skill and rank call for.");
             else if (t.Missing > 0)
             {
-                sb.Append('\n').Append(t.Missing).Append(t.Missing == 1 ? " kit slot goes empty." : " kit slots go empty.");
+                // 532: liczba typu jako czesc calosci (dotad "6 kit slots go empty." czytalo sie jak cala druzyna)
+                sb.Append('\n').Append(t.Missing).Append(" of the ").Append(res.Missing).Append(res.Missing == 1 ? " kit slot" : " kit slots")
+                  .Append(" empty for the next battle are in this troop.");
                 if (t.Replaced > 0) sb.Append(' ').Append(t.Replaced).Append(t.Replaced == 1 ? " weapon gap is" : " weapon gaps are").Append(" filled with another kind of weapon and not counted.");
             }
             foreach (int c in KitGaps.Order)
             {
                 if (t.Short[c] <= 0) continue;
                 // 525: puste po zastapieniu (suma rodzajow == puste sloty typu); reszta braku tego rodzaju - zapelniona inna bronia
-                sb.Append("\n\n").Append(Cap(KitGaps.NameEn(c))).Append(": ").Append(t.Open[c]).Append(" of ").Append(t.Need[c]).Append(" empty");
+                // 532: "3 empty of 12 in their kit" - dotad "3 of 12 empty" obok "6 of 31" (inna calosc)
+                sb.Append("\n\n").Append(Cap(KitGaps.NameEn(c))).Append(": ").Append(t.Open[c]).Append(" empty of ").Append(t.Need[c]).Append(" in their kit");
                 // recenzja 525: przy Open == 0 bez "more" ("0 of 31 empty (19 more ...)" czytalo sie jak 19 pustych)
                 if (t.Short[c] > t.Open[c])
                     sb.Append(t.Open[c] > 0 ? " (" : " - ").Append(t.Short[c] - t.Open[c]).Append(t.Open[c] > 0 ? " more filled with another kind of weapon)" : " filled with another kind of weapon");
@@ -1208,7 +1235,8 @@ namespace Armoury
             sb.Append("\n\nThe men handed out last get the gaps; in a siege or a hideout every rider fights on foot.");
             // recenzja 133: zdania z podpowiedzi wiersza glownego (dymek za waski) - losowy pancerz wzorca (K7) i pasek DTE (decyzja (h)); osobny akapit (Paginate)
             sb.Append("\n\nArmour of the kit is picked at random within the troop's band, so single pieces can differ from one look to the next."
-                      + " The armoury readiness bar on the map counts the wounded too and leaves out spare kit, so its numbers differ.");
+                      + " The armoury readiness bar on the map (\"Most needed equipment: TYPE (N missing)\") counts by its own rule: one melee weapon a man, no side-arm,"
+                      + " no spare kit, the wounded too, and only the one kind it lacks most - so its number is not the kit slots empty here.");
             return sb.ToString();
         }
 

@@ -1,5 +1,42 @@
 # DZIENNIK ZMIAN
 
+## 532: braki sprzetu - jedna liczba "kit slots empty for the next battle" wszedzie, inne liczby z opisem, czego dotycza - Armoury (KitPreview, ArmyReview.Kit, SmithMenu, MenPurse; bez nowych kluczy)
+
+**Problem:** Jeff, czat 14.11: "pokazuje ze mam missing 6 rzeczy a potem na czerwono ze 20 pare, to w koncu ile?". Log `Modules/Armoury/Armoury-2026-11-14_23-28-03.log` linia 9612: `QM: 31 kit slots empty (25 of 34 fit men lack: side-arm (melee) 24, shield 3, melee weapon 2 and more; 2 men get no weapon from the armoury) for the next battle`. Wczesniej (linia 7814) `Your men bought 9 missing pieces of kit`, linia 7816 `Your men bought 6 better pieces`.
+
+**Przyczyna:** na ekranie trzy reguly i dwa zakresy pod podobnymi slowami:
+- Pasek DTE na mapie ("Most needed equipment: TYPE (N missing)", `MapArmoryReadinessMixin` / `PartyEquipmentDistributor.MeasureMainPartyArmoryReadiness`) - cudzy mod: bron biala raz na czlowieka (broni bocznej nie liczy - u Jeffa 24 z 31 pustych), liczy rannych, pokazuje JEDEN rodzaj. Najpewniej to "missing 6". Nasz kod mowil o tym tylko polzdaniem na koncu strony typu.
+- "Your men bought N missing pieces" (MenPurse) - sztuki KUPIONE wedlug papieru kwatermistrza, nie liczba brakow.
+- Meldunek QM "25 of 34 fit men lack: ... and more" - liczba LUDZI obok liczby SLOTOW, rodzaje nie sumowaly sie do 31 ("and more").
+- Wiersz typu "Name xN: 6 empty", strona typu "6 kit slots go empty", "Shield: 3 of 12 empty", zbrojownia "EMPTY 3", "Order kit" "Shield 3 empty", "Last battle: 6 kit slots empty" - liczby czesci albo innej bitwy bez slowa, czego dotycza.
+
+**Zmiana (tylko napisy; liczby i reguly bez zmian):**
+- Meldunek QM (`KitPreview.EmptyDetail`): stare `QM: 31 kit slots empty (25 of 34 fit men lack: side-arm (melee) 24, shield 3, melee weapon 2 and more; 2 men get no weapon from the armoury) for the next battle - ...` -> nowe `QM: 31 kit slots empty (side-arm (melee) 24, shield 3, melee weapon 2, other 2; 25 of 34 fit men short, 2 men get no weapon from the armoury) for the next battle - ...`. Rodzaje zawsze sumuja sie do 31 (nowe `KitPreview.KindsSum`: najwyzej n rodzajow, reszta "other N" zamiast "and more"). Poczatek i koniec linii bez zmian (tools/sprawdz_logi.py Q316-3).
+- Review the army, wiersz glowny: `Kit for the next battle: 31 slots empty - side-arm (melee) 24, shield 3` -> `Kit for the next battle: 31 kit slots empty - side-arm (melee) 24, shield 3, other 4`; `no slot empty` -> `no kit slot empty`. Podpowiedz + `Same number as the QM report and the armoury; the map's readiness bar counts another way.`
+- Opis listy typow: `31 kit slots empty,` -> `31 kit slots empty for the next battle,`.
+- Wiersz typu: `Spearmen x12: 6 empty - arrows 6` -> `Spearmen x12: 6 of 31 empty slots - arrows 6` (przy wiecej rodzajach `, other N`). Stara jednoargumentowa `RowTitle(t)` zostaje (bez calosci: `6 empty slots`).
+- Strona typu: `6 kit slots go empty.` -> `6 of the 31 kit slots empty for the next battle are in this troop.`; `Shield: 3 of 12 empty` -> `Shield: 3 empty of 12 in their kit`; akapit o pasku DTE: `The armoury readiness bar on the map counts the wounded too and leaves out spare kit, so its numbers differ.` -> `The armoury readiness bar on the map ("Most needed equipment: TYPE (N missing)") counts by its own rule: one melee weapon a man, no side-arm, no spare kit, the wounded too, and only the one kind it lacks most - so its number is not the kit slots empty here.`
+- Last battle (wiersz): `Last battle: 6 kit slots empty, 2 riders on foot (40 men)` -> `Last battle: 6 kit slots were empty, 2 riders fought on foot (40 men)`.
+- Zbrojownia "Muster the men's kit": `Next battle (34 fit men): 31 kit slots empty - 25 of 34 fit men lack: ...` -> `Kit for the next battle: 31 kit slots empty (side-arm (melee) 24, ...; 25 of 34 fit men short).`; wiersz typu `... / 25 in the battle kit  EMPTY 3` -> `... EMPTY 3 of 31`; przypis `EMPTY with enough on the racks (EMPTY n of the kit slots empty for the next battle): ...`.
+- "Order kit" podpowiedz: `The men go short: Shield 3 empty, OneHanded 20 empty, ...` -> `The men go short: 31 kit slots empty for the next battle (Shield 3, ...)`; lista: `Shield: 25 of 25 - short 3` -> `Shield: 25 of 25 - 3 of 31 empty` (dlugi zapis `- EMPTY 3 of 31`), podpowiedz `3 of the 31 kit slots empty for the next battle are of this kind (as in Review the army).` Papier (podglad niedostepny) - `short` / `SHORT` jak dotad.
+- MenPurse: `Your men bought 9 missing pieces of kit for X denars from their own purse.` -> `Your men bought 9 pieces of kit they lacked for X denars from their own purse.` (bez slowa "missing").
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: tylko teksty ekranu; liczby (Missing, Open, ByType, papier) i kolor meldunku 316d bez zmian. `sprawdz_logi.py` Q316-3 szuka `QM: (\d+) kit slots? empty` na poczatku i `for the next battle - see Review the army in camp.` na koncu - oba zostaly. Linie logu po polsku (Brief, kwatermistrz, Sakiewka ludzi) bez zmian. Nikt w tools nie czyta `missing pieces`, `slots go empty`, `in the battle kit`.
+- Suma: `KindsSum` liczy z tej samej tablicy `Open`, co TopKinds; suma Open == Missing (525, test T1 133g) - wiec "other N" = Missing minus pokazane. Typy zbrojowni (ByType) sumuja sie do Missing (komentarz 525) - "of 31" w zbrojowni i Order kit to ta sama calosc.
+- Dlugosc: wiersz glowny ok. 85 znakow (2 linie), wiersz typu przy dlugiej nazwie moze siegnac 3 linii - patrzec w oknie.
+- Pasek DTE: cudzy mod, nie zmieniony - tylko opis w podpowiedzi i na stronie typu.
+- Build Armoury 0 bledow. Gra Jeffa wlaczona - NIE wgrane, w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA (galaz noc/532-qm-jedna, nie wgrane).
+
+**Recenzja 532 (poprawki, galaz noc/532-qm-jedna):**
+- `KindsSum(open, n, total)`: reszta "other N" liczona od liczby z TEGO SAMEGO napisu (Missing z `GarrisonKit.Missing`), nie od sumy `Open`. Przy rozjezdzie (`Result.Bad` - `g.Missing != miss`) rodzaje dalej sumuja sie do naglowka. Wolajacy: EmptyDetail (r.Missing), MainTitle (r.Missing), RowTitle (t.Missing).
+- Akapit o pasku DTE: cytat poprawiony na prawdziwy napis DTE `Most needed equipment: TYPE (N missing)` (std_module_strings_xml.xml DTE, `armory_readiness_shortage`); dotad `N missing` bez TYPE i nawiasu.
+- Order kit, krotki napis z podgladu: `Shield: 25 of 25 - 3 of 31 empty` (dwa "of" z inna caloscia obok siebie - ten sam rodzaj zamieszania, o ktory pytal Jeff) -> `Shield: racks 25 / kit 25 - EMPTY 3 of 31` (te same slowa co raport zbrojowni). Papier bez zmian (`Shield: 25 of 25 - short 3`).
+- Raport zbrojowni: znaczenie `EMPTY n of N` osobnym zdaniem pod lista zawsze, gdy sa puste sloty: `EMPTY n of 31: n of the 31 kit slots empty for the next battle are of this kind.`; przypis o pelnych stojakach znow bez nawiasu (`EMPTY with enough on the racks: ...`).
+- Sprawdzone: wszystkie miejsca z liczba pustych slotow uzywaja `Result.Missing` (QM, wiersz glowny, opis listy, strona typu, zbrojownia, Order kit); liczby czesci zawsze z "of N" albo w nawiasie po N; "Last battle" w czasie przeszlym. Nie sprawdzone: typy przedmiotow spoza `QuartermasterLaw.KitTypes` (np. Sling/Pistol) - wtedy "EMPTY n of N" po typach nie zsumuje sie do N; w ROT nie spotkane.
+- Build Armoury 0 bledow. NIE wgrane (gra Jeffa wlaczona), w grze nie sprawdzone.
 ## 531: wies poboczna - szlachetny ochotnik (elita z losu modelu ochotnikow) przychodzi jako rekrut rodu pana tier 1 (np. Blackwood Recruit), gdzie indziej elita kultury tier 1, dopiero potem chlop - Armoury (SideVillageVisit.Levy)
 
 **Problem:** Jeff, czat 14.11, zrzut werbunku we wsi pobocznej Bluefork Bend (`castle_village_EN7_2#de9a47c2`, wies okregu Tumblestone, siedziba Raventree Hall - klan `clan_empire_north_8` Blackwood, kultura `river`, szablon `clan_blackwood_party_template`): "w pobocznej wiosce na terenie blackwoodow nigdy nie spotkalem zeby pojawil sie blackwood levy czy to blad czy zamierzone, to samo w stark levy etc." Po wyjasnieniu: "ale masz blackwood poziom 1 przeciez wiem ze szlachetni tez maja poziom 1". Bez logu - przyczyna z kodu i danych.
