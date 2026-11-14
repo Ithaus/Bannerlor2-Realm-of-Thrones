@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 10:05 - WGRANIE 230 (494-497-q; test zbiorczy at-497q2 czysty)
+
+- Armoury.dll md5 ea06b3b927d9778cc433708605ed49e5, GrandTourney.dll md5 5f67df146958357389e76eebb44d97fd = galaz noc/367c-jeniec-po-odejsciu 634ca04a (= noc/497-q-fach-zywiec; 493 + 494 alarm CloseRanks, 495 prognoza zlota, 496 log GrandTourney z data, 497 Plan KS zna mnoznik budynkow i urodzaj, 497-p, 497-q fach - cel ze stolem / F). ForgeView, RealisticCaptivity, CrashScribe bez zmian. Kopie przed: .bak-2026-11-14-przed-wgranie230 (Armoury 4387bb46 = 229, GrandTourney 5a3e98b2), C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie230 i -przed). Przy problemie: cofnac do 229.
+- Decyzja domyslna (noc 14.11): wgrane po czystym autotescie (stala zgoda). at-497q2 (Armoury-2026-11-14_08-24-37.log, session-2026-11-14_08-24-36): 220/220 dob, 22.6 s/dobe, 23 bledy cudze (te same latki Harmony przy starcie co at-497), 0 potkniec, bitwy 3/5 (2 lordowskie pominiete - brak wolnej partii, kod 4 jak zawsze). Pierwszy bieg at-497q stanal w karczmie (474-P8) przed pierwsza doba - jednorazowo, powtorka ruszyla normalnie; do obserwacji.
+- Ekonomia na koniec (bilans Westeros, na targ / popyt): zboze 1.05 (at-497 1.12, at-493b 0.99), mieso 1.06 (1.08 / 1.00), ser 1.03 (1.06), oliwki 1.14 (1.21). 497-q zdejmuje ok. 880 szt./d celu na targ w 213 okregach; "cel produkcji zamiast celu na targ 0" = 0 (przypadek Tm <= 0 nie wystapil). Rownowaga miesa Planu dalej niezbiezna (mt 1.25, cena miesa W 0.639 vs 0.575 w 497).
+- Jeff - do sprawdzenia w grze: 493 werbunek we wsiach pobocznych, 491 rany na turnieju, mieso na polkach miast (nadal nisko w grze - 497-q go NIE naprawia), 492 srebro w Lannisport.
+- Otwarte: reszta nadwyzki zboza W (stary projekt m106: k nie widzi dostaw z okregow bez fachu); 486 napis "noc niepelna" w stajni (kosmetyka); zimowa sciezka 497-p nieprzetestowana. Decyzje czekajace na Jeffa jak w STAN 07:10.
+
 ## STAN 14.11 07:10 - WGRANIE 229 (493 werbunek we wsiach pobocznych wedlug reputacji wsi glownej; test zbiorczy at-493b nocy 14.11)
 
 - Armoury.dll md5 4387bb464ae52ab1ace45e97755e9de9 = galaz noc/367c-jeniec-po-odejsciu f59c11bf (WGRANIE 228 + 493). GrandTourney, ForgeView, RealisticCaptivity, CrashScribe bez zmian. Kopie przed: Armoury.dll.bak-2026-11-14-przed-wgranie229 (= 228 a97b2e28), C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie229 i -przed).
