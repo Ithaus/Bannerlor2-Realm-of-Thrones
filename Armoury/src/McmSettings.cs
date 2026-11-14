@@ -4109,7 +4109,7 @@ namespace Armoury
         public bool AmmoRecoveryBySide { get; set; } = true;
 
         // 512 (perki): Perk512.cs - amunicja i zwierzeta
-        [SettingPropertyBool("Ammo Perks Rework", HintText = "ammunition perks give no extra arrows, bolts or throwing weapons any more. Instead: a party led by a hero with Deep Quivers, Fletcher or Well Prepared gathers back more of its shot arrows, bolts or thrown weapons after a battle it holds the field in (Ammo Perk Party Percent); Fletcher makes your own crossbow wear less with every shot (Ammo Perk Own Percent); Saddlebags lets the party of the hero who has it carry more (Saddlebags Carry Percent, on land). Off = the perks as before", RequireRestart = false)]
+        [SettingPropertyBool("Ammo Perks Rework", HintText = "ammunition perks give no extra arrows, bolts or throwing weapons any more. Instead: a party led by a hero with Deep Quivers, Fletcher or Well Prepared gathers back more of its shot arrows, bolts or thrown weapons after a battle it holds the field in (Ammo Perk Party Percent); Fletcher makes your own crossbow wear less with every shot (Ammo Perk Own Percent); Saddlebags lets the party of the hero who has it carry more (Saddlebags Carry Percent, on land). Off = none of these new effects (the old extra-ammo bonus does not work with Realm of Thrones either way)", RequireRestart = false)]
         [SettingPropertyGroup("Ammunition and animal perks")]
         public bool AmmoPerksRework { get; set; } = true;
 
@@ -4125,11 +4125,11 @@ namespace Armoury
         [SettingPropertyGroup("Ammunition and animal perks")]
         public float SaddlebagsCarryPercent { get; set; } = 5f;
 
-        [SettingPropertyBool("Breeder Realistic", HintText = "Breeder: animals in the party breed only on land, only while the party is not starving, and only where there is at least a pair of the same kind (horses with horses, sheep with sheep; mules do not breed); never dragons, elephants, mammoths, chariots or unique beasts. The young are of their parents' kind and eat like the rest of the herd. Off = as Realm of Thrones has it", RequireRestart = false)]
+        [SettingPropertyBool("Breeder Realistic", HintText = "Breeder: animals in the party breed only on land, only while the party is not starving, and only where there is at least a pair of the same kind (horses with horses, sheep with sheep; mules do not breed); never dragons, elephants, mammoths, chariots or unique beasts. The young are of their parents' kind (an ordinary horse from ordinary horses, a noble one only from noble ones; zorses do not breed). Animals eat fodder only in winter, in deserts and in snow. Off = as Realm of Thrones has it", RequireRestart = false)]
         [SettingPropertyGroup("Ammunition and animal perks")]
         public bool BreederRealistic { get; set; } = true;
 
-        [SettingPropertyBool("Beast Whisperer Plain Mounts", HintText = "Beast Whisperer: on steppes and plains your scout finds only ordinary riding horses and pack animals - never war horses, noble horses, camels, chariots, elephants, dragons or unique beasts - and less often (Beast Whisperer Chance Factor). Off = as Realm of Thrones has it", RequireRestart = false)]
+        [SettingPropertyBool("Beast Whisperer Plain Mounts", HintText = "Beast Whisperer: on steppes and plains the scout of any party with the perk (lords too) finds only ordinary riding horses and pack animals - never war horses, noble horses, camels, chariots, elephants, dragons or unique beasts - and less often (Beast Whisperer Chance Factor). Off = as Realm of Thrones has it", RequireRestart = false)]
         [SettingPropertyGroup("Ammunition and animal perks")]
         public bool BeastWhispererPlainMounts { get; set; } = true;
 

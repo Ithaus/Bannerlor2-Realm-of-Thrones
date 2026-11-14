@@ -18,7 +18,7 @@ using TaleWorlds.MountAndBlade;
 namespace Armoury
 {
     /// <summary>
-    /// 512 (perki, Jeff 14.11: "dodatkowe strzaly to glupota" - nowe efekty 16, 20, 21, 23, 25a, 25b zaakceptowane; 33 Breeder urealnic; 44 BeastWhisperer
+    /// 512 (perki, Jeff 14.11: "dodatkowe strzaly to glupota" - nowe efekty 16, 20, 23, 25a, 25b zaakceptowane (21 Pavise - zmiana 506); 33 Breeder urealnic; 44 BeastWhisperer
     /// tylko zwykle konie/juczne, rzadziej). AMUNICJA I ZWIERZETA - jeden plik, wpiecia w istniejacych plikach po jednej linii.
     ///
     /// A. DAWNE "+AMUNICJA" (DeepQuivers, Fletcher, WellPrepared, Resourceful, Saddlebags): gra dodaje je w SandboxAgentStatCalculateModel.InitializeMissionEquipment
@@ -222,7 +222,7 @@ namespace Armoury
         private static TextObject _capTxt;
 
         /// <summary>Postfiks DefaultInventoryCapacityModel.CalculateInventoryCapacity: __0 partia, __1 na morzu. Wodz z perkiem Saddlebags - +SaddlebagsCarryPercent udzwigu (na ladzie).</summary>
-        public static void CapPostfix(MobileParty __0, bool __1, ref ExplainedNumber __result)
+        public static void CapPostfix(MobileParty __0, bool __1, bool __6, ref ExplainedNumber __result)
         {
             try
             {
@@ -231,9 +231,25 @@ namespace Armoury
                 var h = __0.LeaderHero;
                 if (h == null || !h.GetPerkValue(DefaultPerks.Throwing.Saddlebags)) return;
                 if (_capTxt == null) _capTxt = DefaultPerks.Throwing.Saddlebags.Name;
-                __result.AddFactor(s.SaddlebagsCarryPercent / 100f, _capTxt);
+                float pct = s.SaddlebagsCarryPercent / 100f;
+                if (__6 && __0.AttachedParties != null && __0.AttachedParties.Count > 0)
+                {
+                    // udzwig liczony z doczepionymi partiami (armia): premia tylko od wlasnej czesci (wagi jak w grze: ludzie i konie x20, juczne x100)
+                    float own = Share(__0.Party), all = own;
+                    foreach (var ap in __0.AttachedParties) if (ap != null) all += Share(ap.Party);
+                    if (all <= 0f) return;
+                    __result.Add(__result.ResultNumber * pct * (own / all), _capTxt);
+                    return;
+                }
+                __result.AddFactor(pct, _capTxt);
             }
             catch (Exception e) { Stumble("CapPostfix", e); }
+        }
+
+        private static float Share(PartyBase p)
+        {
+            if (p == null) return 0f;
+            return p.NumberOfHealthyMembers * 20f + p.NumberOfMounts * 20f + p.NumberOfPackAnimals * 100f;
         }
 
         // ------------------------------------------------------------ D. 33 Breeder (zamiast latki ROT)
@@ -253,8 +269,11 @@ namespace Armoury
             string mid = mon != null && mon.StringId != null ? mon.StringId : "";
             string id = it.StringId ?? "";
             if (id.IndexOf("mule", StringComparison.OrdinalIgnoreCase) >= 0 || mid.IndexOf("mule", StringComparison.OrdinalIgnoreCase) >= 0) return null;   // mul jest bezplodny
+            if (id.IndexOf("zorse", StringComparison.OrdinalIgnoreCase) >= 0) return null;   // zorse (ROT-Content) - mieszaniec, bezplodny jak mul
             if (hc.IsLiveStock) return "ls:" + (it.ItemCategory != null ? it.ItemCategory.StringId : mid);
-            if (fam == MountLaw.Fam.Horse) return "horse";
+            // konie wedlug kategorii: zwykly ze zwyklym, juczny z jucznym, bojowy z bojowym, szlachetny ze szlachetnym (recenzja 512: para zwykly +
+            // szlachetny nie rodzi szlachetnego z niczego)
+            if (fam == MountLaw.Fam.Horse) return "horse:" + (hc.IsPackAnimal ? "pack" : (it.ItemCategory != null ? it.ItemCategory.StringId : "?"));
             return mid.Length > 0 ? "m:" + mid : null;
         }
 
@@ -386,6 +405,9 @@ namespace Armoury
         internal static void EnsureHooks()
         {
             ResetDay();
+            // obiekty przedmiotow i napisy z poprzedniej gry w tym samym procesie sa niewazne (recenzja 512) - pula buduje sie od nowa
+            _plainMounts = null;
+            _capTxt = null;
             try
             {
                 if (_h == null) _h = new Harmony(Owner);
@@ -456,7 +478,7 @@ namespace Armoury
                          + " | strzaly z kuszy z Fletcher " + _dXbowShots
                          + " | Breeder: proby " + _dBreedTry + ", morze " + _dBreedSea + ", glod " + _dBreedHungry + ", bez pary " + _dBreedNoPair
                          + ", porody " + _dBreedEvents + " (" + _dBreedBirths + " szt." + (by.Length > 0 ? ": " + by : "") + ")"
-                         + " | BeastWhisperer: proby " + _dWhispTry + ", znalezione " + _dWhispFound
+                         + " | BeastWhisperer: proby " + _dWhispTry + ", znalezione " + _dWhispFound + ", pula " + (_plainMounts != null ? _plainMounts.Count.ToString(Inv) : "-")
                          + " | potkniecia doby " + _dStumbles + " (sesja " + _stumbles + ").");
             }
             catch (Exception e) { Stumble("Daily", e); }
