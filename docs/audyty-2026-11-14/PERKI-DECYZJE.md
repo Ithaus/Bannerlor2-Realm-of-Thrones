@@ -79,3 +79,4 @@ Jeff 14.11 po WGRANIU 234: D16b kolczany/bron miotana/tarcze okretu - odzysk po 
 ## Drogi 520 i waga pieniedzy - decyzje Jeffa 14.11
 520: Valyria tez +30% (nie 50); odsiecz drogami - tak, gdy nie wolniej; drogami trzymaja sie patrole i milicja ("bo bandyci poluja przeciez na kupcow i karawany"), lordowie patrolujacy ziemie - nie wymuszac.
 Waga pieniedzy (521): 1 sklad sakiewki - tak (propozycja: pensy/srebro/zloto, udzial zlota wedlug mennicy); 2 zloto w skarbcu - tak; 3 "lordowie nie woza ze soba 3 milionow, maja skarbiec i tam trzymaja zloto lub gdzies" - AI lordowie wioza tylko sakiewke robocza, reszta w skarbcu.
+521 decyzje (Jeff 14.11): 1 skarbiec utraconej osady -> zdobywca: tak; 2 lokata w Banku z odsetkami: najpierw projekt; 3 waga kies karawan i band: tak (pyta, jaki to procent ich ladownosci); 4 udzial zlota Essos/Westeros: tak; 5 wierzyciele siegaja do wszystkich skarbcow: tak.
