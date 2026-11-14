@@ -91,7 +91,7 @@ namespace Armoury
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;
             public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; public double[] WSpareKg; public double OrdPcs;
-            public double[] PreY, PostY;   // 497: produkcja gry przed rokiem urodzaju i po roku urodzaju i ziemi zmeczonej (przed zamowieniami 363); null - klucz NIE albo Plan
+            public double[] PreY, PostY;   // 497: produkcja gry przed rokiem urodzaju i po roku urodzaju (497-p: bez ziemi zmeczonej - tylko gra; przed zamowieniami 363); null - klucz NIE albo Plan
             public double WinterF = 1.0; public bool[] WinterSp;   // 497-p: czesc zimowa czynnika okregu (1 - VillageCut/TownCut; 1 - poza zima) i maska towarow oszczedzonych przez zime (297)
             public double[] S490; }   // 490 (sam pomiar): kroki drogi towaru okregu w grze (StartCalibration.Rozjazd490.cs); null - rachunek bez czynnikow (Plan)   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
         // m114-prace (recenzja): WorksAll - caly dodatek po czynnikach (sztuki gry na dobe), WorksPart - kg dodatku czesci przed zima (klucz DistrictWorks.PartKey):
@@ -440,8 +440,9 @@ namespace Armoury
                 if (vf497) res.PreY = (double[])prod.Clone();   // 497: przed rokiem urodzaju (tylko odczyt)
                 HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (rok zniw - poza zima; 432: rok trybu zimy takze w zimie)
                 // R3-06d (TiredLand): ziemia zajeta ponad baze okregu - tylko gra (Plan bez zmian); przedtem kopia plonu bez stada i ziemi do bramki krainy (StartCalibration.Stada.cs)
+                // 497-p (recenzja): PostY PRZED ziemia zmeczona - ziemia zalezy od zajecia ziemi samego okregu (sprzezenie z Planem), R3-06d: tylko gra
+                if (vf497) res.PostY = (double[])prod.Clone();  // 497: po roku urodzaju, przed ziemia zmeczona i zamowieniami (tylko odczyt)
                 LandKs(ld, prod, f);
-                if (vf497) res.PostY = (double[])prod.Clone();  // 497: po roku urodzaju i ziemi zmeczonej, przed zamowieniami (tylko odczyt)
                 // 363: towar zamowienia po zimie i czynnikach rak wyjety z produkcji PRZED stolem okregu i targiem (okreg go nie spala, wozy go nie wioza) - sztuki doby dla zamawiajacych
                 if (ord) OrderAfter(ld, res, prod, kgT);
                 if (res.S490 != null) S490Snap(res.S490, 4, prod, kgT, 1.0);   // 490: sam pomiar - po roku urodzaju, ziemi i zamowieniach

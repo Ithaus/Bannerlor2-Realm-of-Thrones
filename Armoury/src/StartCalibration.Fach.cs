@@ -61,7 +61,7 @@ namespace Armoury
             public bool[] FhFeed;                                       // okreg fachu objety progiem wyzywienia w tej rownowadze (PairKcal i mieszanka bloku policzone)
             public int[] FhIdx;                                         // bufor dawcow bloku (ApplyFach - od najnizszego dochodu pary)
             public int FhN;                                             // okregi fachu (bez regale)
-            public KsDistrict[] FhD; public int[] FhG, FhPs, FhPk, FhOs, FhOrd; public double[] FhT, FhOwn, FhK, FhAfter; public byte[] FhFlag;
+            public KsDistrict[] FhD; public int[] FhG, FhPs, FhPk, FhOs, FhOrd; public double[] FhT, FhOwn, FhK, FhAfter; public byte[] FhFlag; public bool[] FhHeld;   // 497-p: FhHeld - fach przesunal rece w ostatniej rundzie
             public double[] FhHandsBy = new double[KsTab.NC];           // rece przesuniete do fachu wedlug zajecia dawcy (ostatnia runda)
             public double FhHands;
             public long FhTicks;
@@ -127,9 +127,9 @@ namespace Armoury
             }
             int n = dl.Count;
             x.FhN = n; x.FhD = dl.ToArray(); x.FhG = new int[n]; x.FhT = new double[n]; x.FhOwn = new double[n]; x.FhK = new double[n];
-            x.FhAfter = new double[n]; x.FhFlag = new byte[n]; x.FhFeed = new bool[n];
+            x.FhAfter = new double[n]; x.FhFlag = new byte[n]; x.FhFeed = new bool[n]; x.FhHeld = new bool[n];
             var ps = new List<int>(n + 1); var pk = new List<int>(n * 24); var os = new List<int>(n + 1); var ord = new List<int>(n * 20);
-            var sumKg = new Dictionary<int, double>(); var sumOwn = new Dictionary<int, double>();
+            var sumKg = new Dictionary<int, double>(); var sumOwn = new Dictionary<int, double>(); var sumKgF = new Dictionary<int, double>();
             var tmp = new double[KsTab.NN];
             for (int i = 0; i < n; i++)
             {
@@ -140,6 +140,9 @@ namespace Armoury
                 x.FhOwn[i] = own;
                 int key = d.Market * KsTab.NG + g;
                 double a; sumKg.TryGetValue(key, out a); sumKg[key] = a + d.FachKg * (Livestock(g) ? KsTab.MeatOfLive : 1.0);
+                // 497-p (recenzja): baza fachu w kg gry Z czynnikami (Vf okregu) - popyt Planu jest wobec podazy z czynnikami; klucz NIE: Vf null, F = 1 (bit w bit jak dotad)
+                double vf = d.Vf != null && g < d.Vf.Length && d.Vf[g] > 0 ? d.Vf[g] : 1.0;
+                sumKgF.TryGetValue(key, out a); sumKgF[key] = a + d.FachKg * (Livestock(g) ? KsTab.MeatOfLive : 1.0) * vf;
                 sumOwn.TryGetValue(key, out a); sumOwn[key] = a + own;
             }
             // k rynku i towaru (jedyna skala - z podazy i popytu Planu); zywiec wobec rynku miesa (popyt Planu nie ma zywca osobno: mieso z uboju = zywiec x 0.5)
@@ -159,7 +162,8 @@ namespace Armoury
                     var ea = FachRoomPrev ? (x.In.PrevEaten ?? x.EqEat) : (x.EqEat ?? x.In.PrevEaten);   // bramka: poprzedni Plan najpierw (stale k w Planie)
                     if (ea != null && gi < ea.Length && ea[gi] > 0 && !double.IsNaN(ea[gi]) && !double.IsInfinity(ea[gi])) eatAll = ea[gi];
                 }
-                double avail = Math.Max(0.0, dm - sr - Math.Max(sumOwn[key], eatAll)), tot = sumKg[key];
+                // 497-p: k = min(1, wolne / suma baz Z czynnikami) - okreg fachu daje w grze k x baza x F, wiec suma nie przekracza wolnego miejsca; cel FhT i FhOg bez czynnikow
+                double avail = Math.Max(0.0, dm - sr - Math.Max(sumOwn[key], eatAll)), tot = sumKgF[key];
                 double k = tot > 0 ? Math.Min(1.0, avail / tot) : 0.0;
                 if (double.IsNaN(k) || double.IsInfinity(k)) k = 0.0;
                 kOf[key] = k;
@@ -209,7 +213,7 @@ namespace Armoury
                 for (int j = x.FhPs[i]; j < x.FhPs[i + 1]; j++) { int k = x.FhPk[j]; P += xs[k] * sc[x.Pb[k]] * og[k]; }
                 double T = x.FhT[i], tol = 1e-9 * Math.Max(1.0, T);
                 byte fl = 0;
-                double gap = T - P;
+                double gap = T - P, p0 = P;
                 if (gap > tol)
                 {
                     for (int q = x.FhOs[i]; q < x.FhOs[i + 1] && gap > tol; q++)
@@ -221,7 +225,7 @@ namespace Armoury
                     }
                     if (gap > tol && fl == 0) fl = 4;                              // bez bloku z praca typu do przesuniecia
                 }
-                x.FhAfter[i] = P; x.FhFlag[i] = fl;
+                x.FhAfter[i] = P; x.FhFlag[i] = fl; x.FhHeld[i] = P > p0 + tol;
             }
             x.FhTicks += Stopwatch.GetTimestamp() - t0;
         }
@@ -355,7 +359,7 @@ namespace Armoury
             var map = new Dictionary<string, KsFach>(StringComparer.Ordinal);
             double sig = Math.Max(1.0, x.In.Sigma);
             Func<int, double> pcs = g => { KsItem it; return sig * (x.In.Items.TryGetValue(KsTab.Goods[g], out it) && it != null && it.Kg > 0 ? it.Kg : 10.0); };
-            double A = 0, B = 0; int full = 0, part = 0, cLand = 0, cProfit = 0, cFloor = 0, nReg = 0;
+            double A = 0, B = 0; int full = 0, part = 0, cLand = 0, cProfit = 0, cFloor = 0, nReg = 0, grainHeld = 0, grainN = 0; bool anyVf = false;
             var worst = new List<KeyValuePair<double, string>>();
             var sc = x.BlockScale;
             for (int i = 0; i < x.FhN; i++)
@@ -375,6 +379,8 @@ namespace Armoury
                     else flag = 1;
                 }
                 map[d.Id] = new KsFach { G = g, T = Tm, P = P, Own = own, K = x.FhK[i], Flag = flag };
+                if (d.Vf != null) anyVf = true;
+                if (g == KsTab.GGrain) { grainN++; if (x.FhHeld != null && i < x.FhHeld.Length && x.FhHeld[i]) grainHeld++; }   // 497-p: okregi zboza (wheat_farm) trzymane podloga fachu
                 double u = pcs(g);
                 A += Tm / u; double got = Math.Min(Tm, Math.Max(0.0, P - own)); B += got / u;
                 if (flag == 0) full++; else { part++; if (flag == 1) cLand++; else if (flag == 2) cProfit++; else cFloor++; }
@@ -414,6 +420,7 @@ namespace Armoury
               .Append(" | najwiekszy niedobor (cel/w Planie szt./d): ");
             if (worst.Count == 0) sb.Append('-');
             for (int i = 0; i < worst.Count && i < 6; i++) sb.Append(i > 0 ? ", " : "").Append(worst[i].Value);
+            if (anyVf) sb.Append(" | 497 k z czynnikami gry; okregi zboza (wheat_farm) trzymane fachem ").Append(grainHeld).Append(" z ").Append(grainN);   // 497-p: tylko przy czynnikach (klucz NIE - linia jak dotad)
             if (x.In.FachMarketRoom) sb.Append(" | miejsce na targu od popytu - zjedzone we wszystkich okregach (Ks Fach Market Room TAK)");   // m107 K5 (przed "czas fach" - regex WZ)
             sb.Append(" | czas fach ").Append(R.FachMs.ToString("0", inv)).Append(" ms.");
             R.FachLine = sb.ToString();

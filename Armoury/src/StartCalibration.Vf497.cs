@@ -6,7 +6,7 @@ namespace Armoury
     /// 497 (noc 14.11, klucz Ks Plan Knows Village Factors, domyslnie TAK): Plan KS zna czynniki, ktore gra doklada do plonu wsi PO Planie.
     /// Pomiar 490 (tasks/wolzo6s5a, meatGrain490): dostawa wsi w grze = Plan x (rok urodzaju / ziemia zmeczona ok. +3.4% Westeros, -6% Essos) x ScaleRates
     /// (drogi i budynki BK, 338 - ok. x1.10 na targu); Plan tego nie wiedzial, wiec zboze Westeros na targ wychodzilo 1.21-1.27 Planu (nadmiar).
-    /// Gra (watek glowny, przy przeliczeniu okregu): na towar dostawy i okreg F = (po roku urodzaju i ziemi / przed) x (stol + targ x s) / (stol + targ),
+    /// Gra (watek glowny, przy przeliczeniu okregu): na towar dostawy i okreg F = (po roku urodzaju / przed; 497-p: ziemia zmeczona tylko w grze, R3-06d) x (stol + targ x s) / (stol + targ),
     /// s = (stawka A po ScaleRates + PlanBack chleba i skory) / na targ przed ScaleRates (to samo, co dotad dostaje mkByM). Wejscie Planu (watek glowny, BuildInput):
     /// zwykle tablice KsDistrict.Vf [NG] i VfItem [ItemCount] - watek roboczy tylko je czyta. Plan (KsCore.Pairs i PairFood): produkcja pary x F towaru
     /// (zywiec x F, a mieso i skory z niego za nim; wieloryb / dziczyzna x F). Wlasny stol w grze nie dostaje ScaleRates - dlatego F miesza s tylko w czesci na targ.
@@ -99,7 +99,7 @@ namespace Armoury
 
     internal sealed partial class KsDistrict
     {
-        // 497: czynniki gry po Planie (rok urodzaju / ziemia zmeczona x ScaleRates czesci na targ) - [NG] towar Planu i [ItemCount] towar dostawy; null - 1 (jak dotad).
+        // 497: czynniki gry po Planie (rok urodzaju x ScaleRates czesci na targ; 497-p: bez ziemi zmeczonej) - [NG] towar Planu i [ItemCount] towar dostawy; null - 1 (jak dotad).
         // Zwykle tablice z watku glownego (BuildInput), watek roboczy tylko czyta.
         public double[] Vf, VfItem;
     }
