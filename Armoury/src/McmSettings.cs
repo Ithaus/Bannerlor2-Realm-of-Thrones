@@ -732,11 +732,11 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool BreakAtZeroCondition { get; set; } = false;
 
-        [SettingPropertyBool("Arena No Wear", HintText = "blows and shots in the arena, a tournament, a practice bout or a brawl - any fight that is not a battle on the map - no longer wear your gear or your men's kit (arena gear is borrowed); the tally of blows starts afresh with every battle, and blows from a battle you lost or left no longer wear your gear after the next victory", RequireRestart = false)]
+        [SettingPropertyBool("Arena No Wear", HintText = "blows and shots in the arena, a tournament (unless Tourney Gear Wear is on), a practice bout or a brawl - any fight that is not a battle on the map - no longer wear your gear or your men's kit (arena gear is borrowed); the tally of blows starts afresh with every battle, and blows from a battle you lost or left no longer wear your gear after the next victory", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool ArenaNoWear { get; set; } = true;
 
-        [SettingPropertyBool("Tourney Gear Wear", HintText = "in the lists your own armour and your own melee weapon wear from the blows, less than in battle (the weapons are blunted); borrowed weapons, shields, bows and horses of the games never wear your gear. Off = the lists do not wear your gear (as before)", RequireRestart = false)]
+        [SettingPropertyBool("Tourney Gear Wear", HintText = "in the lists your own armour and your own melee weapon wear from the blows, less than in battle (the weapons are blunted); borrowed weapons, shields, bows and horses of the games never wear your gear. Off = the lists follow Arena No Wear, as before", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool TourneyGearWear { get; set; } = true;
 

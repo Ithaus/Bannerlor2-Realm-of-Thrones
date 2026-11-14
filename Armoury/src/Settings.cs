@@ -240,10 +240,10 @@ namespace Armoury
         public bool BreakAtZeroCondition = false;          // at zero the piece finally breaks and is gone for good
         // E8/A (250, PLAN 8.8e, regula R4): ksiegi zuzycia (rynsztunek bohatera i sprzet wojska) pisza tylko w bitwie kampanii - misja z bitwa gracza na mapie;
         // arena, turniej, cwiczenia i bojki nie obijaja; ksiega ciosow bohatera zerowana na poczatku bitwy i po bitwie przegranej albo opuszczonej (FieldCraft, ArmouryBehavior)
-        public bool ArenaNoWear = true;                    // blows and shots in the arena, a tournament, a practice bout or a brawl - any fight that is not a battle on the map - no longer wear your gear or your men's kit (arena gear is borrowed); the tally of blows starts afresh with every battle, and blows from a battle you lost or left no longer wear your gear after the next victory
+        public bool ArenaNoWear = true;                    // blows and shots in the arena, a tournament (unless Tourney Gear Wear is on), a practice bout or a brawl - any fight that is not a battle on the map - no longer wear your gear or your men's kit (arena gear is borrowed); the tally of blows starts afresh with every battle, and blows from a battle you lost or left no longer wear your gear after the next victory
         // 499 (Jeff 14.11: na turnieju bron stepiona, ale sprzet ma sie zuzywac - mniej niz w bitwie): osobna ksiega turnieju (FieldCraft.TourneyLedger),
         // tylko WLASNE sztuki gracza po tozsamosci (Item + ItemModifier) - zbroja 5-9 i wlasna bron biala (wstawka GrandTourney 498); rozliczenie na koniec misji turnieju
-        public bool TourneyGearWear = true;                // in the lists your own armour and your own melee weapon wear from the blows, less than in battle (the weapons are blunted); borrowed weapons, shields, bows and horses of the games never wear your gear. Off = the lists do not wear your gear (as before)
+        public bool TourneyGearWear = true;                // in the lists your own armour and your own melee weapon wear from the blows, less than in battle (the weapons are blunted); borrowed weapons, shields, bows and horses of the games never wear your gear. Off = the lists follow Arena No Wear, as before
         public float TourneyArmourWearPercent = 50f;       // share of a battle blow's wear your own armour takes in the lists
         public float TourneyWeaponWearPercent = 50f;       // share of a battle blow's wear your own melee weapon takes in the lists (blunted edge)
         // --- Crown jewels ---

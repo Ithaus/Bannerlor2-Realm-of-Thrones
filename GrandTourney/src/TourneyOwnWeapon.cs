@@ -35,6 +35,13 @@ namespace GrandTourney
         private static int _stumbles;
         private static int _swaps;
 
+        // 499 (recenzja): co 498 wstawil graczowi w BIEZACYM meczu - czyta Armoury (FieldCraft, odbiciem), zeby zuzywac wlasna bron tylko,
+        // gdy cios zadano bronia z TEGO slotu meczu. -1 = w tym meczu wlasna bron nie weszla (klucz NIE, brak broni, kon, brak slotu).
+        // Ustawiane na poczatku kazdego PrepareForMatch (kazdy mecz zaczyna od -1), czytane tylko w misji.
+        public static int MatchOwnSlot = -1;
+        public static ItemObject MatchOwnItem;
+        public static ItemModifier MatchOwnModifier;
+
         private static bool On { get { var s = Settings.Current; return s != null && s.Enabled && s.TourneyOwnMeleeWeapon; } }
 
         private static void Stumble(string where, Exception e)
@@ -132,6 +139,7 @@ namespace GrandTourney
         /// <summary>Po RBM: MatchEquipment gracza - slot "drugorzednej" broni bialej dostaje wlasna bron gracza (przed spawnem agentow).</summary>
         public static void PrepareForMatchPostfix(TournamentMatch ____match)
         {
+            MatchOwnSlot = -1; MatchOwnItem = null; MatchOwnModifier = null;
             try
             {
                 if (!On || ____match == null) return;
@@ -173,9 +181,11 @@ namespace GrandTourney
                         if (!old.IsEmpty && old.Item == own.Item && old.ItemModifier == own.ItemModifier)
                         {
                             Log.Info(P + "slot " + slot + " juz ma wlasna bron " + Name(own) + " - bez zmian.");
+                            MatchOwnSlot = slot; MatchOwnItem = own.Item; MatchOwnModifier = own.ItemModifier;   // 499: ta sama sztuka w slocie - liczona jako wlasna
                             return;
                         }
                         me.AddEquipmentToSlotWithoutAgent((EquipmentIndex)slot, new EquipmentElement(own.Item, own.ItemModifier));
+                        MatchOwnSlot = slot; MatchOwnItem = own.Item; MatchOwnModifier = own.ItemModifier;   // 499
                         _swaps++;
                         Log.Info(P + "mecz gracza, slot " + slot + ": " + (insert ? "pusty -> wstawiona " : Name(old) + " -> ") + Name(own)
                                  + " | wybrana z [" + Candidates(hero.BattleEquipment) + "]" + (mounted ? ", mecz konny" : "")

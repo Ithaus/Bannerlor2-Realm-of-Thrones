@@ -707,6 +707,7 @@ namespace Armoury
         private static int _tourStumbles;                                         // potkniecia 499 w sesji (liczone, nic nie gasimy)
         private int _tourney = -1;                                                // -1 nie sprawdzone, 0 nie turniej, 1 misja turnieju (walka wrecz)
         private int _own498 = -1;                                                 // klucz GrandTourney 498 (Enabled + TourneyOwnMeleeWeapon): 1 TAK, 0 NIE, 2 brak moda / blad
+        private System.Reflection.FieldInfo _gtSlot, _gtItem, _gtMod;          // recenzja 499: GrandTourney.TourneyOwnWeapon.MatchOwnSlot/Item/Modifier (wstawka 498 w biezacym meczu)
         private int _tourTaken, _tourGiven, _tourArmN, _tourWepN, _tourBorrowed, _tourAmbig, _tourShots;
         private float _tourArm, _tourWep;
 
@@ -739,6 +740,13 @@ namespace Armoury
                 var en = t != null ? t.GetField("Enabled") : null;
                 var ow = t != null ? t.GetField("TourneyOwnMeleeWeapon") : null;
                 if (cur != null && en != null && ow != null) _own498 = (bool)en.GetValue(cur) && (bool)ow.GetValue(cur) ? 1 : 0;
+                // recenzja 499: slot wstawki 498 w biezacym meczu; starszy GrandTourney bez tych pol - bron gracza traktowana jak pozyczona
+                var tw = Type.GetType("GrandTourney.TourneyOwnWeapon, GrandTourney");
+                var fl = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static;
+                _gtSlot = tw != null ? tw.GetField("MatchOwnSlot", fl) : null;
+                _gtItem = tw != null ? tw.GetField("MatchOwnItem", fl) : null;
+                _gtMod = tw != null ? tw.GetField("MatchOwnModifier", fl) : null;
+                if (_own498 == 1 && (_gtSlot == null || _gtItem == null || _gtMod == null)) _own498 = 3;
             }
             catch (Exception e) { _own498 = 2; TourStumble("Own498", e); }
             return _own498;
@@ -832,18 +840,18 @@ namespace Armoury
                     int j = Own498() == 1 ? OwnSlot498(eq, mounted) : -1;
                     var own = j >= 0 ? eq[(EquipmentIndex)j] : EquipmentElement.Invalid;
                     if (own.IsEmpty || own.Item != it || own.ItemModifier != w.ItemModifier) { _tourBorrowed++; return; }
-                    if (own.ItemModifier == null)
-                    {
-                        // ta sama sztuka bez modyfikatora moze byc tez bronia RBM / szablonu (RBM daje zawsze modyfikator null) - liczymy tylko, gdy w zestawie
-                        // meczu jest jedna taka (wstawka 498); dwie jednakowe - nie wiadomo, ktora jest gracza: pomijamy
-                        int same = 0;
-                        for (int i = 0; i < 4; i++)
-                        {
-                            var se = by.SpawnEquipment[(EquipmentIndex)i];
-                            if (!se.IsEmpty && se.Item == it && se.ItemModifier == null) same++;
-                        }
-                        if (same != 1) { _tourAmbig++; return; }
-                    }
+                    // recenzja 499: cios musi isc bronia z TEGO slotu meczu, do ktorego 498 wstawil wlasna bron w biezacym meczu (pole GrandTourney,
+                    // ustawiane w PrepareForMatch). 498 nic nie wstawil (4 sloty zajete bez jednorecznej / dwurecznej, kon) albo bron z innego slotu
+                    // (np. ta sama sztuka RBM / szablonu z modyfikatorem null) - nie wiadomo, czy to sztuka gracza: pomijamy ("spoza slotu 498")
+                    int ms = (int)_gtSlot.GetValue(null);
+                    var mi = _gtItem.GetValue(null) as ItemObject;
+                    var mm = _gtMod.GetValue(null) as ItemModifier;
+                    EquipmentIndex wi = EquipmentIndex.None;
+                    try { wi = by.GetPrimaryWieldedItemIndex(); } catch { }
+                    if (ms < 0 || ms > 3 || mi != own.Item || mm != own.ItemModifier || wi != (EquipmentIndex)ms)
+                    { _tourAmbig++; return; }
+                    var se = by.SpawnEquipment[(EquipmentIndex)ms];
+                    if (se.IsEmpty || se.Item != own.Item || se.ItemModifier != own.ItemModifier) { _tourAmbig++; return; }
                     float addW = Math.Max(0f, c.WearWeaponPerHit) * Math.Max(0f, Math.Min(100f, c.TourneyWeaponWearPercent)) / 100f;
                     if (addW > 0f) { TourPut(j, own, addW); _tourWep += addW; _tourWepN++; }
                 }
@@ -870,8 +878,8 @@ namespace Armoury
                 Log.Info("Zuzycie turnieju (499): ciosy przyjete " + _tourTaken + ", zadane " + _tourGiven
                          + " | zbroja " + _tourArm.ToString("0.0", inv) + " pkt z " + _tourArmN + " ciosow (x" + (c.TourneyArmourWearPercent / 100f).ToString("0.00", inv) + ")"
                          + " | bron " + _tourWep.ToString("0.00", inv) + " pkt z " + _tourWepN + " ciosow (x" + (c.TourneyWeaponWearPercent / 100f).ToString("0.00", inv) + ")"
-                         + " | pozyczone pominiete " + _tourBorrowed + ", niepewne (2 jednakowe bez modyfikatora) " + _tourAmbig + ", strzaly pozyczonym lukiem " + _tourShots
-                         + " | 498 " + (_own498 == 1 ? "TAK" : _own498 == 0 ? "NIE" : _own498 < 0 ? "-" : "brak") + " | rozliczenie: " + res
+                         + " | pozyczone pominiete " + _tourBorrowed + ", bron spoza slotu wstawki 498 " + _tourAmbig + ", strzaly pozyczonym lukiem " + _tourShots
+                         + " | 498 " + (_own498 == 1 ? "TAK" : _own498 == 0 ? "NIE" : _own498 < 0 ? "-" : _own498 == 3 ? "TAK, ale GrandTourney bez MatchOwnSlot (stary DLL)" : "brak") + " | rozliczenie: " + res
                          + " | potkniec w sesji " + _tourStumbles + ".");
             }
             catch (Exception e) { TourStumble("TourneySettle", e); }
