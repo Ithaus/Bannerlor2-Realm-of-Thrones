@@ -11140,6 +11140,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageHouseLevy { get; set; } = true;
 
+        [SettingPropertyBool("Side Village House Recruit", HintText = "with Side Village Recruit: when the game would send a side village a young man of noble stock (the same chance as in any village), he no longer comes as a plain peasant: on the land of a great house with its own men at arms, held by that house in its own homeland, he comes as that house's first-rank recruit (a Blackwood Recruit on Blackwood land, a Stark Volunteer on Stark land); elsewhere as the culture's first-rank noble recruit where the culture has one, otherwise as a plain peasant. Only first-rank men on foot - a single village sends no trained or mounted men. Not in your own villages. Off = always plain peasants, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageHouseRecruit { get; set; } = true;
+
         [SettingPropertyBool("Castellan Levy From Pool", HintText = "the castellan of a great house's seat (Raventree Hall, Winterfell, Riverrun and the others) no longer conjures household troops out of nothing: the men you recruit from him are sons of the seat's own villages, as many as those villages can spare above their last homesteads, and they are gone from those fields for good. You pay the same price as before, but the money goes to their families (the purse of each village, for its own men) instead of vanishing. The Red Keep's Kingsguard stay as they were. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool CastellanLevyFromPool { get; set; } = true;
@@ -16538,6 +16542,7 @@ namespace Armoury
             s.SideRecruitResettleDays = SideRecruitResettleDays;
             s.SideVillageParentReputation = SideVillageParentReputation;
             s.SideVillageHouseLevy = SideVillageHouseLevy;
+            s.SideVillageHouseRecruit = SideVillageHouseRecruit;
             s.CastellanLevyFromPool = CastellanLevyFromPool;
             s.SideVillageRecruitScreen = SideVillageRecruitScreen;
             s.SideVillageWalk = SideVillageWalk;
