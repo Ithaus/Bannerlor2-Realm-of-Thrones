@@ -64,6 +64,27 @@ namespace Armoury
             return p >= 100 || p < 5 ? 1f : p / 100f;
         }
 
+        /// <summary>Recenzja 564 (uwaga 2): druzyna skryptu (CustomPartyComponent z wlasnym BaseSpeed - questy sandbox, NavalDLC). Gra zastepuje jej cala
+        /// predkosc (DefaultPartySpeedCalculatingModel.CalculateFinalSpeed), wiec FinalPostfix jej nie rusza; sufit kolumny dostaje wtedy tempo jak przed 564.</summary>
+        internal static bool Skips(MobileParty mp)
+        {
+            if (mp == null || !mp.IsCustomParty) return false;
+            var cc = mp.PartyComponent as CustomPartyComponent;
+            return cc != null && Math.Abs(cc.BaseSpeed) > 1e-5f;
+        }
+
+        /// <summary>Recenzja 564 (uwaga 3): podloga gry (MinimumSpeed 1) na mapie - przy tempie na calej predkosci FinalPostfix mnozy ja x tempo.</summary>
+        internal static float MinSpeed(Settings s) { return Whole(s) ? Scale(s) : 1f; }
+
+        /// <summary>Recenzja 564 (uwaga 1): predkosc bazowa z pamieci gry (MobileParty.LastCalculatedBaseSpeed) w jednostkach mapy - dla NASZYCH szacunkow
+        /// w logu. Przy kluczu WorldPaceWholeSpeed tempo nie siedzi juz w bazie (BasePostfix wychodzi), tylko w predkosci koncowej - tu x tempo.
+        /// Gra (inicjatywa poscigu AI, punkt ucieczki) czyta pole wprost i tego mnoznika NIE dostaje - opisane w CHANGELOG (564, recenzja).</summary>
+        internal static float BaseOnMap(MobileParty mp, Settings s)
+        {
+            float v = mp != null ? mp.LastCalculatedBaseSpeed : 0f;
+            return Whole(s) && !Skips(mp) ? v * Scale(s) : v;
+        }
+
         public static void BasePostfix(ref ExplainedNumber __result)
         {
             try
@@ -98,12 +119,7 @@ namespace Armoury
                 if (!Whole(s)) return;
                 float k = Scale(s);
                 if (k >= 1f) return;
-                var mp = __0;
-                if (mp != null && mp.IsCustomParty)
-                {
-                    var cc = mp.PartyComponent as CustomPartyComponent;
-                    if (cc != null && Math.Abs(cc.BaseSpeed) > 1e-5f) return;   // wlasna predkosc druzyny skryptu - jak przed 564
-                }
+                if (Skips(__0)) return;                         // wlasna predkosc druzyny skryptu - jak przed 564 (sufit kolumny x tempo w MarchPace)
                 float f = 1f + __result.SumOfFactors;
                 __result.AddFactor((k - 1f) * f, _txtPace);
                 float lo = __result.LimitMinValue, hi = __result.LimitMaxValue;

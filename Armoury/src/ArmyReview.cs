@@ -621,7 +621,7 @@ namespace Armoury
                     : col.Double > 0 ? ". Spare horses carry the prisoners first, then the footmen; the footmen left over ride double behind the riders."
                                      : ". Spare horses carry the footmen first, then the prisoners.");
             sb.Append("\n\n");
-            string capText = Num(col.Cap) + " on the map (" + Num(col.CapRaw) + " at full pace x " + Math.Max(5, Math.Min(100, c.WorldPacePercent)) + "% world pace)";
+            string capText = Num(col.Cap) + " on the map (" + Num(col.CapRaw) + " at full pace x " + (int)Math.Round(WorldPace.Scale(c) * 100f) + "% world pace)";
             if (col.Kind == 0)
             {
                 int footWalk = col.Foot - col.RidingFoot;

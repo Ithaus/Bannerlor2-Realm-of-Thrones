@@ -387,7 +387,7 @@ namespace Armoury
         private static void Excess(MobileParty mp, float exFactor, Settings s)
         {
             if (exFactor <= 0.0005f) return;
-            double u = exFactor * mp.LastCalculatedBaseSpeed;
+            double u = exFactor * WorldPace.BaseOnMap(mp, s);   // recenzja 564 (uwaga 1): jednostki mapy - przy WorldPaceWholeSpeed tempo poza baza
             _exOld += u;
             if (s.TerrainEaseEnabled && !s.TerrainEaseExact) _exNow += u;
         }

@@ -29,6 +29,20 @@
 
 **Status:** DO SPRAWDZENIA (galaz noc/564-tempo-swiata, nie wgrane)
 
+### Recenzja 564 (galaz noc/564-tempo-swiata-fix -> noc/564-tempo-swiata)
+
+Przyjete (sprawdzone w kodzie):
+- **(1) Predkosc bazowa w pamieci gry bez tempa - opisane jako swiadoma zmiana, do decyzji Jeffa; nasze szacunki w logu poprawione.** Gra czyta `MobileParty.LastCalculatedBaseSpeed` (= wynik CalculateBaseSpeed) w liczbach bezwzglednych: `DefaultMobilePartyAIModel` (inicjatywa ataku na ruchomy cel: godziny dogonienia = dystans / roznica predkosci bazowych, prog 18 h, mnoznik checi 18 / godziny) i `MobilePartyAi` (punkt ucieczki = baza x 3). Przy kluczu WorldPaceWholeSpeed tempo nie siedzi juz w bazie, wiec AI widzi roznice predkosci x1/k (przy 75% x1.33): wiecej ruchomych celow "do dogonienia w 18 h" i chetniej je goni, a uciekajacy celuje x1/k dalej. Porownania baza-do-bazy (kto szybszy, kat ucieczki) bez zmian - stosunek sie skraca. Kodu gry nie latamy: przywrocenie wspolczynnika w bazie z "odwrotem" w FinalPostfix rozjezdza wpisy liczone przez (1 + F) (MapRoads, MarchPace), a latka na getter LastCalculatedBaseSpeed (jedna linia) moze byc wbudowana przez JIT w wolajacych i po cichu nie dzialac. Jesli Jeff nie chce tej zmiany AI - klucz WorldPaceWholeSpeed OFF przywraca stara regule w calosci. Nasze odczyty tylko do logu: `AiRoadRoutes` (przewidywany czas dojazdu) i `TerrainEase.Excess` (nadmiar w jednostkach mapy) biora teraz `WorldPace.BaseOnMap` = baza x tempo przy kluczu (bez druzyn skryptu). F4Pomiary (srednia predkosc bazowa wozow drewna, log) bez zmian - porownuje sie sam ze soba.
+- **(2) Druzyny skryptu (CustomPartyComponent z wlasnym BaseSpeed) dostawaly sufit kolumny bez tempa.** Wspolny warunek `WorldPace.Skips(mp)` (FinalPostfix go uzywa); w MarchPace.ColumnPostfix dla takich druzyn `colScale = scale` - sufit x tempo jak przed 564.
+- **(3) Podloga 0.75 a stale 1.** `LordEscort.Guard335.Hours`: najmniej `WorldPace.MinSpeed(s)` (1, przy kluczu 1 x tempo). Komentarze DrMarchArrival (linie 29 i 347) dopisane - wzor FootUph liczyl dobrze.
+- **(4) Opis "World Pace Percent" w MCM i Settings.cs** mowil, ze teren, ladunek, sen i sufit kolumny licza sie na tempie - przy kluczu ON tempo mnozy cala predkosc koncowa. Nowy opis (angielski) mowi oba tryby i "ponizej 5 = bez zmiany".
+- **(6) WorldPacePercent < 5.** MarchPace (ColumnPostfix i Column) i tekst ArmyReview biora `WorldPace.Scale(c)` - ta sama regula co BasePostfix/FinalPostfix (5..99 = procent, poza tym 1). Przy kluczu OFF to zmienia stary blad (sufit kolumny x0.05 przy bazie bez zmiany) - tylko dla wartosci 0..4, ktorych nikt nie gra.
+
+Bez zmian w kodzie:
+- (5) Przelaczenie klucza w trakcie gry: gra trzyma predkosc bazowa partii w pamieci do zmiany ladunku, skladu albo pogody (MobileParty.CalculateSpeedForPartyUnified, IsBaseSpeedCacheInvalid). Do tego czasu tempo dziala podwojnie (OFF -> ON) albo wcale (ON -> OFF) - ta sama klasa co przy zmianie WorldPacePercent w trakcie gry. Zmieniac klucz najlepiej przed wczytaniem zapisu; samo przejdzie po pierwszej zmianie skladu/ladunku.
+
+**Ryzyko / co sprawdzic (recenzja):** build 0 bledow. W grze: rozpiska predkosci jak w 564; inicjatywa poscigu AI przy kluczu ON (uwaga 1) - jesli lordowie AI za czesto gonia szybkie cele, wylaczyc klucz i dac znac. Druzyna questu z wlasna predkoscia w kolumnie - sufit na mapie x tempo (linia audytu predkosci). Bez nowych kluczy.
+
 ## 562b: musztra - pasek Drill pokazuje postep w sztukach (%), podpowiedz mowi, czego brakuje najbardziej i dlaczego pobor nic nie bierze - Armoury (DrillKit.cs, MarchHud.cs)
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 262: Horses 165/165, Pack 80/139, Drill 0/164 czerwone - "mam rzeczy w armoury, ale wojsko nie pobiera - jak mam cos kliknac?". Log Armoury-2026-11-15_19-36-27.log, linia 953: migracja 562 - zapas 299 -> 255 szt., do zbrojowni 53, wzieto z nadwyzki 9 (wlocznie 14 -> 23/26), kontrola ZGODNE. Pokrycie rodzajow: 1H 88/88, 2H 3/3, wlocznie 23/26, tarcze 0/88, luki 0/73, strzaly 0/73, oszczepy 0/7, korpus 61/164, helmy 38/164, nogi 31/164, oponcze 0/164 = 244/1013 sztuk (24%).

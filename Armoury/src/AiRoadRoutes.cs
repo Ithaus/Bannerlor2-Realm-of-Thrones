@@ -677,7 +677,7 @@ namespace Armoury
         {
             byte gp = res == RouteOk ? GrpDet : res == RouteCtl ? GrpCtl : (byte)0;
             if (gp == 0) return;
-            float v = mp.LastCalculatedBaseSpeed;
+            float v = WorldPace.BaseOnMap(mp, Settings.Current);   // recenzja 564 (uwaga 1): przy WorldPaceWholeSpeed tempo jest poza baza - x tempo, jak dojazd zmierzony
             if (!(v > 0.1f)) return;
             _slotT0[slot] = NowRel();
             _slotPred[slot] = L / v;
