@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -30,6 +31,16 @@ namespace Armoury
     ///      SaleFloor. Zloto za towar, nic z niczego. TA karawana nie odkupi tego srebra w tej wizycie (CaravanGoods.BkValuePostfix - SoldHere).
     /// Klucz CaravanSilverToSmiths; czynne tylko przy SilverOreToSmiths (GoodsPaths.CraftFirst - mieszczanie nie biora zapasu warsztatow) i przy czynnym wyborze
     /// celu 294c (RouteOn). Stan tylko w sesji. Linia doby 'Srebro do zlotnikow (492)'. Wyjatek - licznik potkniec, bez wylacznika.
+    ///
+    /// 554 (15.11, Jeff "warsztaty to napraw, czemu nie jezdza karawany") - DOPLATA ZLOTNIKA. Dowod (log 2026-11-15_15-14-12, doby 109108-117): karawan
+    /// skierowanych 0 przez 10 dob, sprzedanych 16 szt. (Gulltown 12, King's Landing 2, Frostfang's Camp 2), odrzucone 'bez zysku po koszcie' 9 przy wyborze
+    /// i 11 przy wjezdzie; 15 zlotnikow swiata 0 cykli (311c), brak 14 miast 608 szt., juki karawan 500 szt. Przyczyna: cena srebra jest wyrownana w calym
+    /// rynku (360d rozklada zapas poza polkami na wszystkie miasta wedlug popytu; indeks cwiartek miast 1.71-2.07, 287), a popyt gry to tylko mieszczanie -
+    /// brak zlotnika nie podnosi ceny. Pierwsze sztuki ida po mycie powyzej kosztu, kolejne ponizej (cena spada z kazda sztuka), MaxAtCost dawal < MinLot.
+    /// Zmiana (klucz CaravanSilverSmithPays): sztuki, ktore po cenie rynku i mycie nie daja karawanie kosztu x (1 + EarnK), dostaja doplate od zlotnikow tego
+    /// miasta (kapital warsztatow ze srebrem na wsadzie, ponad polowe kapitalu poczatkowego) - najwyzej PremMaxK x wartosci sztuki. Kasa miasta placi cene
+    /// rynku jak dotad (i tylko ponad zapas kupcow), zlotnik pozniej kupuje srebro z polki po cenie rynku (BK ConsumeInputFromTownMarket) - doplata to jego
+    /// zamowienie dowozu. Zloto: kapital warsztatu -> kiesa karawany, nic z niczego. Klucz NIE - jak 492 (sprzedaz tylko po koszcie).
     /// </summary>
     internal static class CaravanSilver492
     {
@@ -39,6 +50,9 @@ namespace Armoury
         private const int RouteTowns = 10;          // kandydaci (najblizsze miasta ze zlotnikiem i brakiem)
         private const double MaxDaysK = 2.0;        // zasieg = max(dni do wyboru BK, 2 x odcinek)
         private const double NoLegDays = 6.0;       // zasieg bez pomiaru odcinka
+        private const double EarnK = 0.10;          // 554: z doplata karawana dostaje za sztuke co najmniej koszt x 1.10 (po mycie)
+        private const double PremMaxK = 1.0;        // 554: doplata zlotnika najwyzej 1.0 x wartosci sztuki srebra
+        private const int PlanMax = 200;            // 554: najwiecej sztuk w jednej ocenie
 
         private static ItemCategory _cat;
         private static ItemObject _item;
@@ -54,6 +68,7 @@ namespace Armoury
         // liczniki doby
         private static int _dec, _dir, _already, _noCand, _rCost, _rGold, _rCap, _rRoute, _sCaravans, _sPcs, _sCost, _sGold, _sExempt;
         private static long _sGot, _sToll;
+        private static int _pSales, _pPcs, _pShort, _rPurse; private static long _pGold;   // 554: doplata zlotnikow
         private static readonly Dictionary<string, int> _soldTowns = new Dictionary<string, int>();
         private static long _ticks;
         private static int _stumbles, _stumbleSess;
@@ -70,7 +85,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dec = _dir = _already = _noCand = _rCost = _rGold = _rCap = _rRoute = _sCaravans = _sPcs = _sCost = _sGold = _sExempt = 0;
-            _sGot = _sToll = 0; _soldTowns.Clear(); _ticks = 0; _stumbles = 0;
+            _sGot = _sToll = 0; _pSales = _pPcs = _pShort = _rPurse = 0; _pGold = 0; _soldTowns.Clear(); _ticks = 0; _stumbles = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -94,6 +109,103 @@ namespace Armoury
         }
 
         private static bool On(Settings s) { return s != null && s.CaravanSilverToSmiths && Resolve() && GoodsPaths.CraftFirst(_cat); }
+
+        // ------------------------------------------------------------ 554: doplata zlotnika
+        private static bool Pays(Settings s) { return s != null && s.CaravanSilverSmithPays; }
+
+        /// <summary>Warsztat ze srebrem na wsadzie (ta sama miara co GoodsPaths.SilverBatchOf), z wlascicielem.</summary>
+        private static bool UsesSilver(Workshop w)
+        {
+            var wt = w != null ? w.WorkshopType : null;
+            if (wt == null || wt.Productions == null || w.Owner == null) return false;
+            foreach (var p in wt.Productions)
+            {
+                if (p.Inputs == null) continue;   // Production to struct
+                foreach (var i in p.Inputs) if (i.Item1 == _cat && i.Item2 > 0) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Kapital warsztatu, ktory zlotnik moze dac na doplate: ponad polowe kapitalu poczatkowego (reszta zostaje na wsad i place).</summary>
+        private static int SpareOf(Workshop w) { return Math.Max(0, w.Capital - Math.Max(0, w.InitialCapital) / 2); }
+
+        /// <summary>Razem kapital zlotnikow miasta na doplate.</summary>
+        private static long SmithPurse(Town t)
+        {
+            long n = 0;
+            var ws = t != null ? t.Workshops : null;
+            if (ws == null) return 0;
+            foreach (var w in ws)
+            {
+                try { if (UsesSilver(w)) n += SpareOf(w); }
+                catch (Exception e) { Stumble("SmithPurse", e); }
+            }
+            return n;
+        }
+
+        /// <summary>Zdejmuje do `due` zlota z kapitalu zlotnikow miasta (po kolei, kazdy do swojej nadwyzki); zwraca zdjete.</summary>
+        private static int TakeFromSmiths(Town t, int due)
+        {
+            int got = 0;
+            var ws = t != null ? t.Workshops : null;
+            if (ws == null || due <= 0) return 0;
+            foreach (var w in ws)
+            {
+                if (got >= due) break;
+                try
+                {
+                    if (!UsesSilver(w)) continue;
+                    int x = Math.Min(due - got, SpareOf(w));
+                    if (x <= 0) continue;
+                    w.ChangeGold(-x);
+                    got += x;
+                }
+                catch (Exception e) { Stumble("TakeFromSmiths", e); }
+            }
+            return got;
+        }
+
+        /// <summary>554: karawana nie przyjela doplaty (wyjatek) - zloto wraca do pierwszego zlotnika miasta.</summary>
+        private static void TakeBack(Town t, int x)
+        {
+            try
+            {
+                var ws = t != null ? t.Workshops : null;
+                if (ws == null) return;
+                foreach (var w in ws) if (UsesSilver(w)) { w.ChangeGold(x); return; }
+            }
+            catch (Exception e) { Stumble("TakeBack", e); }
+        }
+
+        /// <summary>
+        /// Ile z n sztuk karawana sprzeda w town: kazda sztuka po mycie co najmniej `floor` (prog sprzedazy), a gdy zlotnik doplaca (pay) - sztuka ponizej
+        /// floor x (1 + EarnK) dostaje doplate do tej kwoty, najwyzej PremMaxK x wartosci, razem najwyzej `purse`. Cena k-tej sztuki maleje z k (CaravanGoods.NetAt) -
+        /// pierwsza sztuka, ktorej nie da sie sprzedac, konczy liczenie. Bez doplaty - MaxAtCost jak w 492. prem - doplata razem (zl).
+        /// </summary>
+        private static int Plan(Town t, Settlement st, MobileParty mp, EquipmentElement el, int n, double floor, long purse, bool pay, out long prem)
+        {
+            prem = 0;
+            if (n <= 0 || !(floor > 0) || el.Item == null) return 0;
+            if (!pay) return CaravanGoods.MaxAtCost(t, st, mp, el, n, floor);
+            double target = floor * (1.0 + EarnK);
+            double cap = PremMaxK * Math.Max(1, el.Item.Value);
+            int k = 0;
+            n = Math.Min(n, PlanMax);
+            for (int j = 1; j <= n; j++)
+            {
+                double net = CaravanGoods.NetAt(t, st, mp, el, j);
+                if (double.IsNaN(net)) { prem = 0; return CaravanGoods.MaxAtCost(t, st, mp, el, n, floor); }
+                double p = net >= target ? 0.0 : target - net;
+                long pc = (long)Math.Ceiling(p);
+                if (pc > 0 && (p > cap || prem + pc > purse))
+                {
+                    if (net >= floor) pc = 0;                               // bez doplaty sztuka i tak nie idzie ponizej progu
+                    else break;
+                }
+                prem += pc; k = j;
+            }
+            return k;
+        }
 
         // ------------------------------------------------------------ brak miasta
         /// <summary>Miasta z zapasem warsztatow srebra (CraftReserve > 0) - pamiec doby.</summary>
@@ -212,8 +324,11 @@ namespace Armoury
                     if (want < MinLot) { _rCost++; continue; }
                     double floor = CaravanGoods.SaleFloor(mp, it, t.Settlement);
                     if (!(floor > 0)) { _rCost++; continue; }
-                    int k = CaravanGoods.MaxAtCost(t, t.Settlement, mp, el, want, floor);
-                    if (k < MinLot) { _rCost++; continue; }
+                    bool pay = Pays(s);
+                    long purse = pay ? SmithPurse(t) : 0;
+                    long prem;
+                    int k = Plan(t, t.Settlement, mp, el, want, floor, purse, pay, out prem);   // 554: z doplata zlotnika
+                    if (k < MinLot) { if (pay && purse <= 0) _rPurse++; else _rCost++; continue; }
                     int price = Math.Max(1, t.GetItemPrice(el, mp, true));
                     int kg = (t.Gold - TownPurse.BuyFloorPeek(t, reserve)) / price;
                     if (kg < MinLot) { _rGold++; continue; }
@@ -298,7 +413,10 @@ namespace Armoury
                 if (n <= 0) { _sGold++; break; }
                 double floor = CaravanGoods.SaleFloor(mp, it, st);
                 if (!(floor > 0)) { _sCost++; continue; }
-                int k = CaravanGoods.MaxAtCost(t, st, mp, el.EquipmentElement, n, floor);   // nigdy ponizej progu sprzedazy (koszt z ksiegi / istniejace progi strat)
+                bool pay = Pays(s);
+                long prem;
+                // nigdy ponizej progu sprzedazy (koszt z ksiegi / istniejace progi strat); 554: sztuki ponizej kosztu x (1 + EarnK) z doplata zlotnika
+                int k = Plan(t, st, mp, el.EquipmentElement, n, floor, pay ? SmithPurse(t) : 0, pay, out prem);
                 if (k <= 0) { _sCost++; continue; }
                 int purse = mp.PartyTradeGold;
                 bool broke = false;
@@ -316,6 +434,23 @@ namespace Armoury
                     try { shelf.AddToCounts(el.EquipmentElement, -moved); pack.AddToCounts(el.EquipmentElement, moved); }   // towar poszedl, zloto nie - cofamy
                     catch (Exception e) { Stumble("Sell(cofniecie)", e); }
                     moved = 0;
+                }
+                if (moved > 0 && pay && prem > 0)
+                {
+                    // 554: doplata z rzeczywistego utargu po mycie (got - toll) do floor x (1 + EarnK) za sprzedane sztuki, najwyzej plan
+                    double due = Math.Ceiling(floor * (1.0 + EarnK) * moved - (got - toll));
+                    int dueI = (int)Math.Max(0.0, Math.Min((double)prem, due));
+                    if (dueI > 0)
+                    {
+                        int paid = TakeFromSmiths(t, dueI);
+                        if (paid > 0)
+                        {
+                            try { mp.PartyTradeGold += paid; }
+                            catch (Exception e) { Stumble("Sell(doplata)", e); TakeBack(t, paid); paid = 0; }
+                        }
+                        if (paid > 0) { _pSales++; _pPcs += moved; _pGold += paid; }
+                        if (paid < dueI) _pShort++;
+                    }
                 }
                 if (moved > 0)
                 {
@@ -415,6 +550,8 @@ namespace Armoury
                 sb.Append("]");
                 sb.Append(" | odrzucone kandydaty: bez zysku po koszcie ").Append(_rCost).Append(", kasa miasta ").Append(_rGold).Append(", limit miasta ").Append(_rCap)
                   .Append(", trasa bez zysku ").Append(_rRoute).Append(" | brak kandydata (za daleko/wojna) ").Append(_noCand);
+                sb.Append(" | doplata zlotnikow (554) ").Append(s != null && s.CaravanSilverSmithPays ? "TAK" : "NIE").Append(": ").Append(_pGold).Append(" zl w ").Append(_pSales)
+                  .Append(" sprzedazach (").Append(_pPcs).Append(" szt.), za malo kapitalu ").Append(_pShort).Append(", kandydat bez kapitalu zlotnika ").Append(_rPurse);
                 sb.Append(" | przy wjezdzie: ponizej progu kosztu ").Append(_sCost).Append(", kasa miasta ").Append(_sGold).Append(", wyjete ").Append(_sExempt);
                 sb.Append(" | czas ").Append((_ticks * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(")");
                 Log.Info(sb.ToString());

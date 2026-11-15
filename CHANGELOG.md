@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 554: srebro do zlotnikow - doplata zlotnika do sztuk, ktorych cena rynku nie pokrywa kosztu karawany - Armoury (CaravanSilver492.cs, CaravanGoods.NetAt; klucz NOWY CaravanSilverSmithPays = TAK, MCM "Silversmiths Pay Silver Delivery Fee")
+
+**Problem:** Jeff, czat 15.11: "warsztaty to napraw, czemu nie jezdza karawany". Dwa jego warsztaty 'Silversmith' (Gulltown, Seagard) stoja; bilans dobowy +2353 -> -904. Log Armoury-2026-11-15_15-14-12 (WGRANIE 250), linia "Srebro do zlotnikow (492)" A:1335 ... A:10622 (doby 109108-117): "karawan skierowanych 0" przez 10 dob, decyzji karawan ze srebrem razem 12, sprzedanych razem 16 szt. (Gulltown 7+5, King's Landing 2, Frostfang's Camp 2; od doby 109112 zero), odrzucone przy wyborze: "bez zysku po koszcie" 9, "kasa miasta" 5, trasa 1; przy wjezdzie: ponizej progu kosztu 11, kasa miasta 34. Koniec: 14 z 14 miast ze zlotnikiem z brakiem (608 szt.). 311c (A:10349): "silversmithy 15 (pracowalo 0, cykli 0)"; 284 (A:10625): brak wsadu silver 9 cykli. 285 (A:10876): juki karawan 500 szt., 73 z 97 miast bez srebra; nekon (A:10773): srebro w karawanach 500 = 7.4 dni, karawany kupily 52 / sprzedaly 14.
+
+**Przyczyna:**
+- Cena srebra jest wyrownana w calym rynku: 360d (OrePrice360.Supply) rozklada zapas poza polkami (wsie, wozy, juki karawan) na wszystkie miasta wedlug popytu mieszczan, wiec miasto zlotnika z pusta polka ma taka sama cene jak miasto, w ktorym karawana kupila (287, A:10611: indeks cwiartek miast silver 1.71-2.07; KS A:10799 mediana 1.89, Westeros 2.03, Essos 1.74). Popyt gry (Demand) to tylko mieszczanie - brak zlotnika (zapas 25 szt. na cykl) ceny nie podnosi.
+- 492 sprzedaje tylko sztuki, ktorych cena po mycie >= koszt z ksiegi (CaravanGoods.MaxAtCost). Cena spada z kazda sztuka (polka rosnie o ShelfWorth), wiec ponad koszt idzie kilka pierwszych sztuk (Gulltown 7 szt. za 225 zl = 32/szt. przy wartosci 20 i indeksie ~1.9), reszta ponizej kosztu. Przy wyborze celu MaxAtCost < MinLot (10) -> "bez zysku po koszcie" -> karawana nie jest kierowana; przy wjezdzie -> "ponizej progu kosztu". Cykl wymaga pelnego wsadu na polce (gra: DetermineItemRosterHasSufficientInputs), wiec 12 szt. w Gulltown nie uruchomilo warsztatu.
+- "kasa miasta" (34 przy wjezdzie) to miasta zlotnikow ponizej zapasu kupcow (kasy-miast.csv doba 109116: Qarth kasa/cel 0.04, Qarkash 0.51, New Ghys 0.60) - regula E5/A1 (miasto kupuje tylko z nadwyzki). Miasta Jeffa maja nadwyzke (Gulltown 186899 / zapas 133565, Seagard 225987 / 70713) - u Jeffa blokowal koszt, nie kasa.
+
+**Zmiana:**
+- Klucz `CaravanSilverSmithPays` (Settings.cs + McmSettings.cs recznie, grupa "Caravan guards, silver and iron flow (285)", domyslnie TAK; Jeff nie ma klucza w Armoury.json - zadziala TAK).
+- CaravanSilver492.Plan (wybor celu i sprzedaz przy wjezdzie): sztuka po sztuce (CaravanGoods.NetAt = PriceAt x (1 - myto), ta sama miara co MaxAtCost) - sztuka, ktora po mycie daje karawanie mniej niz prog x 1.10 (prog = CaravanGoods.SaleFloor, zwykle koszt z ksiegi), dostaje doplate do tej kwoty od zlotnikow miasta; doplata za sztuke najwyzej 1.0 x wartosci srebra (20 zl), razem najwyzej kapital zlotnikow miasta ponad polowe ich kapitalu poczatkowego (warsztaty z silver na wsadzie i z wlascicielem). Gdy doplaty zabraknie, sztuka idzie tylko, jesli bez niej nie schodzi ponizej progu (jak 492). Klucz NIE -> MaxAtCost jak dotad.
+- Sprzedaz: kasa miasta placi cene rynku jak dotad (SellItemsAction, tylko ponad zapas kupcow, myto), potem doplata liczona z RZECZYWISTEGO utargu po mycie: prog x 1.10 x sprzedane sztuki - (utarg - myto), najwyzej plan; zdejmowana z kapitalu zlotnikow (Workshop.ChangeGold) do kiesy karawany (PartyTradeGold). Zloto: kapital warsztatu -> karawana, nic z niczego; miasto netto bez zmian (zlotnik kupi srebro z polki po cenie rynku przy cyklu - BK ConsumeInputFromTownMarketPrefix).
+- Linia doby 492: "doplata zlotnikow (554) TAK: X zl w N sprzedazach (S szt.), za malo kapitalu K, kandydat bez kapitalu zlotnika R".
+
+**Ryzyko / co sprawdzic (regula 0):**
+- Regresje: Plan z kluczem NIE = MaxAtCost (stara sciezka bit w bit). Redirect, Sell, SmithKeep, SoldHere, Daily - jedyne miejsca 492; NetAt nowa, MaxAtCost i PriceAt bez zmian. MoneyLedger liczy kapital warsztatow i kiesy karawan jako posiadaczy - przeniesienie netto 0.
+- Kolizje: kapital warsztatow gracza czyta 259/305b (CaravanSettle.Player) - doplata Jeffa obnizy "zysk przed wyplata" jego zlotnikow (to koszt dowozu wsadu); jesli 305b dopelnia kapital z kiesy Jeffa, doplata wyjdzie z kiesy (sprawdzic "doplata kapitalu" w linii 259). Kapital nie schodzi ponizej polowy poczatkowego (Jeff 5000 -> 2500), wiec warunek gry Capital >= koszt wsadu (25 x ~40 = ~1000) zostaje.
+- Nie zmienione (osobne sprawy): miasta zlotnikow ponizej zapasu kupcow dalej nie kupuja (E5/A1 - Qarth, Qarkash, New Ghys); srebro dowiezione na polke moga odkupic INNE karawany BK (SoldHere blokuje tylko sprzedajaca); wozy kupcow / kontrakty 174 dla srebra bez zmian; karawany z < 10 szt. srebra (MinLot) nie sa kierowane.
+- Wydajnosc: Plan liczy cene sztuka po sztuce (najwyzej min(juki, brak) <= 200 wywolan GetPrice na kandydata, kandydatow <= 10) - tylko karawany ze srebrem >= 10 szt. (12 decyzji przez 10 dob) i wjazdy ze srebrem do miast zlotnikow; czas w linii 492.
+- W grze sprawdzic: linia 492 - karawan skierowanych > 0, sprzedanych szt. rosnie, doplata zlotnikow > 0, "bez zysku po koszcie" maleje; 311c silversmithy cykli > 0; 284 brak wsadu silver maleje; linia 259 - warsztaty 'Silversmith' Gulltown/Seagard z wyplata > 0. Build 0 bledow, w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".

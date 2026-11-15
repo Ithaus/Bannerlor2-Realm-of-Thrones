@@ -11529,6 +11529,10 @@ namespace Armoury
         [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
         public bool CaravanSilverToSmiths { get; set; } = true;
 
+        [SettingPropertyBool("Silversmiths Pay Silver Delivery Fee", HintText = "with Caravans Bring Silver To Silversmiths: the silversmiths of a town short of silver ore pay a delivery fee to the caravan for the pieces the town's market price no longer covers, so the caravan still earns a tenth over what it paid; the fee comes from the workshops' own capital above half of their starting capital and is at most the ore's value per piece; the town still pays only its market price (off = the caravan sells only what the market price alone covers)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
+        public bool CaravanSilverSmithPays { get; set; } = true;
+
         [SettingPropertyBool("Ks Iron Market Full Counts Iron On The Road", HintText = "with Ks Iron Hands Count Iron On The Road: the weekly step also counts the iron on its way to the towns when it decides the market is full (until now only when it decided it was short)", RequireRestart = false)]
         [SettingPropertyGroup("Caravan guards, silver and iron flow (285)")]
         public bool KsIronFullCountsTransit { get; set; } = true;
@@ -16724,6 +16728,7 @@ namespace Armoury
             s.TownMaterialOrderLuxuryInputs = TownMaterialOrderLuxuryInputs;
             s.CaravanGlutToShortTown = CaravanGlutToShortTown;
             s.CaravanSilverToSmiths = CaravanSilverToSmiths;
+            s.CaravanSilverSmithPays = CaravanSilverSmithPays;
             s.KsIronFullCountsTransit = KsIronFullCountsTransit;
             s.KsIronStockTrend = KsIronStockTrend;
             s.CaravanGuardByRoadStrength = CaravanGuardByRoadStrength;
