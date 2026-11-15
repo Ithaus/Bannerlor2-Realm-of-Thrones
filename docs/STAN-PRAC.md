@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 254 (552 szyk AI pod ostrzalem: sygnal od samotnego strzelca, czolo i tarcze do strzelca, tarcze w marszu), bez autotestu
+
+- Armoury.dll b4f8f502 = noc/scal-perki 9bab2eb7 (253 + 552). Kopie: .bak-2026-11-15-przed-wgranie254, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie254 i -przed). Klucze NOWE: ShieldsUpHarassShots = 2, FormationsFaceTheShooter, ShieldsToTheShooter (TAK).
+- Do sprawdzenia: linia konca bitwy 552 (zwroty, 'pominiete: konnica'), brak migania facingu. W toku: 554 srebro, 555 zaloga Banefortu, 557 log strat, 558 towarzysze cwicza, 556 log zbiorki.
+
 ## STAN 15.11 - WGRANIE 253 (549 cios w plecy x2 + 25% przebicia, 550 AI przy sztandarze), bez autotestu
 
 - Armoury.dll 8aa66f43 = noc/scal-perki 13e1e18d (252 + 549 + 550). Kopie: .bak-2026-11-15-przed-wgranie253, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie253 i -przed).
