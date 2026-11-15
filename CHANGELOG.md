@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 558: towarzysze cwicza - bohaterowie partii lorda (towarzysze, rodzina) dostaja w dniu musztry XP umiejetnosci noszonej broni wedlug wzoru oddzialu i licza sie do kompletu zapasu - Armoury (Drill.cs, MarchHud.cs; klucze NOWE DrillHeroes = TAK, DrillHeroXpMult = 1.0 w Settings.cs + McmSettings.cs recznie, MCM "Drill Heroes", "Drill Hero Xp Multiplier")
+
+**Problem:** Jeff, czat 15.11: "towarzysze maja cwiczyc" (wczesniej: "bohaterowie tez cwicza i dostaja xp, tylko gracz nie dostaje"). Musztra dawala XP tylko zolnierzom; pasek Drill liczyl komplet na samych zolnierzy ("heroes do not drill and are not counted").
+
+**Przyczyna:**
+- `MobilePartyTrainingBehavior.OnDailyTickParty` liczy model treningu dla kazdego elementu, ale XP dodaje tylko `!IsHero`; nasz `Drill.Shape` dla bohatera zwraca 0. Jedyna nauka bohatera z ticku to perk Bow.Trainer gry (6 XP Luku) - bez zmian.
+- `Drill.Men` = sami zolnierze, wiec komplet (`Full`) i zapas pomijaly bohaterow.
+
+**Zmiana:**
+- `Drill.HeroDrill` (wolane na poczatku `TickPostfix`, przed `AfterPlayerTick`): kazdy bohater skladu partii lorda (`IsLordParty`, aktywnej, nie Inni), zywy, dorosly, nie dowodca partii i nigdy gracz. Ciezko ranny (`IsWounded`) nie cwiczy (liczy sie do kompletu). Partie: gracz i Z14a przy DrillLaw, AI przy DrillLawAi (wylaczony = bohaterowie AI nie cwicza).
+- XP na dobe = B x L x D x S x mnoznik z tego samego `Ctx` co oddzial (kara glodu i snu o swicie, godziny obozu, dowodca, zapas); B = 10 + 2 x min(Level / 4 + 1, MaxCharacterTier) - tier zastepczy gry z `GetDefaultTroopPower`; w bitwie B = 0. Rowno na rozne umiejetnosci broni zestawu bitewnego (sloty 0-3: jednoreczna, dwureczna, drzewcowa, luk, kusza, miotana; bez tarcz i amunicji); bez broni nic. `Hero.AddSkillXp` w `SkillLedger.SDrill` (wspolczynnik i limit nauki gry dzialaja same). Bez perkow P.
+- Komplet: `Ctx.Kit = Men + HeroKit`, `Full(Kit)`; `Drill.Men` bez zmian (statystyki, "per man", ZGODNE). `Wear` przy `Kit > 0`, zuzycie takze, gdy cwiczyli sami bohaterowie (`HeroN`). `Accept`, `TrophyTip`, `AutotestFeed`, `HudKit` (pole `Heroes`, `KitN`) licza komplet z bohaterami.
+- W grze: "Drill today ...; companions drilled too: N of M (X XP each, shared among the weapons they carry; W wounded lie abed)"; druzyna z samymi towarzyszami - "Your companions drilled today: ...". Pasek: mianownik = zolnierze + towarzysze, podpowiedz "N soldiers and M companions - you lead the drill and are not counted".
+- Log (DrillLog, raz na dobe): "Musztra bohaterow (558): dzien D | gracz: ... [Imie (poz., B) umiejetnosc v0->v1 +XP] | komplet zapasu gracza: K = zolnierzy + bohaterow | rod i armia gracza | AI | mnoznik, potkniecia".
+- Potkniecia per bohater i per partia (Stumble), bez wylacznika.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: `Men()` nie zmienione - linia "Musztra (gracz)", XP na glowe i kontrola ZGODNE stoja. Zmienia sie tylko komplet: S przy tym samym zapasie troche spada (wiecej osob), zuzycie sztuk w uzyciu troche rosnie, ekrany i autotest przyjmuja wiecej (zamierzone: jedna sztuka na osobe). Nadwyzka K1 AI nietknieta.
+- Kolejnosc w ticku: HeroDrill przed `c`/`mine` (Ctx partii bez zolnierzy) i przed `AfterPlayerTick` (godziny obozu jeszcze w Ctx). Wiadomosc raz na dobe (`_msgDay`).
+- Kolizje: Bow.Trainer gry osobno; ROT patch30 przy zaciagu - partia nieaktywna, bez musztry; PlayerXp480, SmithXp, XpFair nie dotycza. SkillLedger przypisze XP do "musztra" (rod gracza, lordowie AI) - sprawdzic E8/P1.
+- Martwy kod zywy: raz na dobe petla po skladzie kazdej partii lorda i kilka `AddSkillXp` na bohatera; dodatkowy `CtxOf` tylko dla partii z samymi bohaterami. Uboczny efekt: `GainRawXp` daje wolny przyrost poziomu postaci (jak kazda nauka).
+- W grze: pasek Drill z mianownikiem zolnierze + towarzysze; dzien "Train the men" 8 h daje "companions drilled too" i wpisy 558 z przyrostem; marsz przy Drill Camp Only - 0; ranny towarzysz w "ranni"; XP AI na bohatera rzedu 10-60.
+- Decyzja Jeffa: czy dowodcy partii AI tez maja cwiczyc (w `DrillHero` skreslic `h != mp.LeaderHero`; wtedy cwiczylby tez dowodca partii rodu gracza).
+- Zbudowane (0 bledow), nie wgrane, nie testowane w grze.
+
+**Status:** DO SPRAWDZENIA
+
 ## 550: AI przy sztandarze - biegacz tylko bez zagrozenia, straz reaguje na podejscie (smycz od miejsca ofiary), kusznicy szyku piechoty wrecz albo czysty strzal - Armoury (BannerCompanies.Pickup.cs, BannerCompanies.Guard550.cs NOWY, BannerCompanies.cs, HorsePursuit.React.cs / ReactFire.cs / Hunt.cs; klucze NOWE BannerPickupSafeRadius = 10, BannerGuardsAnswer = TAK, MCM "Banner Pickup Safe Radius", "Standard Guards Close In")
 
 **Problem:** Jeff, czat 15.11, w trakcie bitwy: "podszedlem do goscia z banerem, armia przeciwnika stoi w obronie, atakuje go, zabilem, reszta jego ludzi gapi sie jak idioci, stoja, ludzie z wloczniami i kusznicy - zabijam jednego po drugim, normalnie rzucili by sie na mnie od razu jak tylko podejde do baneru, nie pozwolili go przechwycic; a druga rzecz jak upadnie baner nastepny uruchamia marsz ze idzie go przejac, ale ja stoje miedzy nim a banerem, ma to gdzies, idzie jak zombie, jak go bije on sie nie broni bo ma misje podniesc baner - podniesc baner tak, jak nie ma zagrozenia; oni zachowuja sie jak boty!" Log 16:09:31-16:10:09: 7 biegaczy 158, 3 zgineli w biegu, 0 rezygnacji "wrogowie przy sztandarze"; kusznicy z kusza w rece 2-3 m od Jeffa (16:14:34, 16:14:46); start 283 przy sztandarze z "piechoty 0", szyk 153 m szerokosci, Jeff 60-76 m od jego mediany.

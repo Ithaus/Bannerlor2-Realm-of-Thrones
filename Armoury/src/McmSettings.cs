@@ -7701,6 +7701,14 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillCampOnlyAi { get; set; } = true;
 
+        [SettingPropertyBool("Drill Heroes", HintText = "companions and kin in a lord's party drill with the men: on a day of drill they gain experience in the skills of the weapons they carry (one-handed, two-handed, polearm, bow, crossbow, throwing - shared evenly), by the troops' rule: 10 + 2 x tier (a hero's tier is his level / 4 + 1, up to 6), the commander's Leadership, the hours of drill, the drill kit; nothing when starving, after a dawn short of sleep, on a battle day or while badly wounded. You and every party's commander do not drill - you lead it. They count in the drill kit, one set each. The same rule for AI lords' parties (off = heroes do not drill and are not counted in the kit)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillHeroes { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Drill Hero Xp Multiplier", 0.00f, 3.00f, "0.00", HintText = "with Drill Heroes: the heroes' daily drill experience is multiplied by this (1 = the troops' rule, 0.5 = half as fast, 0 = none)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public float DrillHeroXpMult { get; set; } = 1.0f;
+
         [SettingPropertyBool("Drill Master", HintText = "with Drill Camp Only: the best drill master among the other heroes of the party (companion or kin, by Leadership) helps the commander - half his Leadership adds to the commander's in the drill pace, still within half to one and a half (off = the commander alone)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillMaster { get; set; } = true;
@@ -15791,6 +15799,8 @@ namespace Armoury
             s.DrillDailyMessage = DrillDailyMessage;
             s.DrillCampOnly = DrillCampOnly;
             s.DrillCampOnlyAi = DrillCampOnlyAi;
+            s.DrillHeroes = DrillHeroes;
+            s.DrillHeroXpMult = DrillHeroXpMult;
             s.DrillMaster = DrillMaster;
             s.DrillSiegeArmy = DrillSiegeArmy;
             s.DrillTownStay = DrillTownStay;

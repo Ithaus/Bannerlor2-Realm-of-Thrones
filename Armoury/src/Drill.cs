@@ -117,6 +117,7 @@ namespace Armoury
             internal bool Main, NoBase, Rest, Hungry, Sleepless, Zero, Off, StockOn, ArmsGate, PerkW, PerkA, Counted;
             internal bool ClanHead;                        // MUSZTRA-j: glowa rodu AI, ktorej gra (i BK) daje 15 + 3 x tier - tylko do linii (wzor jej tego nie daje)
             internal int Men, Lead = -1, Moved, Debt, Full, GivenW, GivenA, SurW, SurA;
+            internal int Kit, HeroKit, HeroN;   // 558: komplet zapasu = zolnierze + bohaterowie, ktorzy cwicza (HeroKit); HeroN - bohaterowie, ktorzy dzis naprawde cwiczyli
             internal int DebtNow;                          // MUSZTRA-j: Debt = dlug o ostatnim swicie (kara); DebtNow = dlug biezacy (predkosc, morale) - tylko do linii
             internal float L = LeadMin, D = MarchDay, S = 1f;
             // m97-szkolenie (CampDrill): Camp - zasada obozu czynna dla tej partii; H - godziny cwiczen (gracz: z menu obozu, reszta: postoj za dnia,
@@ -173,6 +174,7 @@ namespace Armoury
             // m114-musztra: uciete XP i ludzie wedlug powodu (CutTop..CutSaddle), nazwa brakujacego przedmiotu, opis oddzialow do logu
             internal readonly long[] CutBy = new long[CutKinds]; internal readonly int[] MenBy = new int[CutKinds]; internal string ItemName, CutLog;
             internal VetRec V;                             // 319b: nauka weteranow w tiku gracza (DrillVeterans.cs)
+            internal int HN, HAll, HWound; internal double HXp;   // 558: bohaterowie druzyny gracza w tym ticku (do wiadomosci w grze)
         }
         private static PlayerRec _pr, _prLast;
         private static int _msgDay = -1;                   // MUSZTRA-m: doba ostatniej linii musztry gracza w grze (raz na dobe)
@@ -227,6 +229,9 @@ namespace Armoury
             _aRuleBase = _aHeadBase = _aPerks = _aXpGame = _aXpNow = _aManN = 0; _aNoModel = _aSleepDawn = _aSleepPaid = _sleepNowAbove = 0;
             Array.Clear(_aWT, 0, _aWT.Length); Array.Clear(_aWTn, 0, _aWTn.Length); Array.Clear(_hb, 0, _hb.Length); _leads.Clear(); _ticks = 0;
             VetClearDay();   // 319b: liczniki doby AI nauki weteranow
+            // 558: liczniki doby musztry bohaterow
+            Array.Clear(_hParties, 0, 3); Array.Clear(_hAll, 0, 3); Array.Clear(_hDone, 0, 3); Array.Clear(_hWounded, 0, 3); Array.Clear(_hNoArms, 0, 3);
+            Array.Clear(_hZero, 0, 3); Array.Clear(_hLevels, 0, 3); Array.Clear(_hXp, 0, 3); _hPlayerLog.Length = 0;
         }
 
         /// <summary>Zegar kosztu musztry (T1): Clk na wejsciu kazdej metody wolanej z zewnatrz (godzina, model treningu, tick partii, ekrany, miasto,
@@ -315,6 +320,160 @@ namespace Armoury
         }
 
         private static int Full(int men) { return men > 0 ? (men + MenPerPiece - 1) / MenPerPiece : 0; }
+
+        // ------------------------------------------------------------ 558: bohaterowie cwicza (Jeff 15.11: "towarzysze maja cwiczyc")
+        private static bool HeroesOn(Settings s, bool noBase) { return s != null && s.DrillHeroes && (noBase ? s.DrillLaw : s.DrillLawAi); }
+
+        /// <summary>558: bohater, ktory cwiczy i liczy sie do kompletu: zywy, dorosly, nie dowodca partii (dowodca prowadzi musztre - jego Przywodztwo to L),
+        /// nigdy gracz. Ranny liczy sie do kompletu jak ranny zolnierz, ale nie cwiczy (HeroDrill).</summary>
+        private static bool DrillHero(MobileParty mp, Hero h)
+        { return h != null && h.IsAlive && !h.IsChild && h != Hero.MainHero && h != mp.LeaderHero; }
+
+        private static int KitHeroes(MobileParty mp, Settings s, bool noBase)
+        {
+            try
+            {
+                var r = mp != null ? mp.MemberRoster : null;
+                if (r == null || r.TotalHeroes <= 0 || !HeroesOn(s, noBase)) return 0;
+                int n = 0;
+                for (int i = 0; i < r.Count; i++) { var ch = r.GetCharacterAtIndex(i); if (ch != null && ch.IsHero && DrillHero(mp, ch.HeroObject)) n++; }
+                return n;
+            }
+            catch (Exception e) { Stumble("KitHeroes", e); return 0; }
+        }
+
+        /// <summary>558: ludzie do kompletu zapasu: zolnierze + bohaterowie, ktorzy cwicza (bez gracza i dowodcy).</summary>
+        private static int KitMen(MobileParty mp) { return Men(mp) + KitHeroes(mp, Settings.Current, NoGameBase(mp)); }
+
+        /// <summary>558: B bohatera = 10 + 2 x tier zastepczy - ten, ktorym gra mierzy bohatera w sile oddzialu i w XP z ciosu
+        /// (GetDefaultTroopPower: Level / 4 + 1), do MaxCharacterTier; CharacterObject.Tier bohatera = 0.</summary>
+        private static float HeroBase(Hero h)
+        {
+            int max = 6;
+            try { max = Campaign.Current.Models.CharacterStatsModel.MaxCharacterTier; } catch { }
+            return 10f + 2f * Math.Min(h.Level / 4 + 1, max);
+        }
+
+        /// <summary>558: rozne umiejetnosci broni z zestawu bitewnego (sloty 0-3), bez tarcz i amunicji.</summary>
+        private static int HeroSkills(Hero h, SkillObject[] dst)
+        {
+            int n = 0; var eq = h.BattleEquipment;
+            if (eq == null) return 0;
+            for (int i = 0; i < 4; i++)
+            {
+                var it = eq[(EquipmentIndex)i].Item;
+                if (it == null) continue;
+                switch (it.ItemType)
+                {
+                    case ItemObject.ItemTypeEnum.OneHandedWeapon: case ItemObject.ItemTypeEnum.TwoHandedWeapon: case ItemObject.ItemTypeEnum.Polearm:
+                    case ItemObject.ItemTypeEnum.Bow: case ItemObject.ItemTypeEnum.Crossbow: case ItemObject.ItemTypeEnum.Thrown: break;
+                    default: continue;
+                }
+                var sk = it.RelevantSkill;
+                if (sk == null) continue;
+                bool dup = false; for (int j = 0; j < n; j++) if (dst[j] == sk) { dup = true; break; }
+                if (!dup) dst[n++] = sk;
+            }
+            return n;
+        }
+
+        // liczniki doby: [0] gracz, [1] rod i armia gracza (Z14a), [2] AI
+        private static readonly int[] _hParties = new int[3], _hAll = new int[3], _hDone = new int[3], _hWounded = new int[3], _hNoArms = new int[3], _hZero = new int[3], _hLevels = new int[3];
+        private static readonly double[] _hXp = new double[3];
+        private static readonly StringBuilder _hPlayerLog = new StringBuilder();
+
+        /// <summary>558: dobowa musztra bohaterow - XP = B x L x D x S x mnoznik (A: niesie bron), z tego samego Ctx co oddzial (kara, godziny, dowodca, zapas);
+        /// w bitwie B = 0; ranny nie cwiczy. XP rowno na umiejetnosci broni (Hero.AddSkillXp - wspolczynnik nauki gry, limit nauki). Potkniecia per bohater, bez wylacznika.</summary>
+        private static void HeroDrill(MobileParty mp, Settings s)
+        {
+            try
+            {
+                if (mp == null || s == null || !mp.IsLordParty || !mp.IsActive || Undead.Party(mp)) return;
+                bool noBase = NoGameBase(mp);
+                if (!HeroesOn(s, noBase)) return;
+                var r = mp.MemberRoster;
+                if (r == null || r.TotalHeroes <= 0) return;
+                bool any = false;
+                for (int i = 0; i < r.Count && !any; i++) { var ch = r.GetCharacterAtIndex(i); any = ch != null && ch.IsHero && DrillHero(mp, ch.HeroObject); }
+                if (!any) return;
+                var c = CtxOf(mp, noBase, s);                       // ten sam kontekst co oddzial (z pamieci, gdy liczyl go Shape / TickPrefix)
+                float sk = c.StockOn ? c.S : 1f, mult = Math.Max(0f, s.DrillHeroXpMult);
+                bool battle = mp.MapEvent != null;
+                int row = c.Main ? 0 : (c.NoBase ? 1 : 2);
+                var rec = c.Main && _pr != null && _pr.C == c ? _pr : null;
+                _hParties[row]++;
+                var sks = new SkillObject[4];
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var ch = r.GetCharacterAtIndex(i);
+                    if (ch == null || !ch.IsHero) continue;
+                    var h = ch.HeroObject;
+                    try
+                    {
+                        if (!DrillHero(mp, h)) continue;
+                        _hAll[row]++; if (rec != null) rec.HAll++;
+                        if (h.IsWounded) { _hWounded[row]++; if (rec != null) rec.HWound++; continue; }   // Jeff 14.11: ciezko ranny lezy
+                        int k = HeroSkills(h, sks);
+                        if (k == 0) { _hNoArms[row]++; continue; }
+                        float b = battle ? 0f : HeroBase(h);
+                        float x = c.Off ? 0f : b * c.L * c.D * sk * mult;
+                        if (x <= 0f) { _hZero[row]++; continue; }
+                        float per = x / k;
+                        c.HeroN++; _hDone[row]++; _hXp[row] += x;
+                        if (rec != null) { rec.HN++; rec.HXp += x; }
+                        bool log = row == 0 && s.DrillLog && _hPlayerLog.Length < 1500;
+                        if (log) _hPlayerLog.Append(_hPlayerLog.Length > 0 ? "; " : "").Append(h.Name).Append(" (poz. ").Append(h.Level).Append(", B ").Append(F1(b)).Append(')');
+                        int prev = SkillLedger.Enter(SkillLedger.SDrill);
+                        try
+                        {
+                            for (int j = 0; j < k; j++)
+                            {
+                                int v0 = h.GetSkillValue(sks[j]);
+                                h.AddSkillXp(sks[j], per);
+                                int v1 = h.GetSkillValue(sks[j]);
+                                if (v1 > v0) _hLevels[row] += v1 - v0;
+                                if (log) _hPlayerLog.Append(' ').Append(sks[j].StringId).Append(' ').Append(v0).Append(v1 > v0 ? "->" + v1 : "").Append(" +").Append(F1(per));
+                            }
+                        }
+                        finally { SkillLedger.Leave(prev); }
+                    }
+                    catch (Exception e) { Stumble("HeroDrill", e); }
+                }
+            }
+            catch (Exception e) { Stumble("HeroDrill.Party", e); }
+        }
+
+        private static string HeroClause(PlayerRec r)
+        {
+            return r.HN + " of " + r.HAll + " (" + F1(r.HXp / Math.Max(1, r.HN)) + " XP each, shared among the weapons they carry"
+                   + (r.HWound > 0 ? "; " + r.HWound + " wounded lie abed" : "") + ")";
+        }
+
+        /// <summary>558: linia logu musztry bohaterow (raz na dobe przy DrillLog).</summary>
+        private static void HeroLine(int day, Settings s)
+        {
+            var sb = new StringBuilder("Musztra bohaterow (558): dzien ").Append(day);
+            if (!s.DrillHeroes) { Log.Info(sb.Append(" - wylaczona (Drill Heroes)").ToString()); return; }
+            sb.Append(" | gracz: partii ").Append(_hParties[0]).Append(", bohaterow ").Append(_hAll[0]).Append(", cwiczylo ").Append(_hDone[0])
+              .Append(" (ranni ").Append(_hWounded[0]).Append(", bez broni ").Append(_hNoArms[0]).Append(", bez XP ").Append(_hZero[0]).Append(" - glod/sen/bez godzin/bitwa)")
+              .Append(", XP surowe ").Append(F1(_hXp[0])).Append(", poziomow +").Append(_hLevels[0]);
+            if (_hPlayerLog.Length > 0) sb.Append(" [").Append(_hPlayerLog).Append(']');
+            var pc = _prLast != null && _prLast.Day >= day - 1 ? _prLast.C : null;
+            if (pc != null) sb.Append(" | komplet zapasu gracza: ").Append(pc.Kit).Append(" = zolnierzy ").Append(pc.Men).Append(" + bohaterow ").Append(pc.HeroKit).Append(" (gracz poza kompletem)");
+            else
+            {
+                var main = MobileParty.MainParty;
+                int m = Men(main), hk = KitHeroes(main, s, true);
+                sb.Append(" | komplet zapasu gracza (teraz): ").Append(m + hk).Append(" = zolnierzy ").Append(m).Append(" + bohaterow ").Append(hk).Append(" (gracz poza kompletem)");
+            }
+            sb.Append(" | rod i armia gracza: partii ").Append(_hParties[1]).Append(", bohaterow ").Append(_hAll[1]).Append(", cwiczylo ").Append(_hDone[1])
+              .Append(", XP ").Append(F1(_hXp[1])).Append(", poziomow +").Append(_hLevels[1]);
+            sb.Append(" | AI: partii ").Append(_hParties[2]).Append(", bohaterow ").Append(_hAll[2]).Append(", cwiczylo ").Append(_hDone[2])
+              .Append(" (ranni ").Append(_hWounded[2]).Append(", bez broni ").Append(_hNoArms[2]).Append(", bez XP ").Append(_hZero[2]).Append("), XP ").Append(F1(_hXp[2]))
+              .Append(" (sr. ").Append(F1(_hDone[2] > 0 ? _hXp[2] / _hDone[2] : 0)).Append(" na bohatera), poziomow +").Append(_hLevels[2]);
+            sb.Append(" | mnoznik ").Append(F2(s.DrillHeroXpMult)).Append(", potkniecia musztry ").Append(_stumbles).Append('.');
+            Log.Info(sb.ToString());
+        }
 
         private static void GivenCounts(out int w, out int a)
         {
@@ -595,7 +754,9 @@ namespace Armoury
             try
             {
                 c.Men = Men(mp);
-                c.Full = Full(c.Men);
+                c.HeroKit = KitHeroes(mp, s, noBase);
+                c.Kit = c.Men + c.HeroKit;
+                c.Full = Full(c.Kit);                                  // 558: komplet na zolnierzy i bohaterow, ktorzy cwicza
                 var h = mp.LeaderHero;
                 if (h != null) { c.Lead = h.GetSkillValue(DefaultSkills.Leadership); c.L = Clamp(c.Lead / LeadNorm, LeadMin, LeadMax); }
                 c.Moved = MovedHours(mp);
@@ -631,7 +792,7 @@ namespace Armoury
                 // (partia cwiczylaby bez bramki broni, czyli z wiekszym XP)
                 c.ArmsGate = c.Main ? s.DrillNeedsArmsPlayer : (AiGear.On && s.PartyDrillNeedsArms);
                 bool measure = c.StockOn || (!c.Main && !c.NoBase && s.DrillLog);   // AI przy wylaczonym zapasie: S tylko do linii pomiaru
-                if (measure && c.Men > 0)
+                if (measure && c.Kit > 0)
                 {
                     // sklad8-p (uwaga 8): zapas liczy plan K1 (wiecej miejsc, ktore moga rzucic wyjatek) - osobny try: przy bledzie zapas z nadwyzki = 0
                     // (bez premii i bez zuzycia), a perki i S licza sie dalej; slad w liczniku potkniec (Stumble "CtxOf.Stock")
@@ -965,6 +1126,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (mobileParty == null || s == null) return;
+                HeroDrill(mobileParty, s);   // 558: przed liczeniem c/mine (moze zbudowac Ctx partii bez zolnierzy), przed AfterPlayerTick (zuzywa godziny obozu)
                 var c = _ctx;
                 bool mine = c != null && c.Party == mobileParty && Math.Abs(c.At - CampaignTime.Now.ToHours) < 1e-6;
                 // 319b: weterani ucza swoja bron - po dodaniu XP przez gre, przed pomiarem "przyjete" gracza (nauka wchodzi do przyjetych)
@@ -993,12 +1155,14 @@ namespace Armoury
                             Log.Player("Your men were too hungry to drill - nobody learned anything, training perks included.", true);
                         else if (!pc.Off && pc.Men > 0 && s.DrillDailyMessage) DayMessage(_pr, pc);   // MUSZTRA-m: dzien cwiczen - wynik i czynniki wzoru
                     }
+                    else if (pc != null && pc.HeroN > 0 && !pc.Off && s.DrillDailyMessage && _pr.Day != _msgDay)   // 558: druzyna bez zolnierzy - sami towarzysze
+                    { _msgDay = _pr.Day; Log.Player("Your companions drilled today: " + HeroClause(_pr) + "."); }
                     // m97-szkolenie: godziny z menu obozu zuzyte tym tickiem (takze w dniu kary) i linia doby gracza
                     if (pc != null && pc.Camp) CampDrill.AfterPlayerTick(pc, _pr.Accepted - taught, _pr.N > 0 ? _pr.N : pc.Men, _pr.P, _pr.N > 0 ? _pr.ShN / _pr.N : 1.0);
                     _pr = null;
                 }
                 if (!Active(s) && _acc.Count == 0) return;           // musztra wylaczona i nic nie czeka - bez zuzycia i bez kowali
-                if (mine && c.Counted) { long w0 = Stopwatch.GetTimestamp(); try { Wear(c, s); } finally { _prof[PWear] += Stopwatch.GetTimestamp() - w0; _profReads += 2; } }   // E8/0: czas zuzycia (tylko pomiar)
+                if (mine && (c.Counted || c.HeroN > 0)) { long w0 = Stopwatch.GetTimestamp(); try { Wear(c, s); } finally { _prof[PWear] += Stopwatch.GetTimestamp() - w0; _profReads += 2; } }   // E8/0: czas zuzycia (tylko pomiar)
                 var st = mobileParty.CurrentSettlement;
                 if (st != null && st.IsTown) { long k0 = Stopwatch.GetTimestamp(); try { SellScrap(mobileParty, st); } finally { _prof[PScrapTick] += Stopwatch.GetTimestamp() - k0; _profReads += 2; } }   // E8/0: kowale w tiku (tylko pomiar)
             }
@@ -1046,7 +1210,8 @@ namespace Armoury
                 sb.Append(", drill kit x").Append(F2(sk))
                     .Append(", armed ").Append(Pct(armed, 1.0)).Append(", perks +").Append(F1(perks)).Append(" per man");
                 if (r.V != null) VetMessage(sb, r.V);   // 319b: "N XP passed on - V veterans taught L riders, ..."
-                if (r.Cut > 0) CutMessage(sb, r);   // m114-musztra: dotad zawsze "men are waiting to be upgraded" - takze dla ludzi bez dalszego awansu
+                if (r.Cut > 0) CutMessage(sb, r);
+                if (r.HN > 0) sb.Append("; companions drilled too: ").Append(HeroClause(r));   // 558   // m114-musztra: dotad zawsze "men are waiting to be upgraded" - takze dla ludzi bez dalszego awansu
                 Log.Player(sb.Append('.').ToString());
             }
             catch (Exception e) { Stumble("DayMessage", e); }
@@ -1181,7 +1346,7 @@ namespace Armoury
         // ------------------------------------------------------------ zuzycie i zlom
         private static void Wear(Ctx c, Settings s)
         {
-            if (!c.StockOn || c.Men <= 0 || c.Full <= 0 || c.Off) return;   // dzien kary (glod, sen) - nikt nie cwiczy, nic sie nie zuzywa
+            if (!c.StockOn || c.Kit <= 0 || c.Full <= 0 || c.Off) return;   // dzien kary (glod, sen) - nikt nie cwiczy, nic sie nie zuzywa
             var mp = c.Party;
             bool law = c.NoBase || s.DrillLawAi;
             float dw = law ? c.D : 1f;                     // AI bez Z14b cwiczy plasko jak w grze; od MUSZTRA-j Z14b domyslnie TAK - zuzycie AI x D (1.5 / 0.9)
@@ -1388,7 +1553,7 @@ namespace Armoury
                     if (el.Amount > 0 && Eligible(el.EquipmentElement.Item)) cand.Add(el);
                 }
                 if (cand.Count == 0) return 0;
-                int men = Men(main), full = Full(men), cap = IntakeSets * full;
+                int men = KitMen(main), full = Full(men), cap = IntakeSets * full;   // 558: zolnierze + bohaterowie, ktorzy cwicza
                 int w, a; GivenCounts(out w, out a);
                 var cur = new[] { w, a };
                 cand.Sort((x, y) => x.EquipmentElement.ItemValue.CompareTo(y.EquipmentElement.ItemValue));
@@ -1438,14 +1603,14 @@ namespace Armoury
         /// <summary>Podpowiedz Spoils "Leave" przy czynnym zapasie (LeaveOn): ile sztuk ludzie jeszcze przyjma; reszta zostaje na polu bez XP (Z1).</summary>
         internal static string TrophyTip()
         {
-            int room = 0;
+            int room = 0, full = 0;
             try
             {
-                int full = Full(Men(MobileParty.MainParty)), w, a; GivenCounts(out w, out a);
+                full = Full(KitMen(MobileParty.MainParty)); int w, a; GivenCounts(out w, out a);   // 558
                 room = Math.Max(0, IntakeSets * full - w) + Math.Max(0, IntakeSets * full - a);
             }
             catch (Exception e) { Stumble("TrophyTip", e); }
-            if (PartyWords.NoTroops) return "Remaining {COUNT} items will be left on the field.";   // m110-sam: bez zolnierzy zapas nic nie przyjmuje - jak LeftBehindTip
+            if (PartyWords.NoTroops && full <= 0) return "Remaining {COUNT} items will be left on the field.";   // 558: sami towarzysze tez cwicza   // m110-sam: bez zolnierzy zapas nic nie przyjmuje - jak LeftBehindTip
             return "Remaining {COUNT} items: your men keep up to " + room + " pieces of arms and armour for their drill stock, the rest stay on the field.";
         }
 
@@ -1455,6 +1620,8 @@ namespace Armoury
         {
             internal bool Ok;                                  // false - zapas wylaczony albo blad liczenia
             internal int Men, Full, GivenW, GivenA, SurW, SurA, WornW, WornA;
+            internal int Heroes;                               // 558: bohaterowie, ktorzy cwicza (bez gracza)
+            internal int KitN { get { return Men + Heroes; } }
             internal bool PerkW, PerkA;
             internal float AccW, AccA;                         // ulamek zuzycia do nastepnej sztuki (0..1)
             internal int HaveW { get { return GivenW + SurW; } }
@@ -1499,12 +1666,13 @@ namespace Armoury
                 k.Ok = false;
                 if (!StockOn || main == null) return k;
                 k.Men = Men(main);
-                k.Full = Full(k.Men);
+                k.Heroes = KitHeroes(main, Settings.Current, true);
+                k.Full = Full(k.KitN);                         // 558
                 int w, a; GivenCounts(out w, out a); k.GivenW = w; k.GivenA = a;
                 k.WornW = _pWornW; k.WornA = _pWornA;
                 var acc = AccOf(main, false);
                 k.AccW = acc != null ? acc.WW : 0f; k.AccA = acc != null ? acc.WA : 0f;
-                if (k.Men <= 0) { k.SurW = k.SurA = 0; k.Ok = true; return k; }
+                if (k.KitN <= 0) { k.SurW = k.SurA = 0; k.Ok = true; return k; }
                 var arm = QuartermasterLaw.DteArmory();
                 var bag = main.ItemRoster;
                 int av = arm != null ? arm.VersionNo : -1, rv = main.MemberRoster != null ? main.MemberRoster.VersionNo : -1, bv = bag != null ? bag.VersionNo : -1;
@@ -1885,7 +2053,7 @@ namespace Armoury
             var main = MobileParty.MainParty;
             if (!StockOn || main == null || _fed || !AutotestActive()) return;
             _feedTries++;
-            int men = Men(main), full = Full(men);
+            int men = KitMen(main), full = Full(men);   // 558: zolnierze + bohaterowie, ktorzy cwicza
             int w0, a0; GivenCounts(out w0, out a0);
             int[] want = { Math.Max(0, full - w0), Math.Max(0, full - a0) };
             if (full > 0 && want[GW] + want[GA] == 0) { _fed = true; Log.Info("Musztra (autotest): zapas od gracza pelny (bron " + w0 + ", zbroje " + a0 + " na pelny " + full + ") - zasilanie zakonczone."); return; }
@@ -1972,6 +2140,7 @@ namespace Armoury
                     PlayerLine(day, s, w, a, bal);
                     AiLine(day, s);
                     try { VetLines(day, s); } catch (Exception e) { Stumble("VetLines", e); }   // 319b
+                    try { HeroLine(day, s); } catch (Exception e) { Stumble("HeroLine", e); }   // 558
                     if (day % 5 == 0) KingdomLine(day, s);
                 }
                 CampDrill.Daily();   // m97-szkolenie: linia AI i strony gracza (zasada obozu wobec dawnej reguly; wlasny try, zeruje liczniki)
