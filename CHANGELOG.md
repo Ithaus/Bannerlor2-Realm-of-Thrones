@@ -28,6 +28,24 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 573
+
+Trzy niezalezne recenzje; kazde zgloszenie sprawdzone w kodzie i dekompilacji (gra 1.4.8, DTE v1.4.7).
+
+**Poprawione:**
+- R2-1 (ranni sprzed bitwy obszukiwani drugi raz) - PRAWDA. "Capture the enemy" (MenuHelper, NumberOfHealthyMembers == 0) i banda ranna we wczesniejszej walce: ich sprzet zaplacil juz lup tamtej bitwy (W3 / loteria zwyciezcy AI). Nowa migawka `SnapshotSurrenderSide` w `OnMapEventStarted` (obok `_prisonerBaseline`): zdrowi wedlug typu na stronie przeciwnej. Kolejnosc sprawdzona: MapEvent.Initialize -> OnMapEventStarted, dopiero potem EnemySurrender -> DoSurrender -> SurrenderParty (rani). `StripSurrendered`: fresh = min(fresh, zdrowi na starcie), zdrowi zuzywani z migawki; "Capture the enemy" przy samych rannych = 0. Bez migawki tej bitwy (gracz dolaczyl do cudzej bitwy - OnMapEventStarted nie byl bitwa gracza) - stary lad (bez obszukania), linia "pominiete - brak migawki".
+- R1-1 / R2-2 (pokonany ze zbrojownia DTE) - CZESCIOWO PRAWDA. Sprawdzone: DTE `FilterValidParties` odrzuca druzyne gracza (MobilePartyExtension.IsValid: owner.IsHumanPlayerCharacter -> false; tez CaptiveArmory: "Gracza DTE w tej drodze nie ma"), wiec gdy gracz wygrywa sam, `DistributeLootRandomly` nic mu nie daje (pusta lista zwyciezcow -> ChoosePartyRandomly null -> return) - teza R1 "DTE wklada graczowi ich zbrojownie" falszywa. Ale gdy po stronie gracza stoja wazne partie AI (armia, sojusznicy), dostaja one cala zbrojownie pokonanego - z kompletem ze wzorca u gracza bylby dubel (R2-2 prawda). Do tego zbrojownia lorda to w modelu DTE realny rynsztunek jego ludzi. Poprawka: gdy ktorakolwiek partia przegrana ma niepusta zbrojownie DTE (migawka przy starcie bitwy LUB stan w chwili jencow, `AiGear.Armories()`), `StripSurrendered` zwraca false (stary lad) z linia "pominiete - zbrojownia DTE pokonanych N szt.". Bandy, wozy wsi, karawany bez wodza-bohatera - zbrojowni nie maja, wiec przypadek Jeffa dziala.
+- R3-3 (mylaca linia "0 ludzi, 0 szt.") - poprawiona: linia mowi, ilu wzial ekran, ilu rannych sprzed bitwy pominieto i czy w lochu byli nowi.
+
+**Odrzucone / zostawione (bez dubla, tylko strata albo pomiar):**
+- R1-2 / R3-2 (ten sam typ jencow wypuszczony i wziety na jednym ekranie - liczba netto): strata, nie dubel; stara sciezka TryStripNewCaptives liczy tak samo. Bez zmian.
+- R1-3 (sciezka bez DTE - druga loteria stanu w WearTheLoot): u Jeffa nieczynna (DTE jest), tylko stan sztuk, bez nowych przedmiotow. Bez zmian.
+- R3-1 (LootTally / okno 117 nie liczy sztuk 573): tylko pomiar; dowodem dzialania jest linia "Jency obszukani (573 kapitulacja)". Bez zmian.
+- R2 uwaga (byli jency bandy na liscie): przypadek brzegowy sprzed 573, bez zmian.
+- Nowe ograniczenie z poprawki R2-1: partie dolaczone do bitwy po starcie (PlayerEncounter.CheckNearbyPartiesToJoinPlayerMapEvent - po OnMapEventStarted) nie sa w migawce zdrowych - ich ludzie nie beda obszukani (strata, nie dubel). Zwykla banda poddaje sie sama.
+
+Build Armoury 0 bledow (Release). NIE wgrane.
+
 ## 572: szybkie drabiny przy miazdzacej przewadze - AI co najmniej 8:1 szturmuje drabinami od 1. doby (oboz gotowy), do pierwszego odparcia - Armoury (SiegeWalls2.cs; nowe klucze SiegeLadderStormRatio, SiegeLadderStormDays w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11, po analizie Goldentooth: armia korony z przewaga 11.7:1 przez 4.7 doby nie szturmowala. Gra odmawiala, bo machiny nie byly gotowe (BesiegerCamp.StartingAssaultOnBesiegedSettlementIsLogical: min(3, gotowe)/3 = 0 bez gotowej machiny), nasze MB (SiegeWalls2.Unblock) przepuszczalo tylko przy gotowym taranie i wiezy, wyrwie albo drabinach DR po SiegeLadderMinDays = 21 dob, a brama OB1 (SiegeWalls.Veto, m.Ready) wymaga taranu i wiezy albo wyrwy. Propozycja: "szybkie drabiny przy miazdzacej przewadze: przy przewadze co najmniej 8:1 armia moze isc na drabiny juz od 1. dnia, gdy oboz jest zbudowany, bez czekania na machiny; szansa liczy sie tym samym wzorem co dzis; dziala tylko do pierwszego odpartego szturmu". Jeff: "tak".

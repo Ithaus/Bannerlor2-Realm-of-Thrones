@@ -719,6 +719,11 @@ namespace Armoury
             catch (Exception e) { Log.Error("ReconcileStock", e); }
         }
         private Dictionary<string,int> _prisonerBaseline;
+        // 573 recenzja: stan strony przeciwnej na poczatku bitwy gracza - zdrowi wedlug typu (ranni sprzed bitwy juz oddali sprzet w lupie tamtej walki)
+        // i sztuki w zbrojowniach DTE pokonanych (lord/druzyna z wodzem - jej rynsztunek liczy DTE, nie wzorzec)
+        private MapEvent _surrenderMe;
+        private Dictionary<string,int> _surrenderHealthy;
+        private int _surrenderArmPieces;
         // p6-okup (R3-03a): ochrony wsi po okupie od zera przy nowej kampanii / przed wczytaniem (osobna linia z dala od linii fali 1 - scalenie fali 2 bez konfliktu)
         private readonly bool _p6OkupReset = P6OkupReset();
         private static bool P6OkupReset() { try { RaidTribute.Reset(); } catch (Exception e) { Log.Error("P6OkupReset", e); } return true; }
@@ -3748,6 +3753,7 @@ namespace Armoury
                 _lootSnapshot = SnapshotBaggage();
                 SnapshotOwnRanks();   // roznica po bitwie = polegli (GatherFallen)
                 _prisonerBaseline = SnapshotPrisoners();
+                try { SnapshotSurrenderSide(mapEvent); } catch (Exception e) { _surrenderMe = null; Log.Error("OnMapEventStarted.SnapshotSurrenderSide (573)", e); }
             }
             catch (Exception e) { Log.Error("OnMapEventStarted", e); }
         }
@@ -4152,6 +4158,50 @@ namespace Armoury
         /// zbrojowni DTE na liste gracza (StockDepositKey), reszta do zbrojowni DTE jako stan wojska. Bez zbrojowni DTE - wszystko do sakw (jak dotad).
         /// Zwraca true, gdy sprawa zalatwiona (ksiega jencow juz nowa).
         /// </summary>
+        /// <summary>573 recenzja: migawka strony przeciwnej przy starcie bitwy gracza (przed SurrenderParty, ktore rani cala druzyne) - zdrowi wedlug typu
+        /// i sztuki w zbrojowniach DTE. Partie dolaczone pozniej (CheckNearbyPartiesToJoinPlayerMapEvent) nie sa w migawce - ich ludzie nie beda
+        /// obszukani (strata, nie dubel).</summary>
+        private void SnapshotSurrenderSide(MapEvent me)
+        {
+            _surrenderMe = null; _surrenderHealthy = null; _surrenderArmPieces = 0;
+            var opp = me.PlayerSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
+            var healthy = new Dictionary<string,int>();
+            foreach (var mep in me.PartiesOnSide(opp))
+            {
+                var pb = mep != null ? mep.Party : null;
+                if (pb == null || pb == PartyBase.MainParty || pb.MemberRoster == null) continue;
+                var r = pb.MemberRoster;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero) continue;
+                    int h = el.Number - el.WoundedNumber;
+                    if (h <= 0) continue;
+                    int v; healthy.TryGetValue(el.Character.StringId, out v); healthy[el.Character.StringId] = v + h;
+                }
+            }
+            _surrenderHealthy = healthy;
+            _surrenderArmPieces = DefeatedArmoryPieces(me, opp);
+            _surrenderMe = me;
+        }
+
+        /// <summary>573 recenzja: suma sztuk w zbrojowniach DTE (PartyArmories) partii strony side; 0 bez DTE.</summary>
+        private static int DefeatedArmoryPieces(MapEvent me, BattleSideEnum side)
+        {
+            var all = AiGear.Armories();
+            if (all == null) return 0;
+            int sum = 0;
+            foreach (var mep in me.PartiesOnSide(side))
+            {
+                var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
+                if (mp == null || mp.IsMainParty) continue;
+                Dictionary<ItemObject, int> arm;
+                if (!all.TryGetValue(mp.Id, out arm) || arm == null) continue;
+                foreach (var kv in arm) if (kv.Value > 0) sum += kv.Value;
+            }
+            return sum;
+        }
+
         private bool StripSurrendered(TaleWorlds.CampaignSystem.Roster.FlattenedTroopRoster roster)
         {
             var s = Settings.Current;
@@ -4160,6 +4210,22 @@ namespace Armoury
             var me = MapEvent.PlayerMapEvent ?? TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Battle;
             if (me == null || me.IsPlayerSimulation || LosersFlee.FieldFought(me)) return false;
             if (BattlefieldLaw.RotEnlisted()) return false;   // zaciezny w armii ROT - lup zostaje przy armii (jak AfterGenerateLoot)
+            // recenzja 573: bez migawki tej bitwy (gracz dolaczyl do cudzej bitwy) nie wiadomo, kto byl zdrowy - stary lad
+            if (!ReferenceEquals(_surrenderMe, me) || _surrenderHealthy == null)
+            {
+                Log.Info("Jency (573 kapitulacja): pominiete - brak migawki strony przeciwnej z poczatku tej bitwy (stary lad, bez obszukania).");
+                return false;
+            }
+            // recenzja 573 (R1/R2-2): pokonany ze zbrojownia DTE (druzyna z wodzem-bohaterem) - jego rynsztunek liczy DTE (GetAllLootItems do zwyciezcow AI,
+            // u gracza samego znika z partia); drugi komplet ze wzorca bylby dublem - stary lad
+            int armNow = 0;
+            try { armNow = DefeatedArmoryPieces(me, me.PlayerSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker); } catch { }
+            if (_surrenderArmPieces > 0 || armNow > 0)
+            {
+                Log.Info("Jency (573 kapitulacja): pominiete - zbrojownia DTE pokonanych " + Math.Max(_surrenderArmPieces, armNow)
+                         + " szt. (druzyna z wodzem) - jej rynsztunek rozlicza DTE, obszukanie byloby dublem (stary lad).");
+                return false;
+            }
             var prison = MobileParty.MainParty != null ? MobileParty.MainParty.PrisonRoster : null;
             if (prison == null) return false;
 
@@ -4175,13 +4241,18 @@ namespace Armoury
             }
             var now = SnapshotPrisoners();
             var loot = new TaleWorlds.CampaignSystem.Roster.ItemRoster();
-            int men = 0, pieces = 0;
+            int men = 0, pieces = 0, skippedWounded = 0;
             foreach (var kv in taken)
             {
                 int had = 0, have = 0;
                 if (_prisonerBaseline != null) _prisonerBaseline.TryGetValue(kv.Key.StringId, out had);
                 now.TryGetValue(kv.Key.StringId, out have);
                 int fresh = Math.Min(kv.Value, Math.Max(0, have - had));
+                // recenzja 573 (R2-1): tylko ci, ktorzy na poczatku bitwy byli ZDROWI - ranni sprzed niej oddali sprzet w lupie tamtej walki
+                // ("Capture the enemy" przy samych rannych = 0); zdrowi zuzywani z migawki, wiec ten sam czlowiek nie liczy sie dwa razy
+                int hl; _surrenderHealthy.TryGetValue(kv.Key.StringId, out hl);
+                if (fresh > hl) { skippedWounded += fresh - hl; fresh = hl; }
+                if (fresh > 0) _surrenderHealthy[kv.Key.StringId] = hl - fresh;
                 for (int m = 0; m < fresh; m++)
                 {
                     Equipment eq = null; int n = 0;
@@ -4204,7 +4275,9 @@ namespace Armoury
             _prisonerBaseline = now;   // nowy stan = nowa baza (hourly/menu nie obszukaja ich drugi raz)
             if (pieces <= 0)
             {
-                if (men > 0 || taken.Count > 0) Log.Info("Jency obszukani (573 kapitulacja): " + men + " ludzi, 0 szt. - nic do podzialu.");
+                if (men > 0 || taken.Count > 0)
+                    Log.Info("Jency (573 kapitulacja): obszukanych " + men + " ludzi, 0 szt. - nic do podzialu | ekran wzial " + onScreen + " (lordow " + lords
+                             + "), pominietych rannych sprzed bitwy " + skippedWounded + " (nowi w lochu wg ksiegi: " + (men > 0 ? "tak" : "brak") + ").");
                 return true;
             }
 
@@ -4263,7 +4336,8 @@ namespace Armoury
             }
             StockVersion++;
             Log.Info("Jency obszukani (573 kapitulacja): " + men + " ludzi, " + pieces + " szt.; dzialka gracza " + toPlayer + " szt. (" + pct
-                     + "%), ludziom " + toMen + " szt. | bitwa bez misji i bez symulacji, ekran wzial " + onScreen + " (lordow pominietych " + lords + ").");
+                     + "%), ludziom " + toMen + " szt. | bitwa bez misji i bez symulacji, ekran wzial " + onScreen + " (lordow pominietych " + lords
+                     + "), pominietych rannych sprzed bitwy " + skippedWounded + ".");
             Log.Player("The surrendered captives are stripped at the rope: " + pieces + " pieces of gear. Your captain's share of " + toPlayer
                        + " goes to your list in the troops' armoury, " + toMen + " to your men.", true);
             return true;
