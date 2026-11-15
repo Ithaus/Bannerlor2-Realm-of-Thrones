@@ -518,7 +518,7 @@ namespace Armoury
         public float HideoutGoodsStashShare = 0.25f;       // with Hideout Goods Stash: share of each bale of plundered goods a band carries home each day
         public int HideoutGoodsStashCap = 6000;            // with Hideout Goods Stash: a den holds goods worth at most this many denars (base value) - beyond it the bands sell to the fence as before (0 = no limit)
         // 570 E (Jeff 15.11 "ABCDE tak rob"): odwet tylko klanu kryjowki, bez scalania bohaterow i ich eskort, jedno scalenie i jeden komunikat (HideoutPurge.Reprisal)
-        public bool HideoutReprisalKinOnly = true;         // the reprisal gathers only bands of the den's own clan or den; a band led by a hero, or a hero's escort, is never merged - it follows the warband as an ally; one warband, one message (off = every nearby band merges, as before)
+        public bool HideoutReprisalKinOnly = true;         // the reprisal gathers only bands of the den's own clan or den; a band led by a hero, or a hero's escort, is never merged and takes no orders - it goes its own way and does not count in the warband's strength; one warband, one message (off = every nearby band merges, as before)
         // 570 D: poscig za skarbem (HideoutVendetta)
         public bool HideoutVendetta = true;                // after you carry off a rich hoard, the den's own bands hunt you for days: the strong attack, the weaker shadow you and strike when you are weakened, the hopeless give up (off = no hunt after the search, as before)
         public int HideoutVendettaMinGold = 1500;          // with Hideout Vendetta: the hoard (coin plus goods) you carried off must be worth at least this much for the bands to hunt it

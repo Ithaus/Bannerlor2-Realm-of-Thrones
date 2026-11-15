@@ -24,7 +24,7 @@ namespace Armoury
     /// od gracza HideoutVendettaRadius + HideoutVendettaRadiusPerDay x pelne doby poscigu; bez band w osadach, bitwach, zadaniach, nieumarlych.
     /// Przewodnik = najwieksza banda bez bohatera (HideoutPurge.Mergeable); bandy bez bohatera, ktore go dogonily (MergeDist), scalaja sie w niego
     /// (HideoutPurge.MergeInto - ludzie, jency, towar, kiesa, sakiewka ludzi; nic nie powstaje), reszta idzie za nim (eskorta). Bandy z bohaterem
-    /// (BK) ida za przewodnikiem jako sojusznicy, nigdy scalane i nigdy rzucane do ataku rozkazem (ochrona bohaterow); eskorty bohatera - bez rozkazow.
+    /// (BK) i eskorty bohatera: nigdy scalane, bez naszych rozkazow (ochrona bohaterow, ida wlasnym rozumem) i poza rachunkiem sil (recenzja 570).
     /// Decyzja (sila szacunkowa gry, PartyBase.EstimatedStrength): gracz = jego partia + partie jego frakcji w AllyRange; oslabiony (bitwa w ostatnich
     /// WeakHours h, ranni >= WeakWounded skladu, oboz / sen NightRest) - liczy sie x HideoutVendettaWeakFactor.
     ///  - wszyscy razem / gracz < HideoutVendettaGiveUpOdds -> odpuszczaja (koniec);
@@ -45,6 +45,7 @@ namespace Armoury
         private const float AllyRange = 6f;        // sojusznicy gracza liczeni do jego sily
         private const double WeakHours = 12.0;     // po bitwie gracz jest oslabiony tyle godzin
         private const float WeakWounded = 0.3f;    // ranni / sklad
+        private const float AttackHold = 0.8f;     // recenzja 570: trwajacy atak przerywany dopiero ponizej AttackOdds x AttackHold (bez migotania co godzine)
 
         private static bool _active;
         private static string _clanId = "", _homeId = "", _homeName = "";
@@ -164,7 +165,8 @@ namespace Armoury
                         if (HideoutPurge.InReprisal(mp)) continue;   // horda odwetu innej kryjowki - prowadzi ja odwet
                         bands.Add(mp);
                     }
-                    else if (d <= AllyRange && mp.MapEvent == null && mp.CurrentSettlement == null && me.MapFaction != null && mp.MapFaction == me.MapFaction)
+                    // recenzja 570: tylko partie wojskowe (lordowie / druzyny klanu) - bez karawan i chlopow przejezdzajacych obok
+                    else if (d <= AllyRange && mp.IsLordParty && mp.MapEvent == null && mp.CurrentSettlement == null && me.MapFaction != null && mp.MapFaction == me.MapFaction)
                         allies += mp.Party.EstimatedStrength;
                 }
                 catch (Exception e) { Stumble("Scan", e); }
@@ -199,14 +201,16 @@ namespace Armoury
                 catch (Exception e) { Stumble("Merge", e); }
             }
             // sily
-            float sAll = 0f, sNear = 0f;
+            // recenzja 570: bohaterowie i ich eskorty nigdy nie gonia (bez rozkazow) - poza rachunkiem "odpuszczaja" i ataku, tylko do logu
+            float sAll = 0f, sNear = 0f, sHero = 0f;
             Vec2 lp = _lead.GetPosition2D;
             foreach (var mp in bands)
             {
                 float st = 0f;
                 try { st = mp.Party.EstimatedStrength; } catch { }
+                if (mp.LeaderHero != null || HideoutPurge.HeroEscort(mp)) { sHero += st; continue; }
                 sAll += st;
-                if (mp.GetPosition2D.Distance(lp) <= GatherDist && mp.LeaderHero == null && !HideoutPurge.HeroEscort(mp)) sNear += st;
+                if (mp.GetPosition2D.Distance(lp) <= GatherDist) sNear += st;
             }
             float mine = 0f;
             try { mine = me.Party.EstimatedStrength; } catch { }
@@ -220,7 +224,8 @@ namespace Armoury
                 return;
             }
             bool canHit = me.CurrentSettlement == null && me.AttachedTo == null && !me.IsCurrentlyAtSea && !NightRest.EnlistedNow;
-            bool attack = canHit && near >= Math.Max(0.1f, s.HideoutVendettaAttackOdds);
+            float odds = Math.Max(0.1f, s.HideoutVendettaAttackOdds);
+            bool attack = canHit && near >= (_phase == 2 ? odds * AttackHold : odds);   // histereza: wejscie od odds, wyjscie ponizej odds x AttackHold
             int phase = attack ? 2 : 1;
             foreach (var mp in bands)
             {
@@ -262,7 +267,7 @@ namespace Armoury
                 }
                 Log.Info("Poscig za skarbem (570): godzina " + _hours + " - " + (phase == 2 ? "ATAK" : "sledza") + "; promien " + radius.ToString("0", CultureInfo.InvariantCulture)
                          + ", band " + bands.Count + ", przewodnik " + _lead.StringId + " (" + _lead.MemberRoster.TotalManCount + " ludzi, " + _lead.GetPosition2D.Distance(at).ToString("0.0", CultureInfo.InvariantCulture)
-                         + " od gracza); sila zebranych " + (int)sNear + ", wszystkich " + (int)sAll + " vs gracz " + (int)mine + " + sojusznicy " + (int)allies
+                         + " od gracza); sila zebranych " + (int)sNear + ", wszystkich " + (int)sAll + " (bohaterowie / eskorty poza rachunkiem " + (int)sHero + ") vs gracz " + (int)mine + " + sojusznicy " + (int)allies
                          + (weakWhy != null ? " (oslabiony: " + weakWhy + ", liczony " + (int)pe + ")" : "") + (canHit ? "" : " (gracz poza zasiegiem ataku)")
                          + "; scalen dotad " + _merges + ".");
                 _phase = phase;
@@ -305,6 +310,8 @@ namespace Armoury
         {
             mp.Ai.SetInitiative(0.1f, 1f, 2f);
             _ordered.Add(mp);
+            // recenzja 570: gracz na morzu - ladowej bandy nie wysylamy na punkt na wodzie, czeka na brzegu
+            if (me.IsCurrentlyAtSea) { mp.SetMoveModeHold(); return; }
             Vec2 a = me.GetPosition2D, b = mp.GetPosition2D;
             float d = b.Distance(a);
             if (d >= ShadowMin && d <= ShadowMax) { mp.SetMoveModeHold(); return; }

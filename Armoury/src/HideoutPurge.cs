@@ -655,6 +655,7 @@ namespace Armoury
 
                 var pack = new System.Collections.Generic.List<MobileParty>();
                 float theirs = 0f;
+                float allyStr = 0f;   // 570 recenzja: sila band z bohaterem i eskort bohatera - tylko do logu (nie ida z horda, nie licza sie do decyzji)
                 int foreign = 0;
                 foreach (var mp in MobileParty.All)
                 {
@@ -671,7 +672,11 @@ namespace Armoury
                         if (HideoutVendetta.Hunting(mp)) continue;   // juz w poscigu za skarbem (570 D) - jeden zarzadca bandy
                     }
                     pack.Add(mp);
-                    try { theirs += mp.Party.EstimatedStrength; } catch { }
+                    // 570 recenzja: przy kin do decyzji (ucieczka / atak) liczy sie tylko to, co pojdzie w polu - boss i scalani (Mergeable);
+                    // bohaterowie i ich eskorty nie dostaja rozkazow, wiec ich sila tylko do logu (dotad 80 bohatera + 20 bossa vs 250 gracza = szarza 20)
+                    float st = 0f;
+                    try { st = mp.Party.EstimatedStrength; } catch { }
+                    if (!kin || Mergeable(mp)) theirs += st; else allyStr += st;
                 }
                 if (pack.Count == 0)
                 {
@@ -679,11 +684,17 @@ namespace Armoury
                     return;
                 }
 
+                if (kin && theirs <= 0f)
+                {
+                    _reprisalFor = _pendingHideout;
+                    Log.Info("HideoutPurge: odwet (570) - w promieniu same bandy z bohaterem albo eskorty bohatera (" + pack.Count + ", sila " + (int)allyStr + ") - nikt ich nie scala ani nie prowadzi.");
+                    return;
+                }
                 if (mine >= theirs * fleeOdds)
                 {
                     if (kin) _reprisalFor = _pendingHideout;   // 570 E: jeden komunikat na kryjowke
                     Log.Player("Bandits circle the ridge to take their den back - one look at your line and they melt away.", true);
-                    Log.Info("HideoutPurge: odwet stchorzyl (" + pack.Count + " band, sila " + (int)theirs + " vs " + (int)mine + ").");
+                    Log.Info("HideoutPurge: odwet stchorzyl (" + pack.Count + " band, sila " + (int)theirs + " vs " + (int)mine + (kin ? ", sojusznicy bez rozkazow " + (int)allyStr + " poza rachunkiem" : "") + ").");
                     return;
                 }
                 // POLACZENIE W JEDEN ODDZIAL (Jeff: "pojedynczo nie maja przewagi
@@ -691,7 +702,7 @@ namespace Armoury
                 // i dobytek przechodza, oproznione bandy znikaja ze swiata.
                 // Jedna horda z suma sil idzie po swoje zloto.
                 // 570 E: przy kluczu HideoutReprisalKinOnly scalane tylko bandy bez bohatera i nie bedace eskorta bohatera (Mergeable); boss tez
-                // tylko z Mergeable. Bandy z bohaterem i eskorty bohatera zostaja sojusznikami w sile odwetu, ale BEZ naszych rozkazow: BK
+                // tylko z Mergeable. Bandy z bohaterem i eskorty bohatera nie wchodza do sily odwetu (recenzja 570) i nie dostaja naszych rozkazow: BK
                 // (BKBanditBehavior.TickBandits, co godzine) kaze kazdej bandzie bez bohatera w promieniu 10 od bohatera-bandyty isc za nim
                 // (SetFollow: eskorta + AI wylaczone 2 h) - rozkaz "bohater za bossem" dawalby wzajemna eskorte (boss za bohaterem, bohater
                 // za bossem) i horda stalaby w miejscu. Bohater idzie wiec wlasnym rozumem (ochrona bohaterow), jego eskorta - za nim. Scalenie przez MergeInto (towar zdjety ze scalanej bandy,
@@ -755,7 +766,7 @@ namespace Armoury
                 Log.Player("The scattered bands mass into one warband - they want their gold back and they will chase you for it!", true);
                 Log.Info("HideoutPurge: odwet rusza JEDNA HORDA (" + (merged + 1) + " band scalono, "
                          + (boss != null ? boss.MemberRoster.TotalManCount : 0) + " ludzi, sila " + (int)theirs + " vs " + (int)mine + ")"
-                         + (kin ? "; 570: klan " + (_pendingClan != null ? _pendingClan.StringId : "-") + ", sojusznikow bez scalenia i rozkazow (bohater / eskorta bohatera) " + allies + ", obcych band w promieniu pominietych " + foreign : "") + ".");
+                         + (kin ? "; 570: klan " + (_pendingClan != null ? _pendingClan.StringId : "-") + ", sojusznikow bez scalenia i rozkazow (bohater / eskorta bohatera) " + allies + " (sila " + (int)allyStr + ", poza rachunkiem odwetu), obcych band w promieniu pominietych " + foreign : "") + ".");
             }
             catch (Exception e) { Log.Error("HideoutPurge.Reprisal", e); }
         }

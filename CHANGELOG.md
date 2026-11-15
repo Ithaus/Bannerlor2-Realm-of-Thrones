@@ -39,6 +39,20 @@
 **Pliki do wgrania (gra zamknieta):**
 - `Armoury/bin/Release/Armoury.dll` -> `Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll`
 
+### Recenzja 570
+
+Recenzja kodu (19c76b3d) - 4 usterki potwierdzone w kodzie i poprawione, 2 uwagi informacyjne bez zmian w kodzie:
+- **(1) Odwet liczyl sile, ktora nie idzie w pole** (HideoutPurge.Reprisal, klucz HideoutReprisalKinOnly): `theirs` sumowal tez bandy z bohaterem BK i eskorty bohatera, ktore nie sa scalane i nie dostaja rozkazow - np. bohater 80 + boss 20 vs gracz 250 nie uciekali (250 < 3 x 100), a na gracza szarzowal sam boss z 20 ludzmi z twardym rozkazem na 48 h (wbrew "AI walczy o zycie"). Poprawka: przy kin do decyzji ucieczka/atak liczy sie tylko sila band Mergeable (boss + scalani); sila bohaterow/eskort tylko w logu ("sojusznicy bez rozkazow N poza rachunkiem"). Same bandy z bohaterem w promieniu - linia "nikt ich nie scala ani nie prowadzi" PRZED decyzja ucieczki (bez falszywego komunikatu "melt away"). To samo w poscigu (HideoutVendetta): `sAll` (decyzja "odpuszczaja") liczy juz tylko bandy bez bohatera i nie-eskorty; sila bohaterow w linii fazy jako "bohaterowie / eskorty poza rachunkiem".
+- **(2) Opis MCM nieprawdziwy** ("it follows the warband as an ally" - kod nie daje bohaterom rozkazow): Settings.cs + McmSettings.cs, teraz "is never merged and takes no orders - it goes its own way and does not count in the warband's strength". Komentarz klasy HideoutVendetta poprawiony tak samo.
+- **(3) Migotanie atak/sledzenie co godzine:** histereza - wejscie w atak od HideoutVendettaAttackOdds, wyjscie dopiero ponizej AttackOdds x 0.8 (stala AttackHold); do sily gracza licza sie tylko partie wojskowe jego frakcji (`IsLordParty`), bez karawan i chlopow w promieniu 6.
+- **(4) Gracz na morzu:** `Shadow` przy `me.IsCurrentlyAtSea` daje przewodnikowi `SetMoveModeHold` (dotad mogl dostac punkt gracza na wodzie).
+- **(5) Odrzucone jako usterka (informacyjne):** `_ordered` nie jest zapisywane - po wczytaniu z wylaczonym kluczem HideoutVendetta bandy z rozkazem EngageParty (inicjatywa do 2 h) scigaja gracza do wlasnego przemyslenia AI (najwyzej kilka godzin), przez pierwsza godzine po wczytaniu nie sa chronione przed drzemka band. Nieszkodliwe; wiedziec przy tescie.
+- **(6) Informacyjne:** przy WYLACZONYM kluczu HideoutReprisalKinOnly zostaje stary blad odwetu - towar scalanej bandy kopiowany do bossa i zostawiany w znikajacej bandzie (nasluchy zniszczenia rozdaja go drugi raz). Swiadomie: klucz off = stare zachowanie.
+
+**Ryzyko / co sprawdzic (recenzja):** odwet przy kin czesciej stchorzy (bez sily bohaterow) - to zamierzone; poscig moze szybciej odpuscic przy samych bohaterach w promieniu (zostaja wtedy w swoich sprawach jak dotad). Histereza: atak trwa przy stosunku 1.04-1.3 jesli juz trwal. W tescie: linia "odwet rusza ... (sila N, poza rachunkiem odwetu)", linie fazy poscigu z "bohaterowie / eskorty poza rachunkiem", liczba linii ATAK/sledza bez przeskokow co godzine.
+
+**Status recenzji:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane). Plik do wgrania jak w wpisie wyzej (`Armoury/bin/Release/Armoury.dll`).
+
 ## 568: lup w kryjowce - bandy odnosza czesc zrabowanego towaru do magazynu kryjowki, zabiera go ten, kto ja oczysci (gracz przy przeszukaniu, zwyciezca AI) - Armoury (HideoutGoods.cs nowy, HideoutPurge.cs, OutlawLaw.cs, Settings.cs, McmSettings.cs, ArmouryBehavior.cs)
 
 **Problem:** Jeff, czat 15.11, po audycie kryjowek: "ABCDE tak rob" - punkt B: "bandy odnosza do kryjowki czesc zrabowanego towaru (dzis tylko zloto - 25% kiesy ponad 3 dni zapasu), ktory zdobywasz po rozbiciu". Dzis bandy odnosza tylko zloto (OutlawLaw.StashDay); towar z rabunkow zostaje w jukach i idzie do pasera. Magazyn kryjowki (Settlement.ItemRoster) jest zawsze pusty, wiec ekran lupu po przeszukaniu (HideoutPurge.BuildLoot) nigdy sie nie pokazuje (w logu zawsze "magazyn kryjowki pusty - lup tylko z band (vanilla)").

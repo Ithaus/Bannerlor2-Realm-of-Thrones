@@ -1456,7 +1456,7 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public int HideoutGoodsStashCap { get; set; } = 6000;
 
-        [SettingPropertyBool("Hideout Reprisal Kin Only", HintText = "the reprisal gathers only bands of the den's own clan or den; a band led by a hero, or a hero's escort, is never merged - it follows the warband as an ally; one warband, one message (off = every nearby band merges, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Hideout Reprisal Kin Only", HintText = "the reprisal gathers only bands of the den's own clan or den; a band led by a hero, or a hero's escort, is never merged and takes no orders - it goes its own way and does not count in the warband's strength; one warband, one message (off = every nearby band merges, as before)", RequireRestart = false)]
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutReprisalKinOnly { get; set; } = true;
 
