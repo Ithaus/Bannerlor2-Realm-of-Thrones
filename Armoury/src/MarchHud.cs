@@ -288,7 +288,7 @@ namespace Armoury
                 warn[0] = r != null && !r.AtSea && mounted < r.Men;   // 548: ktos idzie pieszo (bez konia, bez pasujacej uprzezy albo za niska Jazda) - kto i dlaczego w podpowiedzi
                 full[1] = PackText(r); num[1] = r != null ? r.CPack.ToString() : "-"; iv[1] = r != null ? r.CPack : 0;
                 warn[1] = r != null && r.CPack > r.PackLimit;
-                bool men = kit && k.Men > 0;
+                bool men = kit && k.KitN > 0;   // 558: zolnierze + towarzysze, ktorzy cwicza
                 int ready = men ? k.Ready : 0;
                 full[2] = men ? Frac(ready, k.Full) : "-"; num[2] = men ? ready.ToString() : "-"; iv[2] = ready; warn[2] = men && ready < k.Full;
 
@@ -455,19 +455,20 @@ namespace Armoury
                 l.Add(new TooltipProperty("Drill kit", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                 var k = Drill.HudKit();
                 if (k == null || !k.Ok) { l.Add(new TooltipProperty("Drill stock is off", "", 0, false, TooltipProperty.TooltipPropertyFlags.None)); return l; }
-                if (k.Men <= 0) { Row(l, "No soldiers", "nobody drills, the stock takes nothing"); return l; }
+                if (k.KitN <= 0) { Row(l, "Nobody to drill", "no soldiers or companions - the stock takes nothing"); return l; }
                 int per = Drill.OnePer, ready = k.Ready;
                 string unit = per == 1 ? "one weapon and one piece of armour per man" : "one weapon and one piece of armour per " + per + " men";
-                // recenzja 548: mianownik bez bohaterow (Drill.Men) - inny niz Troops i Horses, wiec mowimy to wprost
-                if (per == 1) Row(l, "Ready to drill / soldiers", ready + " of " + k.Men + " soldiers have a weapon and a piece of armour to drill with" + (ready < k.Full ? " (red)" : "") + " - heroes do not drill and are not counted");
-                else Row(l, "Ready / full set", ready + " of " + k.Full + " sets (" + unit + ", " + k.Men + " soldiers, heroes not counted)" + (ready < k.Full ? " (red)" : ""));
+                // recenzja 548: mianownik inny niz Troops i Horses, wiec mowimy to wprost; 558: zolnierze + towarzysze, ktorzy cwicza (bez gracza)
+                string who = k.Men + " soldiers" + (k.Heroes > 0 ? " and " + k.Heroes + (k.Heroes == 1 ? " companion" : " companions") : "") + (Drill.HudHeroesOn ? " - you lead the drill and are not counted" : " - heroes do not drill and are not counted");   // recenzja 558 pkt 2
+                if (per == 1) Row(l, "Ready to drill / men", ready + " of " + k.KitN + " have a weapon and a piece of armour to drill with" + (ready < k.Full ? " (red)" : "") + " (" + who + ")");
+                else Row(l, "Ready / full set", ready + " of " + k.Full + " sets (" + unit + ", " + who + ")" + (ready < k.Full ? " (red)" : ""));
                 Row(l, "Weapons", KitLine(k, true));
                 Row(l, "Armour", KitLine(k, false));
                 Row(l, "Full set", unit + ", beside his battle kit");
                 Row(l, "They take from you", k.RoomW + " more weapons and " + k.RoomA + " more pieces of armour (up to " + (Drill.IntakeSetsN == 1 ? "one full set" : Drill.IntakeSetsN + " full sets") + ")");
                 float bonus = (k.Bonus(true) + k.Bonus(false)) * 100f;
                 float max = Drill.BonusPerSet * 100f * ((k.PerkW ? Drill.BonusPerkMult : 1f) + (k.PerkA ? Drill.BonusPerkMult : 1f));
-                Row(l, "Drill bonus", "+" + bonus.ToString("0.#") + "% of +" + max.ToString("0.#") + "% troop XP from drill (each half grows with its share of the full set; "
+                Row(l, "Drill bonus", "+" + bonus.ToString("0.#") + "% of +" + max.ToString("0.#") + "%" + (Drill.HudHeroesOn ? " drill XP of troops and companions" : " troop XP from drill") + " (each half grows with its share of the full set; "
                        + "Giving Hands raises the weapons half" + (k.PerkW ? "" : " - not taken") + ", Paid in Promise the armour half" + (k.PerkA ? "" : " - not taken")
                        + ", from +" + (Drill.BonusPerSet * 100f).ToString("0.#") + "% to +" + (Drill.BonusPerSet * 100f * Drill.BonusPerkMult).ToString("0.#") + "%)");
                 float rw = k.WearPerFullDay(true), ra = k.WearPerFullDay(false);

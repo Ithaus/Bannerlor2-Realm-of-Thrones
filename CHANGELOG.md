@@ -1,5 +1,46 @@
 # DZIENNIK ZMIAN
 
+## 558: towarzysze cwicza - bohaterowie partii lorda (towarzysze, rodzina) dostaja w dniu musztry XP umiejetnosci noszonej broni wedlug wzoru oddzialu i licza sie do kompletu zapasu - Armoury (Drill.cs, MarchHud.cs; klucze NOWE DrillHeroes = TAK, DrillHeroXpMult = 1.0 w Settings.cs + McmSettings.cs recznie, MCM "Drill Heroes", "Drill Hero Xp Multiplier")
+
+**Problem:** Jeff, czat 15.11: "towarzysze maja cwiczyc" (wczesniej: "bohaterowie tez cwicza i dostaja xp, tylko gracz nie dostaje"). Musztra dawala XP tylko zolnierzom; pasek Drill liczyl komplet na samych zolnierzy ("heroes do not drill and are not counted").
+
+**Przyczyna:**
+- `MobilePartyTrainingBehavior.OnDailyTickParty` liczy model treningu dla kazdego elementu, ale XP dodaje tylko `!IsHero`; nasz `Drill.Shape` dla bohatera zwraca 0. Jedyna nauka bohatera z ticku to perk Bow.Trainer gry (6 XP Luku) - bez zmian.
+- `Drill.Men` = sami zolnierze, wiec komplet (`Full`) i zapas pomijaly bohaterow.
+
+**Zmiana:**
+- `Drill.HeroDrill` (wolane na poczatku `TickPostfix`, przed `AfterPlayerTick`): kazdy bohater skladu partii lorda (`IsLordParty`, aktywnej, nie Inni), zywy, dorosly, nie dowodca partii i nigdy gracz. Ciezko ranny (`IsWounded`) nie cwiczy (liczy sie do kompletu). Partie: gracz i Z14a przy DrillLaw, AI przy DrillLawAi (wylaczony = bohaterowie AI nie cwicza).
+- XP na dobe = B x L x D x S x mnoznik z tego samego `Ctx` co oddzial (kara glodu i snu o swicie, godziny obozu, dowodca, zapas); B = 10 + 2 x min(Level / 4 + 1, MaxCharacterTier) - tier zastepczy gry z `GetDefaultTroopPower`; w bitwie B = 0. Rowno na rozne umiejetnosci broni zestawu bitewnego (sloty 0-3: jednoreczna, dwureczna, drzewcowa, luk, kusza, miotana; bez tarcz i amunicji); bez broni nic. `Hero.AddSkillXp` w `SkillLedger.SDrill` (wspolczynnik i limit nauki gry dzialaja same). Bez perkow P.
+- Komplet: `Ctx.Kit = Men + HeroKit`, `Full(Kit)`; `Drill.Men` bez zmian (statystyki, "per man", ZGODNE). `Wear` przy `Kit > 0`, zuzycie takze, gdy cwiczyli sami bohaterowie (`HeroN`). `Accept`, `TrophyTip`, `AutotestFeed`, `HudKit` (pole `Heroes`, `KitN`) licza komplet z bohaterami.
+- W grze: "Drill today ...; companions drilled too: N of M (X XP each, shared among the weapons they carry; W wounded lie abed)"; druzyna z samymi towarzyszami - "Your companions drilled today: ...". Pasek: mianownik = zolnierze + towarzysze, podpowiedz "N soldiers and M companions - you lead the drill and are not counted".
+- Log (DrillLog, raz na dobe): "Musztra bohaterow (558): dzien D | gracz: ... [Imie (poz., B) umiejetnosc v0->v1 +XP] | komplet zapasu gracza: K = zolnierzy + bohaterow | rod i armia gracza | AI | mnoznik, potkniecia".
+- Potkniecia per bohater i per partia (Stumble), bez wylacznika.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: `Men()` nie zmienione - linia "Musztra (gracz)", XP na glowe i kontrola ZGODNE stoja. Zmienia sie tylko komplet: S przy tym samym zapasie troche spada (wiecej osob), zuzycie sztuk w uzyciu troche rosnie, ekrany i autotest przyjmuja wiecej (zamierzone: jedna sztuka na osobe). Nadwyzka K1 AI nietknieta.
+- Kolejnosc w ticku: HeroDrill przed `c`/`mine` (Ctx partii bez zolnierzy) i przed `AfterPlayerTick` (godziny obozu jeszcze w Ctx). Wiadomosc raz na dobe (`_msgDay`).
+- Kolizje: Bow.Trainer gry osobno; ROT patch30 przy zaciagu - partia nieaktywna, bez musztry; PlayerXp480, SmithXp, XpFair nie dotycza. SkillLedger przypisze XP do "musztra" (rod gracza, lordowie AI) - sprawdzic E8/P1.
+- Martwy kod zywy: raz na dobe petla po skladzie kazdej partii lorda i kilka `AddSkillXp` na bohatera; dodatkowy `CtxOf` tylko dla partii z samymi bohaterami. Uboczny efekt: `GainRawXp` daje wolny przyrost poziomu postaci (jak kazda nauka).
+- W grze: pasek Drill z mianownikiem zolnierze + towarzysze; dzien "Train the men" 8 h daje "companions drilled too" i wpisy 558 z przyrostem; marsz przy Drill Camp Only - 0; ranny towarzysz w "ranni"; XP AI na bohatera rzedu 10-60.
+- Decyzja Jeffa: czy dowodcy partii AI tez maja cwiczyc (w `DrillHero` skreslic `h != mp.LeaderHero`; wtedy cwiczylby tez dowodca partii rodu gracza).
+- Zbudowane (0 bledow), nie wgrane, nie testowane w grze.
+
+**Status:** DO SPRAWDZENIA
+
+### Recenzja 558 (galaz noc/558-towarzysze-cwicza-fix -> noc/558-towarzysze-cwicza)
+
+Przyjete (sprawdzone w kodzie):
+- **(2) Podpowiedz paska przy wylaczonym Drill Heroes** (MarchHud.cs). Tekst "you lead the drill and are not counted" i "drill XP of troops and companions" byl bez wzgledu na klucz. Zmiana: `Drill.HudHeroesOn` (ten sam `HeroesOn` co komplet, dla gracza) - przy wylaczonym kluczu wraca stary tekst "heroes do not drill and are not counted" i "troop XP from drill". Liczby bez zmian.
+- **(3) "X XP each" pokazywal surowe XP** (Drill.cs `HeroClause`). Zmiana: w druzynie gracza `HeroDrill` mierzy `HeroDeveloper.GetSkillXp` przed i po `AddSkillXp` (nowe pole `PlayerRec.HGot`); napis: "X XP each learned", a gdy rozne od surowego - "of Y drilled - their learning rate and limit". Towarzysz ponad limitem nauki widzi 0. Pomiar tylko dla druzyny gracza (AI bez kosztu); log 558 bez zmian.
+- **(4) "up to 6" w opisie** (Settings.cs, McmSettings.cs recznie). Kod bierze `MaxCharacterTier`; opis: "up to the game's top troop tier - 6 unless a mod changes it".
+- Kosmetyka: komentarz m114 wrocil na linie `CutMessage` (Drill.cs `DayMessage`).
+
+Nie zmieniane:
+- **(1) Druzyna z samymi towarzyszami przy Drill Camp Only nie cwiczy** - potwierdzone (CampDrill: menu "Train the men" i godziny w osadzie / armii wymagaja `TotalRegulars > 0`). To zmiana zasady obozu, nie blad 558 - **do decyzji Jeffa**: wpuscic "Train the men" przy samych towarzyszach albo zostawic. Szkody brak (bez cwiczen bez zuzycia; zapas przyjmuje tylko discard / lup).
+- Decyzja Jeffa (bez zmian): czy dowodcy partii AI tez maja cwiczyc.
+
+Ryzyko: `GetSkillXp` to odczyt slownika (bez skutkow ubocznych), w petli tylko dla druzyny gracza. `HudHeroesOn` w try/catch. Build Armoury 0 bledow. Nie wgrane, w grze nie sprawdzone.
+
 ## 556: armia w zbiorce w linii "dlaczego stoi" i linia OB5 "armia wladcy po zbiorce" - TYLKO LOG - Armoury (CanonWarWatch.cs, BesiegedRelief.cs, ReliefStrike326.cs)
 
 **Problem:** Jeff, czat 15.11: "sprawdz czemu tak jest z armia Joffreya". Armoury-2026-11-15_15-14-12.log:10822 (16:29:09): mysl AI Joffreya "1. BesiegeSettlement Maidenpool 51.038 ... 3. DefendSettlement Banefort 2.560", a "dlaczego stoi: SCA: wyczerpane - cele oblezen x0.55". Oceny zapisane w czasie zbiorki armii (gra ustawia DoNotChangeBehavior - AiMilitaryBehavior.cs:496-499; OB5 BesiegedRelief nie podbija w zbiorce); zbiorke zakonczyl 326c o 16:29:08 (linia "koniec zbiorki ... odsiecz Banefort", powod czas 24.4 h), gra zamknieta 30 s pozniej. Po zbiorce OB5 powinien dac obronie Banefort ok. 56 > 51 - brak dowodu, bo nie bylo ani jednej mysli po koncu zbiorki.
