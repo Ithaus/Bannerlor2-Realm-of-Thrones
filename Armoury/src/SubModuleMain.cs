@@ -1016,6 +1016,7 @@ namespace Armoury
                 starter.AddBehavior(new NavalRealmsBehavior());     // 326a: floty wedlug krolestw - nadmiar statkow do portow, linia "Floty krolestw (326a)"
                 starter.AddBehavior(new NorthConquestBehavior());   // 326b: zwrot zdobyczy Polnocy spoza jej ziem (zapis arm_k326b)
                 starter.AddBehavior(new Banefort544Behavior());     // 544: jednorazowy zwrot Banefortu koronie (kapitulacja z terminu 471b; flaga arm_544_banefort)
+                starter.AddBehavior(new Banefort555Behavior());     // 555: jednorazowy dar zalogi dla Banefortu (336 sprzed oblezenia x 1.5; flaga arm_555_banefort)
                 starter.AddBehavior(new PlayerClaims369Behavior());  // 369: roszczenia gracza do twierdz zdobytych na jego rodzie (zapis arm_k369), naprawa Ashemark
                 starter.AddBehavior(new WarFront334Behavior());     // 334: balans wojny korona-Polnoc z Zelaznymi (zapis arm_f334, zdarzenia, start sesji)
                 starter.AddBehavior(new CanonCompanionsBehavior()); // m101-postacie: postacie kanonu do rodow, usuniete, zmiany stron (flaga arm_canon_companions, tylko nowa kampania)

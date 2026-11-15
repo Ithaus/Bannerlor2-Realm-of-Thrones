@@ -1,5 +1,69 @@
 # DZIENNIK ZMIAN
 
+## 555: jednorazowy dar zalogi dla Banefortu - 336 sprzed oblezenia x 1.5 = 504 - Armoury (Banefort555.cs nowy, Banefort544.Pending, SubModuleMain; flaga w zapisie arm_555_banefort; bez nowego klucza)
+
+**Problem:** Jeff, czat 15.11: "Banefort - tak, daj mu zaloge taka jak mial przed szturmem i powieksz o 50%". 544 oddal Banefort (ROT_castle20) House Banefort bez obsady: Armoury-2026-11-15_15-14-12.log l.864 "zaloga Banefort 311 -> [...], zostalo 0 ... po zmianie Banefort: pan Banefort, zaloga 0"; Polnoc (Gregor Forrester) oblega go znowu od dnia 109116 przy 11.8:1 (l.8978, obroncy z milicja 411 - zaloga ok. 74 z werbunku pana).
+
+**Przyczyna:** 544 celowo bez obsady (TransferFor noFill: true - regula 326x "zaloga z werbunku pana, nic z niczego"); zaloga sprzed upadku (ludzie Polnocy) poszla do partii Polnocy. Zaloga korony sprzed oblezenia: oblezenie od dnia 108995 (Armoury-2026-11-15_01-07-36.log l.56285 "Czas oblezenia (471) start ... obroncy (strona gry, z milicja) 678"), linie OB1 dni 109003-109012 "obrona: zaloga 336, milicja 344-347" - 336 ludzi. Skladu zalogi zaden log nie zapisal.
+
+**Zmiana:**
+- Nowy `Banefort555` (wzor 544): raz na kampanie, HourlyTickEvent, flaga `arm_555_banefort` ("" czeka, "new" nowa kampania, "done:dzien:wynik").
+- Warunki: pan = House Banefort (ROTclan_59) albo rod panujacy korony "vlandia" (zapasowy odbiorca 544); rod gracza - koniec bez daru; pan spoza tych dwoch przy czekajacym 544 (nowe `Banefort544.Pending`) - czeka; inny pan - koniec bez daru.
+- Dar: zaloga do celu 504 (dodaje 504 - obecni szeregowi; zaloga >= 504 - bez daru). Sklad: drzewo oddzialow kultury pana (BasicTroop + awanse, bez bohaterow; zapas: kultura osady, korony), udzialy tierow T1 10% / T2 25% / T3 30% / T4 20% / T5 10% / T6 5% (brak tieru w drzewie - udzial na pozostale), w tierze po rowno, zdrowi.
+- Oblezenie: dar idzie takze w oblezeniu - gra sama dopisuje ludzi do zalogi oblezonej twierdzy (GarrisonTroopsCampaignBehavior.OnSettlementEntered bez warunku oblezenia, dekompilacja 1.4.8); werbunek gry wstrzymuje tylko przy MapEvent/SiegeEvent (regula projektu gry, nie bezpieczenstwo). Czeka tylko gdy bitwa (MapEvent osady albo zalogi) albo gracz stoi w Banefort.
+- Zamknieta ekonomia: WYJATEK z rozkazu Jeffa - ludzie z niczego, bez zlota i bez zdjecia z ludnosci, opisany w linii jako "dar 555"; ksiega ludzi: PeopleBook.GiveNone(..., -1) - koszyk bez pochodzenia (jak CartEscort297).
+- Linia logu `Banefort (555): ... DAR 555 zalogi Banefort ...` (zaloga przed -> po, tiery, typy, oblezenie, milicja, limit zalogi gry, budzet zoldu zalogi) + linia startu sesji; wiadomosc dla gracza: "Banefort's garrison is restored: N fresh troops join the defenders (M men in the castle)."
+
+**Ryzyko / co sprawdzic:**
+- Regresje/kolizje (kontrola w kodzie): zaloge Banefortu pisza tez 544 (u Jeffa juz zrobione - flaga done), gra (werbunek, zostawianie/zabieranie przez lordow), 326c-E FrontGarrison (tylko nieoblegane, werbunek gry), W4c OverflowHome (przepelnienie), zbrojownia zalogi. 555 nie zmienia zadnej z tych regul; liczy obecnych szeregowych w chwili daru, wiec nie dubluje ludzi dodanych wczesniej.
+- LIMIT ZALOGI: zamek gry ma 200 + Przywodztwo pana + budynki/perki (DefaultPartySizeLimitModel). Jesli limit < 504, nadwyzka odchodzi przez przepelnienie (gra: 25% nadwyzki na dobe, W4c - do wsi Banefortu), takze w oblezeniu (DesertionCampaignBehavior bez warunku oblezenia). Linia 555 pokazuje "limit zalogi gry" - jesli wyraznie < 504, dar rozplynie sie w kilka dob; ochrona daru to decyzja Jeffa (osobna zmiana), nie dopisana "przy okazji".
+- Zold: 504 ludzi to zold House Banefort (budzet zoldu zalogi w linii); przy braku pieniedzy zwykle reguly (limit zoldu, D5 do domu).
+- Jedzenie zalogi: z ok. 74 do 504 ludzi zapas spada szybciej (l.8978: 853 dob przy -13.6/d - zostaje duzy zapas).
+- Sprzet: nowi ludzie z ekwipunkiem szablonu; zbrojownia zalogi dokupi braki z sakiewki zalogi.
+- W logu po wczytaniu: "Banefort (555): start sesji | stan zapisu: czeka", w pierwszej godzinie gry "DAR 555 ..." (albo "czeka - ... bitwa" i dar po bitwie); w liniach OB1/471 Banefortu "zaloga" ok. 504.
+- Build 0 bledow; w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
+### Recenzja 555 (galaz noc/555-banefort-zaloga-fix -> noc/555-banefort-zaloga)
+
+Przyjete (sprawdzone w kodzie):
+- **#1 Wyzwalacz bez zwiazku z 544** - prawda: brak klucza w zapisie = "czeka", jedynym warunkiem byl pan; starszy zapis sprzed oblezenia (zaloga 336) albo zapis autotestu dostalby +168 i wiecej z niczego. Zmiana: dar tylko gdy 544 w tej kampanii naprawde oddal zamek - nowe `Banefort544.ReturnedOk` (stan 544 "done:dzien:ok") i `Banefort544.StateText`; 544 czeka - 555 czeka ("czekam na zwrot 544"); kazdy inny wynik 544 (juz-w-koronie, inny-pan, gracz, new, blad) - 555 konczy "bez-zwrotu-544" z linia logu. U Jeffa 544 ma wynik ok (l.864 WGRANIE 250), wiec dar nadal dojdzie.
+- **#3 Zold** - prawda (DefaultPartyWageModel.GetCharacterWage: T1 2, T2 3, T3 5, T4 8, T5 12, T6 17; dawna mieszanka ok. 6.1 na czlowieka, ok. 3070/dobe za 504). Zmiana: mieszanka T1 30% / T2 35% / T3 20% / T4 10% / T5 5% / T6 0% - ok. 4.05 na czlowieka (-34%, ok. 2040/dobe za 504, za dodanych ok. 1740 przy zalodze ok. 74). Linia DAR 555 pisze teraz "zold dodanych ok. N na dobe" (z modelu gry). Zold nadal ponad sily House Banefort (linia 334 dnia 109114: zold 827, dlug 1911) - patrz DECYZJA nizej.
+- **Drobne: gotowosc gracza** - zamiast "gracz nie w Banefort" ten sam warunek co 544 (`BookHoldings.PlayerOnMapFor`: nie w osadzie, menu, spotkaniu, bitwie, oblezeniu, armii, rozmowie, niewoli), z tym samym ograniczeniem linii "czeka ... gracz" do jednej na dobe. Skutek: gdy Jeff jest w armii albo w osadzie, dar czeka do wyjscia na mape.
+- **Drobne: ksiega ludzi** - `GiveNone(..., -1)` nie liczyl naplywu w zadnej przyczynie. Nowa przyczyna `PeopleBook.FGift555 = 67` ("dar zalogi Banefort (555)", FKinds 67 -> 68, nazwa dopisana na koncu FName); linia doby ksiegi pokazuje ja w "wejscia" tylko gdy > 0. Tablice FKinds tylko w pamieci doby (nie w zapisie) - poszerzenie bez skutku dla zapisow.
+
+Potwierdzone, bez zmiany kodu - DECYZJA JEFFA przed wgraniem:
+- **#2 Limit zalogi** - prawda: DefaultPartySizeLimitModel zamek 200 + Przywodztwo pana + perki/budynki; DesertionCampaignBehavior pomija tylko partie w MapEvent (dziala w oblezeniu miedzy szturmami); DefaultPartyDesertionModel zdejmuje 25% nadwyzki na dobe (+5 na dobe przy niezaplaconym zoldzie, do 20 przy limicie zoldu). Nadwyzka odchodzi W4c do ludnosci BK wsi. Przed oblezeniem zamek trzymal 336, wiec limit byl wtedy co najmniej ok. 336 - 504 jest ponad nim o ok. 170, czyli ok. 7 dob do zejscia do limitu. Cel 504 to liczba z rozkazu Jeffa, wiec go nie ciete. Do wyboru: (a) zostaje 504 - dar topnieje do limitu, nadwyzka do wsi; (b) cel = min(504, limit zalogi gry) - nic nie przecieka do wsi, ale bez pelnego +50%; (c) osobna ochrona zalogi Banefortu przed przepelnieniem do konca oblezenia (nowa latka - osobna zmiana).
+- Klucz MCM do wylaczenia 555 - nie dodany (zadanie go nie wymagalo).
+
+Odrzucone: brak.
+
+Ryzyko: 555 zalezy teraz od stanu 544 - zapis, w ktorym 544 zakonczyl sie innym wynikiem niz ok, daru nie dostanie (zamierzone). Rejestracja 544 przed 555 bez zmian (ta sama godzina). Build Armoury 0 bledow. W grze nie sprawdzone.
+
+### 555b (Jeff: wariant b)
+
+Jeff, czat 15.11: po wyjasnieniu, ze gra co dobe zdejmuje 25% nadwyzki zalogi ponad limit (504 skurczyloby sie do limitu w tydzien) i wyborze (a) 504 i niech splywa, (b) tylko do limitu zalogi, (c) 504 chronione do konca oblezenia - "Banefort dajemy b".
+
+- **Limit sprawdzony w dekompilacji 1.4.8:** `DesertionCampaignBehavior` (DailyTickParty, partie lorda/karawany/zalogi bez MapEvent) -> `DefaultPartyDesertionModel.GetTroopsToDesertDueToWageAndPartySize`: nadwyzka = `Party.NumberOfAllMembers - Party.PartySizeLimit`, dezercja `max(1, 25% nadwyzki)` na dobe. Zaden mod (BK, ROT, BKROTPatch, BEE, Naval) nie podmienia modelu dezercji; `PartySizeLimit` liczy czynny model rozmiaru partii (BK/ROT/BEE/Naval) - 555b czyta te sama wlasciwosc co gra.
+- **Zmiana (Banefort555.Hourly):** dar = `min(504 - szeregowi zalogi, max(0, PartySizeLimit - NumberOfAllMembers))` w chwili daru - ta sama miara co gra (wszyscy czlonkowie z rannymi), wiec dar nigdy nie przekroczy limitu i nie uruchomi przepelnienia. Cel 504 zostaje gorna granica. Ta sama mieszanka tierow (T1 30 / T2 35 / T3 20 / T4 10 / T5 5), przeskalowana do liczby daru (Plan bez zmian).
+- Miejsce 0 (albo zaloga >= 504): linia `Banefort (555): ... dano 0, bez daru (555b: dar tylko do limitu)` z limitem, obecnymi i celem; flaga done z wynikiem "limit" albo "pelna" - nie powtarza sie. Blad odczytu limitu - dar czeka (linia raz na dobe), bez porzucenia.
+- Linia DAR 555: `555b limit: limit zalogi gry L, obecnie (wszyscy) A, miejsce M, dano N (cel 504 - zaloga G = X)`. Wiadomosc dla gracza: "Banefort's garrison is reinforced up to the castle's limit: N fresh troops join the defenders (M men in the castle)." (bez "up to the castle's limit", gdy ograniczyl cel 504).
+
+**Ryzyko / co sprawdzic:**
+- Dar moze byc duzo mniejszy niz 504: zamek ma ok. 200 + Przywodztwo pana + budynki/perki (modele BK/ROT moga to zmienic) - liczba w linii "555b limit". To zamierzone (wariant b).
+- Regresje/kolizje: zmiana tylko liczby daru w 555; reguly gry, W4c OverflowHome, 544, FrontGarrison bez zmian. Kolejnosc w dobie: dar w HourlyTick, dezercja w DailyTick - dar do limitu nie daje nadwyzki, chyba ze limit spadnie pozniej (np. zmiana pana/perkow) - wtedy zwykle przepelnienie.
+- Ludzie wchodzacy do zalogi po darze (lord zostawia ludzi) moga przekroczyc limit - zwykla regula gry, nie 555.
+- Build 0 bledow; w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
+#### Recenzja 555b: limit wprost z modelu, nie z pamieci PartyBase
+
+- **Problem (kod, dekompilacja 1.4.8):** `PartyBase.PartySizeLimit` trzyma wartosc w pamieci (`_cachedPartyMemberSizeLimit`) i przelicza ja tylko po zmianie wersji rosteru (`MemberRoster.VersionNo`). 544 (BookHoldings.TransferFor) najpierw oproznia zaloge (YieldOut), potem zmienia pana (`ChangeOwnerOfSettlementAction.ApplyByDefault` - rosteru zalogi nie rusza). Jesli do daru nic nie zmienilo rosteru, 555b czytal limit STAREGO pana (Przywodztwo i perki glowy rodu Polnocy - `CalculateGarrisonPartySizeLimit`: 200 + Przywodztwo wlasciciela + perki + budynki). Gra po darze (nowa wersja rosteru) przelicza limit od nowa dla House Banefort - przy wyzszym starym limicie nadwyzka splywalaby 25% na dobe, czyli dokladnie to, czego wariant b mial uniknac.
+- **Zmiana (Banefort555.Hourly):** limit = `(int)Campaign.Current.Models.PartySizeLimitModel.GetPartyMemberSizeLimit(g.Party).ResultNumber` - ten sam lancuch modeli (BK/ROT/BEE/Naval) i ta sama wartosc, ktora gra policzy przy dezercji po darze. Reszta 555b bez zmian.
+- **Ryzyko / co sprawdzic:** jedno wywolanie modelu raz na kampanie; postfiks BK (`BKPartyLimitTweakPatches.SyncCachedSize`) przy okazji odswieza pamiec PartyBase - bez skutkow ubocznych (dla zalogi bez lidera BK nic nie dodaje). Zold ponad budzet zalogi (limit zoldu `a` w tej samej metodzie gry, do 20/dobe) nadal moze zdejmowac ludzi - to decyzja Jeffa o zoldzie, nie limit. Build 0 bledow; w grze nie sprawdzone.
+
 ## 558: towarzysze cwicza - bohaterowie partii lorda (towarzysze, rodzina) dostaja w dniu musztry XP umiejetnosci noszonej broni wedlug wzoru oddzialu i licza sie do kompletu zapasu - Armoury (Drill.cs, MarchHud.cs; klucze NOWE DrillHeroes = TAK, DrillHeroXpMult = 1.0 w Settings.cs + McmSettings.cs recznie, MCM "Drill Heroes", "Drill Hero Xp Multiplier")
 
 **Problem:** Jeff, czat 15.11: "towarzysze maja cwiczyc" (wczesniej: "bohaterowie tez cwicza i dostaja xp, tylko gracz nie dostaje"). Musztra dawala XP tylko zolnierzom; pasek Drill liczyl komplet na samych zolnierzy ("heroes do not drill and are not counted").
