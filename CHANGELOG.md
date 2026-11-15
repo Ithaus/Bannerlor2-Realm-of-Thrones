@@ -27,6 +27,19 @@
 
 **Status:** DO SPRAWDZENIA (galaz noc/549-cios-w-plecy, nie wgrane).
 
+### Recenzja 549 (galaz noc/549-cios-w-plecy-fix -> noc/549-cios-w-plecy)
+
+Recenzja: brak bledu blokujacego wgranie (cel DeclaredMethod, nazwy parametrow, kolejnosc przed RBM, kolizje 415/416/423b/Perk506, watki, jedno zalozenie na proces, klucz NIE = stare zachowanie - potwierdzone).
+
+Przyjete (sprawdzone w kodzie):
+- **Uwaga 3: srednie pancerza w linii konca misji liczone przed odrzuceniem sneaka.** Prefiks dodawal do _armN/_armB10/_armA10 zanim postfiks odrzucal cios z ukrycia (isSneakAttack), wiec srednie obejmowaly ciosy, ktorych 549 nie liczy w "z tylu". Teraz prefiks zapisuje pancerz przed/po w polach [ThreadStatic] (_armBefore/_armAfter), a do sum trafia on dopiero w postfiksie, przy ciosie faktycznie pomnozonym. Tylko log - obrazenia bez zmian (przebicie pancerza przy sneaku zostaje, RBM i tak zabija takim ciosem).
+
+Odrzucone (bez zmiany kodu):
+- **Uwaga 1: regula obejmuje kazda misje (turnieje GrandTourney, arena, kryjowki, pojedynki).** Nie blad kodu - wpis 549 opisuje to jako decyzje Jeffa ("gdyby nie - bramka trybu jak FriendlyFire"). Przekazane Jeffowi jako pytanie.
+- **Uwaga 2: MCM dopisane recznie, gen_mcm.py nie uruchomiony.** Generator dalby gorsze tytuly ("Backstab Damage Mult", opisy z przedrostkiem "549: ") i i tak rozjezdza sie z recznym McmSettings.cs w wielu wpisach - uruchomienie przepisaloby cudze pozycje. Zapisane wartosci trzyma nazwa pola, wiec reczne wpisy sa poprawne. Stan zastany, nie ruszam.
+
+- Build Armoury 0 bledow. W grze nie sprawdzone, nie wgrane.
+
 ## 548: pasek mapy czytelny - kazda pozycja "mam / potrzeba", pelne ulamki; zestaw do musztry 1 na czlowieka - Armoury (MarchHud.cs, Drill.cs, RiddenBy.cs; klucz NOWY DrillMenPerPiece = 1, MCM "Drill Men Per Piece")
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 250 (gora: troops 133; dol: Horses 131/146 CZERWONE, Pack 59/117, Weapons 82/43, Armour 82): "nie rozumiem tej tabelki, mam 131 ludzi czemu 146 czerwone, potem 82/43 czyli co, za duzo mam broni czy za malo, i 1 miecz i jeden pancerz na osobe a nie na 3 ludzi ... i te 82 czyli co 82/82 ... zrob aby UX/UI byl czytelny". Log Armoury-2026-11-15_15-14-12: 146 = wszystkie konie wierzchowe (ladunek + zbrojownia + stajnia), czerwien = 1 osoba pieszo (Amanda, Jazda 5); 82/43 = od gracza + nadwyzka ludzi / ceil(129/3); "Armour 82" = 82/43 skrocone bezpiecznikiem szerokosci (16:01:24 "skrocone do licznika 1", gora 690 px); liczniki broni skakaly 83 -> 187 -> 87 z nadwyzka ludzi.

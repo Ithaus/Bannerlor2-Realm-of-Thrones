@@ -41,6 +41,7 @@ namespace Armoury
         internal static bool Patched { get { return _patched > 0; } }
 
         [ThreadStatic] private static bool _mark;           // prefiks uznal cios za cios w plecy - postfiks mnozy obrazenia
+        [ThreadStatic] private static float _armBefore, _armAfter;   // pancerz przed/po przebiciu tego ciosu (-1 = bez zmiany) - do sumy dopiero w postfiksie (bez sneaka)
 
         // liczniki misji (Interlocked; sumy jako long)
         private static int _melee, _rear, _rearOnPlayer, _rearByPlayer, _skipFriend, _skipBackShield, _skipProne, _skipSneak, _stum, _armN;
@@ -136,13 +137,12 @@ namespace Armoury
 
                 float pen = Pen(s);
                 float a = attackInformation.ArmorAmountFloat;
+                _armBefore = -1f; _armAfter = -1f;
                 if (a > 0f && pen > 0f)
                 {
                     float b = a * (1f - pen / 100f);
                     attackInformation.ArmorAmountFloat = b;
-                    Interlocked.Increment(ref _armN);
-                    Interlocked.Add(ref _armB10, (long)(a * 10f + 0.5f));
-                    Interlocked.Add(ref _armA10, (long)(b * 10f + 0.5f));
+                    _armBefore = a; _armAfter = b;                 // recenzja 549 uwaga 3: liczone w postfiksie, po odrzuceniu sneaka
                 }
                 _mark = true;
             }
@@ -162,6 +162,12 @@ namespace Armoury
                 int after = Math.Min(2000, (int)(before * m + 0.5f));
                 inflictedDamage = after;
                 absorbedByArmor = Math.Max(0, raw - after);
+                if (_armBefore > 0f)
+                {
+                    Interlocked.Increment(ref _armN);
+                    Interlocked.Add(ref _armB10, (long)(_armBefore * 10f + 0.5f));
+                    Interlocked.Add(ref _armA10, (long)(_armAfter * 10f + 0.5f));
+                }
                 Interlocked.Increment(ref _rear); Interlocked.Add(ref _hpB, before); Interlocked.Add(ref _hpA, after);
                 if (attackInformation.IsVictimPlayer) Interlocked.Increment(ref _rearOnPlayer);
                 else if (attackInformation.IsAttackerPlayer) Interlocked.Increment(ref _rearByPlayer);
