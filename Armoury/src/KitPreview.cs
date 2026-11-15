@@ -437,6 +437,14 @@ namespace Armoury
                    + "|" + (SaddleLaw.On ? 1 : 0) + (GearFit.CultureOn ? 1 : 0) + (GearFit.FloorOn ? 1 : 0) + (GearFit.FloorOverSkillOn ? 1 : 0) + (GearFit.FloorForeignOn ? 1 : 0);
         }
 
+        /// <summary>541 (recenzja): wynik z pamieci jest aktualny - ten sam klucz co Get(false) (zbrojownia, sklad, sakwy, dzien, klucze GearFit), wiec Get(false)
+        /// zwroci go bez liczenia. Dla paska mapy (Drill.HudKit) - pelny Compute tylko gdy pamiec nieaktualna i najwyzej raz na 5 s. Nie rzuca.</summary>
+        internal static bool Fresh(Result r)
+        {
+            try { var mp = MobileParty.MainParty; return r != null && r.Ok && mp != null && mp.MemberRoster != null && r.Key == Key(mp); }
+            catch { return false; }
+        }
+
         /// <summary>Typ z podgladu po StringId (null - brak).</summary>
         internal static TypeRow Find(Result r, string id)
         {

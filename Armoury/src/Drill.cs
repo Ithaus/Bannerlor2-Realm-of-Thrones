@@ -1473,11 +1473,15 @@ namespace Armoury
         internal static int IntakeSetsN { get { return IntakeSets; } }
 
         private static readonly Kit _hudKit = new Kit();
-        private static int _hudArmVer = int.MinValue, _hudRosVer = int.MinValue, _hudAt = Environment.TickCount - 60000, _hudN;
+        private static int _hudArmVer = int.MinValue, _hudRosVer = int.MinValue, _hudBagVer = int.MinValue, _hudDay = int.MinValue, _hudAt = Environment.TickCount - 60000,
+                           _hudFullAt = Environment.TickCount - 60000, _hudN, _hudFullN;
         private static ItemRoster _hudArm;
+        private static object _hudPv;   // recenzja 541: KitPreview.Last przy ostatnim przeliczeniu (nowy wynik od kogos innego - Accept, meldunek, DteMapBar533 - przelicza pasek)
 
         /// <summary>541: odczyt dla paska mapy (watek glowny, co 0.2 s). Ludzie i od gracza - zywe (dwa pola i mala petla); nadwyzka ludzi (11 planow K1) liczona od nowa
-        /// tylko po zmianie zbrojowni albo skladu (VersionNo) i najwyzej raz na 1 s - inaczej z pamieci. Licznik MenPurse._keptGiven przywracany. Nie rzuca.</summary>
+        /// tylko po zmianie klucza (zbrojownia, sklad, sakwy, dzien, nowy KitPreview.Last) i najwyzej raz na 1 s - inaczej z pamieci. Recenzja 541: plan nadwyzki pyta
+        /// podglad bitwy (KitPreview.ForArmoury -> Get) - gdy pamiec podgladu jest aktualna (KitPreview.Fresh), to bez liczenia; gdy nie - pelny Compute (proba DTE,
+        /// ok. 35 ms) najwyzej raz na 5 s (jak DteMapBar533), a do tego czasu pasek trzyma poprzednie liczby. Licznik MenPurse._keptGiven przywracany. Nie rzuca.</summary>
         internal static Kit HudKit()
         {
             var k = _hudKit;
@@ -1494,20 +1498,31 @@ namespace Armoury
                 k.AccW = acc != null ? acc.WW : 0f; k.AccA = acc != null ? acc.WA : 0f;
                 if (k.Men <= 0) { k.SurW = k.SurA = 0; k.Ok = true; return k; }
                 var arm = QuartermasterLaw.DteArmory();
-                int av = arm != null ? arm.VersionNo : -1, rv = main.MemberRoster != null ? main.MemberRoster.VersionNo : -1;
+                var bag = main.ItemRoster;
+                int av = arm != null ? arm.VersionNo : -1, rv = main.MemberRoster != null ? main.MemberRoster.VersionNo : -1, bv = bag != null ? bag.VersionNo : -1;
+                int day = (int)CampaignTime.Now.ToDays;
+                var last = KitPreview.Last;
                 int now = Environment.TickCount;
-                bool changed = !ReferenceEquals(arm, _hudArm) || av != _hudArmVer || rv != _hudRosVer;
+                bool changed = !ReferenceEquals(arm, _hudArm) || av != _hudArmVer || rv != _hudRosVer || bv != _hudBagVer || day != _hudDay || !ReferenceEquals(last, _hudPv);
                 if (changed && unchecked(now - _hudAt) >= 1000)
                 {
-                    _hudAt = now; _hudArm = arm; _hudArmVer = av; _hudRosVer = rv; _hudN++;
-                    int sw = 0, sa = 0, kept = MenPurse.KeptGiven;
-                    try
+                    _hudAt = now;
+                    // podglad z pamieci aktualny (Get(false) bez liczenia) albo minelo 5 s od ostatniego pelnego liczenia - inaczej czekamy (klucz nie zapisany, proba za 1 s)
+                    bool fresh = arm == null || KitPreview.Fresh(last);
+                    if (fresh || unchecked(now - _hudFullAt) >= 5000)
                     {
-                        if (arm != null)
-                            foreach (var kv in PlayerSurplus()) { int g = TypeGroup((int)kv.Key); if (g == GW) sw += kv.Value.Count; else if (g == GA) sa += kv.Value.Count; }
+                        if (!fresh) { _hudFullAt = now; _hudFullN++; }
+                        _hudN++;
+                        int sw = 0, sa = 0, kept = MenPurse.KeptGiven;
+                        try
+                        {
+                            if (arm != null)
+                                foreach (var kv in PlayerSurplus()) { int g = TypeGroup((int)kv.Key); if (g == GW) sw += kv.Value.Count; else if (g == GA) sa += kv.Value.Count; }
+                        }
+                        finally { MenPurse.KeptGiven = kept; }
+                        k.SurW = sw; k.SurA = sa;
+                        _hudArm = arm; _hudArmVer = av; _hudRosVer = rv; _hudBagVer = bv; _hudDay = day; _hudPv = KitPreview.Last;   // Last po liczeniu (Get mogl go podmienic)
                     }
-                    finally { MenPurse.KeptGiven = kept; }
-                    k.SurW = sw; k.SurA = sa;
                 }
                 k.PerkW = main.HasPerk(DefaultPerks.Steward.GivingHands);
                 k.PerkA = main.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
@@ -1519,9 +1534,11 @@ namespace Armoury
 
         /// <summary>541: liczba przeliczen nadwyzki dla paska (do linii doby MarchHud.State).</summary>
         internal static int HudKitCounts { get { return _hudN; } }
+        /// <summary>Recenzja 541: w tym przeliczen z pelnym liczeniem podgladu bitwy (pamiec KitPreview nieaktualna; najwyzej raz na 5 s).</summary>
+        internal static int HudKitFullCounts { get { return _hudFullN; } }
 
         /// <summary>541: nowa kampania - pamiec paska od zera.</summary>
-        private static void HudKitReset() { _hudArm = null; _hudArmVer = _hudRosVer = int.MinValue; _hudAt = Environment.TickCount - 60000; _hudN = 0; _hudKit.Ok = false; _hudKit.SurW = _hudKit.SurA = 0; }
+        private static void HudKitReset() { _hudArm = null; _hudPv = null; _hudArmVer = _hudRosVer = _hudBagVer = _hudDay = int.MinValue; _hudAt = _hudFullAt = Environment.TickCount - 60000; _hudN = _hudFullN = 0; _hudKit.Ok = false; _hudKit.SurW = _hudKit.SurA = 0; }
 
         // ekran 1 (zwykly ekwipunek "Discard") i 2 (lup gry): prefiks + finalizer na metodzie otwierajacej, postfiks na InventoryLogic.Initialize
         public static void OpenDiscardPrefix() { _opening = 1 + SrcDiscard; }

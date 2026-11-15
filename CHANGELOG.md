@@ -31,6 +31,26 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 541 (galaz noc/541-pasek-fix -> noc/541-pasek)
+
+Przyjete (sprawdzone w kodzie):
+- **1. Horses - falszywe ostrzezenie.** Warunek `AllHarness < AllHorses || UnusedPairs > 0` zapalal kolor przy nadmiarze koni lub par w zbrojowni DTE, choc nikt nie szedl pieszo (MarchPairs.Assign: UnusedPairs = wszystkie pary bez jezdzca). Teraz `WalkNoHarness > 0 || WalkSkill > 0` (ktos naprawde idzie pieszo bez uprzezy albo przez za niska Jazde) - MarchHud.Sync.
+- **2. Szerokosc nie gwarantowana.** Bezpiecznik skracal tylko pozycje bez ostrzezenia. Teraz druga runda skraca takze pozycje z ostrzezeniem (kolor zostaje, pelny ulamek w podpowiedzi). Gdy nawet same liczniki sa szersze niz gorny rzad - wiecej zrobic sie nie da (4 pozycje); linia "pasek (N)" pokazuje oba szacunki.
+- **3. Pelne liczenie podgladu bitwy co sekunde.** HudKit -> PlayerSurplus -> PlayerSurplusPlan -> KitPreview.ForArmoury -> Get(false): przy zmianie skladu chybia pamiec i robi Compute (ok. 35 ms). Teraz: nowe `KitPreview.Fresh(r)` (ten sam klucz co Get - Get(false) zwroci wynik bez liczenia); HudKit przelicza nadwyzke od razu (najwyzej 1/s), gdy pamiec podgladu aktualna, a gdy nie - najwyzej raz na 5 s (jak DteMapBar533), do tego czasu stare liczby. Linia doby: "przeliczen zapasu musztry N (w tym z pelnym liczeniem podgladu bitwy M)".
+- **4. Spozniona liczba po Discard / zmianie dnia.** Klucz paska ma teraz takze wersje sakw, dzien i referencje KitPreview.Last (Accept po Discard liczy podglad - pasek przelicza sie z tym samym wynikiem, ta sama liczba co wiadomosc).
+- **5. Linia startu "nalozone 0x".** Przy 0 pisze, ze wstawka naklada sie przy pierwszym wczytaniu paska i liczbe pokazuje linia doby.
+- **6. Podpowiedz MCM.** "shown when Drill Stock, Drill Law and Donation Xp Off are on" (warunek Drill.StockOn); opis ostrzezenia Horses zgodny z p. 1; skrot dotyczy kazdej pozycji. Settings.cs i McmSettings.cs recznie (gen_mcm.py nadpisuje reczne zmiany innych wpisow w McmSettings - nie uzywac do tej poprawki).
+
+Odrzucone / bez zmian w kodzie:
+- **7. Usuniecie pozycji Harness** - decyzja dla Jeffa (liczby byly identyczne z Horses; uprzeze sa w podpowiedzi Horses i w kolorze ostrzezenia).
+
+**Ryzyko / co sprawdzic (recenzja):**
+- Regresje: KitPreview.Fresh tylko czyta (Key jak Get); PlayerSurplus / Accept / CountPlayerStock / DteMapBar533 bez zmian. Pasek moze pokazac stara nadwyzke do 5 s po zmianie skladu, gdy nikt inny nie liczyl podgladu.
+- W logu: linia doby "pasek mapy: ... przeliczen zapasu musztry N (w tym z pelnym liczeniem podgladu bitwy M)" - M nie wiecej niz ok. 1 na 5 s gry przy ciaglych zmianach; Horses bez koloru ostrzezenia, gdy wszyscy jada.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).

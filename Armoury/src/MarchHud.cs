@@ -29,7 +29,8 @@ namespace Armoury
     ///  - dolny rzad: Horses, Pack, Weapons, Armour (Harness polaczone z Horses - liczby byly te same; uprzeze w podpowiedzi i w kolorze ostrzezenia);
     ///  - Weapons / Armour = zapas musztry (Drill.HudKit: od gracza + nadwyzka ludzi / komplet = 1 na 3 ludzi), ostrzezenie ponizej kompletu;
     ///  - pelne ulamki: pole tekstu dolnego rzedu MaxWidth 70 (MarchHudUi, UIExtenderEx) + bezpiecznik szerokosci: szacunek obu rzedow z czcionki Galahad;
-    ///    gdy dol bylby szerszy niz gora, pozycje PELNE (bez ostrzezenia) pokazuja sam licznik - pozycje z brakiem zawsze pelny ulamek;
+    ///    gdy dol bylby szerszy niz gora, pozycje PELNE (bez ostrzezenia) pokazuja sam licznik, a gdy to nie wystarczy (recenzja 541) - takze pozycje z brakiem
+    ///    (kolor ostrzezenia zostaje, pelny ulamek w podpowiedzi); Horses ostrzega tylko, gdy ktos idzie pieszo bez uprzezy albo przez za niska Jazde;
     ///  - ikony: wlasne warstwy pedzla MapBar.Right.Icons (dopisane do pedzla, ktory wygral - BK zostaje) ze sprajtami gry (kon, juczne, miecz, zbroja).
     /// </summary>
     internal static class MarchHud
@@ -86,7 +87,7 @@ namespace Armoury
             {
                 Log.Info(Tag + "latki " + _wired + " | klucz March Pairs Hud " + (On ? "TAK" : "NIE")
                          + " | 541: gorny rzad bez naszych pozycji (szerokosc jak przed 537); dolny: Horses (z uprzezami), Pack, Weapons, Armour (zapas musztry "
-                         + (Drill.StockOn ? "czynny" : "NIECZYNNY - pozycje ukryte") + ") | pole tekstu dolnego rzedu: " + MarchHudUi.State + ", nalozone " + BottomApplied + "x"
+                         + (Drill.StockOn ? "czynny" : "NIECZYNNY - pozycje ukryte") + ") | pole tekstu dolnego rzedu: " + MarchHudUi.State + (BottomApplied > 0 ? ", nalozone " + BottomApplied + "x" : " (nakladane przy pierwszym wczytaniu paska mapy - po starcie sesji; liczbe pokazuje linia doby)")
                          + " | ikony: " + IconState()
                          + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
             }
@@ -102,7 +103,7 @@ namespace Armoury
             return "pasek mapy: latki " + (_ok ? "TAK" : "NIE") + ", klucz " + (On ? "TAK" : "NIE") + ", paskow " + _bars + ", dodan pozycji " + _added
                    + ", zdjetych obcych duplikatow " + _dupRemoved + ", zmian tekstu " + _shown + ", w tym ze skrotem do licznika (bezpiecznik szerokosci) " + _shortened
                    + ", MaxWidth dolnego rzedu " + (BottomApplied > 0 ? BottomMaxWidth + " (nalozone " + BottomApplied + "x)" : "52 (wstawka nienalozona)")
-                   + ", ikony " + IconState() + ", przeliczen zapasu musztry " + Drill.HudKitCounts
+                   + ", ikony " + IconState() + ", przeliczen zapasu musztry " + Drill.HudKitCounts + " (w tym z pelnym liczeniem podgladu bitwy " + Drill.HudKitFullCounts + ")"
                    + (_stumbles > 0 ? ", potkniecia " + _stumbles : "")
                    + (_lastText != null ? ", ostatnio \"" + _lastText + "\"" : "");
         }
@@ -269,7 +270,7 @@ namespace Armoury
                 // pelne teksty, sam licznik, ostrzezenie
                 var full = new string[4]; var num = new string[4]; var warn = new bool[4]; var iv = new int[4];
                 full[0] = HorsesText(r); num[0] = r != null ? r.Ridden.ToString() : "-"; iv[0] = r != null ? r.Ridden : 0;
-                warn[0] = r != null && !r.AtSea && (r.AllHarness < r.AllHorses || r.UnusedPairs > 0);   // konie bez uprzezy albo pary za trudne dla Riding
+                warn[0] = r != null && !r.AtSea && (r.WalkNoHarness > 0 || r.WalkSkill > 0);   // recenzja 541: ktos NAPRAWDE idzie pieszo - bez uprzezy albo para za trudna dla Riding (nadmiar koni / par w zbrojowni to nie brak)
                 full[1] = PackText(r); num[1] = r != null ? r.CPack.ToString() : "-"; iv[1] = r != null ? r.CPack : 0;
                 warn[1] = r != null && r.CPack > r.PackLimit;
                 bool men = kit && k.Men > 0;
@@ -285,12 +286,15 @@ namespace Armoury
                 float bottom = RowPx(vm.SecondaryInfoItems, maxB);
                 for (int i = 0; i < n; i++) bottom += ItemPx(pick[i], maxB);
                 int cut = 0;
-                for (int i = n - 1; i >= 0 && bottom > top + 0.5f; i--)
-                {
-                    if (warn[i] || pick[i] == num[i]) continue;   // brak (ostrzezenie) zawsze pelnym ulamkiem
-                    bottom += ItemPx(num[i], maxB) - ItemPx(pick[i], maxB);
-                    pick[i] = num[i]; cut++;
-                }
+                // runda 0: najpierw pozycje pelne (bez ostrzezenia); runda 1 (recenzja 541): gdy nadal za szeroko - takze z ostrzezeniem (kolor zostaje,
+                // pelny ulamek w podpowiedzi) - szerokosc paska jak przed 537 ma pierwszenstwo
+                for (int round = 0; round < 2; round++)
+                    for (int i = n - 1; i >= 0 && bottom > top + 0.5f; i--)
+                    {
+                        if (pick[i] == num[i] || (round == 0 && warn[i])) continue;
+                        bottom += ItemPx(num[i], maxB) - ItemPx(pick[i], maxB);
+                        pick[i] = num[i]; cut++;
+                    }
 
                 Put(it.Horses, pick[0], iv[0], warn[0]);
                 Put(it.Pack, pick[1], iv[1], warn[1]);
