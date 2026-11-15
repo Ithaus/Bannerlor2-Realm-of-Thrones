@@ -2870,7 +2870,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SiegeLadderMinRatio { get; set; } = 4f;
 
-        [SettingPropertyFloatingInteger("Siege Ladder Storm Ratio", 0.00f, 30.00f, "0.0", HintText = "with Siege Ladder Overwhelm: an AI host at least this many times stronger than the defenders may storm with ladders from the first days of the siege, as soon as its camp is built, without waiting for a ram and a siege tower - until its first assault is repulsed; after that the usual rule (Siege Ladder Min Days and Min Ratio) applies. 0 = off", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Siege Ladder Storm Ratio", 0.00f, 30.00f, "0.0", HintText = "with Siege Ladder Overwhelm: an AI host at least this many times stronger than the defenders may storm with ladders from the first days of the siege, as soon as its camp is built, without waiting for a ram and a siege tower - until its first assault is repulsed; after that the usual rule (Siege Ladder Min Days and Min Ratio) applies. Never lower than Siege Ladder Min Ratio (a smaller value counts as that ratio). 0 = off", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public float SiegeLadderStormRatio { get; set; } = 8f;
 

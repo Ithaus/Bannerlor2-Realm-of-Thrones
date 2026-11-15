@@ -129,7 +129,8 @@ namespace Armoury
         private static int LadderDays { get { var s = Settings.Current; return s == null ? 30 : (int)Clamp(s.SiegeLadderMinDays, 0, 364); } }
         internal static double LadderRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderMinRatio) ? 6.0 : Clamp(s.SiegeLadderMinRatio, 2.0, 20.0); } }
         // 572: szybkie drabiny - prog przewagi (0 = wylaczone) i doba oblezenia (1 = od pierwszej doby, gdy oboz gotowy)
-        private static double StormRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderStormRatio) || s.SiegeLadderStormRatio <= 0f ? 0.0 : Clamp(s.SiegeLadderStormRatio, 2.0, 30.0); } }
+        // Recenzja 572: prog nigdy nizszy niz LadderRatio - szybkie drabiny nie moga przepuszczac slabszej przewagi niz dlugie oblezenie
+        private static double StormRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderStormRatio) || s.SiegeLadderStormRatio <= 0f ? 0.0 : Math.Max(Clamp(s.SiegeLadderStormRatio, 2.0, 30.0), LadderRatio); } }
         private static int StormDays { get { var s = Settings.Current; return s == null ? 1 : (int)Clamp(s.SiegeLadderStormDays, 1, 364); } }
         private static bool LogOn { get { var s = Settings.Current; return s != null && s.SiegeWallsLog && s.LogEnabled; } }
         /// <summary>Lista gry WearOutDefenders: trebuszy (DefaultSiegeStrategyActionModel :273-278).</summary>

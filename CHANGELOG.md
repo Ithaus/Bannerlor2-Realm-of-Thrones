@@ -23,6 +23,15 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 572
+
+Recenzja (tylko odczyt diffu): brak uwag blokujacych - Veto, MB Unblock, Retry307 i okup sprawdzone; licznik odparc (`pz.Repels++`) zapisywany w Export/Import, kasowany dopiero po koncu oblezenia, wiec szybkie drabiny nie wracaja po odparciu ani po wczytaniu. Uwagi sprawdzone w kodzie:
+- **Przyjeta (uwaga 2):** `SiegeLadderStormRatio` ponizej `SiegeLadderMinRatio` (np. 3 przy 4) przepuszczalby szybkie drabiny przy slabszej przewadze niz dlugie oblezenie - sprzeczne z "miazdzaca przewaga". Zmiana: `SiegeWalls2.StormRatio` = max(klucz, LadderRatio) (0 dalej = wylaczone); opis MCM/Settings: "Never lower than Siege Ladder Min Ratio". Przy domyslnych 8 i 4 bez zmiany dzialania.
+- **Odrzucona (uwaga 1):** szturm przerwany bez zwyciezcy poza Repel (`SiegeWalls.cs:1199`, `_dNone`) nie zamyka okna - to nie jest odparcie w rozumieniu decyzji Jeffa, a przy `SiegeAssaultBreak` = tak (domyslne u Jeffa) zalamany szturm idzie przez Repel/371 i liczy sie.
+- **Odrzucona (uwaga 3):** gracz jako czlonek armii AI moze trafic na szturm drabinami od 1. doby - zgodne z regula (wyjatek dotyczy tylko oblezen prowadzonych przez gracza).
+- **Bez zmiany kodu (uwaga 4):** przy 11.7:1 obronca Goldentooth moze zaplacic okup O0 (`SiegeRansom.cs:282+`) zamiast przyjac szturm - w tescie sprawdzic, czy po linii DR jest bitwa czy okup.
+- Build Armoury 0 bledow (Release). NIE wgrane.
+
 ## 563: stal valyrianska w sztabach - przetop od 275 (10 sztab na miare), kucie klingi jednorecznej z 10 sztab (perk Legendary Smith + 300), sztaba jako towar; zgodne z 177 (bilans stali) - Armoury (ValyrianBlades.Ingots.cs nowy, ValyrianBlades.cs, SmeltTab.cs, ForgeBill.cs, HistoricalPrices.cs, RareMaterials.cs, UniqueShelf.cs, UniqueSpoils.cs, CastleSteel.cs, PerkTexts.cs, QohorMasters.Own.cs, ArmouryBehavior.cs; ModuleData/arm_items_rare.xml - nowy przedmiot arm_valyrian_steel; nowe klucze ValyrianIngots, ValyrianSmeltSkill, ValyrianForgeSkill, ValyrianLegendarySmithAt300 w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "dodaj valyrianska stal: jesli przetapiam valyrianska stal, to otrzymuje x valyrianskiej stali - jesli do miecza potrzeba 10, a przetopilem ten sam miecz, to dostane 10; valyrianska stal - znajdz lub stworz ikone do handlu; w kuzni przy wykuwaniu mieczy moze byc nad innymi surowcami ...; zeby wytopic valyrianska stal trzeba miec 275 smithing; zmien tez umiejetnosc [perk], ze pozwala wykuwac bron z valyrianskiej stali - daj na poziomie 300; stworz ikone, ze odblokowuje ..." oraz "i jak teraz jest to z valyrianska stala - cos podobno jest w grze, ze mozna wykuc - zeby sie nie gryzlo". Dzis (177) przetop VS w zwyklej kuzni jest zablokowany ("Only the masters of Qohor can work Valyrian steel."), jedyna droga do nowej klingi to Qohor. Bez dowodu z logu - nowa funkcja.
