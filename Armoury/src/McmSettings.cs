@@ -4207,7 +4207,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool HistBanditHideoutScoreOldCoin { get; set; } = true;
 
-        [SettingPropertyBool("Hist Hideout Loot Old Coin", HintText = "the extra goods you find after a night raid on a hideout are counted at their worth before the historical repricing, never as worth less than the game counts them (so never more goods than without it) - otherwise the game's sum buys many times more goods out of nothing. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
+        [SettingPropertyBool("Hist Hideout Loot Old Coin", HintText = "while Hideout Night No Free Loot is off, the extra goods you find after a night raid on a hideout are counted at their worth before the historical repricing, never as worth less than the game counts them (so never more goods than without it) - otherwise the game's sum buys many times more goods out of nothing. Switching it on mid-game takes effect after loading a save", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool HistHideoutLootOldCoin { get; set; } = true;
 
@@ -7288,6 +7288,10 @@ namespace Armoury
         [SettingPropertyBool("Hideout Guide Bandit Ai", HintText = "with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Hideout spotted")]
         public bool HideoutGuideBanditAi { get; set; } = true;
+
+        [SettingPropertyBool("Hideout Night No Free Loot", HintText = "after a night attack on a bandit hideout the game no longer adds trade goods out of nothing to your loot - you keep only what the bandits really had. Counted in the Armoury log (line 569). Off = the game adds its extra goods as before. Takes effect at once", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutNightNoFreeLoot { get; set; } = true;
 
         [SettingPropertyBool("House Levies Enabled", HintText = "in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice", RequireRestart = false)]
         [SettingPropertyGroup("House levies")]
@@ -15752,6 +15756,7 @@ namespace Armoury
             s.HideoutClearedRadius = HideoutClearedRadius;
             s.HideoutNeverLastCleared = HideoutNeverLastCleared;
             s.HideoutGuideBanditAi = HideoutGuideBanditAi;
+            s.HideoutNightNoFreeLoot = HideoutNightNoFreeLoot;   // 569
             s.HouseLeviesEnabled = HouseLeviesEnabled;
             s.HouseRecruitShare = HouseRecruitShare;
             s.NorthernFareEnabled = NorthernFareEnabled;

@@ -1006,6 +1006,7 @@ namespace Armoury
                 starter.AddBehavior(new MusterBook());
                 starter.AddBehavior(new HideoutSpotter());
                 starter.AddBehavior(new HideoutSight());       // m100-kryjowki: wypatrzenie ze Zwiadu, plotka odslania, miejsce nowych kryjowek (zapis arm_hideout_sight)
+                starter.AddBehavior(new HideoutNightLoot569());   // 569 (C): nocny atak na kryjowke bez towaru z niczego - latka W KAMPANII (OnSessionLaunched), klucz HideoutNightNoFreeLoot
                 starter.AddBehavior(new HouseLevies());
                 starter.AddBehavior(new WorkshopIconsBehavior());   // 463: ikony typow warsztatow BK (style pedzla Clan.Workshop.Type.Image, mapa ekranu miasta) - start sesji, linia logu
                 starter.AddBehavior(new WorkshopTradeBehavior());   // warsztaty towarowe: linia dnia, rozmowa kupna, srednie zysku w zapisie

@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 569 (C): nocny atak na kryjowke bez towaru z niczego - Armoury (HideoutNightLoot569.cs nowy, SubModuleMain.cs, nowy klucz HideoutNightNoFreeLoot w Settings.cs + McmSettings.cs recznie)
+
+**Problem:** audyt kryjowek 15.11, pkt C (Jeff: "ABCDE tak rob"): po nocnym ataku gracza na kryjowke gra doklada do lupu towar, ktorego bandyci nie mieli - 350-4750 zl (stara moneta) na kazda kryjowke, bez platnika. Lamie zamknieta ekonomie. Bez dowodu z logu gry - wynik dekompilacji; dotad slad tylko w linii "Kryjowka nocna (n20): gra dolozyla do lupu N szt. towaru" (Wyceny20.HidePost).
+
+**Przyczyna:** `HideoutCampaignBehavior.OnCollectLootItems` (gra 1.4.8, sluchacz `OnCollectLootsItemsEvent`, dek. HideoutCampaignBehavior.cs:107-161): gdy zwyciezca to gracz, bitwa w kryjowce, nie "wyslij wojsko" i jest noc - cel = clamp(zloto lupu x populacja x 135, najtanszy towar ~350, 4750); najpierw sztuki z `_potentialLootItems` (towary handlowe, do 5 pozycji w lupie), potem petla do-while kopiuje sztuki juz lezace w lupie. Kazda dolozona sztuka bez modyfikatora (`AddToCounts(ItemObject, 1)`). Zlota gra nie dosypuje.
+
+**Zmiana:** `HideoutNightLoot569` (CampaignBehavior, rejestrowany obok HideoutSight). W `OnSessionLaunched` przy kluczu TAK - raz na proces latka na `HideoutCampaignBehavior.OnCollectLootItems` (AccessTools.DeclaredMethod, wlasna instancja Harmony "com.jeff.armoury.hideoutnight569"): prefiks (tylko lup gracza) zapamietuje liczbe sztuk BEZ modyfikatora per przedmiot, postfiks `Priority.Last` zdejmuje z lupu to, czego przybylo w metodzie gry. Metoda gry biegnie jak dotad (zerowanie `_initialHideoutPopulation`, transpiler Wyceny20 D zostaja) - schodzi tylko jej doklad. Log: start sesji "Kryjowka noca (569, klucz Hideout Night No Free Loot): CZYNNE - wpiete ..." / "WYLACZONE (MCM) - nic nie wpiete"; zdarzenie "Kryjowka noca (569): zablokowano towar z niczego po nocnym ataku na kryjowke - N szt., wartosc dzis V d (id xN, ...); razem w procesie ..." (do 50 linii). MCM (grupa Hideout spotted): "Hideout Night No Free Loot" (TAK). Klucz NIE = jak w grze (postfiks sprawdza klucz przy kazdym wywolaniu; wlaczenie w trakcie gry - latka przy nastepnym wczytaniu).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Ten sam cel patchuje Wyceny20 D (HistHideoutLootOldCoin): transpiler wartosci + prefiks/postfiks logujacy. Nasz postfiks Priority.Last biegnie PO HidePost, wiec linia "Kryjowka nocna (n20): gra dolozyla ..." dalej sie pojawi, a zaraz po niej "Kryjowka noca (569): zablokowano ..." z ta sama liczba sztuk. Wyceny20 D przy kluczu 569 TAK nie ma juz skutku w grze (tylko log) - nie usuwane (jedna zmiana naraz).
+- Prawdziwy lup jest nietkniety: roster jest wypelniony PRZED wywolaniem metody gry; w jej wnetrzu nie dziala zaden inny kod. Zdejmujemy tylko przyrost sztuk bez modyfikatora tego samego przedmiotu - dokladnie to, co gra dolozyla. Inne sluchacze OnCollectLootsItemsEvent (BattleCampaignBehavior, BannerCampaignBehavior) i latki DTE/Spoils na `CampaignEventDispatcher.OnCollectLootItems` nie sa zmieniane; sluchacze po naszym widza roster bez dokladu.
+- Zadna ksiega Armoury nie liczyla dokladu (sztuki z niczego) - nic nie trzeba korygowac. Zloto: bez zmian (gra nie dosypuje).
+- Sprawdzone w dekompilacji: nikt z BK/ROT nie zastepuje HideoutCampaignBehavior (sprawdzone tylko w zdekompilowanym zestawie - linia startu pokaze "wpiete" albo "BRAK").
+- Latka W KAMPANII (CLAUDE.md 7), wyjatki per wywolanie licza potkniecia (bez wylacznika). Brak zapisu.
+
+**Testy:** linia startu "Kryjowka noca (569 ...): CZYNNE - wpiete"; w grze: nocny atak na kryjowke - w ekranie lupu tylko to, co bandyci mieli (bez dodatkowych towarow handlowych), linia "zablokowano N szt."; atak za dnia i "Send troops" - brak linii 569; klucz NIE - towar gry jak dotad.
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane, nie testowane w grze).
+
 ## 567: kryjowka nigdy nie wraca w ostatnio rozbite miejsce swojej kultury (bez limitu czasu) - Armoury (HideoutSight.cs; nowy klucz HideoutNeverLastCleared w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11, po audycie kryjowek - propozycja A ("kryjowka nigdy nie wraca w ostatnio rozbite miejsce swojej kultury, bez limitu czasu"), odpowiedz "ABCDE tak rob". Dzis pamiec rozbitych trzyma punkt 60 dni (`HideoutClearedMemoryDays`, `PruneCleared`), potem bandy wracaja w to samo miejsce; Rycerze-Rozbojnicy maja w praktyce 5 punktow, wiec powrot jest czesty. Bez dowodu z logu - zmiana zasady.
@@ -72,6 +91,15 @@ Przeglad c6838ca6 (tylko odczyt); poprawki w tym samym wpisie, build Armoury 0 b
 - **PRZYJETE 3 (podpowiedz "Refill"):** `_pBookBack` liczy kazdy zwrot przez `BackToArmory` (takze `ReturnForBattle` -> `BackBattle` i `MoveAll`), a liczba stala w nawiasie przy "back to the armoury (not needed)" - mogl wyjsc napis "... (not needed) 0 (5 back to your list)". Teraz za cala lista: "; of all pieces given back today N went back to your list" (`MarchHud.cs`).
 - **PRZYJETE 4 (tylko opis, kodu nie zmieniam):** waga "yours" (`StashWeight` czyta `QuartermasterLaw.LastSplit`, odswiezany w `PurgeUnusable`) przy egzemplarzu czesciowo gracza, czesciowo ludzi liczy `Own = min(N, stare v[1])` - do najblizszego porzadku "yours" stoi, spada "men's"; suma wagi dobra. Sprawdzenie "waga yours spadnie o tyle, o ile wzrosnie Drill kit" dotyczy tylko egzemplarzy w calosci gracza (albo po porzadku / otwarciu zbrojowni); przy mieszanych to NIE blad.
 - Ryzyko / co sprawdzic: `BookLose` czyta zapas po zdjeciu sztuk (`FindIndexOfElement` - jeden element na egzemplarz id|mod, jak `ClipBook`); niezmiennik "pamiec <= zapas" zachowany na kazdej sciezce. W logu po pojmaniu bez C4: "zuzyte/stracone sztuki gracza Y" mniejsze niz przed poprawka przy mieszanym zapasie; linia "rozliczenia 562" - suma czesci = N kazdej doby.
+
+### Recenzja 569
+
+Recenzja (aa8c602b) bez uwag blokujacych; trzy drobne uwagi sprawdzone w kodzie:
+1. **Przyjeta (poprawione).** Latka wpinala sie tylko przy kluczu TAK w OnSessionLaunched, a klucz ma `RequireRestart = false` - wlaczenie w MCM w trakcie sesji nie dzialalo do wczytania. Teraz `SessionStart` wpina latke ZAWSZE (raz na proces); Pre sprawdza klucz przy kazdym wywolaniu (NIE = `__state = null`, Post nic nie robi), wiec przelaczenie dziala od razu w obie strony. Linia startu: "CZYNNE - wpiete ..." albo "WYLACZONE (MCM, towar z niczego jak w grze; latka czeka na wlaczenie klucza) - wpiete ...". Opis MCM: "Takes effect at once". Koszt przy NIE: jedno sprawdzenie klucza na zbieranie lupu (raz na bitwe).
+2. **Przyjeta czesciowo.** Opis klucza HistHideoutLootOldCoin (Settings.cs + McmSettings.cs) zaczyna sie teraz od "while Hideout Night No Free Loot is off" - przy 569 TAK tego towaru nie ma. Odrzucone: zmiana linii logu "Kryjowka nocna (n20): gra dolozyla ..." (Wyceny20.HidePost) - to tylko log, zaraz po niej stoi linia 569 z ta sama liczba sztuk (opisane w Ryzyku), jedna zmiana naraz.
+3. **Uwaga dla B (bez zmiany kodu).** Wszystko, co B (skarb band w kryjowce) dolozy do lupu WEWNATRZ `HideoutCampaignBehavior.OnCollectLootItems` (postfiks lub prefiks po prefiksie 569), Post 569 zdejmie jako "towar z niczego" (sztuki bez modyfikatora). B musi oddawac skarb poza ta metoda: wlasny sluchacz `OnCollectLootsItemsEvent`, postfiks dispatchera albo osobny ekran lupu.
+
+Zbudowane, 0 bledow. Status bez zmian: DO SPRAWDZENIA (nie wgrane).
 
 ## 563: stal valyrianska w sztabach - przetop od 275 (10 sztab na miare), kucie klingi jednorecznej z 10 sztab (perk Legendary Smith + 300), sztaba jako towar; zgodne z 177 (bilans stali) - Armoury (ValyrianBlades.Ingots.cs nowy, ValyrianBlades.cs, SmeltTab.cs, ForgeBill.cs, HistoricalPrices.cs, RareMaterials.cs, UniqueShelf.cs, UniqueSpoils.cs, CastleSteel.cs, PerkTexts.cs, QohorMasters.Own.cs, ArmouryBehavior.cs; ModuleData/arm_items_rare.xml - nowy przedmiot arm_valyrian_steel; nowe klucze ValyrianIngots, ValyrianSmeltSkill, ValyrianForgeSkill, ValyrianLegendarySmithAt300 w Settings.cs + McmSettings.cs recznie)
 
