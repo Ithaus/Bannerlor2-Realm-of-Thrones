@@ -29,6 +29,20 @@ namespace Armoury
         private static bool LongOn { get { var s = Settings.Current; return s != null && s.SiegeHoldTenDays; } }
         private static double FreshHours { get { return LongOn ? 240.0 : 48.0; } }
         private const float FreshFoodDays = 1.5f;
+        // 545 (Jeff 15.11 Willow Wood: "jak oblegaja to maja oblegac a nie dochodza"): klucz SiegeCampHoldsToEnd - trzymanie bez wygasniecia po FreshHours, ale tylko
+        // tam, gdzie oblezenie konczy limit 471b/542 (TimeOn i Acts471 == null: bez gracza, Innych, skryptu fabuly) - oboz nie siedzi wiecznie. Wyjscia bez zmian:
+        // jedzenie, przewazajaca odsiecz (OB5), obrona wlasnej twierdzy, odwrot 334e; pokoj / rozejm konczy oblezenie gra albo Lift384. NIE = FreshHours jak dotad.
+        internal static bool HoldToEnd545Key { get { var s = Settings.Current; return s != null && s.SiegeCampHoldsToEnd; } }
+        internal static int HoldOver545;                                                     // 545: godziny trzymania ponad dawny prog (doba, zeruje Time471Daily)
+        private static readonly HashSet<SiegeEvent> _over545 = new HashSet<SiegeEvent>();    // 545: oblezenia trzymane dzis ponad dawny prog
+        internal static int HoldOver545Sieges { get { return _over545.Count; } }
+        internal static int FreshHoursLog545 { get { return (int)FreshHours; } }   // recenzja 545 (3): prog do linii doby (240 h albo 48 h)
+        internal static void ZeroHold545() { HoldOver545 = 0; _over545.Clear(); }
+        private static bool HoldsToEnd545(SiegeEvent ev)
+        {
+            try { return HoldToEnd545Key && SiegeWalls.TimeOn && SiegeWalls.Acts471(ev) == null; }
+            catch (Exception e) { Stumble3("HoldsToEnd545", e); return false; }
+        }
         private static double RetryShortDays { get { return LongOn ? 10.0 : 1.0; } }   // oblezenie krotsze niz doba (478-S3: 10 dob) ...
         private static double RetryBanDays { get { return LongOn ? 7.0 : 3.0; } }      // ... = ta frakcja nie wraca pod te osade przez 3 dni (478-S3: 7)
 
@@ -66,7 +80,7 @@ namespace Armoury
             if (!FreshOn || party.IsMainParty || party.AttachedTo != null) return false;
             if (party.Army != null && party.Army.LeaderParty != party) return false;
             if (st.Town == null || !st.IsFortification) return false;
-            if (ev.SiegeStartTime.ElapsedHoursUntilNow >= FreshHours) return false;
+            if (ev.SiegeStartTime.ElapsedHoursUntilNow >= FreshHours && !HoldsToEnd545(ev)) return false;   // 545: bez wygasniecia (limit 471b/542 konczy oboz)
             if (party.MapEvent != null || party.IsCurrentlyAtSea || pt.DoNotChangeBehavior || Scripted(party) || Und(party, st)) return false;
             return true;
         }
@@ -89,6 +103,7 @@ namespace Armoury
             else pt.AddBehaviorScore((new AIBehaviorData(st, AiBehavior.BesiegeSettlement, MobileParty.NavigationType.Default, false, false, false), v));
             _dFreshH++;
             _freshSaved.Add(ev);
+            if (ev.SiegeStartTime.ElapsedHoursUntilNow >= FreshHours) { HoldOver545++; _over545.Add(ev); }   // 545: trzymanie ponad dawny prog
             return true;
         }
 
@@ -190,7 +205,7 @@ namespace Armoury
         private static void ResetHold()
         {
             _besFac.Clear(); _ban.Clear();
-            ZeroHoldDay();
+            ZeroHoldDay(); ZeroHold545();
         }
     }
 }

@@ -13124,6 +13124,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeRepelRebuildMaxDays { get; set; } = 14f;
 
+        [SettingPropertyBool("Siege Sim Repel Long Pause", HintText = "With Siege Assault Break: after a beaten-off assault between lords of the world fought without a battle scene, the besiegers wait as long as when a ram or a siege tower must be built again (Siege Repel Rebuild Min Days to Siege Repel Rebuild Max Days) - they gather their wounded, rebuild and bring up more men before the next try. Assaults with a battle scene are not changed. Off = the short pause (Siege Repel Pause Min Days to Max Days) unless a ram or tower was lost, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegeSimRepelLongPause { get; set; } = true;
+
         [SettingPropertyInteger("Siege Assault Time Limit Minutes", 0, 180, "0", HintText = "In an assault on walls: the time limit in minutes of battle time, counted from the end of deployment and over all the rounds of the same battle. When the enemy storms a fortress you defend (with Siege Assault Break Mission) and has not taken it in this time, its stormers fall back from the walls the same way as when the assault breaks, and the next assault comes after the usual pause - unless the place is being taken (Siege Assault Break Taken Share). When you storm a fortress yourself, you only get a warning 5 minutes before and when the time is up - falling back is your call - unless Siege Player Assault Breaks is on: then your men fall back too. 0 = no limit", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public int SiegeAssaultTimeLimitMinutes { get; set; } = 30;
@@ -13803,6 +13807,18 @@ namespace Armoury
         [SettingPropertyBool("Siege Near Relief Only", HintText = "With Siege Time By Factors: a besieging AI army gives up a siege for a relief army only when that relief would actually arrive within about 3 days, and the siege clock stops only while a relief at least as strong as the camp is within about 3 days, for at most 30 days in one siege. Off = any relief on its way made the army leave and stopped the clock, as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeNearReliefOnly { get; set; } = true;
+
+        [SettingPropertyBool("Siege Yield Only Starving", HintText = "With Siege Time By Factors: a place no longer yields only because its term has run out - while it has food and beats off the assaults it holds. It yields only after a week of hunger (or falls to an assault); when a siege drags past Siege Time Limit Factor times the upper bound of its term, the besiegers give up and leave it alone for 30 days, unless the defenders are starving and about to yield. Off = the place yields when its term runs out and at the limit to a stronger host, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeYieldOnlyStarving { get; set; } = true;
+
+        [SettingPropertyBool("Siege No Minimum Days Gate", HintText = "With Siege Time By Factors: the lords of the world assault a besieged town or castle whenever they have a real chance (the breach, the siege engines and the odds of the storm decide, with the usual pause after a repulse), not only after the lower bound of the term (small castle 20, castle 40, town 60 days) and not only through a breach. Waiting for a starving garrison to yield stays. Off = no assault before the lower bound and bigger places only through a breach, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeNoMinDaysGate { get; set; } = true;
+
+        [SettingPropertyBool("Siege Camp Holds To The End", HintText = "With Siege AI Holds Fresh Siege and Siege Time By Factors: an AI host keeps its siege until the place falls instead of only for the first ten days - it leaves only when its food runs out, a stronger relief army comes, its own stronghold needs defending, peace or a truce ends the war, or the siege drags past Siege Time Limit Factor times the upper bound of its term. Sieges with you, the Others or the story keep the old hold. Off = the hold ends after ten days (two without Siege Hold Ten Days), as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeCampHoldsToEnd { get; set; } = true;
 
         [SettingPropertyBool("Siege Abandon Grace", HintText = "with Siege Near Relief Only: for the first 2 days of a siege the besieging AI army leaves for a relief only if the enemy is stronger by the same measure the army used when it chose to start the siege (enemies in the field within reach) - the start and the first judgement no longer disagree and the army does not walk away a few hours after arriving. Off = the judgement of a running siege applies from the first hour, as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
@@ -17090,6 +17106,7 @@ namespace Armoury
             s.SiegeRepelPauseMaxDays = SiegeRepelPauseMaxDays;
             s.SiegeRepelRebuildMinDays = SiegeRepelRebuildMinDays;
             s.SiegeRepelRebuildMaxDays = SiegeRepelRebuildMaxDays;
+            s.SiegeSimRepelLongPause = SiegeSimRepelLongPause;
             s.SiegeAssaultTimeLimitMinutes = SiegeAssaultTimeLimitMinutes;
             s.SiegeDefenderEngineeringXp = SiegeDefenderEngineeringXp;
             s.SiegeAssaultHoldRetreat = SiegeAssaultHoldRetreat;
@@ -17260,6 +17277,9 @@ namespace Armoury
             s.SiegeTimeByFactors = SiegeTimeByFactors;
             s.SiegeTimeLimitFactor = SiegeTimeLimitFactor;
             s.SiegeNearReliefOnly = SiegeNearReliefOnly;
+            s.SiegeYieldOnlyStarving = SiegeYieldOnlyStarving;
+            s.SiegeNoMinDaysGate = SiegeNoMinDaysGate;
+            s.SiegeCampHoldsToEnd = SiegeCampHoldsToEnd;
             s.SiegeAbandonGrace = SiegeAbandonGrace;
             s.SiegeAbandonStartMeasure = SiegeAbandonStartMeasure;
             s.SiegeTimeRulesPlayerHoldings = SiegeTimeRulesPlayerHoldings;

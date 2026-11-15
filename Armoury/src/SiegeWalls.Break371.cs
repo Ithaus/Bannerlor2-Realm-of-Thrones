@@ -53,6 +53,7 @@ namespace Armoury
         private static double PauseMax { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelPauseMaxDays) ? 5.0 : Clamp(s.SiegeRepelPauseMaxDays, PauseMin, 28.0); } }
         private static double PauseMid { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelPauseMidDays) ? 2.0 : Clamp(s.SiegeRepelPauseMidDays, PauseMin, PauseMax); } }
         private static double RebuildMin { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelRebuildMinDays) ? 7.0 : Clamp(s.SiegeRepelRebuildMinDays, 0.25, 56.0); } }
+        private static bool SimLongPause542 { get { var s = Settings.Current; return s != null && s.SiegeSimRepelLongPause; } }   // 542: Repel - szturm symulowany jak odbudowa machin
         private static double RebuildMax { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelRebuildMaxDays) ? 14.0 : Clamp(s.SiegeRepelRebuildMaxDays, RebuildMin, 56.0); } }
 
         // liczniki doby 371 (misja)

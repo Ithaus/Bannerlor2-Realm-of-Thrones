@@ -1,5 +1,75 @@
 # DZIENNIK ZMIAN
 
+## 545: oblezenia - oblegaja do skutku: szturm wedlug szans (bez zakazu przed 20/40/60 doba), oboz AI trzymany dluzej niz 240 h - Armoury (SiegeWalls.Time471.cs Gate471, SiegeWalls2.Hold.cs FreshCandidate/HoldFresh; klucze NOWE SiegeNoMinDaysGate = true, SiegeCampHoldsToEnd = true)
+
+**Problem:** Jeff, czat 15.11 (Willow Wood): "no kurwa jakie odejscie, zasada 40 dni, to jest bez sensu, jak oblegaja to maja oblegac a nie dochodza!". Log Armoury-2026-11-15_01-07-36: Willow Wood (ROT_castle68, duzy zamek) - OB1 dzien 108969 i 108973 "471b: przed dolna granica kategorii duzy zamek (6.0 / 9.8 < 40 dob) - szturm dopiero od niej" przy 7432 ludziach obozu na 330 zalogi + 86 milicji (ok. 21:1), mury 100%, taran i wieza gotowe; KO dzien 108973: oblezenie 10.1 dob, "odejscie z obozu (zmiana celu - ostatnia mysl: GoToSettlement ROT_town29)", odsiecz 3939 / wymagana 11050 (nie przewazajaca). Acorn Hall (A04) - ten sam wzor.
+
+**Przyczyna:** (1) 471b(c) Gate471 (Veto, przed 307c/DR/OB1): przed dolna granica kategorii (20/40/60/60 dob) bez szturmu, potem zamek/miasto tylko przez wyrwe - armia z miazdzaca przewaga stala bezczynnie. (2) m116 trzymanie oblezenia (SiegeWalls2.Hold FreshCandidate) wygasa po FreshHours = 240 h (478-S3); po 10 dobach mysl gry wybiera inny cel i oboz zwija sie, zanim bramka w ogole pozwoli na szturm.
+
+**Zmiana:**
+- Nowy klucz MCM "Siege No Minimum Days Gate" (grupa 471, domyslnie TAK): Gate471 po galezi glodu zwraca null - bez dolnej granicy dni i bez "wiekszy tylko przez wyrwe" (oraz bez planu trebuszy TryBreach z bramki). O szturmie decyduja reguly szans jak dla kazdego oblezenia: przerwa po odparciu (Veto, takze 542 dla symulowanych), 307c po odparciach, DR, OB1 (s > 1), machiny gry. Zostaje: puste mury (szturm), glod obroncow - czekanie na kapitulacje z glodu (b), gdy (b) moze przyjsc (najwyzej tydzien laski GL; zaloga wychodzi wolno, bez strat obu stron - sensowne, bo zdobycie i tak przychodzi; gdy (b) nie przyjdzie - szturm wedlug szans). NIE = bramka co do bitu jak dotad.
+- Nowy klucz MCM "Siege Camp Holds To The End" (grupa 471, domyslnie TAK): FreshCandidate nie wygasa po FreshHours, gdy oblezenie konczy limit 471b/542 (SiegeWalls.TimeOn i Acts471 == null - bez gracza w obozie/osadzie, bez Innych, bez skryptu fabuly, osada klanu gracza tylko przy D5). Wyjscia HoldFresh bez zmian: jedzenie druzyny < 1.5 doby, przewazajaca odsiecz (OB5 BesiegedRelief.ReliefReady), obrona wlasnej twierdzy (najlepszy cel DefendSettlement), odwrot 334e (FreshYields); pokoj konczy oblezenie gra, rozejm (Truce384/Lift384) zwija oboz. Oboz nie siedzi wiecznie: limit (e) (LimitK x gorna granica; 542 - odejscie z rozejmem 30 dob, czekanie na glod najwyzej do dnia (b)/+30). Poza regula 471 (gracz, fabula, Inni, klucz 471 NIE) - 240 h / 48 h jak dotad. NIE = jak dotad.
+- Linia startu 471 mowi "szturm wedlug szans - 545, bez dolnej granicy" przy kluczu TAK.
+- Log: linia "Czas oblezen (471 doba)" + " | 545: szturmow przed dawna bramka N (klucz TAK), trzyman obozu ponad 240 h M h (oblezen K, klucz TAK)". N - oblezenia (raz na dobe), ktore dawna bramka (dolna granica albo brak wyrwy) by dzis wstrzymala, a teraz decyduja reguly szans (to nie liczba wykonanych szturmow); M - godziny trzymania HoldFresh ponad dawny prog FreshHours (240 h przy Siege Hold Ten Days, inaczej 48 h), K - liczba takich oblezen. Liczniki zerowane w finally Time471Daily (ZeroHold545) i przy nowej kampanii (ResetHold).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje / kolizje: Gate471 wolana tylko z SiegeWalls.Veto (po przerwie po odparciu, przed 307c/DR/OB1) - kolejnosc bez zmian, przerwa po odparciu i 307c dalej wstrzymuja. GateDay/_d471Gate liczone tylko w galeziach starej bramki (przy kluczu TAK tylko glod). StarveWait542 i StarveYield471 nie zaleza od Gate471 - bez zmian. TimeLeft 334e (LocalFront334e.Siege.cs - NIE ruszany, ze wzgledu na noc/543-polnoc) liczy czas z machin/murow i OB1, nie z dolnej granicy - zgodny.
+- 334e Judge: stan 4 (ODSTAP wykonany) -> fresh = false (ThinkPost), Retreating -> FreshYields -> HoldFresh nie trzyma; SRODEK (2) i kandydat ODSTAP (bad < 2) - m116 trzyma jak w pierwszych 240 h dotad (teraz dluzej). Prawdziwy odwrot przed odsiecza zostaje (334e Retreat + OB5 ReliefReady).
+- Wiecej dlugich obozow naraz (oboz nie odchodzi po 10 dobach): HoldFresh to kilka porownan na druzyne-wodza na godzine, Acts471 (Out471 - petla po druzynach obozu) wolane tylko po przekroczeniu FreshHours. Oblezenia trwaja dluzej - do zdobycia, glodu obozu, odsieczy albo limitu (np. duzy zamek 1.5 x 90 = 135 dob).
+- Gracz: IsMainParty wykluczony (FreshCandidate), gracz w obozie AI / w osadzie -> Acts471 = "gracz" -> 240 h jak dotad; bramka Gate471 i tak nie dziala przy graczu. Fabula ROT (Scripted) i Inni (Und) - wykluczeni jak dotad.
+- W grze: Willow Wood-podobne oblezenie (przewaga, mury nietkniete) - OB1 bez "471b: przed dolna granica", szturm, gdy s > 1; KO bez "zmiana celu" po 10 dobach; licznik 545 w linii doby; linie "Czas oblezenia (542) limit minal" / odejscia po limicie nadal.
+
+**Status:** DO SPRAWDZENIA (nie wgrane; galaz noc/545-oblegaj na noc/542-oblezenia).
+
+### Recenzja 545
+
+Recenzja (e57a786e): uwag blokujacych brak; klucze NIE = stare zachowanie, przerwa po odparciu / 307c / OB1 dalej wstrzymuja, glod (b), limit (e)/542, wyjscia obozu i 334e bez zmian - potwierdzone w kodzie. Trzy uwagi drobne:
+- (1) slaby oboz (np. 300 na 400 zalogi, bez odsieczy) trzymany przez HoldFresh do limitu 471b/542 albo do glodu obozu (FoodDays < 1.5) zamiast 240 h - SPRAWDZONE (FreshCandidate :82 + HoldFresh nie patrzy na sile), BEZ ZMIANY: to dokladnie lista wyjsc Jeffa ("odchodzi tylko z braku jedzenia, przed silniejsza odsiecza albo do obrony swojej twierdzy"). Gdyby Jeff chcial inaczej - trzymac ponad 240 h tylko przy ratio > 1 albo stanie 334e 1/3. Do obserwacji w logu.
+- (2) okup oblezenia O0 (SiegeRansom.AssaultPost) mozliwy od pierwszych dob, bo bramka go juz nie wstrzymuje - SPRAWDZONE, BEZ ZMIANY (tak bylo przed 471b; okup to tez sposob zakonczenia oblezenia). Po wgraniu sprawdzic linie "Okup oblezenia (O0)" przy mlodych oblezeniach.
+- (3) kosmetyka logu - ZROBIONE: linia doby pisze prog z FreshHours (SiegeWalls2.FreshHoursLog545: 240 h albo 48 h przy Siege Hold Ten Days NIE) zamiast sztywnego "240 h", a licznik M ma jednostke "druzyno-h" (HoldOver545 liczy godziny kazdej trzymanej druzyny-wodza, nie godziny obozu). Tylko tekst logu, logika bez zmian.
+
+Ryzyko: brak (tylko napis w linii doby; nowa wlasciwosc tylko do odczytu). Status: DO SPRAWDZENIA (nie wgrane).
+
+## 542: oblezenia - zamek nie poddaje sie z samego uplywu czasu; po limicie oboz odchodzi; dluga przerwa po odparciu szturmu symulowanego - Armoury (SiegeWalls.Time471.cs (a)/(e), SiegeWalls.cs Repel; klucze NOWE SiegeYieldOnlyStarving = true, SiegeSimRepelLongPause = true)
+
+**Problem:** Jeff, czat 15.11: "zaloga, ktora ma pelny spichlerz i wygrywa kazdy szturm, nie ma powodu sie poddac - szczegolnie ze wygrywaja wojne, bo war exhaustion i wynik wojny jest po stronie Lannisterow". Log Armoury-2026-11-15_04-07-23: Banefort (ROT_castle20, maly zamek, mury 1) - jedzenie zalogi 144 dob (9434 / -65.5/d), 4 szturmy odparte (dzien 109016, 109018, 109021, 109025; przerwy 1.7-4.3 doby), a dzien 109026 "termin minal: zegar 27 >= R 26.4 ... 471b: KAPITULACJA z terminu" - po 31.1 dob zamek przeszedl do Polnocy (Ondrew Locke, battania) bez glodu i bez przegranego szturmu. W logach 15.11: 5 kapitulacji "droga a - termin R minal".
+
+**Przyczyna:** 471b(a) (SiegeWalls.Time471.cs Time471Daily): zegar >= R, odsiecz nie stoi, oboz liczniejszy -> Yield471 - sam uplyw czasu wystarczal, jedzenie i wynik szturmow sie nie liczyly (R bierze je tylko jako skladniki q). (e) limit przy obozie liczniejszym tez dawal Yield471. Przerwa po odparciu szturmu symulowanego 1-5 dob (Pause371: dlugie 7-14 tylko przy straconym taranie / wiezy), wiec oboz probowal co 2-4 doby.
+
+**Zmiana:**
+- Nowy klucz MCM "Siege Yield Only Starving" (grupa 471, domyslnie TAK): (a) nie daje kapitulacji - zegar i R zostaja do linii i bramki szturmu; linia "termin minal" mowi "termin minal - bez kapitulacji (542)". Twierdza poddaje sie tylko z glodu (b, StarveYield471 bez zmian) albo pada w szturmie (gra).
+- (e) limit: zawsze Lift471 (oboz odchodzi, rozejm 30 dob jak dotad), droga "e-odejscie-542" przy obozie liczniejszym. Wyjatek: obroncy glodza i (b) moze przyjsc (StarveWait542: glod GL wlaczony, zapas 0, odsiecz nie stoi, oboz liczniejszy - te same warunki co Gate471) - oboz czeka, najwyzej 30 dob po limicie (StarveWaitMax542), potem odchodzi; linia "Czas oblezenia (542) limit minal, oboz czeka na glod".
+- Nowy klucz MCM "Siege Sim Repel Long Pause" (grupa 371, domyslnie TAK): odparty szturm symulowany (Repel z finish, nie gracz) - przerwa liczona jak przy odbudowie machin (SiegeRepelRebuildMinDays-MaxDays 7-14, te same czynniki morale / ludzie / oplacalnosc i 307c). Misje (gracz w obronie, 387, 387f) bez zmian. Linia OB2 ma dopisek "szturm symulowany - dluga przerwa (542)".
+- Linia doby "Czas oblezen (471 doba)": "542 TAK (... odejscia zamiast kapitulacji po limicie N, czekaja po limicie na glod M)".
+- Klucze NIE = 471b(a)/(e) i przerwa 371 co do bitu jak przed. Klucze dopisane recznie (Settings.cs, McmSettings.cs, bez gen_mcm.py); w Armoury.json Jeffa ich nie ma - wezma domyslne TAK.
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci: R czyta tylko Time471 (linie, (a)); 334e TimeLeft liczy czas z budowy machin i OB1, nie z R - spojny; OB5/326c-D czyta RepelPauseLeftDays (Until), wiec dluzsza przerwa sama wchodzi do ocen odsieczy; 307c HoldEnd = min(Until + 3 x Mid, odparcie + RebuildMax) - okno nadal konczy sie najdalej 14 dob po odparciu; GrowPause z sufitem RebuildMax; Gate471 (c) bez zmian; SiegeRansom / 374 bez zmian; m116 (glod obozu) dalej zwija oblezenie. Oblezenie nie trwa wiecznie: limit (e) konczy kazde (najdalej limit + 30 dob przy glodzie obroncow).
+- 467: po SiegeAssaultPartyStrikesRepels (2) odparciach idzie cala armia - przy przerwach 7-14 to ok. 2-4 tygodnie wiecej; zdobycia szturmem powinny zostac.
+- Skutek: mniej zmian wlascicieli z oblezen AI, wiecej odejsc po limicie (maly zamek 60 dob, duzy 135, miasto / twierdza 225 przy 1.5). Sprawdzic w logu: brak "droga a - termin R minal", linie "odejscie po limicie | powod: 542", liczba zdobyc szturmem i z glodu, czy wojny nie stoja w miejscu.
+- Dluzsza przerwa = dluzej oboz je - wiecej odstapien z glodu obozu (m116) i furazu 471b-3.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
+### Recenzja 542 (origin/noc/scal-perki...87cc7234) - poprawki - Armoury (LocalFront334e.Siege.cs, SiegeWalls.cs, SiegeWalls.Time471.cs, SiegeWalls2.cs)
+
+**Problem:** recenzja: (1) 334e nie widzi przerwy po odparciu - z 542 to 7-14 dob po kazdym odpartym szturmie symulowanym AI, a TimeLeft liczy tylko przygotowania / machiny / mury / OB1 (przy wyrwie 0.5 doby); silniejsza odsiecz za 2 doby dawala JudgeRule 3 (KONTYNUUJ - nie zdazy) zamiast 4 (ODSTAP), oboz stal w Veto do konca przerwy i dostawal od odsieczy. (2) Oblezenie fabuly ROT z wodzem nieskryptowym: StarveWait542 kazal czekac do 30 dob na (b), a StarveOne przy `story` (b) w ogole nie wola. (3) StarveWait542 konczyl czekanie po limit + 30 bez wzgledu na tydzien laski GL (glod od limit + 25 przy lasce 7 - oboz odchodzil 2 doby przed (b); laska w MCM > 30 - zawsze przed (b)).
+
+**Przyczyna:** (1) LocalFront334e.Siege.cs TimeLeft nie czyta SiegeWalls.RepelPauseLeftDays (czyta je tylko BesiegedRelief.cs:247). (2) Out471 wyklucza tylko Scripted(lp), nie SiegePhantomLift.StoryOf(camp). (3) stala StarveWaitMax542 = 30 bez SiegeStarveGraceDays.
+
+**Zmiana:**
+- (1) JudgeCore (334e): po TimeLeft (takze z pamieci godzinnej) tLeft = max(tLeft, przerwa po odparciu), najwyzej HorizonDays - tylko z kluczem SiegeSimRepelLongPause (i SiegeAssaultBreak); klucz NIE = stara ocena co do bitu. Przerwe czyta nowe SiegeWalls.RepelPauseLeftDaysRO - sam odczyt slownika _pauses, bez przenoszenia rekordu z zapisu (PauseOf zmienia _pendingPauses, a mysl AI jest rownolegla); rekord nieprzeniesiony po wczytaniu = 0 jak przed 542.
+- (2) StarveWait542: oblezenie fabuly (StoryOf != null) - null, wiec po limicie od razu Lift471 (bez 30 dob czekania na (b), ktora tam nie przychodzi). Decyzja domyslna: oblezenia fabuly NIE sa wylaczone z 542 (zaloga z jedzeniem nie kapituluje takze tam) - do potwierdzenia przez Jeffa; gdyby wydarzenie fabuly mialo konczyc sie kapitulacja, trzeba je wylaczyc z (e) 542.
+- (3) StarveWait542 zwraca tez dzien (b): poczatek glodu (SiegeMisery.HungerGet) + laska GL (SiegeWalls2.GraceDays, teraz internal) + 2 doby zapasu; oboz czeka, dopoki wiek < limit + 30 ALBO dzien < dnia (b). Ograniczone: poczatek glodu stoi (laska najwyzej 60), a gdy wraca jedzenie / odsiecz - czekanie konczy sie od razu. Glod bez rekordu - tylko limit + 30 jak dotad. Linia "(542) limit minal, oboz czeka na glod" pokazuje poczatek glodu i dzien (b).
+
+**Ryzyko / co sprawdzic:**
+- (1) mysl AI rownolegla: odczyt _pauses pod zamkiem _lk 334e, zapisy _pauses tylko na watku glownym (Repel, wczytanie) - jak Measure / WallHpMin w tym samym miejscu. Dluzsze tLeft wpuszcza tez wiecej sojusznikow w drodze (lim = tLeft przy braku przewagi) - spojne: oblezenie i tak potrwa do konca przerwy. Linia 334e "pozostalo" pokazuje wartosc z przerwa.
+- (2)/(3) tylko droga (e) przy kluczu SiegeYieldOnlyStarving; klucz NIE bez zmian.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).
