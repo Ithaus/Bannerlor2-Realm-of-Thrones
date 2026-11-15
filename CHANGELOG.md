@@ -1,5 +1,77 @@
 # DZIENNIK ZMIAN
 
+## 540: opisy perkow wedlug dzialania - 60 polowek perkow z nowym angielskim opisem (podpowiedz i okno wyboru perku) - Armoury (PerkTexts.cs, klucz Perk Texts Rewrite)
+
+**Problem:** Jeff, czat 15.11, ze zrzutem ekranu perku Bow Deep Quivers z tekstem gry "+3 extra arrows per quiver / +1 extra arrow per quiver to troops in your party": "ale kurwa czemu opisy perkow nie sa poprawione i perki przeciez miales to zrobic". Audyt perkow 14.11 (docs/audyty-2026-11-14/PERKI.md, PERKI-DECYZJE.md) i wpisy 500-519 (oraz 526, 289, 362, m109, 181, A17/KS) zmienily dzialanie perkow, ale w grze zostaly opisy gry - np. Deep Quivers nie daje strzal (ROT nie wola InitializeMissionEquipment, licznik 512: "wywolan metody gry 0"), tylko +10% odzysku strzal partii.
+
+**Przyczyna:** opisy przepisywaly dotad tylko CampDrill (perki treningu), Drill (Giving Hands, Paid in Promise) i CastleSteel (Steel Maker 3). Reszta zmian dzialania nie miala odpowiednika w tekstach; CastleSteel nadpisywal dodatkowo caly opis Steel Maker 3 jedna linia (okno wyboru perku gubilo druga polowke).
+
+**Zmiana:** nowy PerkTexts.SessionStart w OnSessionLaunched PO Drill.SessionStart (CampDrill) i CastleSteel.Rename. Dla kazdej polowki z listy: PrimaryDescription / SecondaryDescription (podpowiedz) i PropertyObject._description (okno wyboru) skladany od nowa z OBU biezacych polowek jak PerkObject.Initialize ("STR1 + 2 nowe linie + STR2"; bez drugiej polowki kopia pierwszej) - polowki CampDrill zostaja, Steel Maker 3 odzyskuje druga polowke. Liczby z Settings.Current ({VALUE} jak w grze: AddFactor x100, plus przed dodatnia). Tekst null = klucz dzialania wylaczony -> opis gry. Potkniecia per perk (bez wylacznika globalnego). Linia startu: "Opisy perkow (540): podmienione N z M, pominiete (klucz wylaczony) K, potkniecia S | RBM tarcze TAK/NIE | podmienione: [...]". Nowy klucz MCM Perk Texts Rewrite (domyslnie TAK, grupa Wear and tear) - NIE = nic. Perk506.RbmShieldNow() (odczyt prefiksu RBM jak przy misji). Perki NavalDLC po id (MBObjectManager). Lista (1 = pierwsza polowka, 2 = druga; liczby przy wartosciach domyslnych = Jeffa):
+- OneHanded.ArrowCatcher (1): "Your shield is 20% tougher in combat and wears 25% slower." (RBM + PerkShieldsAfterRbm; RBM bez klucza: "No effect in this game: Realistic Battle Mod gives shields no extra cover."; bez RBM - opis gry)
+- OneHanded.ArrowCatcher (2): "Shields of the troops in your formation are 10% tougher in combat." (jw.)
+- Crossbow.Pavise (1): "A shield on your back is 30% tougher against missiles it stops and wears 25% slower." (RBM + klucz, inaczej opis gry)
+- Bow.DeepQuivers (1): "No effect: quivers get no extra arrows in this game."
+- Bow.DeepQuivers (2): "Your party gathers back 10% more of its shot arrows after a battle in which it holds the field." (AmmoPerksRework + AmmoRecoveryEnabled; inaczej "No effect: troops get no extra arrows in this game.")
+- Crossbow.Fletcher (1): "Your crossbow wears 30% less with every shot." (AmmoPerksRework + WearEnabled; inaczej "No effect: quivers get no extra bolts in this game.")
+- Crossbow.Fletcher (2): "Your party gathers back 10% more of its shot bolts after a battle in which it holds the field."
+- Throwing.WellPrepared (1): "No effect: you get no extra throwing weapons in this game."
+- Throwing.WellPrepared (2): "Your party gathers back 10% more of its thrown weapons after a battle in which it holds the field."
+- Throwing.Resourceful (1): "No effect: you get no extra throwing weapons in this game."
+- Throwing.Saddlebags (1): "+5% carrying capacity to the party you lead, on land." (druga polowka - CampDrill, bez zmian)
+- Riding.Breeder (1): "+1% daily chance that a pair of animals of the same kind in your party breeds (only on land and while the party is fed; no mules, dragons, elephants, mammoths, chariots or unique mounts)." (BreederRealistic)
+- Athletics.WalkItOff (1): "+10% hit point regeneration while traveling. On the march, lightly wounded heroes in your party (above 20 hit points) heal at 50% of the resting rate instead of 10% (75% if your surgeon also has Walk It Off)." (HealOnlyAtRest i WalkItOffLightWoundPercent > MovingHealPercent; druga polowka - CampDrill)
+- Athletics.AGoodDaysRest (1): "+10% hit point regeneration while waiting in settlements or resting in camp." (CampHealingPerks; druga polowka - CampDrill)
+- Crafting.IronMaker (1): "Forging an iron bloom into crude iron bars loses 0% of its metal instead of 20%." (MaterialLaw + RealRefining; galaz jak RefinePostfix: bez lupy przy cenach historycznych "+25% crude iron from every unit of iron ore you smelt.", bez cen historycznych "You can smelt one unit of iron ore into four units of crude iron instead of three.")
+- Crafting.CharcoalMaker (1): "+50% charcoal from every load of hardwood you burn." (bez cen historycznych: "You can burn one unit of hardwood into five units of charcoal instead of four.")
+- Crafting.SteelMaker (1): "You can refine five units of iron into four units of steel."
+- Crafting.SteelMaker2 (1): "You can refine five units of steel into four units of fine steel."
+- Crafting.SteelMaker3 (1): "You can refine five units of fine steel into four units of castle-forged steel." (zastepuje tekst CastleSteel; opis calosci znowu z druga polowka)
+- Crafting.PracticalSmith (1): "-50% stamina spent while smithing weapons, armour, bows, crossbows and ammunition, and 25% less time at the anvil." (PerkSmithStamina)
+- Crafting.ArtisanSmith (1): "-50% trade penalty when selling smithing weapons and the armour, bows, crossbows and ammunition you forged yourself." (PerkArtisanSmithOwnWork)
+- Crafting.ExperiencedSmith (1): "+10% greater chance of creating Fine weapons, armour, bows, crossbows and ammunition."
+- Crafting.MasterSmith (1): "+7.5% greater chance of creating masterwork weapons, armour, bows, crossbows and ammunition."
+- Crafting.LegendarySmith (1): "+5% greater chance of creating Legendary weapons, armour, bows, crossbows and ammunition, chance increases by 1% for every 5 skill points above 275."
+- Scouting.BeastWhisperer (1): "+2.5% daily chance to find a common riding horse or pack animal when traveling through steppes and plains." (BeastWhispererPlainMounts; 5% x BeastWhispererChanceFactor)
+- Roguery.RansomBroker (1): "+25% ransom for lords held captive in your party or in the dungeons of your settlements, paid by their family (half while your party is at sea)." (PerkRansomByCaptor)
+- Roguery.KnowHow (1): "+5% more loot from defeated villagers and caravans; when you raid a village, you also force 5% more of its purse out of the villagers' hidden caches (at most 50% of the purse in all)." (RaidCacheByRoguery)
+- Roguery.Scarface (1): "+30% chance for bandits, villagers and caravans to surrender. Villagers you raid give up 25% more of their hidden coin. Outlaws you put to the question are 10% more likely to talk." (zdania wedlug RaidCacheByRoguery / CampInterrogation)
+- Roguery.SaltTheEarth (1): "+20% more loot when villagers comply to your hostile actions, and 20% more hidden coin forced out of a village you raid." (RaidCacheByRoguery)
+- Steward.ForcedLabor (2): "Each working prisoner in the governed settlement's dungeon adds 0.2% (instead of 0.1%) to the day's construction while you are in the settlement." (PrisonLabor; bez niego przy PaidConstruction+Player "No effect with the current settings.")
+- Trade.SpringOfGold (1): "+0.1% of your denars as daily interest, up to 1000 denars, paid by the merchants of the towns where your clan owns workshops (only what they can spare; none from towns at war with you)." (PerkSpringOfGoldFromMerchants)
+- Trade.SpringOfGold (2): "No effect in this game (Banner Kings bases the gold boost to construction on the town's craftsmen)."
+- Trade.InsurancePlans (1): "+5000 denars when an enemy destroys one of your caravans, paid by the merchants of its home town as far as they can spare (nothing for a disbanded caravan)." (PerkTradeGiftsPaid)
+- Trade.RapidDevelopment (1): "When an enemy takes by siege a town where you own a workshop, you carry off its working capital before it is seized; if the town passes to an enemy in any other way, its new lord pays you up to 5000 denars per workshop." (warianty wedlug CapturedWorkshopsToTaker / RapidDevelopmentSavesCapital / PerkTradeGiftsPaid)
+- Trade.SelfMadeMan (2): "+30% build speed for marketplace and aqueduct projects in the governed settlement while you are there." (PerkBuildSpeedOnPaidWork + EngineeringOnPaidWork; "kiln" usuniete w kazdym wariancie)
+- Trade.Tollgates (2): "Caravans visiting the governed settlement pay a toll out of their own purse: 30 denars (60 for caravans travelling by land)." (TownPaysRewards; 60 = podwojny sluchacz gry i BK)
+- Steward.EfficientCampaigner (2): "-25% troop wages in your party." (EfficientCampaignerAlways)
+- Steward.Relocation (2): "No effect in this game (Banner Kings bases the gold boost to construction on the town's craftsmen)."
+- Charm.MeaningfulFavors (1): "+10% chance for double persuasion success; +10 persuasion when you question prisoners, gather tavern gossip or haggle over prices." (lista czynnosci z kluczy CampInterrogation / GossipPerDrinkByPersuasion / PlayerHaggle|CaravanLeaderHaggle; wszystkie NIE = opis gry)
+- Charm.MoralLeader (1): "-1 persuasion success required against characters of your own culture; +25 persuasion with your own people when you question prisoners, gather tavern gossip or haggle over prices."
+- Charm.NaturalLeader (1): "-1 persuasion success required against characters of different cultures; +25 persuasion with strangers when you question prisoners, gather tavern gossip or haggle over prices."
+- Charm.ForgivableGrievances (1): "+20% chance of avoiding critical failure on persuasion; prisoners you put to the question in camp are 20% less likely to die." (CampInterrogation)
+- Medicine.PreventiveMedicine (2): "+30% of lost hit points restored after a won battle; as surgeon you give it to every hero in your party (never twice). After a lost battle your own healing perks restore at most 10 hit points. As surgeon: -15% camp fever in sieges." (zdania wedlug BattleDressingEnabled / LoserSelfDressingCap / SiegeSicknessEnabled)
+- Medicine.WalkItOff (1): "+15% healing rate when moving on the campaign map; on the march lightly wounded heroes heal at 50% of the full rate instead of 10% (75% together with Athletics Walk It Off on the party leader)." (HealOnlyAtRest)
+- Medicine.Sledges (1): "-50% party speed penalty from the wounded; while you are carried on a litter your party keeps 75% of its pace instead of 50%." (LitterEnabled)
+- Medicine.SiegeMedic (2): "+30% chance to recover from lethal wounds during siege bombardment; half as many of your men sick with camp fever die during sieges." (SiegeSicknessEnabled)
+- Medicine.Veterinarian (2): "50% chance that a horse of your party falling in battle (not at sea) is only wounded and stays with the party." (PerkVeterinarianHorses + HorsesDieOnlyKilled)
+- Medicine.PristineStreets (1): "+1 settlement prosperity every day in governed settlements; under siege its defenders catch 30% less camp fever and hunger worsens it by half instead of doubling it." (SiegeSicknessEnabled)
+- Medicine.BushDoctor (2): "+20% party healing rate while waiting in a village or camped beside one." (BushDoctorInVillage / CampHealingPerks - warianty)
+- Medicine.CheatDeath (2): "-50% chance to die when you fall unconscious in battle; as surgeon you also halve the chance of your party's heroes dying of a grave wound." (CheatDeathAtCrisis + HeroWoundsEnabled)
+- Engineering.ArchitecturalCommisions (2): "+20 gold per day for continuous projects in the governed settlement, paid out of its treasury (less when the treasury is short)." (ArchitecturalCommissionsTownPays)
+- Boatswain.WellStocked (1): "+10% to the share of spent arrows, bolts and throwing weapons your party gathers back after a naval battle you win." (NavalDeployAmmoFix NIE; NavalAmmoPerksRecover NIE -> "No effect with the current settings.")
+- Boatswain.WellStocked (2): "No extra effect of its own: throwing weapons are included in the ammunition gathered back after a won naval battle." (NavalDeployAmmoFix NIE)
+- Boatswain.ShipwrightsInsight (2): "+10% to the share of spent arrows, bolts and throwing weapons your party gathers back after a naval battle you win (adds up with Well Stocked)."
+- Boatswain.MerchantPrince (2): "+500 denars for each ship bought or sold in the governed port, paid from the port's spare money." (ShipTradeThroughPort)
+- Boatswain.MasterShipwright (2): "+30 denars from each ship repaired in the governed port, paid from the port's spare money." (ShipTradeThroughPort)
+- Boatswain.Salvage (2): "+40 denars of port dues for each merchant convoy entering the governed port, paid by the convoy." (PerkNavalPortGoldPaid)
+- Boatswain.ShipwrightsHand (2): "+1 volunteer from the town's own notables to the garrison for each merchant convoy entering the governed port (your clan pays the recruitment fee)." (PerkNavalPortGoldPaid + PerkShipwrightsHandVolunteer; bez drugiego "No effect with the current settings.")
+- Boatswain.Resilience (1): "After a naval battle you win, the dressing of your wounds restores 30% more of the lost hit points." (BattleDressingEnabled NIE -> "No effect in this game.")
+- Shipmaster.NightRaider (2): "+5 fish per day to villages bound to the governed town only until the start calibration is applied; after that villages get fish only from their fishermen." (StartCalibration + A17FishFromHands|KsNoFishFromPerk)
+
+**Ryzyko / co sprawdzic:** tylko teksty - zadne dzialanie sie nie zmienia. Kontrola calosci: (1) kolizje z CampDrill/Drill/CastleSteel - polowki CampDrill (druga Walk It Off, A Good Days Rest, Saddlebags) i Drill (Giving Hands, Paid in Promise) nietkniete; opis calosci skladamy z biezacych polowek, wiec ich teksty przezywaja; PerkTexts idzie po nich w tym samym OnSessionLaunched. Steel Maker 3: tekst CastleSteel zastapiony (przy MaterialLaw+RealRefining), opis calosci znowu "pierwsza + druga polowka" (naprawa skladu); przy wylaczonym przetopie zostaje tekst i sklad CastleSteel. (2) Liczby czytane raz na start sesji - zmiana MCM w trakcie gry widoczna po wczytaniu zapisu. (3) Athletics Walk It Off: "20 hit points" stala z listy (WoundedHealthLimit gry), nie czytana z modelu. (4) Tollgates: "60 for land caravans" z dekompilacji (podwojny sluchacz gry i BK, pewnosc niska). (5) NightRaider: tekst nie zalezy od chwili zastosowania KS (opisuje oba stany). (6) W grze: najechac na Deep Quivers / Fletcher / Steel Maker 3 (okno wyboru perku - obie polowki) / Athletics Walk It Off (pierwsza polowka nowa, druga CampDrill) i linia "Opisy perkow (540)" w Armoury.log (oczekiwane przy RBM: podmienione 60 z 60, pominiete 0, potkniecia 0, brak perku 0). Klucz Perk Texts Rewrite dopisany recznie (Settings.cs, McmSettings.cs), bez gen_mcm.py. Build 0 bledow; NIE wgrane.
+
+**Status:** DO SPRAWDZENIA
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).

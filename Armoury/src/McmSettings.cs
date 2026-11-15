@@ -749,6 +749,11 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float ShieldWallPerkCover { get; set; } = 0.10f;
 
+        // 540: opisy perkow wedlug dzialania (PerkTexts.cs)
+        [SettingPropertyBool("Perk Texts Rewrite", HintText = "Perk descriptions follow what the perks really do in this game (Armoury, Banner Kings, Realm of Thrones, Realistic Battle Mod): the hover text and the perk choice window name the new effects and numbers from your settings; a perk whose effect is switched off in these settings keeps the game's own text. Off = the game's texts, even where they are wrong. Read at the start of a campaign or loading a save.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool PerkTextsRewrite { get; set; } = true;
+
         [SettingPropertyBool("Perk Armour After RBM", HintText = "Armour perks count again under Realistic Battle Mod, with the game's own numbers: Ignore Pain (+10% armour on foot; as a commander +5 armour to foot troops in the formation), Dauntless Steed (as a commander +5 armour to mounted troops in the formation) and Tough Steed (+20% armour to your horse; as a commander +10 armour to the horses of the formation). Realistic Battle Mod reads armour straight from the equipment and dropped these bonuses. Off = as before this change. The same rule for you and for the AI.", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool PerkArmourAfterRbm { get; set; } = true;
@@ -14003,6 +14008,7 @@ namespace Armoury
             s.PaviseBackShieldWearCut = PaviseBackShieldWearCut;
             s.PaviseBackShieldMelee = PaviseBackShieldMelee;   // D9
             s.ShieldWallPerkCover = ShieldWallPerkCover;
+            s.PerkTextsRewrite = PerkTextsRewrite;   // 540
             s.PerkArmourAfterRbm = PerkArmourAfterRbm;
             s.BowUsesAtTier1 = BowUsesAtTier1;
             s.BowSkillBonusPercentPerPoint = BowSkillBonusPercentPerPoint;
