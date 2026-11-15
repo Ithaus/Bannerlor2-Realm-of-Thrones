@@ -605,6 +605,8 @@ namespace Armoury
             if (mp.AttachedParties != null && mp.AttachedParties.Count > 0) sb.Append(" (with the parties of your army)");
             sb.Append(", ").Append(col.Foot).Append(" of them without a horse of their own, ").Append(col.Prisoners).Append(" prisoners on the rope.");
             sb.Append("\nSpare horses in your baggage: ").Append(col.Mounts);
+            // 537 E2: kolumna z par - konie z pasujaca uprzeza, ktore piesi umieja poprowadzic
+            if (col.Pairs) sb.Append(" - a man rides only a horse with a harness that fits it and that his Riding allows: ").Append(col.RideCap).Append(col.RideCap == 1 ? " footman can" : " footmen can").Append(" ride");
             if (col.K0 && col.Armory > 0) sb.Append(", and ").Append(col.Armory).Append(" free horses in the armouries of your army's parties");
             // 311d2: przy jezdzie na drugiego luzaki najpierw pod jencow (MarchPace.Cap)
             // recenzja 311d2: wszyscy piechurzy na drugiego mimo wolnych luzakow (luzaki gorsze od koni jezdzcow - Cap wybiera szybszy wariant)
@@ -624,7 +626,8 @@ namespace Armoury
                 if (prisWalk > 0) parts.Add(prisWalk + (prisWalk == 1 ? " prisoner" : " prisoners"));
                 sb.Append(string.Join(" and ", parts.ToArray())).Append(" walk, so the whole column keeps the walking pace: at most ").Append(capText).Append('.');
                 int need = col.Walkers;
-                sb.Append("\nWith ").Append(need).Append(need == 1 ? " more spare horse" : " more spare horses").Append(" in the baggage nobody would walk.");
+                if (col.Pairs) sb.Append("\nWith ").Append(need).Append(need == 1 ? " more horse" : " more horses").Append(" with a fitting harness, and men whose Riding allows them, nobody would walk.");   // 537 E2
+                else sb.Append("\nWith ").Append(need).Append(need == 1 ? " more spare horse" : " more spare horses").Append(" in the baggage nobody would walk.");
                 // 311d2: ilu pieszych mogloby jechac na drugiego (te same reguly co MarchPace.Cap)
                 if (c.RideDoubleFewFootmen && col.Riders > 0)
                 {
@@ -635,7 +638,7 @@ namespace Armoury
                     if (col.Prisoners > col.Horses) sb.Append(", but not while prisoners walk on the rope.");
                     else
                     {
-                        int fw = col.Foot - Math.Min(col.Foot, col.Horses - col.Prisoners);
+                        int fw = col.Foot - Math.Min(col.Foot, col.RideMax(col.Horses - col.Prisoners));   // 537 E2: z par - jak Cap
                         sb.Append(", but with the spare horses under the prisoners ").Append(fw).Append(fw == 1 ? " footman is" : " footmen are").Append(" left without a horse - too many.");
                     }
                 }

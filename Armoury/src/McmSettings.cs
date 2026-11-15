@@ -8724,9 +8724,13 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int RiderHorseCarryKg { get; set; } = 20;
 
-        [SettingPropertyBool("March Pairs Hud", HintText = "on the map bar: Horses (top row) - horses ridden by your men / all your riding horses (baggage and troops' armoury); Harness (lower row) - harness worn by those horses / all your riding horses; Pack (lower row) - pack animals / how many you may lead before the herding penalty (men - livestock - free horses), shown in warning colour when over. A man counts as riding only on a horse with a harness that fits it and that his Riding allows. Display only: party speed and weight are not changed by it (off = the map bar as before)", RequireRestart = false)]
+        [SettingPropertyBool("March Pairs Hud", HintText = "on the map bar: Horses (top row) - horses ridden by your men / all your riding horses (baggage and troops' armoury); Harness (lower row) - harness worn by those horses / all your riding horses; Pack (lower row) - pack animals / how many you may lead before the herding penalty (men - livestock - free horses), shown in warning colour when over. A man counts as riding only on a horse with a harness that fits it and that his Riding allows. Display only: party speed uses the same numbers when March Pairs Speed is on, cargo weight does not use them yet (off = the map bar as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MarchPairsHud { get; set; } = true;
+
+        [SettingPropertyBool("March Pairs Speed", HintText = "party speed counts a man as mounted only on a pair - a horse and a harness that fits it and that his Riding allows, the same numbers as Horses on the map bar. 'Riders without harness' takes the game's Cavalry bonus back from soldiers left without such a pair (with Troops Fight With Own Kit Only); 'Footmen on horses: no harness or skill' (or 'armoury pairs') puts the game's Footmen on horses on the footmen's pairs; 'Herding: horses without riders' adds every horse nobody rides to the herd; Horse quality: spare horses and the marching column use the horses in these pairs. You and your clan's parties (off = as before: every spare horse carries a footman)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool MarchPairsSpeed { get; set; } = true;
 
         [SettingPropertyBool("Harness On Spare Horses", HintText = "every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside): that harness no longer weighs on the baggage, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -15959,6 +15963,7 @@ namespace Armoury
             s.DteConvoyNoFreePacks = DteConvoyNoFreePacks;
             s.RiderHorseCarryKg = RiderHorseCarryKg;
             s.MarchPairsHud = MarchPairsHud;
+            s.MarchPairsSpeed = MarchPairsSpeed;
             s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;

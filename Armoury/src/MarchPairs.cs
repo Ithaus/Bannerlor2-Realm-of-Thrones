@@ -1,12 +1,17 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using System.Threading;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace Armoury
 {
@@ -25,6 +30,8 @@ namespace Armoury
     /// Dobor (rozdz. 1.2): w obrebie rodziny kon rosnaco z uprzeza rodzinna rosnaco, samo siodlo na koncu; potem pary rosnaco wedlug wymogu i ludzie rosnaco
     /// wedlug Jazdy - kazdy bierze najlatwiejsza pare, ktora umie poprowadzic (najwieksza liczba jadacych).
     /// Potkniecia liczone (wyjatek = brak linii dla tej partii), bez wylacznika.
+    /// E2 (klucz MarchPairsSpeed): predkosc gracza i rodu z tego samego rekordu - ApplySpeed (wpisy roznicy wobec gry), ColumnOf (kolumna MarchPace),
+    /// RideQ (HorsePace: "Horse quality: spare horses" z koni w parach). Opis przy sekcji E2 nizej.
     /// </summary>
     internal static class MarchPairs
     {
@@ -32,8 +39,11 @@ namespace Armoury
         // rodzaj czlowieka w puli piechoty
         private const byte KFoot = 0, KWoundedRider = 1, KCavWalk = 2, KHero = 3;
 
-        private sealed class Lot { public ItemObject It; public int Req; public int N; public byte Src; }
-        private sealed class PairLot { public int Req; public int N; public byte HSrc, USrc; }
+        // E2: Md i Q (szybkosc konia z modyfikatorem, HorsePace.Q) - jakosc koni w parach piechoty ("Horse quality: spare horses")
+        private sealed class Lot { public ItemObject It; public ItemModifier Md; public float Q; public int Req; public int N; public byte Src; }
+        private sealed class PairLot { public int Req; public int N; public byte HSrc, USrc; public double Q; }   // Q - suma szybkosci koni pary (E2)
+        /// <summary>E2: konie pod piechota z par (szybkosc z modyfikatorem, liczba) - HorsePace liczy z nich "Horse quality: spare horses" i sufit kolumny.</summary>
+        internal struct QLot { public float Q; public int N; }
         private sealed class ManLot { public CharacterObject Ch; public int Riding; public int N; public byte Kind; public int Got, Skill; }
 
         internal sealed class Rec
@@ -57,6 +67,14 @@ namespace Armoury
             // E1: braki Jazdy wedlug typu po angielsku (podpowiedz HUD), dzien i czas liczenia rekordu
             public readonly List<string> SkillLowEn = new List<string>();
             public int Day; public double Ms;
+            /// <summary>E2: konie pod piechota z puli (pary przydzielone w Assign) - szybkosc i liczba; rekord po opublikowaniu tylko czytany (watki tiku).</summary>
+            public readonly List<QLot> RideQ = new List<QLot>();
+            internal void AddRideQ(float q, int n)
+            {
+                if (n <= 0) return;
+                for (int i = 0; i < RideQ.Count; i++) if (Math.Abs(RideQ[i].Q - q) < 0.001f) { var x = RideQ[i]; x.N += n; RideQ[i] = x; return; }
+                RideQ.Add(new QLot { Q = q, N = n });
+            }
             /// <summary>E1: koni pod ludzmi (pary jazdy + pary puli); na morzu 0 - nikt nie jedzie (rozdz. 1.3). Ta sama liczba w linii doby i w HUD.</summary>
             public int Ridden { get { return AtSea ? 0 : CavPairs + Ride; } }
             /// <summary>E1: wszystkie konie wierzchowe - ladunek + zbrojownia DTE (mianownik HUD, D10 a).</summary>
@@ -69,12 +87,22 @@ namespace Armoury
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        internal static void Reset() { _stumbles = 0; _stumblesDay = 0; _errSites.Clear(); _main = null; _mainKey = null; _mainAt = Environment.TickCount - 20000; _mainCount = 0; }
+        internal static void Reset()
+        {
+            Interlocked.Exchange(ref _stumbles, 0); Interlocked.Exchange(ref _stumblesDay, 0);
+            lock (_errSites) _errSites.Clear();
+            _main = null; _mainKey = null; _mainAt = Environment.TickCount - 20000; _mainCount = 0;
+            // E2: pamiec rodu, ostatnie liczenie gracza, liczniki odswiezen predkosci
+            _clan = new ConcurrentDictionary<MobileParty, CRec>();
+            _lastCalc = null; _invalidations = 0; _clanBuilds = 0; _applyCalls = 0;
+        }
 
+        /// <summary>E2: watki tiku tez tu trafiaja (model predkosci partii rodu) - liczniki Interlocked, miejsca pod blokada.</summary>
         private static void Stumble(string where, Exception e)
         {
-            _stumbles++; _stumblesDay++;
-            if (_errSites.Add(where)) { try { Log.Error("MarchPairs." + where, e); } catch { } }
+            Interlocked.Increment(ref _stumbles); Interlocked.Increment(ref _stumblesDay);
+            bool first; lock (_errSites) first = _errSites.Add(where);
+            if (first) { try { Log.Error("MarchPairs." + where, e); } catch { } }
         }
 
         /// <summary>Wymog Jazdy sztuki (0 - bez wymogu albo wymog innej umiejetnosci).</summary>
@@ -94,12 +122,17 @@ namespace Armoury
             try { return ch != null ? ch.GetSkillValue(DefaultSkills.Riding) : 0; } catch { return 0; }
         }
 
-        private static void AddLot(List<Lot> l, ItemObject it, int n, byte src)
+        private static void AddLot(List<Lot> l, ItemObject it, int n, byte src) { AddLot(l, it, null, n, src); }
+
+        /// <summary>E2: z modyfikatorem (jakosc konia w parze); uprzeze i zbrojownia DTE (slownik bez modyfikatorow) - md null.</summary>
+        private static void AddLot(List<Lot> l, ItemObject it, ItemModifier md, int n, byte src)
         {
             if (it == null || n <= 0) return;
             int rq = Req(it);
-            foreach (var x in l) if (x.It == it && x.Src == src) { x.N += n; return; }
-            l.Add(new Lot { It = it, Req = rq, N = n, Src = src });
+            foreach (var x in l) if (x.It == it && x.Md == md && x.Src == src) { x.N += n; return; }
+            float q = 0f;
+            try { q = it.HasHorseComponent ? HorsePace.Q(it, md) : 0f; } catch { q = 0f; }
+            l.Add(new Lot { It = it, Md = md, Q = q, Req = rq, N = n, Src = src });
         }
 
         /// <summary>Uprzaz pod zwyklego konia: 1 rodzinna (z pancerzem), 2 samo siodlo, 3 inna rodzina, 4 siodlo transportowe, 0 nie uprzaz.</summary>
@@ -117,7 +150,7 @@ namespace Armoury
             var res = new List<PairLot>();
             horses.Sort((a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : a.Src.CompareTo(b.Src));
             var fam = new List<Lot>(); var sad = new List<Lot>();
-            foreach (var h in harness) { var c = new Lot { It = h.It, Req = h.Req, N = h.N, Src = h.Src }; if (h.It.ArmorComponent != null) fam.Add(c); else sad.Add(c); }
+            foreach (var h in harness) { var c = new Lot { It = h.It, Md = h.Md, Q = h.Q, Req = h.Req, N = h.N, Src = h.Src }; if (h.It.ArmorComponent != null) fam.Add(c); else sad.Add(c); }
             Comparison<Lot> asc = (a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : a.Src.CompareTo(b.Src);
             fam.Sort(asc); sad.Sort(asc);
             var left = new int[horses.Count];
@@ -134,7 +167,7 @@ namespace Armoury
                         if (u.N <= 0 || !SaddleLaw.Fits(u.It, ho.It)) continue;
                         int t = Math.Min(left[i], u.N);
                         left[i] -= t; u.N -= t;
-                        AddPair(res, Math.Max(ho.Req, u.Req), t, ho.Src, u.Src);
+                        AddPair(res, Math.Max(ho.Req, u.Req), t, ho.Src, u.Src, t * (double)ho.Q);
                     }
                 }
             }
@@ -142,10 +175,10 @@ namespace Armoury
             return res;
         }
 
-        private static void AddPair(List<PairLot> l, int req, int n, byte hs, byte us)
+        private static void AddPair(List<PairLot> l, int req, int n, byte hs, byte us, double q)
         {
-            foreach (var x in l) if (x.Req == req && x.HSrc == hs && x.USrc == us) { x.N += n; return; }
-            l.Add(new PairLot { Req = req, N = n, HSrc = hs, USrc = us });
+            foreach (var x in l) if (x.Req == req && x.HSrc == hs && x.USrc == us) { x.N += n; x.Q += q; return; }
+            l.Add(new PairLot { Req = req, N = n, HSrc = hs, USrc = us, Q = q });
         }
 
         private static void AddMan(List<ManLot> l, CharacterObject ch, int n, byte kind)
@@ -172,6 +205,7 @@ namespace Armoury
                     int t = Math.Min(want, pl[p]);
                     want -= t; pl[p] -= t; m.Got += t;
                     r.Ride += t;
+                    if (pairs[p].N > 0) r.AddRideQ((float)(pairs[p].Q / pairs[p].N), t);   // E2: srednia szybkosc koni tej grupy par
                     if (pairs[p].HSrc == SCargo) r.RideCargoHorse += t;
                 }
             }
@@ -241,7 +275,7 @@ namespace Armoury
                     if (KitPreview.RidingMount(it))
                     {
                         r.CMounts += el.Amount;
-                        if (Stables.IsPlainMount(it)) { r.CPlain += el.Amount; AddLot(horses, it, el.Amount, SCargo); }
+                        if (Stables.IsPlainMount(it)) { r.CPlain += el.Amount; AddLot(horses, it, el.EquipmentElement.ItemModifier, el.Amount, SCargo); }
                         else r.COtherMount += el.Amount;
                         continue;
                     }
@@ -421,7 +455,11 @@ namespace Armoury
                 r.Ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
                 // klucz po liczeniu: podglad DTE mogl podbic wersje (bez petli - nastepne liczenie dopiero po zmianie albo za 10 s)
                 try { _mainKey = MainKey(mp); } catch { _mainKey = key; }
+                // E2: zmiana liczb predkosci (jazda, pary piechoty, stado, jakosc koni) - gra liczy predkosc od nowa przy nastepnym wolaniu (pamiec predkosci
+                // gry trzyma wynik do zmiany wersji partii, a nasz rekord przychodzi do 1 s pozniej); watek glowny, tylko przy zmianie
+                var old = _main;
                 _main = r; _mainCount++;
+                if (SpeedOn && (old == null || SpeedSig(old) != SpeedSig(r))) Invalidate(mp);
                 return r;
             }
             catch (Exception e) { Stumble("Main", e); return _main; }
@@ -439,6 +477,261 @@ namespace Armoury
 
         /// <summary>Ostatni rekord gracza bez liczenia (podpowiedz HUD).</summary>
         internal static Rec Last { get { return _main; } }
+
+        // ---------------------------------------------------------------- E2: predkosc z par (projekt rozdz. 1.3; gracz i partie jego rodu - D3)
+        // Trzy wpisy jako ROZNICA wobec gry (te same wzory co DefaultPartySpeedCalculatingModel.CalculateLandBaseSpeed 1.4.8, z mokrem -30% i perkami):
+        //  - "Riders without harness": gra liczy jazde z NumberOfMenWithHorse (wzorzec, z rannymi); gracz - jezdzcy z para (jazda z podgladu DTE + bohaterowie
+        //    na wlasnym koniu); reszta zdejmuje "Cavalry" (-0.3 x n / N, mokro x0.7) i jest w puli piechoty (D6, D9). Tylko przy TroopsFightWithOwnKitOnly
+        //    (bez niej DTE daje konia wzorca - jak RidersWithoutHorseWalk). Zastepuje u gracza "Riders without horses" HorsePace (ten sam czlowiek raz).
+        //  - "Footmen on horses: ...": num10 gry = min(piesi, NumberOfMounts) zastapione parami puli piechoty (z Unhorsed - D11 wolne pary zbrojowni po jezdzie);
+        //    zastepuje u gracza "Footmen on horses (riders without horses)" / "(armoury)" HorsePace. Doczepione partie armii - wedlug gry (bez zmian).
+        //  - "Herding: horses without riders": stado gry = juczne + bydlo + max(0, NumberOfMounts - num10); nasze - konie ladunku bez jezdzca z pary;
+        //    z perkiem Shepherd jak gra. Obowiazkowe (inaczej kon bez uprzezy "jedzie" w stadzie gry).
+        // Gracz: rekord Main z pamieci (bez liczenia w modelu predkosci - watki tiku); odswiezany na watku glownym (pasek mapy co 0.2 s, takze przy wylaczonym
+        // HUD, i linia doby), zmiana liczb -> Invalidate (gra liczy predkosc od nowa). Partia rodu: rekord z ladunku (bez podgladu DTE) w pamieci po kluczu
+        // wersji (liczony tam, gdzie pyta model - tanie, bez stanu wspolnego poza ConcurrentDictionary). Na morzu - nic (nikt nie jedzie).
+
+        private sealed class CRec { public int Key; public Rec R; }
+        private static ConcurrentDictionary<MobileParty, CRec> _clan = new ConcurrentDictionary<MobileParty, CRec>();
+        private static long _clanBuilds, _applyCalls;
+        private static int _invalidations;
+        private static int _pureState;   // 0 nie sprawdzane, 1 pole jest, 2 brak pola (linia doby)
+        private static AccessTools.FieldRef<MobileParty, int> _pureVer;
+        private static TextObject _txFootLess, _txFootMore, _txCav, _txHerd;
+        private static TextObject TxFootLess { get { return _txFootLess ?? (_txFootLess = new TextObject("{=!}Footmen on horses: no harness or skill")); } }
+        private static TextObject TxFootMore { get { return _txFootMore ?? (_txFootMore = new TextObject("{=!}Footmen on horses: armoury pairs")); } }
+        private static TextObject TxCav { get { return _txCav ?? (_txCav = new TextObject("{=!}Riders without harness")); } }
+        private static TextObject TxHerd { get { return _txHerd ?? (_txHerd = new TextObject("{=!}Herding: horses without riders")); } }
+
+        /// <summary>E2: klucz MarchPairsSpeed (NOWY).</summary>
+        internal static bool SpeedOn { get { var s = Settings.Current; return s != null && s.MarchPairsSpeed; } }
+
+        /// <summary>E2: liczenie korekt jednej partii (te same liczby we wpisach, w kolumnie i w linii doby).</summary>
+        internal sealed class Calc
+        {
+            public int N, CavG, CavO, FootG, MountsG, Num10G, Num10O, HerdG, HerdO, RideO, FreeO, AttRide, Att;
+            public float Wet = 1f, Nomad, Shep, DCav, DFoot, DHerd;
+            public bool CavRule;
+        }
+        private static volatile Calc _lastCalc;   // ostatnie liczenie gracza w modelu predkosci (linia doby)
+
+        private static bool InClan(MobileParty x)
+        {
+            if (x.IsGarrison || x.IsCaravan || x.IsVillager || x.IsMilitia) return false;
+            var lh = x.LeaderHero; var pc = Clan.PlayerClan;
+            return lh != null && pc != null && lh.Clan == pc;
+        }
+
+        /// <summary>E2: rekord par do predkosci (null - klucz wylaczony, morze, poza zasiegiem, nic nie policzone). Gracz - ostatni rekord Main bez liczenia;
+        /// partia rodu - pamiec po kluczu wersji (liczona tu). Dowolny watek.</summary>
+        internal static Rec SpeedRec(MobileParty mp)
+        {
+            if (!SpeedOn || mp == null || mp.MemberRoster == null || mp.Party == null || mp.IsCurrentlyAtSea) return null;
+            if (mp.IsMainParty) { var r = _main; return r != null && r.Ok && !r.AtSea ? r : null; }
+            if (!mp.IsActive || !InClan(mp)) return null;
+            return ClanRec(mp);
+        }
+
+        private static Rec ClanRec(MobileParty x)
+        {
+            int key;
+            unchecked
+            {
+                key = x.MemberRoster.VersionNo;
+                key = key * 397 + (x.ItemRoster != null ? x.ItemRoster.VersionNo : -1);
+                key = key * 397 + (int)CampaignTime.Now.ToDays;   // Jazda bohaterow i ludzi (awans zmienia wersje skladu, nauka - nie)
+            }
+            CRec c;
+            var d = _clan;
+            if (d.TryGetValue(x, out c) && c != null && c.Key == key) return c.R;
+            Rec r = null;
+            try { r = Of(x); } catch (Exception e) { Stumble("Of(rod, predkosc)", e); }
+            if (r == null || !r.Ok) return null;
+            d[x] = new CRec { Key = key, R = r };   // podmiana w calosci
+            Interlocked.Increment(ref _clanBuilds);
+            return r;
+        }
+
+        /// <summary>Podpis liczb predkosci rekordu (zmiana = Invalidate).</summary>
+        private static int SpeedSig(Rec r)
+        {
+            unchecked
+            {
+                int h = r.CavPairs;
+                h = h * 397 + r.HeroMounted; h = h * 397 + r.Ride; h = h * 397 + r.RideCargoHorse; h = h * 397 + r.CMounts;
+                h = h * 397 + r.UnusedPairs; h = h * 397 + r.PoolMen; h = h * 397 + (r.AtSea ? 1 : 0);
+                foreach (var q in r.RideQ) { h = h * 397 + (int)(q.Q * 10f); h = h * 397 + q.N; }
+                return h;
+            }
+        }
+
+        /// <summary>Pamiec predkosci gry gracza (MobileParty._partyPureSpeedLastCheckVersion = -1: CalculateSpeedForPartyUnified liczy baze i wynik od nowa).
+        /// Watek glowny, tylko przy zmianie liczb. Bez pola - linia doby mowi BRAK (predkosc dojdzie przy nastepnej zmianie wersji partii).</summary>
+        private static void Invalidate(MobileParty mp)
+        {
+            if (_pureState == 2) return;
+            try
+            {
+                if (_pureVer == null)
+                {
+                    if (AccessTools.DeclaredField(typeof(MobileParty), "_partyPureSpeedLastCheckVersion") == null) { _pureState = 2; return; }
+                    _pureVer = AccessTools.FieldRefAccess<MobileParty, int>("_partyPureSpeedLastCheckVersion");
+                    _pureState = 1;
+                }
+                _pureVer(mp) = -1;
+                _invalidations++;
+            }
+            catch (Exception e) { Stumble("Invalidate", e); }
+        }
+
+        private static float Herd(int men, int herd) { return Herding(men, herd); }
+
+        /// <summary>E2: korekty jednej partii z rekordu r. Liczby gry (piesi, luzaki, jazda, stado, z doczepionymi) zawsze swieze; nasze z rekordu
+        /// (u gracza do 1 s starsze - przyciete do skladu teraz). Wzory jak gra (dekompilacja 1.4.8).</summary>
+        internal static Calc Compute(MobileParty mp, Rec r)
+        {
+            var c = new Calc();
+            var ir = mp.ItemRoster;
+            int menM = mp.MemberRoster.TotalManCount;
+            int cavG = mp.Party.NumberOfMenWithHorse;
+            int footM = mp.Party.NumberOfMenWithoutHorse;
+            int mountsM = ir != null ? ir.NumberOfMounts : 0;
+            int herdBase = ir != null ? ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals : 0;
+            int n = menM, footA = 0, mountsA = 0;
+            var att = mp.AttachedParties;
+            if (att != null)
+                for (int i = 0; i < att.Count; i++)
+                {
+                    var ap = att[i];
+                    if (ap == null || ap.MemberRoster == null || ap.Party == null) continue;
+                    c.Att++;
+                    n += ap.MemberRoster.TotalManCount;
+                    footA += ap.Party.NumberOfMenWithoutHorse;
+                    var ar = ap.ItemRoster;
+                    if (ar != null) { mountsA += ar.NumberOfMounts; herdBase += ar.NumberOfPackAnimals + ar.NumberOfLivestockAnimals; }
+                }
+            c.N = n; c.CavG = cavG;
+            if (n <= 0) return c;
+            c.FootG = footM + footA; c.MountsG = mountsM + mountsA;
+            c.Num10G = Math.Min(c.FootG, c.MountsG);
+            c.HerdG = herdBase + Math.Max(0, c.MountsG - c.Num10G);
+            c.CavRule = mp.IsMainParty && GarrisonKit.OwnKitOn;
+            c.CavO = c.CavRule ? Math.Min(cavG, r.CavPairs + r.HeroMounted) : cavG;
+            int poolM = Math.Max(0, menM - c.CavO);
+            c.RideO = Math.Min(r.Ride, poolM);
+            int rideCargo = Math.Min(r.RideCargoHorse, c.RideO);
+            c.AttRide = Math.Min(footA, mountsA);
+            c.Num10O = c.RideO + c.AttRide;
+            c.FreeO = Math.Max(0, r.CMounts - rideCargo);
+            c.HerdO = herdBase + c.FreeO + (mountsA - c.AttRide);
+            c.Wet = HorsePace.WetOf(mp);
+            try { var lh = mp.LeaderHero; var pk = DefaultPerks.Riding.NomadicTraditions; if (lh != null && pk != null && lh.GetPerkValue(pk)) c.Nomad = pk.PrimaryBonus; } catch { c.Nomad = 0f; }
+            try { var pk = DefaultPerks.Riding.Shepherd; if (pk != null && mp.HasPerk(pk)) c.Shep = pk.PrimaryBonus; } catch { c.Shep = 0f; }
+            c.DCav = -0.3f * (cavG - c.CavO) / n * c.Wet;
+            c.DFoot = 0.15f * (c.Num10O - c.Num10G) / n * (c.Wet + c.Nomad);
+            c.DHerd = (Herd(n, c.HerdO) - Herd(n, c.HerdG)) * (1f + c.Shep);
+            return c;
+        }
+
+        /// <summary>E2: MarchPace.SpeedPostfix PRZED sufitem kolumny (obok HorsePace.Apply): trzy wpisy roznicy. Dowolny watek; tylko odczyt pamieci (gracz).</summary>
+        internal static void ApplySpeed(MobileParty mp, ref ExplainedNumber result)
+        {
+            if (mp == null || !SpeedOn) return;
+            if (!SpeedDepth.OutermostFinal) return;
+            try
+            {
+                var r = SpeedRec(mp);
+                if (r == null) return;
+                var c = Compute(mp, r);
+                if (c.N <= 0) return;
+                Interlocked.Increment(ref _applyCalls);
+                if (mp.IsMainParty) _lastCalc = c;
+                if (Math.Abs(c.DCav) > 1e-6f) result.AddFactor(c.DCav, TxCav);
+                if (Math.Abs(c.DFoot) > 1e-6f) result.AddFactor(c.DFoot, c.DFoot < 0f ? TxFootLess : TxFootMore);
+                if (Math.Abs(c.DHerd) > 1e-6f) result.AddFactor(c.DHerd, TxHerd);
+            }
+            catch (Exception e) { Stumble("ApplySpeed", e); }
+        }
+
+        /// <summary>E2: kolumna MarchPace z par (sufit 311d i 311d2, "riding double"). Wejscie: piesi i luzaki kolumny z doczepionymi (jak CountColumn; mounts juz
+        /// z wolnymi konmi zbrojowni przy K0 - withArmory), walk - HorsePace.WalkOf. Wyjscie: piesi = pula piechoty partii (gracz: bez jezdzcow z para, z Unhorsed
+        /// i rannymi jezdzcami - D9) + piesi doczepionych; luzaki = pary jadace + pary niewykorzystane (pod jencow - D2) + luzaki doczepionych; rideCap - ilu
+        /// pieszych moze jechac (pary, nie sam kon). Partia rodu: jazda wedlug gry, jezdzcy bez konia (HorsePace krok 3) i wolne konie zbrojowni AI (K0) jak dotad.
+        /// false - bez par (wejscie bez zmian).</summary>
+        internal static bool ColumnOf(MobileParty mp, bool withArmory, int walk, ref int foot, ref int mounts, out int rideCap)
+        {
+            rideCap = -1;
+            try
+            {
+                var r = SpeedRec(mp);
+                if (r == null) return false;
+                var ir = mp.ItemRoster;
+                int footM = mp.Party.NumberOfMenWithoutHorse;
+                int mountsM = ir != null ? ir.NumberOfMounts : 0;
+                int armM = withArmory ? HorseState.FreeOf(mp) : 0;
+                int footA = Math.Max(0, foot - footM), mountsA = Math.Max(0, mounts - mountsM - armM);
+                int menM = mp.MemberRoster.TotalManCount;
+                int cavG = mp.Party.NumberOfMenWithHorse;
+                bool main = mp.IsMainParty;
+                int cavO = main && GarrisonKit.OwnKitOn ? Math.Min(cavG, r.CavPairs + r.HeroMounted) : cavG;
+                int poolM = Math.Max(0, menM - cavO);
+                int rideO = Math.Min(r.Ride, poolM);
+                int extra = main ? 0 : Math.Max(0, walk);    // gracz: jezdzcy bez konia sa juz w puli (MarchPairs); rod - krok 3 HorsePace jak dotad
+                int armRide = main ? 0 : armM;               // gracz: wolne pary zbrojowni juz w puli (D11); rod - wolne konie zbrojowni AI (K0) jak dotad
+                int mainFoot = poolM + extra;
+                int mainRide = Math.Min(mainFoot, rideO + armRide);
+                foot = mainFoot + footA;
+                rideCap = mainRide + Math.Min(footA, mountsA);
+                mounts = rideO + armRide + Math.Max(0, r.UnusedPairs) + mountsA;
+                return true;
+            }
+            catch (Exception e) { Stumble("ColumnOf", e); rideCap = -1; return false; }
+        }
+
+        /// <summary>E2: dopisek partii rodu do linii doby - wpisy predkosci z rekordu do predkosci (ten sam co model).</summary>
+        private static string SpeedClan(MobileParty x)
+        {
+            if (!SpeedOn) return "";
+            try
+            {
+                var sr = SpeedRec(x);
+                if (sr == null) return ", E2: brak (morze albo poza zasiegiem)";
+                var c = Compute(x, sr);
+                return ", E2: num10 " + c.Num10O + "/gra " + c.Num10G + ", stado " + c.HerdO + "/gra " + c.HerdG + ", Footmen " + F3(c.DFoot) + ", Herding " + F3(c.DHerd);
+            }
+            catch (Exception e) { Stumble("SpeedClan", e); return ", E2: blad"; }
+        }
+
+        /// <summary>E2: czesc linii doby (gracz): liczenie na swiezo (Compute) i ostatnie z modelu predkosci, kolumna MarchPace.Explain, stan odswiezen.</summary>
+        private static void SpeedLine(StringBuilder sb, MobileParty mp, Rec r)
+        {
+            sb.Append(" | E2 predkosc z par (klucz MarchPairsSpeed ").Append(SpeedOn ? "TAK" : "NIE").Append(')');
+            if (!SpeedOn) { sb.Append(" - gra i HorsePace jak dotad"); return; }
+            var sr = SpeedRec(mp);
+            if (sr == null) { sb.Append(": brak rekordu do predkosci").Append(r != null && r.AtSea ? " (na morzu)" : ""); return; }
+            var c = Compute(mp, sr);
+            sb.Append(": ludzie ").Append(c.N).Append(c.Att > 0 ? " (z " + c.Att + " doczepionymi)" : "")
+              .Append(" | gra: jazda ").Append(c.CavG).Append(", piesi ").Append(c.FootG).Append(", luzaki ").Append(c.MountsG).Append(", num10 ").Append(c.Num10G).Append(", stado ").Append(c.HerdG)
+              .Append(" | pary: jazda ").Append(c.CavO).Append(c.CavRule ? "" : " (jak gra - TroopsFightWithOwnKitOnly NIE)").Append(", piechota na parach ").Append(c.RideO)
+              .Append(c.Att > 0 ? " + doczepione " + c.AttRide : "").Append(" = num10 ").Append(c.Num10O).Append(", wolne konie w stadzie ").Append(c.FreeO).Append(", stado ").Append(c.HerdO)
+              .Append(" | wpisy: Riders without harness ").Append(F3(c.DCav)).Append(", Footmen on horses ").Append(F3(c.DFoot)).Append(", Herding: horses without riders ").Append(F3(c.DHerd))
+              .Append(" (mokro x").Append(c.Wet.ToString("0.0", Inv)).Append(", NomadicTraditions ").Append(c.Nomad.ToString("0.00", Inv)).Append(", Shepherd ").Append(c.Shep.ToString("0.00", Inv)).Append(')');
+            var lc = _lastCalc;
+            if (lc != null) sb.Append(" | ostatnio w modelu predkosci: ").Append(F3(lc.DCav)).Append(" / ").Append(F3(lc.DFoot)).Append(" / ").Append(F3(lc.DHerd))
+                              .Append(" (num10 ").Append(lc.Num10O).Append(", stado ").Append(lc.HerdO).Append(')');
+            int qn = 0; double qs = 0; foreach (var q in sr.RideQ) { qn += q.N; qs += q.N * (double)q.Q; }
+            sb.Append(" | konie pod piechota z par ").Append(qn).Append(qn > 0 ? " (szybkosc srednio " + (qs / qn).ToString("0.0", Inv) + ")" : "");
+            try
+            {
+                var col = MarchPace.Explain(mp);
+                if (col != null) sb.Append(" | kolumna: z par ").Append(col.Pairs ? "TAK" : "NIE").Append(", piesi ").Append(col.Foot).Append(", luzaki/pary ").Append(col.Horses)
+                                   .Append(", moze jechac ").Append(col.RideCap).Append(", na luzakach ").Append(col.RidingFoot).Append(", idacych ").Append(col.Walkers)
+                                   .Append(", na drugiego ").Append(col.Double).Append(", rodzaj ").Append(col.Kind).Append(" (N ").Append(col.N).Append("), sufit ").Append(col.Cap.ToString("0.00", Inv));
+            }
+            catch (Exception e) { Stumble("SpeedLine.Explain", e); }
+            sb.Append(" | odswiezen predkosci gry ").Append(_invalidations).Append(" (pole ").Append(_pureState == 1 ? "TAK" : _pureState == 2 ? "BRAK" : "nie uzyte").Append(')')
+              .Append(", wywolan wpisow ").Append(Interlocked.Read(ref _applyCalls)).Append(", rekordow rodu liczonych ").Append(Interlocked.Read(ref _clanBuilds));
+        }
 
         private static string F3(float v) { return (v >= 0 ? "+" : "") + v.ToString("0.000", Inv); }
 
@@ -491,6 +784,7 @@ namespace Armoury
                       .Append(" (ludzie - bydlo - wolne konie)").Append(r.AtSea ? " - na morzu nikt nie jedzie" : "")
                       .Append(" | pamiec rekordu: liczen od startu sesji ").Append(_mainCount).Append(", ostatnie ").Append(r.Ms.ToString("0.0", Inv)).Append(" ms")
                       .Append(" | ").Append(MarchHud.State());
+                    try { SpeedLine(sb, mp, r); } catch (Exception e) { Stumble("SpeedLine", e); }   // E2
                     // HorsePace dla porownania (krok 1 i 3 - E2 zastapi wpis "riders without horses")
                     try
                     {
@@ -518,13 +812,17 @@ namespace Armoury
                                 if (q == null || !q.Ok) continue;
                                 clan.Add("'" + (x.Name != null ? x.Name.ToString() : x.StringId) + "' ludzie " + q.Men + ", piesi gry " + q.GameFoot + ", konie ladunku " + q.CMounts
                                          + " (gra " + q.GameMounts + "), uprzeze " + (q.CHarFam + q.CHarSaddle) + ", par " + q.PoolPairs + ", jedzie " + q.Ride + "/num10 " + q.GameNum10
-                                         + " (za niska Jazda " + q.WalkSkill + "), stado " + q.OurHerd + "/gra " + q.GameHerd);
+                                         + " (za niska Jazda " + q.WalkSkill + "), stado " + q.OurHerd + "/gra " + q.GameHerd
+                                         + SpeedClan(x));
                             }
                             catch (Exception e) { Stumble("Of(rod)", e); }
                         }
                 }
                 catch (Exception e) { Stumble("rod", e); }
                 sb.Append(" | partie rodu (sam ladunek): ").Append(clan.Count > 0 ? string.Join("; ", clan) : "-");
+                // E2: porzadek pamieci rodu - partie nieczynne albo spoza rodu
+                try { foreach (var kv in _clan) if (kv.Key == null || !kv.Key.IsActive || !InClan(kv.Key)) { CRec x; _clan.TryRemove(kv.Key, out x); } }
+                catch (Exception e) { Stumble("rod.porzadek", e); }
                 sb.Append(" | potkniecia dzis ").Append(_stumblesDay).Append(", od startu sesji ").Append(_stumbles);
                 if (_errSites.Count > 0) sb.Append(" (").Append(string.Join(", ", _errSites)).Append(')');
                 sb.Append(" | linia ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms.");

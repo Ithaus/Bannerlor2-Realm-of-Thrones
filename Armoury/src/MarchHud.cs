@@ -115,6 +115,8 @@ namespace Armoury
                 if (!On)
                 {
                     if (_vms.TryGetValue(vm, out it)) { Drop(vm.PrimaryInfoItems, it.Horses); Drop(vm.SecondaryInfoItems, it.Harness); Drop(vm.SecondaryInfoItems, it.Pack); }
+                    // 537 E2: predkosc czyta rekord MarchPairs z pamieci - odswiezany tu (watek glowny, najwyzej raz na 1 s po zmianie) takze bez pozycji paska
+                    if (_live && MarchPairs.SpeedOn) MarchPairs.Main(false);
                     return;
                 }
                 if (!_live) return;   // przed startem sesji kampanii: pozycje dojda przy pierwszym odswiezeniu po starcie (0.2 s)
@@ -211,7 +213,8 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s != null) Row(l, "Baggage pace", (int)Math.Ceiling(r.Men * Math.Max(0f, s.MarchPackAllowance)) + " pack animals allowed while all men ride");
                 if (r.SkillLowEn.Count > 0) Row(l, "Riding too low", string.Join(", ", r.SkillLowEn));
-                Row(l, " ", "A man rides only a horse with a harness that fits it and his Riding allows. Counted from the baggage and the troops' armoury; party speed and weight do not use these numbers yet.");
+                Row(l, " ", "A man rides only a horse with a harness that fits it and his Riding allows. Counted from the baggage and the troops' armoury; "
+                            + (MarchPairs.SpeedOn ? "party speed uses these numbers, cargo weight does not yet." : "party speed and weight do not use these numbers (March Pairs Speed is off)."));   // 537 E2
             }
             catch (Exception e) { Stumble("Tooltip", e); }
             return l;

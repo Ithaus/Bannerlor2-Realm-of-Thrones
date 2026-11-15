@@ -194,11 +194,11 @@ namespace Armoury
             bool t1c = true;
             if (col != null)
             {
-                int ride = Math.Min(col.Foot, col.Horses);
+                int ride = Math.Min(col.Foot, col.RideMax(col.Horses));   // 537 E2: kolumna z par - pieszy jedzie tylko na parze (RideCap)
                 int walk = (col.Foot - ride) + Math.Max(0, col.Prisoners - (col.Horses - ride));
                 t1c = col.Double > 0
                     // 311d2: na drugiego - luzaki najpierw pod jencow, nikt nie idzie, reszta piechurow za jezdzcami
-                    ? col.Walkers == 0 && col.Kind != 0 && col.Prisoners <= col.Horses && (col.RidingFoot == Math.Min(col.Foot, col.Horses - col.Prisoners) || (col.RidingFoot == 0 && col.Double == col.Foot))
+                    ? col.Walkers == 0 && col.Kind != 0 && col.Prisoners <= col.Horses && (col.RidingFoot == Math.Min(col.Foot, col.RideMax(col.Horses - col.Prisoners)) || (col.RidingFoot == 0 && col.Double == col.Foot))
                       && col.RidingFoot + col.Double == col.Foot && col.Double <= TaleWorlds.Library.MBMath.ClampFloat(Settings.Current.RideDoubleRatio, 0f, 1f) * col.Riders + 0.001f
                     : walk == col.Walkers && (col.Kind == 0) == (walk > 0) && (col.Kind != 0 || col.N == walk);
             }
