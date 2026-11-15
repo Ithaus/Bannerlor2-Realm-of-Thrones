@@ -58,6 +58,8 @@ namespace Armoury
         private static TextObject _txYours, _txMens;
         private static TextObject TxYours { get { return _txYours ?? (_txYours = new TextObject("{=!}Troops' armoury (unused): yours")); } }
         private static TextObject TxMens { get { return _txMens ?? (_txMens = new TextObject("{=!}Troops' armoury (unused): men's")); } }
+        private static TextObject _txDrill;
+        private static TextObject TxDrill { get { return _txDrill ?? (_txDrill = new TextObject("{=!}Drill kit")); } }   // 562: zapas musztry ludzi (sztuki wziete ze zbrojowni i dary gracza)
 
         internal static void Reset()
         {
@@ -218,7 +220,11 @@ namespace Armoury
                 if (mp == null || !mp.IsMainParty || !On) return;
                 Interlocked.Increment(ref _calls);
                 W w;
-                if (_mainTid >= 0 && Thread.CurrentThread.ManagedThreadId == _mainTid && TaleWorlds.MountAndBlade.Mission.Current == null)
+                bool live = _mainTid >= 0 && Thread.CurrentThread.ManagedThreadId == _mainTid && TaleWorlds.MountAndBlade.Mission.Current == null;
+                // 562: zapas musztry wazy pod tym samym kluczem - sztuka wzieta ze zbrojowni nie gubi wagi (inny watek: ostatni wynik z ta sama flaga morza)
+                float dk = Drill.StockKg(mp, atSea, live);
+                if (dk > 0.05f) result.Add(dk, TxDrill);
+                if (live)
                 {
                     w = Measure(mp, atSea);
                     Interlocked.Increment(ref _live);

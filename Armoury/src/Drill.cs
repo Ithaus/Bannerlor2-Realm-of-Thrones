@@ -39,15 +39,16 @@ namespace Armoury
     ///  Dlug snu (kara "noc bez snu = nastepny dzien bez cwiczen", Jeff 07:10 pkt 2) - DLUG O OSTATNIM SWICIE, NightRest.DawnDebtOf: gracz z jego
     ///      ksiegi (DawnDebt ustawiany w SettleNight), kazda inna partia lorda z ksiegi snu AI T10 (AiSleep.DawnDebt, SettleAi) - ten sam dlug, ktory
     ///      zabiera predkosc i morale; rozni sie tylko chwila odczytu (predkosc i morale - dlug biezacy, dzien cwiczen - swit), niezaleznie od godziny ticku.
-    ///  S - zapas do cwiczen: 1 + 0.10 x uB x kB + 0.10 x uZ x kZ; u = zapas / pelny (pelny = sztuka na 3 ludzi), k = 1.5 z perkiem kwatermistrza
-    ///      (Giving Hands - bron, Paid in Promise - zbroja).
+    ///  S - zapas do cwiczen: 1 + 0.10 x uB x kB + 0.10 x uZ x kZ; u = ludzie z pelnym zestawem broni / zbroi do swojej roli wobec kompletu ludzi
+    ///      (562, DrillKit.cs), k = 1.5 z perkiem kwatermistrza (Giving Hands - bron, Paid in Promise - zbroja).
     ///  P - perki gry i BK w treningu (wynik modelu ponad baze gry); A - udzial uzbrojonych z 171 (ArmsDrill).
     /// Z14a (DrillLaw): partie, ktorym gra nie daje bazy (gracz, rod gracza, lordowie w armii gracza) - caly wzor. AI poza Z14a: caly wzor przy DrillLawAi
     /// (Z14b, domyslnie TAK od MUSZTRA-j); wylaczony = plaska baza gry x [S przy DrillStockAi] + P. Kara (XP = 0 przy glodzie albo dlugu o swicie, takze
     /// perki) przy DrillPenaltyAi (domyslnie wlaczona - "takie same kary jak gracz", Jeff 09.10 04:00 i ponownie) albo DrillLawAi. Zapas gracza (DrillStock przy DrillLaw i Z1): sprzet
-    /// wyrzucony na zwyklym ekranie ekwipunku, zostawiony na ekranie lupu gry i trofea Spoils zostawione przy "Leave" (do 2 x pelny na grupe) + nadwyzka
-    /// ludzi w zbrojowni DTE; AI: tylko nadwyzka zbrojowni ponad komplet (tabor - lup i zaopatrzenie BK - sie nie liczy, jak sakwy gracza). Zapas zuzywa
-    /// sie (sztuka w uzyciu sluzy 200 dni cwiczen), zlom (polowa rudy sztuki) odkupuja kowale miasta przy wizycie, zaplata dla ludzi (AI: trzecia lordowi);
+    /// wyrzucony na zwyklym ekranie ekwipunku, zostawiony na ekranie lupu gry i trofea Spoils zostawione przy "Leave" (do brakow zestawu) + braki zestawu,
+    /// ktore ludzie biora sami z nadwyzki w zbrojowni DTE (562 - sztuka schodzi ze zbrojowni do zapasu); AI: rezerwacja z nadwyzki zbrojowni (tabor - lup i
+    /// zaopatrzenie BK - sie nie liczy, jak sakwy gracza). Zapas zuzywa sie wedlug rodzaju (562: zycie WearDays x LifeX), zlom (polowa rudy sztuki) odkupuja
+    /// kowale miasta przy wizycie, zaplata dla ludzi (AI: trzecia lordowi);
     /// zapasu nie da sie wyjac i nie wraca do sakw.
     /// Liczniki tylko w ticku treningu partii (MobilePartyTrainingBehavior.OnDailyTickParty), linie dnia o polnocy.
     /// WARUNEK SCALENIA K1 - SPELNIONY w scaleniu sklad8 (sklad7 z K1 + grupa11): PlayerSurplus i AiSurplus licza nadwyzke funkcja nadwyzki K1 A9
@@ -65,10 +66,7 @@ namespace Armoury
         // 548 (Jeff 15.11: "1 miecz i jeden pancerz na osobe a nie na 3 ludzi"): pelny zapas = 1 sztuka na tylu ludzi (klucz Drill Men Per Piece, domyslnie 1, bez ustawien tez 1 - recenzja 548;
         // 3 = dawna zasada). Wzor S bez zmian (u uciete do 1) - zmienia sie tylko liczba sztuk do maksimum, ta sama dla gracza i AI (jeden wzor).
         private static int MenPerPiece { get { var s = Settings.Current; return s == null ? 1 : Math.Max(1, Math.Min(3, s.DrillMenPerPiece)); } }
-        // 548: limit przyjecia od gracza w pelnych zapasach - przy 1 na czlowieka jeden zapas (tyle, ile potrzebuja; zapas nic nie wazy - osobny ItemRoster),
-        // przy dawnej zasadzie jak dotad dwa (zapas na wymiane daje nadwyzka ludzi w zbrojowni)
-        private static int IntakeSets { get { return MenPerPiece == 1 ? 1 : 2; } }
-        private const int GW = 0, GA = 1;                 // grupy zapasu: bron (z tarczami), zbroje
+        // 562: limit przyjecia od gracza = braki rodzajow zestawu (DrillKit.cs - Accept); grupy GW/GA zastapione rodzajami K1H..KCape
         // MUSZTRA-j: doby t1 -> t6 przy bazie wzoru x1 (koszty awansu BK TroopUpgradeXp 3.0: 900/1650/2700/3900/5100, projekt rozdz. 2 i 14.3) - tylko do linii
         private const double PromoteDays = 900.0 / 12 + 1650.0 / 14 + 2700.0 / 16 + 3900.0 / 18 + 5100.0 / 20;
         internal const int SrcDiscard = 0, SrcLoot = 1, SrcTrophies = 2, SrcAutotest = 3;
@@ -107,16 +105,18 @@ namespace Armoury
         // i marsz z wlasnych danych, nie "cala doba marszu" (godziny spoza zapisu dalej = ruch)
         private static readonly Dictionary<string, KeyValuePair<int, int>> _pendingMasks = new Dictionary<string, KeyValuePair<int, int>>();
 
-        private sealed class Acc { internal float WW, WA, Ore; }   // liczniki zuzycia (bron, zbroje) i zlom czekajacy na kowali (sztuki ludzi)
+        // liczniki zuzycia wedlug rodzaju (562: WK; WW/WA tylko z zapisu sprzed 562 - format A=) i zlom czekajacy na kowali (sztuki ludzi)
+        private sealed class Acc { internal float WW, WA, Ore; internal readonly float[] WK = new float[NK]; internal float SumW(int lo, int hi) { float v = 0f; for (int k = lo; k <= hi; k++) v += WK[k]; return v; } }
         private static readonly Dictionary<string, Acc> _acc = new Dictionary<string, Acc>();
-        private static readonly ItemRoster _stock = new ItemRoster();         // zapas od gracza (wlasnosc ludzi)
+        private static readonly ItemRoster _stock = new ItemRoster();         // zapas musztry ludzi gracza: dary gracza + to, co ludzie wzieli sami ze zbrojowni (562; wlasnosc ludzi)
 
         internal sealed class Ctx
         {
             internal MobileParty Party; internal double At;
             internal bool Main, NoBase, Rest, Hungry, Sleepless, Zero, Off, StockOn, ArmsGate, PerkW, PerkA, Counted;
             internal bool ClanHead;                        // MUSZTRA-j: glowa rodu AI, ktorej gra (i BK) daje 15 + 3 x tier - tylko do linii (wzor jej tego nie daje)
-            internal int Men, Lead = -1, Moved, Debt, Full, GivenW, GivenA, SurW, SurA;
+            internal int Men, Lead = -1, Moved, Debt;
+            internal KitM M; internal int Ready, ReadyW, ReadyA;   // 562: miara zestawu (gracz - zapas, AI - rezerwacja); ludzie z kompletem calosci / broni / zbroi
             internal int Kit, HeroKit, HeroN;   // 558: komplet zapasu = zolnierze + bohaterowie, ktorzy cwicza (HeroKit); HeroN - bohaterowie, ktorzy dzis naprawde cwiczyli
             internal int DebtNow;                          // MUSZTRA-j: Debt = dlug o ostatnim swicie (kara); DebtNow = dlug biezacy (predkosc, morale) - tylko do linii
             internal float L = LeadMin, D = MarchDay, S = 1f;
@@ -127,8 +127,6 @@ namespace Armoury
             internal float[] PerkV;
             // m109-musztra (DayDrillHours): godziny cwiczen bez limitu postoju i z limitem, godziny za dnia w osadzie i w polu, doba postoju, rodzaj osady, limit
             internal float Hraw, Hcap; internal int Hset, Hover, Hfield, SDay = 1, SKind, SCap = (int)CampDrill.FullHours;
-            internal int StockW { get { return GivenW + SurW; } }
-            internal int StockA { get { return GivenA + SurA; } }
         }
         private static Ctx _ctx;                           // kontekst partii w biezacym ticku (L, D, S liczone raz na partie)
 
@@ -179,10 +177,10 @@ namespace Armoury
         private static PlayerRec _pr, _prLast;
         private static int _msgDay = -1;                   // MUSZTRA-m: doba ostatniej linii musztry gracza w grze (raz na dobe)
         private static readonly int[] _in = new int[4];
-        private static int _noRoom, _backBag, _pWornW, _pWornA, _pWornGiven, _pNoMetal, _pSoldU, _pSoldGold, _givenYday = -1;
+        private static int _noRoom, _backBag, _pNoMetal, _pSoldU, _pSoldGold, _givenYday = -1;
         private static float _pOreAdd;
         private static int _cParties, _cMen, _cRest, _cOff; private static double _cXp, _cL;
-        private static int _aParties, _aMen, _aNoLead, _aFullStock, _aNoStock, _aWornW, _aWornA, _aNoMetal, _aSoldU, _aSoldGold, _aSoldLord, _aSoldPurse, _aOff;
+        private static int _aParties, _aMen, _aNoLead, _aFullStock, _aNoStock, _aNoMetal, _aSoldU, _aSoldGold, _aSoldLord, _aSoldPurse, _aOff;
         private static float _aOreAdd, _oreLost;
         private static double _aW, _aWL, _aWD, _aWS, _aWLD, _aWLDS, _aWRest, _aWMarch, _aWHungry, _aWSleep, _aGame, _aRule, _aPenalty, _aWn, _aWLDn;
         // MUSZTRA-j (jeden wzor): baza wzoru, baza gry glow rodow, perki P, XP po broni "gra" (baza gry + perki, bez kary - jak dzis w grze) i "teraz"
@@ -214,6 +212,7 @@ namespace Armoury
             _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0; _maskSegSeen = false;
             _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length); _profReads = 0;   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
+            _kindOf.Clear(); _roleOf.Clear(); _aiKit.Clear(); _settleSig = 0; _settleArmVer = int.MinValue; _migrPending = false; _importLegacy = 0; _kgOk = false; _kgVer = int.MinValue;   // 562: jak _ore
             HudKitReset();       // 541: pamiec paska mapy
             CampDrill.Reset();   // m97-szkolenie
             VetReset();          // 319b
@@ -221,9 +220,12 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            Array.Clear(_in, 0, _in.Length); _noRoom = _backBag = _pWornW = _pWornA = _pWornGiven = _pNoMetal = _pSoldU = _pSoldGold = 0; _pOreAdd = 0f;
+            Array.Clear(_in, 0, _in.Length); _noRoom = _backBag = _pNoMetal = _pSoldU = _pSoldGold = 0; _pOreAdd = 0f;
+            // 562: liczniki zestawu (ruch zbrojownia - zapas, zuzycie wedlug rodzaju, rezerwacja AI)
+            _pTaken = _pBack = _pBackOther = _pBackBattle = _pBackOff = _pLost = _settleN = _settlePv = _settleBad = _pvNone = _pWornN = 0; _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
+            Array.Clear(_pWorn, 0, NK); Array.Clear(_aWorn, 0, NK); _aKitParties = _aKitPieces = _aiKept = _aiNoKitSale = 0;
             _cParties = _cMen = _cRest = _cOff = 0; _cXp = _cL = 0;
-            _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aWornW = _aWornA = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;
+            _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;
             _aOreAdd = 0f; _oreLost = 0f;
             _aW = _aWL = _aWD = _aWS = _aWLD = _aWLDS = _aWRest = _aWMarch = _aWHungry = _aWSleep = _aGame = _aRule = _aPenalty = _aWn = _aWLDn = 0;
             _aRuleBase = _aHeadBase = _aPerks = _aXpGame = _aXpNow = _aManN = 0; _aNoModel = _aSleepDawn = _aSleepPaid = _sleepNowAbove = 0;
@@ -274,52 +276,12 @@ namespace Armoury
         private static string F1(double v) { return v.ToString("0.0", CultureInfo.InvariantCulture); }
         private static int Pop(int m) { int n = 0; while (m != 0) { m &= m - 1; n++; } return n; }
 
-        // ------------------------------------------------------------ grupy i sztuki zapasu
-        private static int GroupOf(ItemObject it)
-        {
-            if (it == null) return -1;
-            switch (it.ItemType)
-            {
-                case ItemObject.ItemTypeEnum.OneHandedWeapon:
-                case ItemObject.ItemTypeEnum.TwoHandedWeapon:
-                case ItemObject.ItemTypeEnum.Polearm:
-                case ItemObject.ItemTypeEnum.Bow:
-                case ItemObject.ItemTypeEnum.Crossbow:
-                case ItemObject.ItemTypeEnum.Thrown:
-                case ItemObject.ItemTypeEnum.Shield:
-                    return GW;
-                case ItemObject.ItemTypeEnum.BodyArmor:
-                case ItemObject.ItemTypeEnum.HeadArmor:
-                case ItemObject.ItemTypeEnum.LegArmor:
-                case ItemObject.ItemTypeEnum.HandArmor:
-                    return GA;
-            }
-            return -1;
-        }
-
-        private static readonly ItemObject.ItemTypeEnum[] StockTypes =
-        {
-            ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.TwoHandedWeapon, ItemObject.ItemTypeEnum.Polearm, ItemObject.ItemTypeEnum.Bow,
-            ItemObject.ItemTypeEnum.Crossbow, ItemObject.ItemTypeEnum.Thrown, ItemObject.ItemTypeEnum.Shield,
-            ItemObject.ItemTypeEnum.BodyArmor, ItemObject.ItemTypeEnum.HeadArmor, ItemObject.ItemTypeEnum.LegArmor, ItemObject.ItemTypeEnum.HandArmor
-        };
-
-        /// <summary>Sztuka do zapasu: bron/zbroja z grup, bez unikatow i sztuk zakazanych w bitwie (ArmsPricing.IsUnique - z QuartermasterLaw.BarredInBattle,
-        /// pamiec na przedmiot), bez wyrobow gracza (osobne obiekty zapisu).</summary>
-        private static bool Eligible(ItemObject it)
-        {
-            if (GroupOf(it) < 0) return false;
-            try { return !it.IsCraftedByPlayer && !ArmsPricing.IsUnique(it); }
-            catch (Exception e) { Stumble("Eligible", e); return false; }
-        }
-
+        // ------------------------------------------------------------ sztuki zapasu: rodzaje, role, Eligible - DrillKit.cs (562)
         private static int Men(MobileParty mp)
         {
             try { var r = mp != null ? mp.MemberRoster : null; return r != null ? Math.Max(0, r.TotalManCount - r.TotalHeroes) : 0; }
             catch (Exception e) { Stumble("Men", e); return 0; }
         }
-
-        private static int Full(int men) { return men > 0 ? (men + MenPerPiece - 1) / MenPerPiece : 0; }
 
         // ------------------------------------------------------------ 558: bohaterowie cwicza (Jeff 15.11: "towarzysze maja cwiczyc")
         private static bool HeroesOn(Settings s, bool noBase) { return s != null && s.DrillHeroes && (noBase ? s.DrillLaw : s.DrillLawAi); }
@@ -504,18 +466,6 @@ namespace Armoury
             Log.Info(sb.ToString());
         }
 
-        private static void GivenCounts(out int w, out int a)
-        {
-            w = 0; a = 0;
-            for (int i = 0; i < _stock.Count; i++)
-            {
-                var el = _stock.GetElementCopyAtIndex(i);
-                if (el.Amount <= 0) continue;
-                int g = GroupOf(el.EquipmentElement.Item);
-                if (g == GW) w += el.Amount; else if (g == GA) a += el.Amount;
-            }
-        }
-
         private static Acc AccOf(MobileParty mp, bool create)
         {
             if (mp == null || mp.StringId == null) return null;
@@ -547,6 +497,8 @@ namespace Armoury
                 if (all != null)
                     for (int i = 0; i < all.Count; i++) { var mp = all[i]; if (mp == main) mainSeen = true; Observe(mp, now); }
                 if (!mainSeen && main != null) Observe(main, now);
+                // 562: zmiana rol druzyny gracza (rekrut, smierc, awans, bohater) - rozliczenie zapasu od razu (podpis rol bez planow; najwyzej raz na godzine)
+                if (StockOn && main != null) { try { if (PlayerSig() != _settleSig) SettlePlayer(WhyRoster); } catch (Exception e) { Stumble("Hourly.Settle", e); } }
                 if (now % 24 == 0)
                 {
                     var dead = new List<MobileParty>();
@@ -785,7 +737,6 @@ namespace Armoury
                 c.Men = Men(mp);
                 c.HeroKit = KitHeroes(mp, s, noBase);
                 c.Kit = c.Men + c.HeroKit;
-                c.Full = Full(c.Kit);                                  // 558: komplet na zolnierzy i bohaterow, ktorzy cwicza
                 var h = mp.LeaderHero;
                 if (h != null) { c.Lead = h.GetSkillValue(DefaultSkills.Leadership); c.L = Clamp(c.Lead / LeadNorm, LeadMin, LeadMax); }
                 c.Moved = MovedHours(mp);
@@ -827,20 +778,23 @@ namespace Armoury
                     // (bez premii i bez zuzycia), a perki i S licza sie dalej; slad w liczniku potkniec (Stumble "CtxOf.Stock")
                     // Z.3 poz. 3 (tylko pomiar): stoper liczenia nadwyzki K1 partii AI - wyjatek idzie przez finally do tego samego catch co dotad.
                     // Recenzja Z.3: stoper tylko przy Stage8ProfileLog (k0 = 0 - bez odczytu zegara i bez licznika; klucz wylaczony = brak pomiaru)
+                    // 562: gracz - miara zapasu (rozliczony ze zbrojownia w TickPrefix przed CtxOf), AI - rezerwacja z nadwyzki K1 (AiKit; stoper 8/9 jak dotad)
                     try
                     {
-                        if (c.Main) CountPlayerStock(c);
+                        if (c.Main) c.M = MeasurePlayer();
                         else
                         {
                             long k0 = s.Stage8ProfileLog ? Stopwatch.GetTimestamp() : 0L;
-                            try { CountAiStock(c, mp); }
+                            try { AiKit(c, mp, s); }
                             finally { if (k0 != 0) { _prof[PCtxSur] += Stopwatch.GetTimestamp() - k0; _prof[PCtxSurN]++; _profReads += 2; } }
                         }
                     }
-                    catch (Exception e) { c.SurW = 0; c.SurA = 0; Stumble("CtxOf.Stock", e); }
+                    catch (Exception e) { c.M = null; Stumble("CtxOf.Stock", e); }
+                    if (c.M != null) { c.Ready = c.M.Ready; c.ReadyW = c.M.ReadyW; c.ReadyA = c.M.ReadyA; }
                     c.PerkW = mp.HasPerk(DefaultPerks.Steward.GivingHands);
                     c.PerkA = mp.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
-                    float uB = Math.Min(1f, c.StockW / (float)c.Full), uZ = Math.Min(1f, c.StockA / (float)c.Full);
+                    // 562: u = ludzie z kompletem broni / zbroi do swojej roli wobec kompletu ludzi (zolnierze + bohaterowie musztry)
+                    float uB = Math.Min(1f, c.ReadyW / (float)c.Kit), uZ = Math.Min(1f, c.ReadyA / (float)c.Kit);
                     c.S = 1f + StockBonus * uB * (c.PerkW ? PerkMult : 1f) + StockBonus * uZ * (c.PerkA ? PerkMult : 1f);
                 }
             }
@@ -849,113 +803,11 @@ namespace Armoury
             return c;
         }
 
-        // ------------------------------------------------------------ zapas: liczenie
-        private static void CountPlayerStock(Ctx c)
-        {
-            int w, a; GivenCounts(out w, out a); c.GivenW = w; c.GivenA = a;
-            var sur = PlayerSurplus();
-            foreach (var kv in sur) { int g = TypeGroup((int)kv.Key); if (g == GW) c.SurW += kv.Value.Count; else if (g == GA) c.SurA += kv.Value.Count; }
-        }
-
-        private sealed class Sur { internal int Count; internal readonly List<EquipmentElement> Cand = new List<EquipmentElement>(); }
-
-        /// <summary>Nadwyzka ludzi w zbrojowni DTE gracza wedlug typu. Scalenie sklad8 (warunek scalenia K1): funkcja nadwyzki K1 A9
-        /// (MenPurse.PlayerSurplusPlan) - ta sama, co sprzedaz nadwyzek kupcom: po dopasowaniu, ponad komplet + SurplusKeepPercent, bez czesci gracza
-        /// (ksiega wkladow na egzemplarze). Kandydaci - egzemplarze z Sell > 0; do zapasu i do liczby tylko sztuki zdatne (Eligible): unikat albo sztuka
-        /// zakazana w bitwie nie uzbroi czlowieka. Dotad: sztuki typu minus wklady minus potrzeba (po typie, bez zapasu procentowego).</summary>
-        private static Dictionary<ItemObject.ItemTypeEnum, Sur> PlayerSurplus()
-        {
-            var res = new Dictionary<ItemObject.ItemTypeEnum, Sur>();
-            var armory = QuartermasterLaw.DteArmory();
-            if (armory == null) return res;
-            foreach (var type in StockTypes)
-            {
-                var pieces = MenPurse.PlayerSurplusPlan(armory, type);
-                if (pieces == null) continue;
-                Sur sr = null;
-                foreach (var p in pieces)
-                {
-                    if (p.Sell <= 0) continue;
-                    var el = QuartermasterLaw.ElOf(p);
-                    if (el.Item == null || !Eligible(el.Item)) continue;
-                    if (sr == null) sr = new Sur();
-                    sr.Count += p.Sell;
-                    sr.Cand.Add(el);
-                }
-                if (sr != null) res[type] = sr;
-            }
-            return res;
-        }
-
-        private sealed class AiSur
-        {
-            internal readonly Dictionary<int, int> ByType = new Dictionary<int, int>(); internal int Melee = -1;
-            internal readonly HashSet<ItemObject> Cand = new HashSet<ItemObject>();   // scalenie sklad8: przedmioty, ktore K1 oddalby kupcowi (Sell > 0)
-        }
-
-        /// <summary>Nadwyzka zbrojowni AI wedlug typu (bron biala grupa przy AiAnyMeleeWhenShort). Scalenie sklad8 (warunek scalenia K1): funkcja nadwyzki
-        /// K1 A9 (MenPurse.AiSurplusPlan i AiMeleeLeft) - ta sama, co sprzedaz nadwyzek lordow kupcom: po dopasowaniu (bron po slotach wzorca), ponad komplet
-        /// + SurplusKeepPercent. Liczone i brane tylko sztuki zdatne do zapasu (Eligible). Dotad: po typie ponad komplet, bez zapasu procentowego.</summary>
-        private static AiSur AiSurplus(MobileParty mp, Dictionary<ItemObject, int> arm)
-        {
-            var res = new AiSur();
-            if (mp == null || arm == null || arm.Count == 0) return res;
-            var roster = mp.MemberRoster;
-            int meleeLeft = MenPurse.AiMeleeLeft(arm, roster);   // int.MaxValue = bez grupy broni bialej
-            bool group = meleeLeft != int.MaxValue;
-            if (group) res.Melee = 0;
-            foreach (var type in StockTypes)
-            {
-                var pieces = MenPurse.AiSurplusPlan(arm, roster, type);
-                if (pieces == null) continue;
-                int n = 0;
-                foreach (var p in pieces)
-                {
-                    if (p.Sell <= 0) continue;
-                    var it = QuartermasterLaw.ElOf(p).Item;
-                    if (it == null || !Eligible(it)) continue;
-                    n += p.Sell;
-                    res.Cand.Add(it);
-                }
-                if (n <= 0) continue;
-                if (group && AiGear.Melee((int)type)) res.Melee += n;
-                else res.ByType[(int)type] = n;
-            }
-            if (group) res.Melee = Math.Min(res.Melee, Math.Max(0, meleeLeft));
-            return res;
-        }
-
+        // ------------------------------------------------------------ zapas: liczenie - DrillKit.cs (562: MeasurePlayer, AiKit)
         private static Dictionary<ItemObject, int> ArmoryOf(MobileParty mp)
         {
             var d = AiGear.Armories(); Dictionary<ItemObject, int> a;
             return d != null && mp != null && d.TryGetValue(mp.Id, out a) ? a : null;
-        }
-
-        /// <summary>Zapas AI = tylko nadwyzka zbrojowni (sprzet ludzi, ktorego nikt nie nosi) - ta sama regula co nadwyzka ludzi gracza. Tabor sie NIE
-        /// liczy: to lup lorda do sprzedania i zaopatrzenie BK (PartySupplies kupuje do taboru bron i tarcze MeleeWeapons2/3, Shield2/3 i sam je zuzywa,
-        /// BK PartySupplies.cs:118-126, 312-330) - jak sakwy gracza; lord nic z niego nie oddaje, wiec nie ma premii i nie ma podwojnego zuzycia.</summary>
-        private static void CountAiStock(Ctx c, MobileParty mp)
-        {
-            var sur = AiSurplus(mp, ArmoryOf(mp));
-            if (sur.Melee > 0) c.SurW += sur.Melee;
-            foreach (var kv in sur.ByType)
-            {
-                int g = TypeGroup(kv.Key);
-                if (g == GW) c.SurW += kv.Value; else if (g == GA) c.SurA += kv.Value;
-            }
-        }
-
-        private static int TypeGroup(int type)
-        {
-            switch ((ItemObject.ItemTypeEnum)type)
-            {
-                case ItemObject.ItemTypeEnum.OneHandedWeapon: case ItemObject.ItemTypeEnum.TwoHandedWeapon: case ItemObject.ItemTypeEnum.Polearm:
-                case ItemObject.ItemTypeEnum.Bow: case ItemObject.ItemTypeEnum.Crossbow: case ItemObject.ItemTypeEnum.Thrown: case ItemObject.ItemTypeEnum.Shield:
-                    return GW;
-                case ItemObject.ItemTypeEnum.BodyArmor: case ItemObject.ItemTypeEnum.HeadArmor: case ItemObject.ItemTypeEnum.LegArmor: case ItemObject.ItemTypeEnum.HandArmor:
-                    return GA;
-            }
-            return -1;
         }
 
         // ------------------------------------------------------------ wynik modelu (ArmsDrill.TrainingPostfix)
@@ -1109,7 +961,7 @@ namespace Armoury
             if (c.Sleepless) { _aSleepDawn++; if (c.DebtNow == 0) _aSleepPaid++; }   // sen od switu; splacone przed treningiem - przed MUSZTRA-j moglyby cwiczyc
             if (c.Lead >= 0) _leads.Add(c.Lead); else _aNoLead++;
             int b = Bucket(c.Moved); _hb[b]++;
-            if (c.Full > 0) { if (c.StockW >= c.Full && c.StockA >= c.Full) _aFullStock++; else if (c.StockW + c.StockA == 0) _aNoStock++; }
+            if (c.Kit > 0 && c.M != null) { if (c.Ready >= c.Kit) _aFullStock++; else { int cov = 0; for (int i = 0; i < NK; i++) cov += c.M.Cov[i]; if (cov == 0) _aNoStock++; } }
             var k = KOf(mp);
             if (k != null) { k.PartyDays++; k.Hb[b]++; }
         }
@@ -1141,6 +993,8 @@ namespace Armoury
                     _room[el.Character] = new TroopRoom { Room = rm, Room0 = rm, Men = el.Number, Max = max };
                 }
                 _pr = new PlayerRec { Day = (int)CampaignTime.Now.ToDays };
+                // 562: zapas musztry rozliczony ze zbrojownia (nadmiar i braki bitwy wracaja, braki zestawu ludzie biora z nadwyzki) PRZED CtxOf - S i zuzycie z nowego stanu
+                if (StockOn) SettlePlayer(WhyDaily);
                 _ctx = null;
                 _pr.C = CtxOf(mobileParty, NoGameBase(mobileParty), s);
             }
@@ -1372,39 +1226,7 @@ namespace Armoury
 
         public static Exception TickFinalizer(Exception __exception) { _tick = null; _room.Clear(); VetBegin(); return __exception; }
 
-        // ------------------------------------------------------------ zuzycie i zlom
-        private static void Wear(Ctx c, Settings s)
-        {
-            if (!c.StockOn || c.Kit <= 0 || c.Full <= 0 || c.Off) return;   // dzien kary (glod, sen) - nikt nie cwiczy, nic sie nie zuzywa
-            var mp = c.Party;
-            bool law = c.NoBase || s.DrillLawAi;
-            float dw = law ? c.D : 1f;                     // AI bez Z14b cwiczy plasko jak w grze; od MUSZTRA-j Z14b domyslnie TAK - zuzycie AI x D (1.5 / 0.9)
-            if (dw <= 0f) return;
-            var a = AccOf(mp, true);
-            if (a == null) return;
-            int inW = Math.Min(c.StockW, c.Full), inA = Math.Min(c.StockA, c.Full);
-            a.WW += inW * dw / WearDays; a.WA += inA * dw / WearDays;
-            int nW = (int)a.WW, nA = (int)a.WA;
-            a.WW -= nW; a.WA -= nA;
-            if (nW + nA <= 0) return;
-            var gf = GoodsLedger.Begin(GoodsLedger.FDrill, mp);
-            try
-            {
-                for (int g = 0; g < 2; g++)
-                {
-                    int n = g == GW ? nW : nA;
-                    for (int k = 0; k < n; k++)
-                    {
-                        if (!(c.Main ? WearPlayerOne(g, a) : WearAiOne(mp, g, a))) break;
-                        if (c.Main) { if (g == GW) _pWornW++; else _pWornA++; }
-                        else { if (g == GW) _aWornW++; else _aWornA++; }
-                    }
-                }
-            }
-            catch (Exception e) { Stumble("Wear", e); }
-            finally { GoodsLedger.End(gf); }
-        }
-
+        // ------------------------------------------------------------ zuzycie (wedlug rodzaju - DrillKit.cs, 562) i zlom
         private static float Yield() { var s = Settings.Current; return s != null ? MBMath.ClampFloat(s.OldStockScrapYield, 0f, 1f) : 0.5f; }
 
         /// <summary>Metal zuzytej sztuki -> zlom czekajacy na kowali (ruda = ruda sztuki x OldStockScrapYield, jak zlom 174).</summary>
@@ -1417,71 +1239,6 @@ namespace Armoury
             a.Ore += ore;
             if (player) _pOreAdd += ore; else _aOreAdd += ore;
             return ore;
-        }
-
-        /// <summary>Gracz: najgorsza sztuka grupy - najpierw zapas od gracza, potem nadwyzka ludzi w zbrojowni DTE (nigdy ponizej kompletu, nigdy wklady gracza).</summary>
-        private static bool WearPlayerOne(int g, Acc a)
-        {
-            int best = -1; int bv = int.MaxValue;
-            for (int i = 0; i < _stock.Count; i++)
-            {
-                var el = _stock.GetElementCopyAtIndex(i);
-                if (el.Amount <= 0 || GroupOf(el.EquipmentElement.Item) != g) continue;
-                int v = el.EquipmentElement.ItemValue;
-                if (v < bv) { bv = v; best = i; }
-            }
-            if (best >= 0)
-            {
-                var el = _stock.GetElementCopyAtIndex(best);
-                _stock.AddToCounts(el.EquipmentElement, -1);
-                _pWornGiven++;
-                Scrap(el.EquipmentElement.Item, a, true);
-                return true;
-            }
-            var armory = QuartermasterLaw.DteArmory();
-            if (armory == null) return false;
-            EquipmentElement pick = default(EquipmentElement); bool found = false; bv = int.MaxValue;
-            foreach (var kv in PlayerSurplus())
-            {
-                if (kv.Value.Count <= 0 || TypeGroup((int)kv.Key) != g) continue;
-                foreach (var el in kv.Value.Cand)   // scalenie sklad8: egzemplarze, ktore K1 oddalby kupcowi (bez czesci gracza)
-                {
-                    int v = el.ItemValue;
-                    if (v < bv) { bv = v; pick = el; found = true; }
-                }
-            }
-            if (!found) return false;
-            armory.AddToCounts(pick, -1);
-            Scrap(pick.Item, a, true);
-            return true;
-        }
-
-        /// <summary>AI: najgorsza sztuka grupy z nadwyzki zbrojowni (sztuki ludzi; stan z AiWear). Tabor lorda nietkniety (nie jest zapasem - CountAiStock).</summary>
-        private static bool WearAiOne(MobileParty mp, int g, Acc a)
-        {
-            var arm = ArmoryOf(mp);
-            if (arm == null || arm.Count == 0) return false;
-            var sur = AiSurplus(mp, arm);
-            ItemObject pick = null; int pv = int.MaxValue;
-            foreach (var kv in arm)
-            {
-                var it = kv.Key;
-                if (it == null || kv.Value <= 0 || GroupOf(it) != g || !Eligible(it) || !sur.Cand.Contains(it)) continue;   // scalenie sklad8: tylko to, co K1 oddalby kupcowi
-                int ty = (int)it.ItemType;
-                bool ok;
-                if (sur.Melee >= 0 && AiGear.Melee(ty)) ok = sur.Melee > 0;
-                else { int ex; ok = sur.ByType.TryGetValue(ty, out ex) && ex > 0; }
-                if (!ok) continue;
-                if (it.Value < pv) { pv = it.Value; pick = it; }
-            }
-            if (pick == null) return false;
-            // stan sztuki PRZED zmiana zbrojowni (jak MenPurse.SellArmorySurplus): Sync w TakeCondition widzi pelny stan, zdejmuje jeden zapis obitej
-            // sztuki i Known - 1; potem zbrojownia - 1, wiec zapis stanu i Known zostaja zgodne ze zbrojownia (bez darmowej naprawy i fantomu po bitwie)
-            try { AiWear.TakeCondition(mp, pick); } catch (Exception e) { Stumble("TakeCondition", e); }
-            int cnt = arm[pick] - 1;
-            if (cnt > 0) arm[pick] = cnt; else arm.Remove(pick);
-            Scrap(pick, a, false);
-            return true;
         }
 
         private static ItemObject _ore;
@@ -1554,6 +1311,7 @@ namespace Armoury
             {
                 if (mp == null) return;
                 _tr.Remove(mp);
+                _aiKit.Remove(mp);   // 562: rezerwacja dzieli los zbrojowni (DTE PartyArmories.Remove)
                 if (mp == MobileParty.MainParty || mp.StringId == null) return;
                 Acc a;
                 if (_acc.TryGetValue(mp.StringId, out a)) { _oreLost += a.Ore; _acc.Remove(mp.StringId); }
@@ -1561,190 +1319,7 @@ namespace Armoury
             catch (Exception e) { Stumble("OnPartyDestroyed", e); }
         }
 
-        // ------------------------------------------------------------ przyjecie do zapasu (ekrany 1-3)
-        /// <summary>Przyjecie do zapasu gracza: bron i zbroje z listy, najtansze najpierw, do 2 x pelny na grupe; przyjete schodza z listy.
-        /// 316a (Jeff 02.11: "daj ze moge tylko wrzucic tyle ile potrzebuja, a nie ze mam potem komunikat ze jest lost"; log 01.11 01:04:28 przyjeto 35,
-        /// bez miejsca 56 - zniszczone): z ekranu Discard (SrcDiscard, przy zolnierzach) bron i zbroje bez miejsca schodza z listy i wracaja do taboru gracza
-        /// (lewa lista Discard to nowa ItemRoster gry, po DoneLogic przepada; prawa to MobileParty.MainParty.ItemRoster - przeniesienie, nie kopia).
-        /// Lup (SrcLoot) - bez zmian: lewa lista to lup, ktorego gracz nie wzial (setki sztuk po bitwie do taboru = przeciazenie wbrew wyborowi),
-        /// zostaje na polu jak w grze. Trofea Spoils (SrcTrophies) - reszta zostaje na polu (SpoilsSeal, jak dotad). Autotest - reszte zwraca wolajacy.</summary>
-        internal static int Accept(ItemRoster from, int src)
-        {
-            Clk(PScreen);
-            try
-            {
-                var main = MobileParty.MainParty;
-                if (!StockOn || from == null || from.Count == 0 || main == null) return 0;   // bez musztry albo bez Z1 zapas nic nie przyjmuje (rzeczy jak dotad)
-                var cand = new List<ItemRosterElement>();
-                for (int i = 0; i < from.Count; i++)
-                {
-                    var el = from.GetElementCopyAtIndex(i);
-                    if (el.Amount > 0 && Eligible(el.EquipmentElement.Item)) cand.Add(el);
-                }
-                if (cand.Count == 0) return 0;
-                int men = KitMen(main), full = Full(men), cap = IntakeSets * full;   // 558: zolnierze + bohaterowie, ktorzy cwicza
-                int w, a; GivenCounts(out w, out a);
-                var cur = new[] { w, a };
-                cand.Sort((x, y) => x.EquipmentElement.ItemValue.CompareTo(y.EquipmentElement.ItemValue));
-                int taken = 0, noRoom = 0, back = 0;
-                var left = new List<KeyValuePair<EquipmentElement, int>>();
-                foreach (var el in cand)
-                {
-                    int g = GroupOf(el.EquipmentElement.Item);
-                    int t = Math.Min(Math.Max(0, cap - cur[g]), el.Amount);
-                    if (t > 0) { from.AddToCounts(el.EquipmentElement, -t); _stock.AddToCounts(el.EquipmentElement, t); cur[g] += t; taken += t; }
-                    if (el.Amount - t > 0) left.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, el.Amount - t));
-                }
-                // 316a: nadmiar z Discard wraca do taboru, ale tylko gdy zapas cos przyjal (gracz dawal ludziom bron); zapas pelny (nic nie przyjal) - Discard wyrzuca
-                // jak w grze (recenzja 316a: inaczej przy pelnym zapasie nie da sie zrzucic broni ani zbroi, np. przy przeciazeniu)
-                bool toBag = src == SrcDiscard && taken > 0 && men > 0 && main.ItemRoster != null && !ReferenceEquals(from, main.ItemRoster);
-                foreach (var kv in left)
-                {
-                    if (toBag) { from.AddToCounts(kv.Key, -kv.Value); main.ItemRoster.AddToCounts(kv.Key, kv.Value); back += kv.Value; }   // przeniesienie: z listy do taboru
-                    else noRoom += kv.Value;
-                }
-                if (src >= 0 && src < _in.Length) _in[src] += taken;
-                _noRoom += noRoom;
-                _backBag += back;
-                string rest = src == SrcTrophies ? "stay on the field" : (src == SrcAutotest ? "go back to the baggage" : src == SrcLoot ? "stay with the loot you leave behind" : "are thrown away");
-                // stan laczny (od Ciebie + zapasowa bron ludzi w zbrojowni) wobec pelnego, osobno wolne miejsce na to, co dajesz
-                int surW = 0, surA = 0;
-                if (men > 0)
-                    foreach (var kv in PlayerSurplus()) { int g = TypeGroup((int)kv.Key); if (g == GW) surW += kv.Value.Count; else if (g == GA) surA += kv.Value.Count; }
-                int roomW = Math.Max(0, cap - cur[GW]), roomA = Math.Max(0, cap - cur[GA]);
-                if (men > 0)   // m110-sam: bez zolnierzy (sam / sami bohaterowie) bez napisu - zapas nic nie przyjmuje (cap 0), rzeczy jak w grze
-                    Log.Player("Your men took " + taken + " pieces into their drill stock" + (back > 0 ? "; " + back + " pieces they do not need went back to your baggage" : "") + ". They now drill with " + (cur[GW] + surW) + " weapons and " + (cur[GA] + surA)
-                               + " pieces of armour, their spare kit in the armoury included (a full set is " + full + " of each - " + (MenPerPiece == 1 ? "one per man" : "one per " + MenPerPiece + " men") + ", beside their battle kit). They will take "
-                               + roomW + " more weapons and " + roomA + " more pieces of armour from you." + (noRoom > 0 ? " " + noRoom + " pieces " + rest + " - no room." : ""),
-                               noRoom > 0 && taken == 0);
-                Log.Info("Musztra: zapas - przyjeto " + taken + " szt. (" + SrcName[Math.Max(0, Math.Min(SrcName.Length - 1, src))] + "), bez miejsca " + noRoom + ", wrocone do taborow " + back
-                         + "; zapas od gracza: bron " + cur[GW] + ", zbroje " + cur[GA] + "; z nadwyzka ludzi: bron " + (cur[GW] + surW) + ", zbroje " + (cur[GA] + surA)
-                         + " (pelny " + full + ", limit od gracza " + cap + " na grupe, wolne " + roomW + "/" + roomA + ").");
-                return taken;
-            }
-            catch (Exception e) { Stumble("Accept", e); return 0; }
-            finally { Unclk(); }
-        }
-
-        /// <summary>Spoils "Leave" (SpoilsSeal): trofea zostawione na polu - bron i zbroje do zapasu.</summary>
-        internal static void AcceptTrophies(ItemRoster r) { Accept(r, SrcTrophies); }
-
-        /// <summary>Podpowiedz Spoils "Leave" przy czynnym zapasie (LeaveOn): ile sztuk ludzie jeszcze przyjma; reszta zostaje na polu bez XP (Z1).</summary>
-        internal static string TrophyTip()
-        {
-            int room = 0, full = 0;
-            try
-            {
-                full = Full(KitMen(MobileParty.MainParty)); int w, a; GivenCounts(out w, out a);   // 558
-                room = Math.Max(0, IntakeSets * full - w) + Math.Max(0, IntakeSets * full - a);
-            }
-            catch (Exception e) { Stumble("TrophyTip", e); }
-            if (PartyWords.NoTroops && full <= 0) return "Remaining {COUNT} items will be left on the field.";   // 558: sami towarzysze tez cwicza   // m110-sam: bez zolnierzy zapas nic nie przyjmuje - jak LeftBehindTip
-            return "Remaining {COUNT} items: your men keep up to " + room + " pieces of arms and armour for their drill stock, the rest stay on the field.";
-        }
-
-        // ------------------------------------------------------------ 541: zapas musztry na pasku mapy (MarchHud - Weapons i Armour)
-        /// <summary>541: stan zapasu musztry gracza dla paska mapy. Have = od gracza + nadwyzka ludzi (ta sama liczba co "drill kit" w Accept i wzor S w CtxOf).</summary>
-        internal sealed class Kit
-        {
-            internal bool Ok;                                  // false - zapas wylaczony albo blad liczenia
-            internal int Men, Full, GivenW, GivenA, SurW, SurA, WornW, WornA;
-            internal int Heroes;                               // 558: bohaterowie, ktorzy cwicza (bez gracza)
-            internal int KitN { get { return Men + Heroes; } }
-            internal bool PerkW, PerkA;
-            internal float AccW, AccA;                         // ulamek zuzycia do nastepnej sztuki (0..1)
-            internal int HaveW { get { return GivenW + SurW; } }
-            internal int HaveA { get { return GivenA + SurA; } }
-            /// <summary>548: ludzi (pelnych zestawow) gotowych do musztry - min(bron w uzyciu, zbroje w uzyciu); w uzyciu = min(stan, komplet). Pasek mapy.</summary>
-            internal int Ready { get { return Math.Min(Math.Min(HaveW, Full), Math.Min(HaveA, Full)); } }
-            internal int RoomW { get { return Math.Max(0, IntakeSets * Full - GivenW); } }
-            internal int RoomA { get { return Math.Max(0, IntakeSets * Full - GivenA); } }
-            internal float Bonus(bool weapons)                 // premia S tej grupy (0.10 przy pelnym, x1.5 z perkiem)
-            {
-                int have = weapons ? HaveW : HaveA;
-                float u = Full > 0 ? Math.Min(1f, have / (float)Full) : 0f;
-                return StockBonus * u * ((weapons ? PerkW : PerkA) ? PerkMult : 1f);
-            }
-            internal float WearPerFullDay(bool weapons)        // sztuk na pelny dzien cwiczen (8 h, CampDrill.DayFull)
-            {
-                int inUse = Math.Min(weapons ? HaveW : HaveA, Full);
-                return inUse * CampDrill.DayFull / WearDays;
-            }
-        }
-        internal static float BonusPerSet { get { return StockBonus; } }
-        internal static float BonusPerkMult { get { return PerkMult; } }
-        internal static int OnePer { get { return MenPerPiece; } }
-        internal static int IntakeSetsN { get { return IntakeSets; } }
-
-        private static readonly Kit _hudKit = new Kit();
-        private static int _hudArmVer = int.MinValue, _hudRosVer = int.MinValue, _hudBagVer = int.MinValue, _hudDay = int.MinValue, _hudAt = Environment.TickCount - 60000,
-                           _hudFullAt = Environment.TickCount - 60000, _hudN, _hudFullN;
-        private static ItemRoster _hudArm;
-        private static object _hudPv;   // recenzja 541: KitPreview.Last przy ostatnim przeliczeniu (nowy wynik od kogos innego - Accept, meldunek, DteMapBar533 - przelicza pasek)
-
-        /// <summary>541: odczyt dla paska mapy (watek glowny, co 0.2 s). Ludzie i od gracza - zywe (dwa pola i mala petla); nadwyzka ludzi (11 planow K1) liczona od nowa
-        /// tylko po zmianie klucza (zbrojownia, sklad, sakwy, dzien, nowy KitPreview.Last) i najwyzej raz na 1 s - inaczej z pamieci. Recenzja 541: plan nadwyzki pyta
-        /// podglad bitwy (KitPreview.ForArmoury -> Get) - gdy pamiec podgladu jest aktualna (KitPreview.Fresh), to bez liczenia; gdy nie - pelny Compute (proba DTE,
-        /// ok. 35 ms) najwyzej raz na 5 s (jak DteMapBar533), a do tego czasu pasek trzyma poprzednie liczby. Licznik MenPurse._keptGiven przywracany. Nie rzuca.</summary>
-        internal static Kit HudKit()
-        {
-            var k = _hudKit;
-            try
-            {
-                var main = MobileParty.MainParty;
-                k.Ok = false;
-                if (!StockOn || main == null) return k;
-                k.Men = Men(main);
-                k.Heroes = KitHeroes(main, Settings.Current, true);
-                k.Full = Full(k.KitN);                         // 558
-                int w, a; GivenCounts(out w, out a); k.GivenW = w; k.GivenA = a;
-                k.WornW = _pWornW; k.WornA = _pWornA;
-                var acc = AccOf(main, false);
-                k.AccW = acc != null ? acc.WW : 0f; k.AccA = acc != null ? acc.WA : 0f;
-                if (k.KitN <= 0) { k.SurW = k.SurA = 0; k.Ok = true; return k; }
-                var arm = QuartermasterLaw.DteArmory();
-                var bag = main.ItemRoster;
-                int av = arm != null ? arm.VersionNo : -1, rv = main.MemberRoster != null ? main.MemberRoster.VersionNo : -1, bv = bag != null ? bag.VersionNo : -1;
-                int day = (int)CampaignTime.Now.ToDays;
-                var last = KitPreview.Last;
-                int now = Environment.TickCount;
-                bool changed = !ReferenceEquals(arm, _hudArm) || av != _hudArmVer || rv != _hudRosVer || bv != _hudBagVer || day != _hudDay || !ReferenceEquals(last, _hudPv);
-                if (changed && unchecked(now - _hudAt) >= 1000)
-                {
-                    _hudAt = now;
-                    // podglad z pamieci aktualny (Get(false) bez liczenia) albo minelo 5 s od ostatniego pelnego liczenia - inaczej czekamy (klucz nie zapisany, proba za 1 s)
-                    bool fresh = arm == null || KitPreview.Fresh(last);
-                    if (fresh || unchecked(now - _hudFullAt) >= 5000)
-                    {
-                        if (!fresh) { _hudFullAt = now; _hudFullN++; }
-                        _hudN++;
-                        int sw = 0, sa = 0, kept = MenPurse.KeptGiven;
-                        try
-                        {
-                            if (arm != null)
-                                foreach (var kv in PlayerSurplus()) { int g = TypeGroup((int)kv.Key); if (g == GW) sw += kv.Value.Count; else if (g == GA) sa += kv.Value.Count; }
-                        }
-                        finally { MenPurse.KeptGiven = kept; }
-                        k.SurW = sw; k.SurA = sa;
-                        _hudArm = arm; _hudArmVer = av; _hudRosVer = rv; _hudBagVer = bv; _hudDay = day; _hudPv = KitPreview.Last;   // Last po liczeniu (Get mogl go podmienic)
-                    }
-                }
-                k.PerkW = main.HasPerk(DefaultPerks.Steward.GivingHands);
-                k.PerkA = main.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
-                k.Ok = true;
-            }
-            catch (Exception e) { k.Ok = false; Stumble("HudKit", e); }
-            return k;
-        }
-
-        /// <summary>541: liczba przeliczen nadwyzki dla paska (do linii doby MarchHud.State).</summary>
-        internal static int HudKitCounts { get { return _hudN; } }
-        /// <summary>Recenzja 541: w tym przeliczen z pelnym liczeniem podgladu bitwy (pamiec KitPreview nieaktualna; najwyzej raz na 5 s).</summary>
-        internal static int HudKitFullCounts { get { return _hudFullN; } }
-
-        /// <summary>541: nowa kampania - pamiec paska od zera.</summary>
-        private static void HudKitReset() { _hudArm = null; _hudPv = null; _hudArmVer = _hudRosVer = _hudBagVer = _hudDay = int.MinValue; _hudAt = _hudFullAt = Environment.TickCount - 60000; _hudN = _hudFullN = 0; _hudKit.Ok = false; _hudKit.SurW = _hudKit.SurA = 0; }
-
+        // ------------------------------------------------------------ przyjecie do zapasu (ekrany 1-3), pasek mapy - DrillKit.cs (562)
         // ekran 1 (zwykly ekwipunek "Discard") i 2 (lup gry): prefiks + finalizer na metodzie otwierajacej, postfiks na InventoryLogic.Initialize
         public static void OpenDiscardPrefix() { _opening = 1 + SrcDiscard; }
         public static void OpenLootPrefix() { _opening = 1 + SrcLoot; }
@@ -1840,11 +1415,18 @@ namespace Armoury
                                   + (s.NightRestEnabled ? ", gracz z kara" : ""))
                      + ", Z14b (Drill Law Ai) " + On(s.DrillLawAi) + "; " + masks + "; stale: postoj x" + F2(RestDay) + " (ruch < " + RestBelowHours + " h z 24, godzina postoju: osada, oboz, <= "
                      + F2(RestStep) + " jedn./h), marsz x" + F2(MarchDay) + ", dowodca Przywodztwo/" + (int)LeadNorm + " [" + F2(LeadMin) + "-" + F2(LeadMax) + "], zapas +"
-                     + (int)(StockBonus * 100) + "% za grupe (perk x" + F2(PerkMult) + "), sztuka sluzy " + (int)WearDays + " dni cwiczen, zlom x" + F2(Yield())
-                     + "; zapas od gracza: bron " + w + ", zbroje " + a + (imp != null ? "; " + imp : "") + ".");
+                     + (int)(StockBonus * 100) + "% za polowe (bron, zbroja; u = ludzie z kompletem do roli / komplet ludzi; perk x" + F2(PerkMult) + "), zycie rodzajow w dniach musztry: " + LifeLog() + ", zlom x" + F2(Yield())
+                     + "; zapas musztry (562 - pelny zestaw do roli, ludzie biora braki ze zbrojowni): bron " + w + ", zbroje " + a + (imp != null ? "; " + imp : "") + ".");
         }
 
         private static string On(bool b) { return b ? "TAK" : "nie"; }
+
+        private static string LifeLog()
+        {
+            var sb = new StringBuilder();
+            for (int k = 0; k < NK; k++) { if (sb.Length > 0) sb.Append(", "); sb.Append(KindPl[k]).Append(' ').Append((int)(WearDays * LifeX[k])); }
+            return sb.ToString();
+        }
 
         /// <summary>MUSZTRA-jp (recenzja 1): maski godzin ruchu partii lordow z zapisu (segment T= napisu arm_drill) - jak maska gracza: pozycja z chwili
         /// wczytania (= z chwili zapisu), Stamp = biezaca godzina minus wiek z zapisu (godziny nieobserwowane przed zapisem zostaja nieobserwowane - Observe
@@ -1938,14 +1520,29 @@ namespace Armoury
                 foreach (var kv in _acc)
                 {
                     var a = kv.Value;
-                    if (!Safe(kv.Key) || (a.WW <= 0f && a.WA <= 0f && a.Ore <= 0f)) continue;
+                    float ww = a.SumW(0, KThrown), wa = a.SumW(KBody, KCape);   // 562: sumy rodzajow - stary DLL po cofnieciu czyta A= poprawnie
+                    if (!Safe(kv.Key) || (ww <= 0f && wa <= 0f && a.Ore <= 0f)) continue;
                     if (!first) sb.Append(';');
                     first = false;
                     // format v1 bez zmian (5 pol): piate pole (dawniej zlom z taboru lorda) zawsze 0 - tabor nie jest juz zapasem
-                    sb.Append(kv.Key).Append(',').Append(a.WW.ToString("0.###", inv)).Append(',').Append(a.WA.ToString("0.###", inv)).Append(',')
+                    sb.Append(kv.Key).Append(',').Append(ww.ToString("0.###", inv)).Append(',').Append(wa.ToString("0.###", inv)).Append(',')
                       .Append(a.Ore.ToString("0.###", inv)).Append(",0");
                     parties++;
                     if (main != null && kv.Key == main.StringId) oreMain = a.Ore;
+                }
+                // 562: liczniki zuzycia wedlug rodzaju "id,k,v,k,v;..." (tylko niezerowe); stary DLL segment pomija
+                sb.Append("|K=");
+                first = true;
+                foreach (var kv in _acc)
+                {
+                    var a = kv.Value;
+                    if (!Safe(kv.Key)) continue;
+                    var one = new StringBuilder();
+                    for (int k = 0; k < NK; k++) if (a.WK[k] > 0.0005f) one.Append(',').Append(k.ToString(inv)).Append(',').Append(a.WK[k].ToString("0.###", inv));
+                    if (one.Length == 0) continue;
+                    if (!first) sb.Append(';');
+                    first = false;
+                    sb.Append(kv.Key).Append(one);
                 }
                 // MUSZTRA-jp (recenzja 1): maski godzin ruchu pozostalych partii lordow - "id,maska,wiek" (wiek = godziny od ostatniej obserwacji, < 24).
                 // Pomijane: gracz (pole M=, format bez zmian), maska calej doby ruchu (= brak maski) i obserwacja starsza niz doba. Stary DLL segment
@@ -1980,7 +1577,8 @@ namespace Armoury
         {
             try
             {
-                _pendingStock = null; _importNote = null; _importRejected = 0; _pendingMasks.Clear(); _maskSegSeen = false;
+                _pendingStock = null; _importNote = null; _importRejected = 0; _importLegacy = 0; _pendingMasks.Clear(); _maskSegSeen = false;
+                var pendK = new Dictionary<string, float[]>();   // 562: liczniki rodzajow z segmentu K=
                 if (string.IsNullOrEmpty(v)) { _importNote = "z zapisu: brak klucza (stary zapis) - zapas pusty, godziny ruchu nieznane (ruch)"; return; }
                 var inv = CultureInfo.InvariantCulture;
                 foreach (var part in v.Split('|'))
@@ -2000,6 +1598,21 @@ namespace Armoury
                         }
                     }
                     else if (part.StartsWith("F=")) _fed = part.Substring(2) == "1";
+                    else if (part.StartsWith("K="))
+                    {
+                        foreach (var x in part.Substring(2).Split(';'))
+                        {
+                            var f = x.Split(',');
+                            if (f.Length < 3 || f[0].Length == 0 || (f.Length - 1) % 2 != 0) continue;
+                            var wk = new float[NK];
+                            for (int i = 1; i + 1 < f.Length; i += 2)
+                            {
+                                int k; float fv;
+                                if (int.TryParse(f[i], NumberStyles.Integer, inv, out k) && k >= 0 && k < NK && float.TryParse(f[i + 1], NumberStyles.Float, inv, out fv) && fv > 0f) wk[k] = fv;
+                            }
+                            pendK[f[0]] = wk;
+                        }
+                    }
                     else if (part.StartsWith("S=")) _pendingStock = part.Substring(2);
                     else if (part.StartsWith("A="))
                     {
@@ -2014,6 +1627,13 @@ namespace Armoury
                         }
                     }
                 }
+                // 562: liczniki rodzajow z K=; zapis sprzed 562 (bez K=) - bron do 1H, zbroje do korpusu
+                foreach (var kv in _acc)
+                {
+                    float[] wk;
+                    if (pendK.TryGetValue(kv.Key, out wk)) Array.Copy(wk, kv.Value.WK, NK);
+                    else { kv.Value.WK[K1H] = Math.Max(0f, kv.Value.WW); kv.Value.WK[KBody] = Math.Max(0f, kv.Value.WA); }
+                }
             }
             catch (Exception e) { Stumble("Import", e); }
         }
@@ -2026,6 +1646,7 @@ namespace Armoury
             var raw = _pendingStock;
             _pendingStock = null;
             if (raw == null) return note;
+            _migrPending = true;   // 562: pierwsze rozliczenie po wczytaniu pisze linie migracji
             int pcs = 0;
             try
             {
@@ -2038,7 +1659,10 @@ namespace Armoury
                     ItemObject it = null; ItemModifier mod = null;
                     try { it = MBObjectManager.Instance.GetObject<ItemObject>(f[0]); } catch { }
                     if (f[1].Length > 0) { try { mod = MBObjectManager.Instance.GetObject<ItemModifier>(f[1]); } catch { } }
-                    if (it == null || !Eligible(it) || (f[1].Length > 0 && mod == null)) { _importRejected += n; continue; }
+                    // 562: rekawice ze starego zapasu (poza zestawem) - przyjete, pierwsze rozliczenie zwraca je do zbrojowni ludzi (inaczej by zginely)
+                    bool legacy = it != null && KindOf(it) < 0 && it.ItemType == ItemObject.ItemTypeEnum.HandArmor && !it.IsCraftedByPlayer;
+                    if (it == null || (!Eligible(it) && !legacy) || (f[1].Length > 0 && mod == null)) { _importRejected += n; continue; }
+                    if (legacy) _importLegacy += n;
                     _stock.AddToCounts(new EquipmentElement(it, mod), n);
                     pcs += n;
                 }
@@ -2050,7 +1674,7 @@ namespace Armoury
             if (main != null && _acc.TryGetValue(main.StringId ?? "", out am)) oreMain = am.Ore;
             return "z zapisu: zapas " + pcs + " szt. (bron " + w + ", zbroje " + a + "), godzin ruchu gracza " + (_pendingMainMask >= 0 ? Pop(_pendingMainMask).ToString() : "-")
                    + " z 24, zlom gracza czeka " + F2(oreMain) + " rudy, partii z licznikami " + _acc.Count + ", zasilenie autotestu " + (_fed ? "tak" : "nie")
-                   + ", odrzucono " + _importRejected + " szt.";
+                   + ", odrzucono " + _importRejected + " szt., rekawice i inne spoza zestawu 562 (do zbrojowni przy pierwszym rozliczeniu) " + _importLegacy + " szt.";
         }
 
         // ------------------------------------------------------------ autotest: zasilenie zapasu (krytyka 7)
@@ -2073,73 +1697,6 @@ namespace Armoury
             return _autotest == 1;
         }
 
-        /// <summary>Tylko w autotescie (CrashScribe.Autotest.Active), co dobe od doby 2, dopoki zapas od gracza nie jest pelny w obu grupach (flaga w zapisie):
-        /// brakujace do pelnego (sztuka na 3 ludzi) sztuki broni i zbroi z taboru gracza, reszta kupiona najtaniej z polki miasta za zloto gracza, gdy druzyna
-        /// stoi w miescie (handel - kasa miasta dostaje zaplate); ta sama funkcja przyjecia co ekrany; czego zapas nie przyjmie - wraca do taboru.
-        /// Bez ludzi (nowa kampania: gracz sam) nie ma czego zasilac - proba nastepnej doby; flaga dopiero przy pelnym zapasie.</summary>
-        private static void AutotestFeed()
-        {
-            var main = MobileParty.MainParty;
-            if (!StockOn || main == null || _fed || !AutotestActive()) return;
-            _feedTries++;
-            int men = KitMen(main), full = Full(men);   // 558: zolnierze + bohaterowie, ktorzy cwicza
-            int w0, a0; GivenCounts(out w0, out a0);
-            int[] want = { Math.Max(0, full - w0), Math.Max(0, full - a0) };
-            if (full > 0 && want[GW] + want[GA] == 0) { _fed = true; Log.Info("Musztra (autotest): zapas od gracza pelny (bron " + w0 + ", zbroje " + a0 + " na pelny " + full + ") - zasilanie zakonczone."); return; }
-            var st = main.CurrentSettlement;
-            bool town = st != null && st.IsTown && st.Town != null && st.ItemRoster != null;
-            if (full <= 0)
-            {
-                if (_feedTries == 1 || _feedTries % 10 == 0)
-                    Log.Info("Musztra (autotest): zasilenie zapasu - proba " + _feedTries + ": druzyna bez zolnierzy (ludzi " + men + "), nic do zasilenia; ponowie w nastepnej dobie.");
-                return;
-            }
-            var tmp = new ItemRoster();
-            int[] got = new int[2];
-            int fromBag = 0, bought = 0, gold = 0;
-            var bag = main.ItemRoster;
-            var bagEls = new List<ItemRosterElement>();
-            for (int i = 0; i < bag.Count; i++) { var el = bag.GetElementCopyAtIndex(i); if (el.Amount > 0 && Eligible(el.EquipmentElement.Item)) bagEls.Add(el); }
-            foreach (var el in bagEls)
-            {
-                int g = GroupOf(el.EquipmentElement.Item);
-                int t = Math.Min(want[g] - got[g], el.Amount);
-                if (t <= 0) continue;
-                bag.AddToCounts(el.EquipmentElement, -t); tmp.AddToCounts(el.EquipmentElement, t); got[g] += t; fromBag += t;
-            }
-            if (town)
-            {
-                for (int g = 0; g < 2; g++)
-                {
-                    while (got[g] < want[g])
-                    {
-                        int best = -1, bp = int.MaxValue;
-                        var shelf = st.ItemRoster;
-                        for (int i = 0; i < shelf.Count; i++)
-                        {
-                            var el = shelf.GetElementCopyAtIndex(i);
-                            if (el.Amount <= 0 || GroupOf(el.EquipmentElement.Item) != g || !Eligible(el.EquipmentElement.Item)) continue;
-                            int p = st.Town.MarketData.GetPrice(el.EquipmentElement, main, false, st.Party);
-                            if (p > 0 && p < bp) { bp = p; best = i; }
-                        }
-                        if (best < 0 || Hero.MainHero.Gold < bp) break;
-                        var pick = shelf.GetElementCopyAtIndex(best).EquipmentElement;
-                        shelf.AddToCounts(pick, -1);
-                        GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, st, bp, true);
-                        tmp.AddToCounts(pick, 1); got[g]++; bought++; gold += bp;
-                    }
-                }
-            }
-            int taken = fromBag + bought > 0 ? Accept(tmp, SrcAutotest) : 0, back = 0;
-            for (int i = 0; i < tmp.Count; i++) { var el = tmp.GetElementCopyAtIndex(i); if (el.Amount > 0) { bag.AddToCounts(el.EquipmentElement, el.Amount); back += el.Amount; } }
-            int w1, a1; GivenCounts(out w1, out a1);
-            if (w1 >= full && a1 >= full) _fed = true;
-            if (fromBag + bought > 0 || _feedTries == 1 || _feedTries % 10 == 0 || _fed)
-                Log.Info("Musztra (autotest): zasilenie zapasu - proba " + _feedTries + ", ludzi " + men + " (pelny " + full + "): z taboru " + fromBag + " szt., kupione " + bought
-                         + " szt. za " + gold + " d " + (town ? "w " + st.Name : "(poza miastem - bez zakupu)") + ", zloto gracza " + Hero.MainHero.Gold + "; przyjeto " + taken
-                         + ", wraca do taboru " + back + "; zapas od gracza: bron " + w1 + ", zbroje " + a1 + (_fed ? " - PELNY, koniec zasilania." : " - ponowie w nastepnej dobie."));
-        }
-
         // ------------------------------------------------------------ linie dnia
         internal static void Daily()
         {
@@ -2151,17 +1708,20 @@ namespace Armoury
             try
             {
                 _dailyN++;
+                ReleaseIfOff();   // recenzja 562 (2): zapas wylaczony - caly do zbrojowni ludzi (Daily biegnie zawsze, Hourly tylko przy czynnej musztrze; nie rzuca)
                 if (_dailyN >= 2 && !_fed) { try { AutotestFeed(); } catch (Exception e) { Stumble("AutotestFeed", e); } }
                 int w, a; GivenCounts(out w, out a);
                 int given = w + a;
                 int inToday = _in[0] + _in[1] + _in[2] + _in[3];
                 string bal;
-                if (_givenYday < 0) bal = "bilans zapasu od Ciebie od jutra (dzis " + given + ")";
+                int backAll = _pBack + _pBackOther + _pBackBattle + _pBackOff + _pLost;   // recenzja 562: zwrot przy wylaczonym zapasie / pojmaniu i strata przy pojmaniu
+                if (_givenYday < 0) bal = "bilans zapasu musztry od jutra (dzis " + given + ")";
                 else
                 {
-                    int expect = _givenYday + inToday - _pWornGiven;
-                    bal = "bilans zapasu od Ciebie " + (expect == given ? "ZGODNY" : "NIEZGODNY") + " (wczoraj " + _givenYday + " + przyjete " + inToday + " - zuzyte " + _pWornGiven + " = dzis " + given
-                          + (expect == given ? "" : ", oczekiwane " + expect) + ")";
+                    // 562: zapas zmienia sie przyjeciem od gracza, ruchem ze zbrojowni (wziete, zwrocone) i zuzyciem - nic poza tym
+                    int expect = _givenYday + inToday + _pTaken - backAll - _pWornN;
+                    bal = "bilans zapasu musztry " + (expect == given ? "ZGODNY" : "NIEZGODNY") + " (wczoraj " + _givenYday + " + przyjete " + inToday + " + wziete ze zbrojowni " + _pTaken
+                          + " - zwrocone i stracone " + backAll + " - zuzyte " + _pWornN + " = dzis " + given + (expect == given ? "" : ", oczekiwane " + expect) + ")";
                 }
                 _givenYday = given;
                 if (s.DrillLog)
@@ -2212,9 +1772,14 @@ namespace Armoury
                 if (r.Cut > 0)   // m114-musztra: uciete wedlug oddzialow (typ, ludzie, miejsce przed treningiem, uciete, powod)
                     sb.Append(" [uciete: szczyt linii ").Append(r.CutBy[CutTop]).Append(", gotowi ").Append(r.CutBy[CutReady]).Append(", brak przedmiotu ").Append(r.CutBy[CutItem])
                       .Append(", brak zlota ").Append(r.CutBy[CutGold]).Append(", brak perka ").Append(r.CutBy[CutPerk]).Append(", brak uprzezy ").Append(r.CutBy[CutSaddle]).Append(string.IsNullOrEmpty(r.CutLog) ? "" : "; " + r.CutLog).Append(']');
-                sb.Append("; zapas: bron ").Append(c.StockW).Append('/').Append(c.Full).Append(" (od Ciebie ").Append(c.GivenW).Append(", nadwyzka ludzi ").Append(c.SurW)
-                  .Append("), zbroje ").Append(c.StockA).Append('/').Append(c.Full).Append(" (od Ciebie ").Append(c.GivenA).Append(", nadwyzka ").Append(c.SurA)
-                  .Append("), Giving Hands ").Append(c.PerkW ? "tak" : "nie").Append(", Paid in Promise ").Append(c.PerkA ? "tak" : "nie")
+                // 562: zestaw do roli - ludzie z kompletem (calosc, bron, zbroja, bron biala, dystans) i rodzaje potrzeba/pokryte
+                var km = c.M;
+                if (km != null)
+                    sb.Append("; zestaw 562: z kompletem ").Append(c.Ready).Append('/').Append(c.Kit).Append(" (bron ").Append(c.ReadyW).Append(", zbroje ").Append(c.ReadyA)
+                      .Append(", biala ").Append(km.ReadyM).Append('/').Append(km.NeedM).Append(", dystans ").Append(km.ReadyR).Append('/').Append(km.NeedR).Append("), rodzaje [").Append(KindLog(km))
+                      .Append("], role: ").Append(RoleLog(km));
+                else sb.Append("; zestaw 562: brak miary");
+                sb.Append(", Giving Hands ").Append(c.PerkW ? "tak" : "nie").Append(", Paid in Promise ").Append(c.PerkA ? "tak" : "nie")
                   .Append(c.StockOn ? "" : " (zapas wylaczony)");
             }
             float ore = 0f; Acc am;
@@ -2222,9 +1787,14 @@ namespace Armoury
             if (main != null && main.StringId != null && _acc.TryGetValue(main.StringId, out am)) ore = am.Ore;
             sb.Append("; przyjeto ").Append(_in[0] + _in[1] + _in[2] + _in[3]).Append(" (wyrzucone ").Append(_in[SrcDiscard]).Append(", lup ").Append(_in[SrcLoot])
               .Append(", trofea ").Append(_in[SrcTrophies]).Append(", autotest ").Append(_in[SrcAutotest]).Append("), bez miejsca ").Append(_noRoom).Append(", wrocone do taborow ").Append(_backBag)
-              .Append("; zuzyto ").Append(_pWornW + _pWornA).Append(" (bron ").Append(_pWornW).Append(", zbroje ").Append(_pWornA).Append(", w tym od Ciebie ").Append(_pWornGiven)
+              .Append("; rozliczenia 562: ").Append(_settleN).Append(" (doba ").Append(_settleBy[WhyDaily]).Append(", sklad ").Append(_settleBy[WhyRoster]).Append(", bitwa ").Append(_settleBy[WhyBattle])
+              .Append(", miasto ").Append(_settleBy[WhyTown]).Append("; ").Append((_settleTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", CultureInfo.InvariantCulture)).Append(" ms, podgladow bitwy ")
+              .Append(_settlePv).Append(_pvNone > 0 ? ", bez podgladu " + _pvNone : "").Append("), wzieto ze zbrojowni ").Append(_pTaken).Append(", zwrocono ponad komplet ").Append(_pBack)
+              .Append(", spoza zestawu ").Append(_pBackOther).Append(", pod braki bitwy ").Append(_pBackBattle).Append(", przy wylaczonym zapasie / pojmaniu ").Append(_pBackOff).Append(", stracone przy pojmaniu ").Append(_pLost).Append(", kontrola sztuk zbrojownia + zapas ").Append(_settleBad == 0 ? "ZGODNE" : "NIEZGODNE x" + _settleBad)
+              .Append(", waga zapasu ").Append(F1(StockKg(MobileParty.MainParty, MobileParty.MainParty != null && MobileParty.MainParty.IsCurrentlyAtSea, true))).Append(" kg")
+              .Append("; zuzyto ").Append(_pWornN).Append(" (").Append(IntLog(_pWorn))
               .Append("; bez metalu ").Append(_pNoMetal).Append("), zlom +").Append(F2(_pOreAdd)).Append(" rudy, czeka ").Append(F2(ore)).Append(", sprzedano ").Append(_pSoldU)
-              .Append(" ladunkow za ").Append(_pSoldGold).Append(" d; ").Append(bal).Append("; zapas od Ciebie: bron ").Append(w).Append(", zbroje ").Append(a);
+              .Append(" ladunkow za ").Append(_pSoldGold).Append(" d; ").Append(bal).Append("; zapas musztry: bron ").Append(w).Append(", zbroje ").Append(a);
             sb.Append("; partie rodu i armii: ").Append(_cParties);
             if (_cParties > 0) sb.Append(" (ludzi ").Append(_cMen).Append(", XP ").Append((long)_cXp).Append(", dowodca sr. x").Append(F2(_cL / _cParties)).Append(", na postoju ").Append(_cRest)
                                  .Append(", bez cwiczen - glod/sen ").Append(_cOff).Append(')');
@@ -2273,7 +1843,11 @@ namespace Armoury
               .Append(_aManN > 0 ? F1(_aXpNow / _aManN) : "-").Append(" (ludzio-dni ").Append(((long)_aManN).ToString(inv)).Append(")")
               .Append("; sen od switu: partii ").Append(_aSleepDawn).Append(" (w tym splacone przed treningiem ").Append(_aSleepPaid)
               .Append(" - dawniej moglyby cwiczyc), dlug teraz > dlug o swicie (takze Z14a) ").Append(_sleepNowAbove).Append(_sleepNowAbove > 0 ? " - BLAD (ma byc 0)" : "");
-            sb.Append("; zuzyto ").Append(_aWornW + _aWornA).Append(" szt. (bron ").Append(_aWornW).Append(", zbroje ").Append(_aWornA).Append("; bez metalu ").Append(_aNoMetal)
+            int aw = 0; foreach (var v in _aWorn) aw += v;
+            // 562: rezerwacja musztry AI (sztuki zostaja w zbrojowni DTE; sprzedaz nadwyzek je omija)
+            sb.Append("; rezerwacja 562: partii ").Append(_aKitParties).Append(", sztuk ").Append(_aKitPieces).Append(", w pamieci partii ").Append(_aiKit.Count)
+              .Append(", nie sprzedane kupcom (rezerwacja) ").Append(_aiKept).Append(", sprzedaz bez rezerwacji (po wczytaniu) ").Append(_aiNoKitSale);
+            sb.Append("; zuzyto ").Append(aw).Append(" szt. (").Append(IntLog(_aWorn)).Append("; bez metalu ").Append(_aNoMetal)
               .Append("), zlom +").Append(F1(_aOreAdd)).Append(" rudy, czeka razem ").Append(F1(ore)).Append(", sprzedano ").Append(_aSoldU).Append(" ladunkow za ").Append(_aSoldGold)
               .Append(" d (lordowie ").Append(_aSoldLord).Append(", sakiewki ").Append(_aSoldPurse).Append("), przepadlo z rozbitymi ").Append(F1(_oreLost))
               .Append("; potkniecia ").Append(_stumbles).Append("; koszt ").Append((_ticks * 1000.0 / Stopwatch.Frequency).ToString("0.0", inv))

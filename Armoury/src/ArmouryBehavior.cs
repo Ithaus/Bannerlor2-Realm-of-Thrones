@@ -1848,6 +1848,7 @@ namespace Armoury
             CampaignEvents.OnItemsDiscardedByPlayerEvent.AddNonSerializedListener(this, Drill.OnDiscarded);
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("Drill.OnEntered", Drill.OnEntered));
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("Drill.OnPartyDestroyed", Drill.OnPartyDestroyed));
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(this, delegate (MapEvent me, PartyBase a, PartyBase d) { try { Drill.OnMapEventStarted(me); } catch (Exception e) { Log.Error("Drill.OnMapEventStarted", e); } });   // 562: rekruci tej godziny - zapas musztry oddaje braki bitwy przed bitwa
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("Drill.Hourly", delegate { try { Drill.Hourly(); } catch (Exception e) { Log.Error("Drill.Hourly", e); } }));
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("SkillLedger.Hourly", delegate { try { SkillLedger.Hourly(); } catch { } }));   // E8/P1 (243): ksiega umiejetnosci - wylacznik na zywo, znacznik zrodla zerwany wyjatkiem w metodzie gry (tylko log)
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
@@ -2046,6 +2047,8 @@ namespace Armoury
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, CaptiveArmory.OnPrisonerTaken);   // C4 (Jeff 14.10): pojmany gracz - zbrojownia DTE do zdobywcy, jak u lorda AI
             // f5-bitwa (recenzja 18.10): pojmany gracz - zestaw bitwy autotestu zdjety PRZED CaptiveArmory (rejestracja PO nim = wolanie przed nim); tylko autotest
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, AutotestBattleKit.OnPrisonerTaken);
+            // recenzja 562 (1): pojmany gracz - zapas musztry ma los zbrojowni (rejestracja PO CaptiveArmory = wolanie przed nim; regula w Drill.OnPrisonerTaken)
+            CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, delegate (PartyBase cp, Hero h) { try { Drill.OnPrisonerTaken(cp, h); } catch (Exception e) { Log.Error("Drill.OnPrisonerTaken", e); } });
             CrownRents.RegisterEvents(this);    // 180 (C3): bitwy, rabunki i szturmy z wrogiem o kazdej porze doby - pomiar sluzby (tylko liczniki do ticku)
             WarFront.RegisterEvents(this);      // N5-E: te same zdarzenia z miejscem - warownie przy froncie (budowle cywilne z dala od frontu)
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)
