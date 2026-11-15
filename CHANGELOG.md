@@ -32,6 +32,17 @@
 
 **Status:** DO SPRAWDZENIA (galaz noc/548-pasek-ux, nie wgrane).
 
+### Recenzja 548 (galaz noc/548-pasek-ux-fix -> noc/548-pasek-ux)
+
+Przyjete (sprawdzone w kodzie):
+- **Podpowiedz Horses liczyla bohaterow pieszych drugi raz** (MarchHud.Tooltip). Bohater bez wlasnego konia trafia do puli piechoty (MarchPairs: `AddMan(men, ch, n, KHero)`), wiec gdy idzie, jest juz w WalkNoHorse / WalkNoHarness / WalkSkill (Assign liczy walk z calej listy men). HeroFoot liczy tez bohaterow jadacych na parze z puli. Przypadek Jeffa (bohaterow 4, wlasny kon 1, bez konia 3, pieszo 1 - Amanda) dawal "On foot 1: 1 Riding too low (Amanda), 3 heroes without a horse". Zmiana: HeroFoot usuniety z `known` i z listy `why` (linia doby MarchPairs nadal pisze "bez konia N" - tam to opis stanu, nie przyczyna pieszego marszu).
+- **Dwa rozne mianowniki "men"** (Horses = r.Men z bohaterami, Drill = k.Men bez bohaterow, 133 wobec 129). Zmiana tylko tekstu podpowiedzi: Horses "N of M men ride (heroes included, as Troops on the top bar)", Drill "Ready to drill / soldiers: X of 129 soldiers ... - heroes do not drill and are not counted" (wariant 1 na N tez "soldiers, heroes not counted"). Liczby i pasek bez zmian.
+- **Wartosc awaryjna MenPerPiece** (Drill.cs): przy Settings.Current == null zwracala 3, klucz ma domyslnie 1 - teraz 1 (ta sama dla linii startowej MarchHud przez Drill.OnePer).
+
+Odrzucone: brak. Punkt 4 recenzji to nie blad kodu - przekazany Jeffowi: przy nadwyzce ludzi bliskiej 0 jego zapas ok. 82 z 129 daje czerwony Drill i ok. 64% premii zapasu, dopoki nie da ok. 47 broni i 47 zbroi; zuzycie u gracza ok. 0,2 -> ok. 0,65 sztuki na grupe na pelny dzien cwiczen.
+
+Ryzyko: tylko teksty podpowiedzi i fallback bez ustawien - liczby, kolory i szerokosc paska bez zmian. Build Armoury 0 bledow. W grze nie sprawdzone.
+
 ## 547: oblezenia - oboz trzymany do skutku tylko, gdy liczniejszy od obroncow - Armoury (SiegeWalls2.Hold.HoldsToEnd545; klucz NOWY SiegeHoldOnlyStronger = true)
 
 **Problem:** recenzja 546: bez limitu czasu oboz SLABSZY od obroncow, trzymany przez 545, siedzial pod murami 1.5-2 lata - furaz ze spichlerzy wsi trzyma jego jedzenie ponad progiem m116, kapitulacja z glodu (b) wymaga Ratio471 > 1, OB1 "mury trzymaja", straty obozu maleja wykladniczo. Jeff (15.11) z dwoch wariantow: "tylko A".
