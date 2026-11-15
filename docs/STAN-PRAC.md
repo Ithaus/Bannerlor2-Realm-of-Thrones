@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 263 (562b pasek musztry %, 562c premia wedlug sztuk + oponcze dodatkiem, 564 tempo swiata mnoznikiem, 565 pasek taboru, 566 Strong tylko pieszo), bez autotestu
+
+- Armoury.dll 94fabd5c = noc/scal-perki af95ada4 (262 + 562b/562c/564/565/566). Kopie: .bak-2026-11-15-przed-wgranie263, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie263 i -przed). Klucz NOWY World Pace Whole Speed (564).
+- Do sprawdzenia: pasek Drill %, premia musztry > 0; tooltip predkosci 'World pace' (mnoznik), 'Strong: only men on foot'; Pack czerwony gdy tabor ponad prog + wiersz 'Now'. Uwaga 564: AI moze czesciej gonic (ocena poscigu z predkosci bez tempa). W toku: 563c/d stal valyrianska (masa, Legendary Smith 275); audyt kryjowek i odwet bandytow.
+
 ## STAN 15.11 - WGRANIE 262 (562 komplet cwiczebny wedlug roli, sam sie uzupelnia ze zbrojowni), bez autotestu
 
 - Armoury.dll 1a96acf6 = noc/scal-perki afd1449d (261 + 562). Kopie: .bak-2026-11-15-przed-wgranie262, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie262 i -przed). Nowy plik kodu DrillKit.cs; zestaw musztry wazy ('Drill kit'); rekawice poza zestawem.
