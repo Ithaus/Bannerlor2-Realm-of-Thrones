@@ -2922,6 +2922,14 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SiegeLadderMinRatio { get; set; } = 4f;
 
+        [SettingPropertyFloatingInteger("Siege Ladder Storm Ratio", 0.00f, 30.00f, "0.0", HintText = "with Siege Ladder Overwhelm: an AI host at least this many times stronger than the defenders may storm with ladders from the first days of the siege, as soon as its camp is built, without waiting for a ram and a siege tower - until its first assault is repulsed; after that the usual rule (Siege Ladder Min Days and Min Ratio) applies. Never lower than Siege Ladder Min Ratio (a smaller value counts as that ratio). 0 = off", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeLadderStormRatio { get; set; } = 8f;
+
+        [SettingPropertyInteger("Siege Ladder Storm Days", 1, 364, "0", HintText = "with Siege Ladder Storm Ratio: the day of the siege from which the overwhelming host may storm with ladders (1 = from the first day, as soon as the camp is built)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeLadderStormDays { get; set; } = 1;
+
         [SettingPropertyBool("Siege Engines In Progress Dont Hold", HintText = "AI lords whose battering ram and siege tower stand ready (or whose engines have battered a breach) storm the walls without waiting for the trebuchets still being built - the game held every assault while any engine was half done, so a camp building trebuchets never stormed. Also lets Siege Ladder Overwhelm work when no engine is built at all (the game never storms without one). Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeEnginesInProgressDontHold { get; set; } = true;
@@ -14718,6 +14726,8 @@ namespace Armoury
             s.SiegeLadderOverwhelm = SiegeLadderOverwhelm;
             s.SiegeLadderMinDays = SiegeLadderMinDays;
             s.SiegeLadderMinRatio = SiegeLadderMinRatio;
+            s.SiegeLadderStormRatio = SiegeLadderStormRatio;
+            s.SiegeLadderStormDays = SiegeLadderStormDays;
             s.SiegeEnginesInProgressDontHold = SiegeEnginesInProgressDontHold;
             s.SiegeAssaultRunsToEnd = SiegeAssaultRunsToEnd;
             s.SiegeAiHoldsFreshSiege = SiegeAiHoldsFreshSiege;
