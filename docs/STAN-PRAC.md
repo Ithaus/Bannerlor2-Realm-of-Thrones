@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 251 (548 pasek czytelny ma/trzeba, musztra 1 komplet na czlowieka), bez autotestu
+
+- Armoury.dll adb93bd5 = noc/scal-perki 5cd9c77d (250 + 548). Kopie: .bak-2026-11-15-przed-wgranie251, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie251 i -przed). Klucz NOWY DrillMenPerPiece = 1; IntakeSets 1. Pozycje paska: Horses (jadacy/ludzie), Pack, Drill (bron+zbroja razem, zolnierze bez bohaterow).
+- W toku: 549 cios w plecy, 550 AI sztandaru, 551 kusze (diagnoza), 552 reakcja na ostrzal; przeglad logu sesji 15:14 (WGRANIE 250).
+
 ## STAN 15.11 - WGRANIE 250 (547 trzymanie obozu tylko przy przewadze), bez autotestu
 
 - Armoury.dll af946f8f = noc/scal-perki 9ceb645d (249 + 547, wariant A Jeffa). Kopie: .bak-2026-11-15-przed-wgranie250, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie250 i -przed). Klucz NOWY SiegeHoldOnlyStronger (TAK).
