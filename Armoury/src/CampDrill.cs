@@ -169,7 +169,7 @@ namespace Armoury
                 }
                 if (mp.MapEvent != null || mp.IsCurrentlyAtSea || NightRest.EnlistedNow) return;
                 if (!DayHour(Mod24((int)(now % 24) - 1))) return;
-                if (mp.MemberRoster == null || mp.MemberRoster.TotalRegulars <= 0) return;
+                if (NoSoldiers(mp) && Drill.PlayerDrillHeroes(mp) <= 0) return;   // 560: sami towarzysze tez cwicza
                 if (mp.Party != null && mp.Party.IsStarving) return;
                 if (NightRest.DawnDebtOf(mp) >= 1) return;
                 Roll();
@@ -447,7 +447,8 @@ namespace Armoury
                     a.optionLeaveType = GameMenuOption.LeaveType.Wait;
                     string why = WhyNot();
                     if (why != null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); }
-                    else a.Tooltip = new TextObject("{=!}Drill by day: a full day (8 hours) teaches 50% more than a day of rest did; the pace follows your Leadership"
+                    else a.Tooltip = new TextObject("{=!}" + (NoSoldiers(MobileParty.MainParty) ? "You have no men - your companions drill on their own. " : "")   // 560
+                                                    + "Drill by day: a full day (8 hours) teaches 50% more than a day of rest did; the pace follows your Leadership"
                                                     + " and your best drill master's. Marching teaches nothing.");
                     return true;
                 },
@@ -476,7 +477,9 @@ namespace Armoury
                 if (Campaign.Current == null || mp == null) return "No campaign is running.";
                 if (mp.MapEvent != null || mp.SiegeEvent != null || PlayerEncounter.Current != null) return "Not while in a battle or siege.";
                 if (mp.CurrentSettlement != null || mp.IsCurrentlyAtSea || mp.AttachedTo != null) return "Only in your own camp on land.";
-                if (mp.MemberRoster == null || mp.MemberRoster.TotalRegulars <= 0) return "You have no men to drill.";
+                // 560 (Jeff 15.11: "Moze z samymi towarzyszami"): druzyna bez zolnierzy cwiczy, gdy jest towarzysz musztry (Drill Heroes), nie ranny
+                if (NoSoldiers(mp) && Drill.PlayerDrillHeroes(mp) <= 0)
+                    return Drill.HudHeroesOn ? "You have no men to drill, and no companion fit to drill." : "You have no men to drill.";
                 Roll();
                 if (!DayHour(CampaignTime.Now.GetHourOfDay))
                     return "The men are asleep. The drill runs by day, from " + NightRest.PlayerDawn + ":00 to " + NightRest.BedNightStart + ":00.";
@@ -506,9 +509,18 @@ namespace Armoury
             catch (Exception e) { Stumble("DrillInit", e); }
         }
 
+        /// <summary>560: druzyna gracza bez zolnierzy (sami towarzysze) - napisy menu i warunek cwiczen.</summary>
+        private static bool NoSoldiers(MobileParty mp)
+        {
+            var r = mp != null ? mp.MemberRoster : null;
+            return r == null || r.TotalRegulars <= 0;
+        }
+
         private static void SetText()
         {
-            MBTextManager.SetTextVariable("ARM_DRILL_TEXT", "The men drill in camp - sword and shield, the spear wall, volleys at the butts, marching in step. Today: "
+            MBTextManager.SetTextVariable("ARM_DRILL_TEXT", (NoSoldiers(MobileParty.MainParty)   // 560: sami towarzysze
+                    ? "Your companions drill in camp - sword and shield, sparring with the spear, the bow at the butts. Today: "
+                    : "The men drill in camp - sword and shield, the spear wall, volleys at the butts, marching in step. Today: ")
                 + F1(_dayHours) + " of " + (int)FullHours + " hours. What they learn is counted with their daily drill."
                 + (_pre ? " The column halted to drill before sleep; at nightfall (" + NightRest.BedNightStart + ":00) the men bed down" + NightRest.TbsUntilDawn() + "." : ""));   // 311e; 315a: do switu (klucz SleepUntilDawn)
         }

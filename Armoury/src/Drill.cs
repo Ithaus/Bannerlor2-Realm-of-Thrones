@@ -326,10 +326,31 @@ namespace Armoury
         /// <summary>recenzja 558 pkt 2: pasek mapy - czy towarzysze gracza cwicza (tekst podpowiedzi).</summary>
         internal static bool HudHeroesOn { get { try { return HeroesOn(Settings.Current, true); } catch { return false; } } }
 
-        /// <summary>558: bohater, ktory cwiczy i liczy sie do kompletu: zywy, dorosly, nie dowodca partii (dowodca prowadzi musztre - jego Przywodztwo to L),
-        /// nigdy gracz. Ranny liczy sie do kompletu jak ranny zolnierz, ale nie cwiczy (HeroDrill).</summary>
+        /// <summary>558: bohater, ktory cwiczy i liczy sie do kompletu: zywy, dorosly, nigdy gracz. Ranny liczy sie do kompletu jak ranny zolnierz, ale nie
+        /// cwiczy (HeroDrill). 560 (Jeff 15.11: "tez moga cwiczyc AI"): dowodca partii (AI, rod gracza) cwiczy z ludzmi - ta sama regula, L dalej z jego
+        /// Przywodztwa (CtxOf); dotad dowodca byl poza musztra (prowadzil ja). Gracz nie dostaje XP musztry (zasada Jeffa).</summary>
         private static bool DrillHero(MobileParty mp, Hero h)
-        { return h != null && h.IsAlive && !h.IsChild && h != Hero.MainHero && h != mp.LeaderHero; }
+        { return h != null && h.IsAlive && !h.IsChild && h != Hero.MainHero; }
+
+        /// <summary>560 (Jeff 15.11: "Moze z samymi towarzyszami"): ilu towarzyszy druzyny gracza moze teraz cwiczyc w obozie - bohaterowie musztry
+        /// (DrillHero przy Drill Heroes i Drill Law), nie ranni. Menu obozu (CampDrill.WhyNot) i godziny samoczynne (CampDrill.AutoHour) - druzyna bez
+        /// zolnierzy cwiczy, gdy jest ktos taki.</summary>
+        internal static int PlayerDrillHeroes(MobileParty mp)
+        {
+            try
+            {
+                var r = mp != null ? mp.MemberRoster : null;
+                if (r == null || r.TotalHeroes <= 0 || !HeroesOn(Settings.Current, true)) return 0;
+                int n = 0;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var ch = r.GetCharacterAtIndex(i);
+                    if (ch != null && ch.IsHero && DrillHero(mp, ch.HeroObject) && !ch.HeroObject.IsWounded) n++;
+                }
+                return n;
+            }
+            catch (Exception e) { Stumble("PlayerDrillHeroes", e); return 0; }
+        }
 
         private static int KitHeroes(MobileParty mp, Settings s, bool noBase)
         {
@@ -344,7 +365,7 @@ namespace Armoury
             catch (Exception e) { Stumble("KitHeroes", e); return 0; }
         }
 
-        /// <summary>558: ludzie do kompletu zapasu: zolnierze + bohaterowie, ktorzy cwicza (bez gracza i dowodcy).</summary>
+        /// <summary>558: ludzie do kompletu zapasu: zolnierze + bohaterowie, ktorzy cwicza (bez gracza; 560: z dowodca partii innej niz gracza).</summary>
         private static int KitMen(MobileParty mp) { return Men(mp) + KitHeroes(mp, Settings.Current, NoGameBase(mp)); }
 
         /// <summary>558: B bohatera = 10 + 2 x tier zastepczy - ten, ktorym gra mierzy bohatera w sile oddzialu i w XP z ciosu

@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 560: musztra - druzyna z samymi towarzyszami cwiczy w obozie, dowodcy partii (AI i rodu gracza) cwicza z ludzmi - Armoury (Drill.cs, CampDrill.cs; opis klucza DrillHeroes w Settings.cs + McmSettings.cs recznie, bez nowego klucza)
+
+**Problem:** Jeff, czat 15.11 (po 558, WGRANIE 257): (1) druzyna z samymi towarzyszami, bez zolnierzy - przy Drill Camp Only menu obozu odpowiada "You have no men to drill"; Jeff: "Moze z samymi towarzyszami". (2) czy dowodcy partii AI tez maja cwiczyc (wtedy cwiczylby tez dowodca partii z rodu gracza); Jeff: "tez moga cwiczyc AI" (zasada wczesniejsza: "bohaterowie tez cwicza i dostaja xp, tylko gracz nie dostaje").
+
+**Przyczyna:**
+- `CampDrill.WhyNot` (menu "Train the men", takze trening przed snem 311e przez `TbsWhyNot`) i `CampDrill.AutoHour` (godziny samoczynne: oboz oblezenia, cudza armia, postoj w osadzie m109) wymagaly `TotalRegulars > 0`. Druzyna z samymi towarzyszami nie zbierala godzin cwiczen, wiec `HeroDrill` (558) mial D = 0 - towarzysze nic nie dostawali, choc tick i napis "Your companions drilled today" byly gotowe.
+- `Drill.DrillHero` (558) wykluczal `mp.LeaderHero` - dowodca kazdej partii (AI, rod gracza) nie cwiczyl i nie liczyl sie do kompletu.
+
+**Zmiana:**
+- `Drill.DrillHero`: bez warunku `h != mp.LeaderHero` - dowodca partii cwiczy ta sama regula co towarzysze (B x L x D x S x mnoznik, ranny nie cwiczy, bez broni nic) i liczy sie do kompletu zapasu (S, zuzycie). L dalej z jego Przywodztwa (`CtxOf`, mistrz musztry bez zmian - najlepszy INNY bohater). Gracz (`Hero.MainHero`) nigdy - w druzynie gracza nic sie nie zmienia (dowodca = gracz).
+- Nowe `Drill.PlayerDrillHeroes(mp)` - towarzysze musztry druzyny gracza (DrillHero przy Drill Heroes i Drill Law), nie ranni.
+- `CampDrill.WhyNot` i `AutoHour`: brak zolnierzy nie blokuje, gdy `PlayerDrillHeroes > 0`. Brak obu: "You have no men to drill, and no companion fit to drill." (Drill Heroes wylaczone - stare "You have no men to drill.").
+- Napisy menu przy samych towarzyszach: podpowiedz "You have no men - your companions drill on their own. ..." i tekst menu cwiczen "Your companions drill in camp - ...". Nazwa opcji "Train the men" bez zmian.
+- Opis klucza Drill Heroes (Settings.cs, McmSettings.cs): "You do not drill - you lead your party. The commander of any other party ... drills with his men ...".
+
+**Ryzyko / co sprawdzic:**
+- Ile pracy przybywa: `HeroDrill` dotad wychodzil od razu w partii AI bez towarzyszy; teraz w kazdej partii lorda z dowodca liczy `CtxOf` (z pamieci, gdy partia ma zolnierzy - Shape liczyl go w tym samym ticku) i do 4 `AddSkillXp` na dowodce na dobe. Pomiar: linia "Musztra bohaterow (558)" - AI: partii / bohaterow / cwiczylo / poziomow (+ powinno wyraznie wzrosnac), potkniecia musztry 0; E8 profil `PTrain`.
+- Lordowie AI rosna w umiejetnosciach broni szybciej (rzad 20-100 XP na dobe dzielone na bronie, po wspolczynniku nauki gry) - Jeff chcial; gdyby za szybko - `Drill Hero Xp Multiplier` (dotyczy wszystkich bohaterow).
+- Komplet AI wiekszy o 1 (dowodca) - S przy tym samym zapasie odrobine nizsze, zuzycie odrobine wieksze; nadwyzka K1 AI nietknieta.
+- Druzyna gracza z samymi towarzyszami: "Train the men" czynne za dnia, godziny w linii "Szkolenie w obozie (m97): gracz", w grze "Your companions drilled today: ..." po ticku treningu. Trening przed snem (311e) tez sie uruchomi (ten sam WhyNot) - zamierzone. Tylko ranni towarzysze - opcja szara z nowym napisem.
+- Kolizje: `Lead` (mistrz musztry) pomija dowodce jak dotad; `MarchHud` (druzyna gracza) bez zmian - gracz poza kompletem. Kolejnosc ticku bez zmian.
+
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, niewgrane).
+
 ## 558: towarzysze cwicza - bohaterowie partii lorda (towarzysze, rodzina) dostaja w dniu musztry XP umiejetnosci noszonej broni wedlug wzoru oddzialu i licza sie do kompletu zapasu - Armoury (Drill.cs, MarchHud.cs; klucze NOWE DrillHeroes = TAK, DrillHeroXpMult = 1.0 w Settings.cs + McmSettings.cs recznie, MCM "Drill Heroes", "Drill Hero Xp Multiplier")
 
 **Problem:** Jeff, czat 15.11: "towarzysze maja cwiczyc" (wczesniej: "bohaterowie tez cwicza i dostaja xp, tylko gracz nie dostaje"). Musztra dawala XP tylko zolnierzom; pasek Drill liczyl komplet na samych zolnierzy ("heroes do not drill and are not counted").
