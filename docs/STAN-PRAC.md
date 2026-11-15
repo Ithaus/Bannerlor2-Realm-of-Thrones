@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 250 (547 trzymanie obozu tylko przy przewadze), bez autotestu
+
+- Armoury.dll af946f8f = noc/scal-perki 9ceb645d (249 + 547, wariant A Jeffa). Kopie: .bak-2026-11-15-przed-wgranie250, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie250 i -przed). Klucz NOWY SiegeHoldOnlyStronger (TAK).
+- Do sprawdzenia: linia doby 471 '547: slabszy oboz bez trzymania N druzyno-h' i czy po niej KO 'odejscie z obozu'; brak oblezen ciagnacych sie latami; plus 540-546 (perki 60 z 60, Banefort ZWROT, brak KAPITULACJA z terminu, pasek mapy).
+
 ## STAN 15.11 - WGRANIE 249 (546 oblezenia bez limitu czasu), bez autotestu
 
 - Armoury.dll 86a3875b = noc/scal-perki 11d66d4c (248 + 546). Kopie: .bak-2026-11-15-przed-wgranie249, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie249 i -przed). Klucz NOWY SiegeNoTimeLimit (TAK).
