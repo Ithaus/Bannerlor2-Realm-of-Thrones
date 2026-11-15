@@ -26,4 +26,20 @@
 		<Flags
 			Civilian="true" />
 	</Item>
+	<!-- 563 (Jeff 15.11): sztaba stali valyrianskiej. Siatka istniejaca: klinga ROT val_steel_blade_blue (pack7.tpac; zapas: thamaskene_steel).
+	     Kategoria arm_vs_stuff (RareMaterials.RegisterCategory, przed XML). 563c (Jeff: "1 jednostka wazy 0.5 kg"): sztaba = 0.5 kg stali
+	     (ValyrianBlades.IngotG = 500 g - waga tu i w kodzie musza sie zgadzac, start sesji sprawdza). Wartosc = HistValyrianPerMeasure x 500 / 800
+	     (miara = 0.8 kg, klinga VS Sword type 1; kod nadpisuje przy cenach historycznych). -->
+	<Item
+		id="arm_valyrian_steel"
+		name="{=arm_valyrian_steel}Valyrian Steel{@Plural}ingots of Valyrian steel{\@}"
+		mesh="val_steel_blade_blue"
+		culture="Culture.valyrian"
+		item_category="arm_vs_stuff"
+		value="37500"
+		weight="0.5"
+		Type="Goods">
+		<Flags
+			Civilian="true" />
+	</Item>
 </Items>

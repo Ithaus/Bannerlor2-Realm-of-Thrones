@@ -149,13 +149,14 @@ namespace Armoury
             return raw;
         }
 
-        private static int[] PartsMetalRaw(ItemObject item)
+        private static int[] PartsMetalRaw(ItemObject item, bool noBlade = false)
         {
             var raw = new int[7];
             if (item == null || item.WeaponDesign == null || item.WeaponDesign.UsedPieces == null) return raw;
             foreach (var el in item.WeaponDesign.UsedPieces)
             {
                 if (el == null || !el.IsValid || el.CraftingPiece == null || el.CraftingPiece.MaterialsUsed == null) continue;
+                if (noBlade && el.CraftingPiece.PieceType == CraftingPiece.PieceTypes.Blade) continue;
                 foreach (var m in el.CraftingPiece.MaterialsUsed)
                 {
                     int i = (int)m.Item1;
@@ -237,6 +238,25 @@ namespace Armoury
                 for (int g = 1; g <= 6; g++) result[g] = m[g];
             }
             catch (Exception e) { Stumble("ApplyWeapon", e); }
+        }
+
+        /// <summary>Recenzja 563c/d: przetop klingi valyrianskiej przy sztabach - stal klingi wychodzi jako sztaby/skrzynka VS (ValyrianBlades.SmeltToIngots,
+        /// masa czesci Blade = BladeG), a zwykly metal oprawy (jelec, rekojesc, glowica) wraca ta sama regula co z kazdej broni (udzial, sufit klasy BK,
+        /// skrzynka resztek przy SmeltKeepsScraps). Liczone niezaleznie od SmeltWeaponByParts - inaczej metal oprawy ginalby bez odbiorcy.
+        /// Wywolanie tylko zewnetrzne (jak ApplyWeapon); result[1..6] przypisuje.</summary>
+        internal static void ApplyVsFittings(ItemObject item, int[] result)
+        {
+            try
+            {
+                if (item == null || item.WeaponDesign == null || result == null || result.Length < 7) return;
+                var raw = PartsMetalRaw(item, true);
+                if (NoCrudeOn && raw[1] > 0) { raw[2] += raw[1]; raw[1] = 0; }
+                var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SmithingModel : null;
+                if (SmeltScraps.On) { SmeltScraps.Apply(item, SmeltScraps.WeaponMilli(raw, ClassCap(model, item), Share()), result); return; }
+                var m = WeaponMetal(raw, ClassCap(model, item), Share());
+                for (int g = 1; g <= 6; g++) result[g] = m[g];
+            }
+            catch (Exception e) { Stumble("ApplyVsFittings", e); }
         }
 
         /// <summary>Metal wyniku przetopu slowami logu (crude 1, wrought 2 ...).</summary>

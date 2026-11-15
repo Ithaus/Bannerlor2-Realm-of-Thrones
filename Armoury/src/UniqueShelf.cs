@@ -71,7 +71,7 @@ namespace Armoury
                     var el = r.GetElementCopyAtIndex(i);
                     if (el.Amount <= 0) continue;
                     var it = el.EquipmentElement.Item;
-                    if (it == null || !UniqueSpoils.Is(it)) continue;
+                    if (it == null || !(UniqueSpoils.Is(it) || ValyrianBlades.IsIngot(it))) continue;   // 563: sztaba stali valyrianskiej tez nie jest towarem mieszczan
                     if (keep == null) keep = new List<ItemRosterElement>();
                     keep.Add(el);
                 }

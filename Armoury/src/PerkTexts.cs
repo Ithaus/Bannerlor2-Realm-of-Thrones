@@ -144,7 +144,11 @@ namespace Armoury
                 new Rule { Id = "Crafting.MasterSmith", Get = () => DefaultPerks.Crafting.MasterSmith, Secondary = false, Text = (s, p) =>
                     V(p, false) + "% greater chance of creating masterwork weapons, armour, bows, crossbows and ammunition." },
                 new Rule { Id = "Crafting.LegendarySmith", Get = () => DefaultPerks.Crafting.LegendarySmith, Secondary = false, Text = (s, p) =>
-                    V(p, false) + "% greater chance of creating Legendary weapons, armour, bows, crossbows and ammunition, chance increases by 1% for every 5 skill points above 275." },
+                    V(p, false) + "% greater chance of creating Legendary weapons, armour, bows, crossbows and ammunition, chance increases by 1% for every 5 skill points above 275."
+                    // 563d (Jeff 15.11): perk zostaje na 275 i odblokowuje przetop oraz kucie stali valyrianskiej (podpowiedz i okno wyboru perku); 563c: wedlug masy
+                    + (!s.ValyrianIngots || !s.ValyrianNeedsLegendarySmith ? ""
+                       : (s.ValyrianNoSmelt ? " Unlocks melting down Valyrian steel and forging it anew" : " Unlocks forging Valyrian steel anew") + ": a blade melts into as much steel as its blade weighs, and a new blade takes as much as it weighs (an ingot is "
+                         + ValyrianBlades.KgText(ValyrianBlades.IngotG) + " kg; a Valyrian Steel Sword blade weighs " + ValyrianBlades.KgText(ValyrianBlades.MeasureG) + " kg).") },
 
                 // 512-E
                 new Rule { Id = "Scouting.BeastWhisperer", Get = () => DefaultPerks.Scouting.BeastWhisperer, Secondary = false, Text = (s, p) =>

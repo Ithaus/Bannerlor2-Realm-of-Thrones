@@ -39,7 +39,7 @@ namespace Armoury
         internal sealed class Row
         {
             public ItemObject Item;
-            public string Kind = "piece";   // wood, coal, metal, linen, leather, velvet, rare, piece - slowo jednostki w napisie
+            public string Kind = "piece";   // wood, coal, metal, linen, leather, velvet, rare, vs (563c: stal valyrianska), piece - slowo jednostki w napisie
             public bool ByKg;               // true: kg z pamiecia; false: cale sztuki
             public float Need;              // kg (ByKg) albo sztuki na jedno kucie (amunicja: cala seria AmmoBatchStacks)
             public int Bags;                // sztuki w sakwach (Recipes.CountInInventory - len, skora, aksamit cala kategoria)
@@ -118,6 +118,7 @@ namespace Armoury
             if (w == null || !w.ByKg) return 0f;
             if (w.Kind == "wood") return SmithWood.OpenKg;
             if (w.Kind == "coal") return SmithCoal.OpenKg;
+            if (w.Kind == "vs") return ValyrianBlades.BoxG / 1000f;   // 563c: skrzynka resztek stali valyrianskiej
             if (w.Kind == "metal")
             {
                 for (int g = 1; g <= 6; g++)
@@ -285,6 +286,18 @@ namespace Armoury
                 if (SmithCoal.On) { float kg = SmithCoal.WeaponKg(d); if (kg > 0f || cl > 0) b.Rows.Add(KgRow(coal, "coal", kg, SmithCoal.LumpKg, SmithCoal.OpenKg, cl)); }
                 else if (cl > 0) b.Rows.Add(PieceRow(coal, "coal", cl));
             }
+            // 563: klinga ze stali valyrianskiej - stal na pierwszym wierszu (te same liczby, ktore zdejmuje ValyrianBlades.OnCraftedVs);
+            // 563c: wedlug masy klingi - kg, sztaba 0.5 kg, otwarta = skrzynka resztek VS gracza
+            try
+            {
+                var ing = ValyrianBlades.IngotsOn ? ValyrianBlades.Ingot : null;
+                if (ing != null && ValyrianBlades.UsesVs(d))
+                {
+                    int g = ValyrianBlades.BladeG(d);
+                    b.Rows.Insert(0, KgRow(ing, "vs", g / 1000f, ValyrianBlades.IngotG / 1000f, ValyrianBlades.BoxG / 1000f, ValyrianBlades.IngotsToOpen(g)));
+                }
+            }
+            catch (Exception e) { Stumble("OfWeapon(sztaby VS)", e); }
             Finish(b);
             return b;
         }
@@ -312,6 +325,7 @@ namespace Armoury
                 case "linen": u = "bolt"; break;
                 case "leather": u = "hide"; break;
                 case "coal": u = "lump"; break;
+                case "vs": u = "ingot"; break;   // 563c
                 default: u = "piece"; break;
             }
             return n == 1 ? u : u + "s";

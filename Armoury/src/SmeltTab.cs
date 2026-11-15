@@ -127,6 +127,17 @@ namespace Armoury
                         int w = (int)CraftingMaterials.Wood;
                         if (w >= 0 && w < __result.Length && __result[w] > 0) __result[w] = 0;
                     }
+                    // 563: klinga valyrianska przy sztabach (ValyrianIngots) - metal wychodzi WYLACZNIE jako sztaby stali valyrianskiej (ValyrianBlades.SmeltPostfix);
+                    // zwykle sztaby z wyniku gry (Iron6 x3, BK przycina do 2-3, BK dokleja surowke) bylyby stala z niczego - zero w kazdym wywolaniu
+                    // (wewnetrznym i zewnetrznym), przed SmeltTruth.ApplyWeapon (bez ulamkow do skrzynki resztek); wegiel zostaje
+                    if (ValyrianBlades.IngotsOn && ValyrianBlades.Is(item))
+                    {
+                        for (int g = 1; g <= 6 && g < __result.Length; g++) if (__result[g] > 0) __result[g] = 0;
+                        // recenzja 563c/d: stal = sama klinga; zwykly metal oprawy (jelec, rekojesc, glowica - przy kuciu placony zwyklymi sztabami, CostPostfix)
+                        // wraca regula przetopu broni - bez tego Lod gubil ok. 0.8 kg zelaza oprawy bez odbiorcy
+                        if (outer) SmeltTruth.ApplyVsFittings(item, __result);
+                        return;
+                    }
                     // n20-kuznia (klucz SmeltWeaponByParts): metal wedlug gatunkow czesci, bez surowki z niczego (po BK - stad tylko zewnetrzne)
                     if (outer) SmeltTruth.ApplyWeapon(item, __result);
                     return;

@@ -83,7 +83,7 @@ namespace Armoury
                     var it = el.EquipmentElement.Item;
                     if (it == null || el.Amount <= 0) continue;
                     bool u = false;
-                    try { u = UniqueSpoils.Is(it); } catch { u = false; }
+                    try { u = UniqueSpoils.Is(it) || ValyrianBlades.IsIngot(it); } catch { u = false; }   // recenzja 563: sztaby VS jak unikat - do wodza, nie plona
                     double want = u ? Math.Min(el.Amount, Math.Ceiling(share * el.Amount)) : share * el.Amount;
                     p += want; v += want * it.Value;
                     if (Walks7(it)) w += want;
@@ -125,7 +125,7 @@ namespace Armoury
                 var it = el.EquipmentElement.Item;
                 if (it == null || el.Amount <= 0) continue;
                 bool u = false;
-                try { u = UniqueSpoils.Is(it); } catch { u = false; }
+                try { u = UniqueSpoils.Is(it) || ValyrianBlades.IsIngot(it); } catch { u = false; }   // recenzja 563: sztaby VS jak unikat - do wodza, nie plona
                 int want = u ? (int)Math.Ceiling(share * el.Amount) : MBRandom.RoundRandomized((float)(share * el.Amount));
                 if (want > el.Amount) want = el.Amount;
                 if (want <= 0) continue;
