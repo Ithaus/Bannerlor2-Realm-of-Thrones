@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 572: szybkie drabiny przy miazdzacej przewadze - AI co najmniej 8:1 szturmuje drabinami od 1. doby (oboz gotowy), do pierwszego odparcia - Armoury (SiegeWalls2.cs; nowe klucze SiegeLadderStormRatio, SiegeLadderStormDays w Settings.cs + McmSettings.cs recznie)
+
+**Problem:** Jeff, czat 15.11, po analizie Goldentooth: armia korony z przewaga 11.7:1 przez 4.7 doby nie szturmowala. Gra odmawiala, bo machiny nie byly gotowe (BesiegerCamp.StartingAssaultOnBesiegedSettlementIsLogical: min(3, gotowe)/3 = 0 bez gotowej machiny), nasze MB (SiegeWalls2.Unblock) przepuszczalo tylko przy gotowym taranie i wiezy, wyrwie albo drabinach DR po SiegeLadderMinDays = 21 dob, a brama OB1 (SiegeWalls.Veto, m.Ready) wymaga taranu i wiezy albo wyrwy. Propozycja: "szybkie drabiny przy miazdzacej przewadze: przy przewadze co najmniej 8:1 armia moze isc na drabiny juz od 1. dnia, gdy oboz jest zbudowany, bez czekania na machiny; szansa liczy sie tym samym wzorem co dzis; dziala tylko do pierwszego odpartego szturmu". Jeff: "tak".
+
+**Przyczyna:** warunek DR (`SiegeWalls2.LadderOk`) mial tylko jeden prog czasu (21 dob) - przewaga nawet 12:1 nie skracala czekania.
+
+**Zmiana:**
+- `SiegeWalls2.LadderRule(camp, m)`: "dlugie oblezenie" (dotychczasowe: >= SiegeLadderMinDays i sila >= SiegeLadderMinRatio x obroncy w pelni, miara OB1 max(Def, Def0)) albo NOWE "szybkie drabiny": sila >= SiegeLadderStormRatio (8) x obroncy, doba oblezenia >= SiegeLadderStormDays (1 = od pierwszej doby; doba = przebieg + 1), `camp.IsPreparationComplete` i `SiegeWalls.RepelsOf(ev) == 0` (zaden szturm tego oblezenia nie zostal odparty). `LadderOk` = `LadderRule != null` - Veto (brama / mury / losowanie) bez zmian w kodzie, dziala przez LadderOk.
+- `Unblock` (MB): `lad` takze w oknie szybkich drabin przed 21. doba; szansa ta sama: 0.1 x s gry (307c SaneS), bez kary machin; powod w linii MB "szybkie drabiny 8:1" (licznik drabin MB jak dotad).
+- `LadderPass` (linia DR, raz na oblezenie): "regula: szybkie drabiny 8:1 od doby 1, bez odparcia" albo "regula: dlugie oblezenie 21 dob, 4:1"; licznik dobowy "DR: przepuszczone ... w tym szybkie drabiny N"; linie ustawien (start i doba) "drabiny tak (>= 21 dob, >= 4.0 : 1; szybkie 8:1 od doby 1)".
+- MCM (The marching column): Siege Ladder Storm Ratio (0-30, 8; 0 = off), Siege Ladder Storm Days (1-364, 1). W Armoury.json Jeffa kluczy nie ma - dzialaja domyslne 8 i 1. gen_mcm.py NIE uruchamiany.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Bez zmian: oblezenia gracza (IsMainParty), fabula ROT (Scripted), Inni (Und) - te same wyjscia w Veto i Unblock, LadderOk wolane tylko stamtad. Przerwa po odparciu (OB2) i 307c (RetryHeld) dzialaja jak dotad - szybkie drabiny i tak sa wylaczone od pierwszego odparcia (RepelsOf > 0; przerwy w `_pauses` trwaja do konca oblezenia, po wczytaniu z `_pendingPauses`).
+- Gate471 (bramka czasu 471b) stoi w Veto PRZED DR: przy SiegeNoMinDaysGate TAK (domyslne, brak w json Jeffa) nie wstrzymuje; przy NIE wstrzymalby szturm przed dolna granica kategorii - wtedy szybkie drabiny nie zadzialaja (zgodnie z wola klucza). Glod obroncow (471b-b) dalej wstrzymuje szturm.
+- Okup (SiegeRansom F1) i RetryRatio (307c) dalej licza z SiegeLadderMinRatio (4) - nie ruszane; szybkie drabiny nie zmieniaja progu okupu.
+- Bitwa: szturm samymi drabinami - SZ (SiegeLadderWallsFactor x2 mury) jak dla DR; przy 8:1+ szturm drogi, ale wygrany. Odparcie wlacza zwykle zasady.
+- Wiecej szturmow w pierwszych dobach przy miazdzacej przewadze - mniej oblezen ciagnacych sie tygodniami (kontra 471/545). W logu: "Drabiny AI (DR) ... regula: szybkie drabiny", "Szturm bez czekania na machiny (MB) ... powod: szybkie drabiny 8:1".
+- Oczekiwany efekt Goldentooth: korona 11.7:1, oboz gotowy, bez odparcia -> MB losuje co godzine 0.1 x s gry (bez kary machin), OB1 przepuszcza brame przez DR - szturm drabinami w pierwszych godzinach/dobach po zbudowaniu obozu zamiast czekania na taran i wieze.
+- Build Armoury 0 bledow (Release). NIE wgrane.
+
+**Status:** DO SPRAWDZENIA
+
 ## 563: stal valyrianska w sztabach - przetop od 275 (10 sztab na miare), kucie klingi jednorecznej z 10 sztab (perk Legendary Smith + 300), sztaba jako towar; zgodne z 177 (bilans stali) - Armoury (ValyrianBlades.Ingots.cs nowy, ValyrianBlades.cs, SmeltTab.cs, ForgeBill.cs, HistoricalPrices.cs, RareMaterials.cs, UniqueShelf.cs, UniqueSpoils.cs, CastleSteel.cs, PerkTexts.cs, QohorMasters.Own.cs, ArmouryBehavior.cs; ModuleData/arm_items_rare.xml - nowy przedmiot arm_valyrian_steel; nowe klucze ValyrianIngots, ValyrianSmeltSkill, ValyrianForgeSkill, ValyrianLegendarySmithAt300 w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "dodaj valyrianska stal: jesli przetapiam valyrianska stal, to otrzymuje x valyrianskiej stali - jesli do miecza potrzeba 10, a przetopilem ten sam miecz, to dostane 10; valyrianska stal - znajdz lub stworz ikone do handlu; w kuzni przy wykuwaniu mieczy moze byc nad innymi surowcami ...; zeby wytopic valyrianska stal trzeba miec 275 smithing; zmien tez umiejetnosc [perk], ze pozwala wykuwac bron z valyrianskiej stali - daj na poziomie 300; stworz ikone, ze odblokowuje ..." oraz "i jak teraz jest to z valyrianska stala - cos podobno jest w grze, ze mozna wykuc - zeby sie nie gryzlo". Dzis (177) przetop VS w zwyklej kuzni jest zablokowany ("Only the masters of Qohor can work Valyrian steel."), jedyna droga do nowej klingi to Qohor. Bez dowodu z logu - nowa funkcja.

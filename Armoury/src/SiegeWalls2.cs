@@ -90,7 +90,7 @@ namespace Armoury
     ///   (drabiny) nie mial czego przepuscic.
     ///   Zmiana: postfiks decyzji gry (z SiegeRansom.AssaultPost przy "false"), oboz AI po przygotowaniach (bez gracza, skryptu, Innych):
     ///   (a) gotowy taran i wieza albo wyrwa - szansa wzorem gry, ale p liczone tylko z taranow i wiez w budowie (machiny dystansowe - trebusze -
-    ///   nie czekaja); (b) DR (LadderOk: >= SiegeLadderMinDays i sila >= SiegeLadderMinRatio x obroncy) - szansa 0.1 x s gry bez kary machin.
+    ///   nie czekaja); (b) DR (LadderOk: >= SiegeLadderMinDays i sila >= SiegeLadderMinRatio x obroncy) - szansa 0.1 x s gry bez kary machin. 572: takze szybkie drabiny (SiegeLadderStormRatio 8:1 od doby SiegeLadderStormDays, oboz gotowy, do pierwszego odparcia).
     ///   Losowanie raz na godzine i oboz, warunkowo tak, by razem z losowaniem gry szansa byla ta wyliczona; potem OB1 (brama, mury, DR) i okup jak zwykle.
     ///   400 (Jeff 11.11 "rob 1", decyzja 15): TYDZIEN LASKI I UCIECZKA PRZEZ MUR. Doby 1..SiegeStarveGraceDays (7) od zapasu 0 nikt nie umiera z GL
     ///   (rany gry IsGarrisonStarving zostaja, straty RB dalej pominiete); od nastepnej doby SiegeStarveLossPercent jak dotad. Od 1. doby glodu
@@ -128,6 +128,9 @@ namespace Armoury
         internal static bool LadderOn { get { var s = Settings.Current; return s != null && s.SiegeLadderOverwhelm; } }
         private static int LadderDays { get { var s = Settings.Current; return s == null ? 30 : (int)Clamp(s.SiegeLadderMinDays, 0, 364); } }
         internal static double LadderRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderMinRatio) ? 6.0 : Clamp(s.SiegeLadderMinRatio, 2.0, 20.0); } }
+        // 572: szybkie drabiny - prog przewagi (0 = wylaczone) i doba oblezenia (1 = od pierwszej doby, gdy oboz gotowy)
+        private static double StormRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderStormRatio) || s.SiegeLadderStormRatio <= 0f ? 0.0 : Clamp(s.SiegeLadderStormRatio, 2.0, 30.0); } }
+        private static int StormDays { get { var s = Settings.Current; return s == null ? 1 : (int)Clamp(s.SiegeLadderStormDays, 1, 364); } }
         private static bool LogOn { get { var s = Settings.Current; return s != null && s.SiegeWallsLog && s.LogEnabled; } }
         /// <summary>Lista gry WearOutDefenders: trebuszy (DefaultSiegeStrategyActionModel :273-278).</summary>
         private const int TrebNeed = 4;
@@ -837,19 +840,36 @@ namespace Armoury
 
         // ============================================================ DR: drabiny AI przy miazdzacej przewadze (z SiegeWalls.Veto)
         private static readonly HashSet<SiegeEvent> _drLogged = new HashSet<SiegeEvent>();
-        private static int _dDrGate, _dDrWalls, _dDrRoll;
+        private static int _dDrGate, _dDrWalls, _dDrRoll, _dDrFast;
 
-        /// <summary>Warunek DR: oblezenie >= LadderDays i sila oblegajacych >= LadderRatio x obroncy w pelni (miara OB1: max(gra, w pelni)).</summary>
-        internal static bool LadderOk(BesiegerCamp camp, SiegeWalls.Meas m)
+        /// <summary>Warunek DR: oblezenie >= LadderDays i sila oblegajacych >= LadderRatio x obroncy w pelni (miara OB1: max(gra, w pelni))
+        /// albo (572) szybkie drabiny - patrz LadderRule.</summary>
+        internal static bool LadderOk(BesiegerCamp camp, SiegeWalls.Meas m) { return LadderRule(camp, m) != null; }
+
+        /// <summary>572 (Jeff 15.11 "tak"): okno szybkich drabin w tym oblezeniu - prog wlaczony, doba oblezenia >= StormDays, oboz gotowy
+        /// i zaden szturm nie zostal jeszcze odparty (RepelsOf == 0; po pierwszym odparciu tylko dotychczasowa regula DR). Bez miary sil.</summary>
+        private static bool StormWindow(BesiegerCamp camp)
+        {
+            if (StormRatio <= 0.0 || camp == null || !camp.IsPreparationComplete) return false;
+            var ev = camp.SiegeEvent;
+            if (ev == null || ev.SiegeStartTime.ElapsedDaysUntilNow + 1.0 < StormDays) return false;   // doba oblezenia liczona od 1
+            return SiegeWalls.RepelsOf(ev) == 0;
+        }
+
+        /// <summary>Ktora regula DR przepuszcza szturm: "dlugie oblezenie" (>= LadderDays i >= LadderRatio), "szybkie drabiny" (572: >= StormRatio
+        /// od doby StormDays, oboz gotowy, bez odparcia) albo null. Dlugie oblezenie ma pierwszenstwo (ta sama szansa, inna linia logu).</summary>
+        internal static string LadderRule(BesiegerCamp camp, SiegeWalls.Meas m)
         {
             try
             {
-                if (!LadderOn || camp == null || camp.SiegeEvent == null || m == null || m.Empty) return false;
-                if (camp.SiegeEvent.SiegeStartTime.ElapsedDaysUntilNow < LadderDays) return false;
+                if (!LadderOn || camp == null || camp.SiegeEvent == null || m == null || m.Empty) return null;
                 double def = Math.Max(m.Def, m.Def0);
-                return def > 0.0 && m.Att >= LadderRatio * def;
+                if (def <= 0.0) return null;
+                if (camp.SiegeEvent.SiegeStartTime.ElapsedDaysUntilNow >= LadderDays && m.Att >= LadderRatio * def) return "dlugie oblezenie";
+                if (StormWindow(camp) && m.Att >= StormRatio * def) return "szybkie drabiny";
+                return null;
             }
-            catch (Exception e) { Stumble("LadderOk", e); return false; }
+            catch (Exception e) { Stumble("LadderOk", e); return null; }
         }
 
         /// <summary>DR przepuscil decyzje, ktora OB1 by wstrzymal ("brama" / "mury" / "losowanie"): licznik i linia (raz na oblezenie i dobe).</summary>
@@ -858,14 +878,18 @@ namespace Armoury
             try
             {
                 if (would == "brama") _dDrGate++; else if (would == "mury") _dDrWalls++; else _dDrRoll++;
+                bool fast = LadderRule(camp, m) == "szybkie drabiny";
+                if (fast) _dDrFast++;
                 var ev = camp.SiegeEvent;
                 if (!LogOn || ev == null || !_drLogged.Add(ev)) return;
                 var st = ev.BesiegedSettlement;
                 var lp = camp.LeaderParty;
                 double def = Math.Max(m.Def, m.Def0);
+                string thr = fast ? "szybkie drabiny " + F(StormRatio, "0.#") + ":1 od doby " + StormDays + ", bez odparcia"
+                                  : "dlugie oblezenie " + LadderDays + " dob, " + F(LadderRatio, "0.#") + ":1";
                 Log.Info("Drabiny AI (DR): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | wodz " + Hn(lp) + " (frakcja "
-                         + (lp != null && lp.MapFaction != null ? lp.MapFaction.StringId : "-") + ") | oblezenie " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob (prog " + LadderDays + ")"
-                         + " | sila oblegajacy " + F(m.Att, "0") + " / obroncy " + F(def, "0") + " = " + F(def > 0 ? m.Att / def : 0.0, "0.00") + " (prog " + F(LadderRatio, "0.0") + ")"
+                         + (lp != null && lp.MapFaction != null ? lp.MapFaction.StringId : "-") + ") | regula: " + thr + " | oblezenie " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob"
+                         + " | sila oblegajacy " + F(m.Att, "0") + " / obroncy " + F(def, "0") + " = " + F(def > 0 ? m.Att / def : 0.0, "0.00")
                          + " | taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie") + ", wyrwa " + (m.Gap ? "tak" : "nie") + ", HP murow " + F(m.Hp * 100.0, "0") + "%, s OB1 " + F(m.S, "0.000")
                          + " | OB1 wstrzymalby: " + would + " | szturm przepuszczony.");
             }
@@ -902,7 +926,7 @@ namespace Armoury
                 bool breach = SiegeWalls.WallHpMin(st) <= 0.0;
                 bool gap = breach && EarlyOn;                                            // TB2-c: wyrwa - szansa jak drabiny DR, bez kary za machiny w budowie
                 bool eng = (ram && tower) || (breach && !gap);
-                bool lad = LadderOn && ev.SiegeStartTime.ElapsedDaysUntilNow >= LadderDays;
+                bool lad = LadderOn && (ev.SiegeStartTime.ElapsedDaysUntilNow >= LadderDays || StormWindow(camp));   // 572: szybkie drabiny przed LadderDays
                 if (!eng && !gap && !lad) return false;
                 if (SiegeWalls.InRepelPause(ev)) return false;                           // przerwa po odparciu (OB2) - Veto i tak wstrzyma
                 int hour = (int)CampaignTime.Now.ToHours, last;
@@ -930,10 +954,11 @@ namespace Armoury
                     double pw = Clamp(0.1 * sg, 0.0, 1.0);
                     if (pw > pt) { pt = pw; why = "wyrwa"; }
                 }
-                if (lad && LadderOk(camp, m))
+                string rule = lad ? LadderRule(camp, m) : null;
+                if (rule != null)
                 {
                     double pl = Clamp(0.1 * sg, 0.0, 1.0);
-                    if (pl > pt) { pt = pl; why = "drabiny"; }
+                    if (pl > pt) { pt = pl; why = rule == "szybkie drabiny" ? "szybkie drabiny " + F(StormRatio, "0.#") + ":1" : "drabiny"; }
                 }
                 if (why == null || pGame >= 1.0 || pt <= pGame) return false;            // kara gry nie byla przeszkoda
                 _dUnRolls++;
@@ -1067,7 +1092,7 @@ namespace Armoury
                   .Append(" | klucze: trebusze ").Append(TrebOn ? "tak" : "nie").Append(" (zamek po ").Append(CastleDays).Append(" dob), glod ").Append(StarveOn ? "tak" : "nie")
                   .Append(" (").Append(F(LossPct, "0.0")).Append("%/d po ").Append(GraceDays).Append(" dobach laski, przez mur ").Append(FleeOn ? F(FleePct, "0.0") + "%/d" : "nie")
                   .Append(", kapitulacja < ").Append(F(SurShare * 100.0, "0")).Append("% / < ").Append(SurMen).Append("), drabiny ")
-                  .Append(LadderOn ? "tak" : "nie").Append(" (>= ").Append(LadderDays).Append(" dob, >= ").Append(F(LadderRatio, "0.0")).Append(" : 1)")
+                  .Append(LadderOn ? "tak" : "nie").Append(" (>= ").Append(LadderDays).Append(" dob, >= ").Append(F(LadderRatio, "0.0")).Append(" : 1; szybkie ").Append(StormRatio > 0 ? F(StormRatio, "0.#") + ":1 od doby " + StormDays : "nie").Append(")")
                   .Append(" | TB: obozy z trebuszami ").Append(mk).Append(" (miasta ").Append(mTown).Append(", stolice ").Append(mCap).Append(", zamki ").Append(mCastle)
                   .Append("), nowe dzis: miasta ").Append(_dNewTown).Append(", stolice ").Append(_dNewCap).Append(", zamki ").Append(_dNewCastle)
                   .Append(", zmiany strategii ").Append(_dSwitch).Append(", zdjete (gracz, skrypt, Inni) ").Append(_dUnmark)
@@ -1085,7 +1110,7 @@ namespace Armoury
                 else { bool f1 = true; foreach (var kv in _dSurSkip) { if (!f1) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); f1 = false; } }
                 int nRot; lock (Gate) { nRot = _dRotSt.Count; }
                 sb.Append(", straty RB pominiete ").Append(_dRbSkip).Append(", ziemie wokol ROT odjete ").Append(nRot)
-                  .Append(" | DR: przepuszczone ").Append(_dDrGate + _dDrWalls + _dDrRoll).Append(" (brama ").Append(_dDrGate).Append(", mury ").Append(_dDrWalls).Append(", losowanie ").Append(_dDrRoll).Append(')')
+                  .Append(" | DR: przepuszczone ").Append(_dDrGate + _dDrWalls + _dDrRoll).Append(" (brama ").Append(_dDrGate).Append(", mury ").Append(_dDrWalls).Append(", losowanie ").Append(_dDrRoll).Append(", w tym szybkie drabiny ").Append(_dDrFast).Append(')')
                   .Append(" | MB: ").Append(UnblockOn ? "tak" : "nie").Append(", szturmy bez czekania: machiny ").Append(_dUnEng).Append(", wyrwa ").Append(_dUnGap).Append(", drabiny ").Append(_dUnLad).Append(" (losowan ").Append(_dUnRolls).Append(')')
                   .Append(" | zdobyte dzis: miasta ").Append(_dCaptTown).Append(", stolice ").Append(_dCaptCap).Append(", zamki ").Append(_dCaptCastle).Append(" (po kapitulacji ").Append(_dCaptAfterSurr).Append(')')
                   .Append(", bitwy pod murami wygrane przez oblegajacych bez zdobycia (326c) ").Append(_dFieldWon).Append(", odsiecz rozbila oboz (326c) ").Append(_dReliefWon)
@@ -1123,7 +1148,7 @@ namespace Armoury
             _dBesieged = _dStarving = _dDead = _dSurr = _dSurrMen = _dRbSkip = _dNoPrison = 0;
             _dGrace = _dFled = _dFleeSieges = _dFleeNoRoom = 0;
             _dLongestHunger = 0; _dLongestHungerSt = "-"; _dSurSkip.Clear();
-            _dDrGate = _dDrWalls = _dDrRoll = 0; _drLogged.Clear();
+            _dDrGate = _dDrWalls = _dDrRoll = _dDrFast = 0; _drLogged.Clear();
             _dUnEng = _dUnLad = _dUnRolls = 0; _unLogged.Clear();
             _dCaptTown = _dCaptCap = _dCaptCastle = _dCaptAfterSurr = 0; _dFieldWon = 0; _dReliefWon = 0;
             lock (Gate) { _dClampSt.Clear(); _dRotSt.Clear(); _dClampSum = 0; _dStumbles = 0; _dTrebPace.Clear(); _dTrebPacePlayer.Clear(); }
@@ -1226,7 +1251,7 @@ namespace Armoury
                          + " | klucze: trebusze " + (TrebOn ? "tak" : "nie") + " (zamek po " + CastleDays + " dob), glod " + (StarveOn ? "tak" : "nie") + " (" + F(LossPct, "0.0")
                          + "%/d po " + GraceDays + " dobach laski, przez mur " + (FleeOn ? F(FleePct, "0.0") + "%/d" : "nie")
                          + ", kapitulacja < " + F(SurShare * 100.0, "0") + "% / < " + SurMen + "), drabiny " + (LadderOn ? "tak" : "nie") + " (>= " + LadderDays + " dob, >= "
-                         + F(LadderRatio, "0.0") + " : 1), log " + (LogOn ? "tak" : "nie") + ".");
+                         + F(LadderRatio, "0.0") + " : 1; szybkie " + (StormRatio > 0 ? F(StormRatio, "0.#") + ":1 od doby " + StormDays : "nie") + "), log " + (LogOn ? "tak" : "nie") + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
             SessionStart3();                                                      // oblezenia 3: linia "Oblezenia 3 (start)"
