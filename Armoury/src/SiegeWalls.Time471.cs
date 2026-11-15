@@ -402,7 +402,7 @@ namespace Armoury
                         + " | 542 " + (OnlyStarve542 ? "TAK (bez kapitulacji z terminu; odejscia zamiast kapitulacji po limicie " + _d542Lift + ", czekaja po limicie na glod " + _d542Wait + ")" : "NIE (kapitulacja z terminu jak dotad)")
                         + " | 545: szturmow przed dawna bramka " + _d545Gate + " (klucz " + (NoMinDays545 ? "TAK" : "NIE") + "), trzyman obozu ponad " + SiegeWalls2.FreshHoursLog545 + " h " + SiegeWalls2.HoldOver545 + " druzyno-h (oblezen " + SiegeWalls2.HoldOver545Sieges
                         + ", klucz " + (SiegeWalls2.HoldToEnd545Key ? "TAK" : "NIE") + ")"
-                        + " | 546: " + (noLim ? "limit wylaczony, " : "klucz NIE (limit " + F(LimitK, "0.0") + " x gorna granica), ") + "oblezen ponad dawny limit " + _d546Over + " (najdluzsze " + F(_d546Max, "0") + " dob)"
+                        + " | 546: " + (noLim ? "limit wylaczony, oblezen ponad dawny limit " + _d546Over + ", " : "klucz NIE (limit " + F(LimitK, "0.0") + " x gorna granica, ponad nim - patrz 'ponad limitem'), ") + "najdluzsze " + F(_d546Max, "0") + " dob"   // recenzja 546 (4): przy NIE bez licznika 0 obok "ponad limitem N"
                         + " | wiek/R: " + (sbList.Length == 0 ? "-" : sbList.ToString()) + ".");
             }
             catch (Exception e) { Stumble("Time471Daily", e); }
