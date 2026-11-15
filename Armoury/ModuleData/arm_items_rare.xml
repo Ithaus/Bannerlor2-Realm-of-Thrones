@@ -26,4 +26,19 @@
 		<Flags
 			Civilian="true" />
 	</Item>
+	<!-- 563 (Jeff 15.11): sztaba stali valyrianskiej - 10 sztab = 1 miara (klinga jednoreczna). Siatka istniejaca: klinga ROT val_steel_blade_blue
+	     (pack7.tpac; zapas: thamaskene_steel). Kategoria arm_vs_stuff (RareMaterials.RegisterCategory, przed XML). Wartosc = HistValyrianPerMeasure / 10
+	     (kod nadpisuje przy cenach historycznych). Waga: 10 sztab = 1.2 kg, tyle co klinga. -->
+	<Item
+		id="arm_valyrian_steel"
+		name="{=arm_valyrian_steel}Valyrian Steel{@Plural}ingots of Valyrian steel{\@}"
+		mesh="val_steel_blade_blue"
+		culture="Culture.valyrian"
+		item_category="arm_vs_stuff"
+		value="6000"
+		weight="0.12"
+		Type="Goods">
+		<Flags
+			Civilian="true" />
+	</Item>
 </Items>

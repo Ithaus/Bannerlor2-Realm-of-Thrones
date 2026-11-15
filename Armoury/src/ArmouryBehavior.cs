@@ -1079,6 +1079,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_vs_mark", e); }
             try { string vr = dataStore.IsSaving ? ValyrianBlades.Export() : null; SaveText.Sync(dataStore, "arm_vs_registry", ref vr); if (dataStore.IsLoading) ValyrianBlades.Import(vr); }
             catch (Exception e) { Log.Error("SyncData.arm_vs_registry", e); }
+            // 563: rejestr sztab stali valyrianskiej i start bilansu (osobny klucz, wlasny try; stary zapis bez klucza - R_I 0, start przy pierwszym spisie)
+            try { string vi = dataStore.IsSaving ? ValyrianBlades.ExportIngots() : null; SaveText.Sync(dataStore, "arm_vs_ingots", ref vi); if (dataStore.IsLoading) ValyrianBlades.ImportIngots(vi); }
+            catch (Exception e) { Log.Error("SyncData.arm_vs_ingots", e); }
             // 177-3: zlecenia u mistrzow Qohoru (klingi wejscia zyja tylko w tym napisie az do wydania) - wlasny try
             try { string qo = dataStore.IsSaving ? QohorMasters.Export() : null; SaveText.Sync(dataStore, "arm_qohor_orders", ref qo); if (dataStore.IsLoading) QohorMasters.Import(qo); }
             catch (Exception e) { Log.Error("SyncData.arm_qohor_orders", e); }
@@ -2796,6 +2799,7 @@ namespace Armoury
             try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
             try { CastleSteel.Rename(); } catch (Exception e) { Log.Error("CastleSteel.Rename", e); }   // 177-1: Iron6 = "Castle-forged Steel", perk Steel Maker 3, "Thamaskene" w nazwach
+            try { ValyrianBlades.SessionStart563(); } catch (Exception e) { Log.Error("ValyrianBlades.SessionStart563", e); }   // 563: latki sztab VS (kuznia), perk Legendary Smith na 300 - PRZED opisami perkow
             try { PerkTexts.SessionStart(); } catch (Exception e) { Log.Error("PerkTexts.SessionStart", e); }   // 540: opisy perkow wedlug dzialania - PO CastleSteel (Steel Maker 3) i Drill.SessionStart (CampDrill)
             try { Restitution0831(); } catch (Exception e) { Log.Error("Restitution0831", e); }
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
@@ -3645,6 +3649,7 @@ namespace Armoury
         private void OnNewItemCrafted(ItemObject item, ItemModifier modifier, bool isCraftingOrderItem)
         {
             try { HistoricalPrices.PriceOne(item); } catch { }   // wpis 90: wykuty miecz w pensach, jak reszta swiata
+            try { ValyrianBlades.OnCraftedVs(item, isCraftingOrderItem); } catch (Exception e) { Log.Error("ValyrianBlades.OnCraftedVs", e); }   // 563: klinga VS z 10 sztab - rejestr (przed zabraniem na wykonczenie)
             try
             {
                 var s = Settings.Current;

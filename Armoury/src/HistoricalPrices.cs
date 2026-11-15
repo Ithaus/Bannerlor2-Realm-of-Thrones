@@ -739,6 +739,15 @@ namespace Armoury
                         _shelfWorth[it] = making;
                         if (vs.Count < 8) vs.Add(id + " " + making + " -> " + it.Value + " (miar " + m + ")");
                     }
+                    // 563: sztaba stali valyrianskiej = miara / 10 (ValyrianBlades.IngotsPerMeasure) - jedna zasada z cena miary: klinga i jej sztaby kosztuja tyle samo
+                    var ing = ValyrianBlades.Ingot;
+                    if (ing != null)
+                    {
+                        int was = ing.Value;
+                        set(ing, s.HistValyrianPerMeasure / ValyrianBlades.IngotsPerMeasure);
+                        _target[ing] = ing.Value;
+                        vs.Add(ValyrianBlades.IngotId + " " + was + " -> " + ing.Value + " (sztaba, 1/" + ValyrianBlades.IngotsPerMeasure + " miary)");
+                    }
                     int rebuilt = 0;
                     foreach (var t in Town.AllTowns)
                     {

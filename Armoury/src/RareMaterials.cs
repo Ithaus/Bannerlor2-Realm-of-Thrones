@@ -104,6 +104,15 @@ namespace Armoury
                 c.InitializeObject(false, 20, 0, ItemCategory.Property.None, null, 0f, false, true);
             }
             catch (Exception e) { Stumble("RareMaterials.RegisterCategory", e); }
+            // 563: osobna kategoria sztaby stali valyrianskiej (arm_vs_stuff) - te same parametry; osobno, bo zjadanie arm_rare_stuff przez miasta
+            // jest dla surowcow lukow dozwolonym odplywem, a sztaba to skonczony zasob (polka: UniqueShelf.Pre)
+            try
+            {
+                if (game == null || !(game.GameType is Campaign) || game.ObjectManager == null) return;
+                var c = game.ObjectManager.GetObject<ItemCategory>(ValyrianBlades.IngotCategoryId) ?? game.ObjectManager.RegisterPresumedObject(new ItemCategory(ValyrianBlades.IngotCategoryId));
+                c.InitializeObject(false, 20, 0, ItemCategory.Property.None, null, 0f, false, true);
+            }
+            catch (Exception e) { Stumble("RareMaterials.RegisterCategory(arm_vs_stuff)", e); }
         }
 
         // ------------------------------------------------------------ rozwiazanie przedmiotow i osad
@@ -371,6 +380,7 @@ namespace Armoury
         {
             var id = it != null ? it.StringId : null;
             if (id == null) return false;
+            if (id == ValyrianBlades.IngotId) return true;   // 563: sztaba stali valyrianskiej tez nie jest nagroda z niczego (Caravan Ambush, Trade Proposal)
             foreach (var m in _mats) if (id == m.Id) return true;
             return false;
         }

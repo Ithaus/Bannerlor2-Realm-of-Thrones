@@ -49,7 +49,7 @@ namespace Armoury
     ///  6. Kopie z niczego zamkniete u zrodla: karawana posilkow DTE (GetRandomGearItems -> zamienniki), nagroda turniejowa (postfiks
     ///     FightTournamentGame.GetTournamentPrize - TournamentsXPanded bierze nagrode bez filtra NotMerchandise; krytyka pkt 2 i 23).
     /// </summary>
-    internal static class ValyrianBlades
+    internal static partial class ValyrianBlades
     {
         private static readonly string[] Named = {
             "ice_sword", "longclaw_sword", "brightroar", "brightroar2", "blackfyre", "heartsbane", "nightfall", "whyt_sword", "assist_sword",
@@ -138,6 +138,7 @@ namespace Armoury
             _reg = null; _owner = new Dictionary<string, string>(); _markLoaded = false; _recoverPending = false; _guardOffLogged = false; _smeltId = null;
             _tplCount = null; _tplHeroes = null; _where = new Dictionary<string, string>(); _lastCount = new Dictionary<string, int>();
             _lossLogged.Clear(); _lastSummary = ""; _stumbles = 0; _measure.Clear(); _own.Clear(); _dteGone = 0; _dteWeapon = 0; _dteOther = 0; _prizeSwaps = 0; _smeltBlocked = 0;
+            ResetIngots();   // 563: sztaby, bilans, projektant
         }
 
         /// <summary>"v1|R|id:liczba:wlasciciel;..." (R = odzysk po pierwszym wczytaniu jeszcze czeka). Pusto - rejestru brak.</summary>
@@ -419,7 +420,8 @@ namespace Armoury
                 {
                     // zabezpieczenie: szablony bez zadnej klingi przy klingach w swiecie = odczyt stanu startowego zawiodl (np. szablony juz
                     // przeczyszczone w tym procesie) - rejestr z niego zamienilby KAZDA klinge w zwykla stal; wtedy bezpieczny domysl jak nizej
-                    int present = Gather().Values.Sum(x => x.Count);
+                    int present = Gather().Where(kv => kv.Key != IngotId).Sum(kv => kv.Value.Count);   // 563: same klingi (sztaby osobno)
+                    _startUnits = -1;   // 563: rejestr klng budowany od nowa - start bilansu przy pierwszym spisie dobowym
                     bool tplFailed = tplBlades == 0 && present > 0;
                     if (tplFailed) Log.Error("ValyrianBlades.OnSession", new InvalidOperationException("Stal valyrianska: szablony postaci bez zadnej klingi przy " + present + " klingach w swiecie - stanu startowego nie odczytano; bezpieczny domysl (rejestr = obecny stan), nic nie zamieniane"));
                     if (_markLoaded || tplFailed)
@@ -493,6 +495,7 @@ namespace Armoury
             StockpileCopies(add);
             // 177-3: klingi u mistrzow (wejscie do wydania) - nie do zmiany; przyjete dopiero po straznika dla tego wzoru (GuardNow)
             QohorMasters.AddCensus((id, where) => add(new Copy { Id = id, Kind = K.Fixed, Pri = 4, Where = where }));
+            ForgeCensus(add);   // 563: miecz VS na wykonczeniu w kuzni gracza (projekt "van") - nie do zmiany
             // F1 (test zbiorczy 5-8): klingi w wozach kupcow (TradeCarts, 215) - sztuka zeszla z polki zrodla, na polke celu wejdzie po czasie drogi;
             // bez tego spis widzial "ubytek" przez cala droge (ERROR Census, darksister 4 doby). Miejsce nie do zmiany (Surplus - tylko notka),
             // kolejnosc zostawiania jak polka (Pri 6). Napis staly (bez liczby dob) - linia "zmiany" raz przy wyjezdzie i raz przy dojechaniu.
@@ -500,7 +503,7 @@ namespace Armoury
             {
                 TradeCarts.ForEachCartLine((src, dst, el, n) =>
                 {
-                    if (!Is(el.Item)) return;
+                    if (!Is(el.Item) && !IsIngot(el.Item)) return;   // 563: sztaby w wozach kupcow tez
                     string w = TradeCarts.RoadLabel(src, dst);
                     for (int k = 0; k < n; k++) add(new Copy { Id = el.Item.StringId, Kind = K.Cart, Pri = 6, El = el, Where = w });
                 });
@@ -540,7 +543,7 @@ namespace Armoury
             for (int i = 0; i < r.Count; i++)
             {
                 var el = r.GetElementCopyAtIndex(i);
-                if (el.Amount > 0 && Is(el.EquipmentElement.Item)) return true;
+                if (el.Amount > 0 && (Is(el.EquipmentElement.Item) || IsIngot(el.EquipmentElement.Item))) return true;   // 563: roster z samymi sztabami tez
             }
             return false;
         }
@@ -552,7 +555,7 @@ namespace Armoury
             for (int i = 0; i < r.Count; i++)
             {
                 var el = r.GetElementCopyAtIndex(i);
-                if (el.Amount <= 0 || !Is(el.EquipmentElement.Item)) continue;
+                if (el.Amount <= 0 || !(Is(el.EquipmentElement.Item) || IsIngot(el.EquipmentElement.Item))) continue;   // 563: jak AnyIn
                 n += el.Amount;
             }
             return n;
@@ -584,7 +587,8 @@ namespace Armoury
             for (int i = 0; i < r.Count; i++)
             {
                 var el = r.GetElementCopyAtIndex(i);
-                if (el.Amount <= 0 || !Is(el.EquipmentElement.Item)) continue;
+                // 563: sztaby pod kluczem IngotId (petle po AllIds ich nie widza; spis sztab - DailyIngots/IngotSummary)
+                if (el.Amount <= 0 || !(Is(el.EquipmentElement.Item) || IsIngot(el.EquipmentElement.Item))) continue;
                 for (int n = 0; n < el.Amount; n++)
                     add(new Copy { Id = el.EquipmentElement.Item.StringId, Kind = K.Roster, Pri = pri, Roster = r, El = el.EquipmentElement, Player = playerWhere != null, PlayerWhere = playerWhere, Where = where });
             }
@@ -645,7 +649,7 @@ namespace Armoury
                     string town = null;
                     try { var st = MBObjectManager.Instance.GetObject<Settlement>(e.Key as string); if (st != null) town = st.Name.ToString(); } catch { }
                     for (int i = 0; i < ids.Count && i < counts.Count; i++)
-                        if (IsId(ids[i]))
+                        if (IsId(ids[i]) || ids[i] == IngotId)   // 563: sztaby tez (gdy Spoils przyjmuje towary)
                             for (int k = 0; k < counts[i]; k++)
                                 add(new Copy { Id = ids[i], Kind = K.Stock, Pri = 3, Player = true, Stock = sp, Where = "magazyn wojenny Spoils " + e.Key,
                                                PlayerWhere = "in your war stockpile" + (town != null ? " at " + town : "") });
@@ -716,6 +720,7 @@ namespace Armoury
                             // nie odtwarzamy (nic z niczego), rejestr w dol jak przy przetopie z ValyrianNoSmelt wylaczonym
                             int was = Registered(id);
                             _reg[id] = Math.Max(0, was - need);
+                            NoteLoss((was - _reg[id]) * Math.Max(1, Measures(Item(id))) * IngotsPerMeasure);   // 563: legalna strata - start bilansu w dol
                             notes.Add(id + " przetopiona przez gracza przed 177 (czesci klingi odkryte w kuzni) - nie odtwarzam, rejestr " + was + " -> " + _reg[id]);
                             smelted += need;
                         }
@@ -724,6 +729,8 @@ namespace Armoury
                     // klinga w magazynie DTE partii AI - do wodza tej partii (zaklada), bez wodza - na polke
                     foreach (var c in l.Where(x => x.Kind == K.Armory).ToList()) { if (MoveFromArmory(c, notes)) moved++; }
                 }
+                // 563: sztaby - nadwyzka ponad rejestr sztab -> Castle-forged Steel, ubytek -> ERROR
+                fromNothing += DailyIngots(copies, notes);
                 if (recover)
                 {
                     _recoverPending = false;
@@ -739,6 +746,7 @@ namespace Armoury
                 Summary(fromNothing + recovered + fromDead + moved + smelted > 0 ? Gather() : copies, false);
             }
             catch (Exception e) { Log.Error("ValyrianBlades.Daily", e); }
+            try { Daily563(); } catch (Exception e) { Log.Error("ValyrianBlades.Daily563", e); }
         }
 
         /// <summary>Nadwyzka ponad rejestr -> zwykly odpowiednik w tym samym miejscu. Kolejnosc zostawiania: u mistrzow Qohoru (nie do zmiany - klinga
@@ -962,7 +970,8 @@ namespace Armoury
             _where = where;
             string sum = "Stal valyrianska: dzien " + (int)CampaignTime.Now.ToDays + " - " + blades + " klng, " + measures + " miar (rejestr " + (_reg != null ? _reg.Values.Sum() : 0)
                          + " klng, baza " + BaseMeasures() + " miar): na bohaterach " + onHeroes + ", tabory " + bags + ", targi " + shelves + ", schowki gracza " + stash
-                         + ", magazyny DTE " + dte + ", magazyn wojenny " + stock + ", u mistrzow Qohoru " + qohor + ", w drodze wozem " + carts;
+                         + ", magazyny DTE " + dte + ", magazyn wojenny " + stock + ", u mistrzow Qohoru " + qohor + ", w drodze wozem " + carts
+                         + IngotSummary(copies, measures, start);   // 563: sztaby i bilans (stan / baza / start)
             if (start || changes.Count > 0 || sum != _lastSummary)
                 Log.Info(sum + (changes.Count > 0 ? "; zmiany: " + string.Join(" | ", changes.ToArray()) : "") + ".");
             _lastSummary = sum;
@@ -1007,33 +1016,58 @@ namespace Armoury
             Log.Info("ValyrianBlades: latki wpiete - " + (got.Count > 0 ? string.Join(", ", got.ToArray()) : "ZADNA") + ".");
         }
 
-        // przetop dozwolony (ValyrianNoSmelt wylaczone): ile sztuk tej klingi bylo w taborze przed przetopem (recenzja 177)
+        // przetop dozwolony: ile sztuk tej klingi bylo w taborze przed przetopem (recenzja 177); 563: kowal i miary - sztaby w postfiksie
         private static string _smeltId;
         private static int _smeltBefore;
 
-        /// <summary>Zwykla kuznia nie rusza stali valyrianskiej (kanon: przekuwac umie tylko Qohor) - niezaleznie od CraftingEnabled.</summary>
-        public static bool SmeltPrefix(EquipmentElement equipmentElement)
+        /// <summary>Zwykla kuznia nie rusza stali valyrianskiej (kanon: przekuwac umie tylko Qohor) - niezaleznie od CraftingEnabled. 563 (ValyrianIngots):
+        /// kowal od ValyrianSmeltSkill przetapia klinge w sztaby (10 na miare); ponizej - blokada jak w 177. Przed przetopem straznik tego wzoru (GuardNow):
+        /// kopia z niczego nie "wypierze" sie w prawdziwe sztaby.</summary>
+        public static bool SmeltPrefix(Hero currentCraftingHero, EquipmentElement equipmentElement)
         {
-            _smeltId = null;
+            _smeltId = null; _smeltHero = null; _smeltMeasures = 0;
             try
             {
-                if (!Is(equipmentElement.Item)) return true;
-                if (!Settings.Current.ValyrianNoSmelt)
+                var item = equipmentElement.Item;
+                if (!Is(item)) return true;
+                var s = Settings.Current;
+                var r = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                if (!s.ValyrianIngots)
                 {
-                    var r = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
-                    if (r != null && _reg != null) { _smeltId = equipmentElement.Item.StringId; _smeltBefore = r.GetItemNumber(equipmentElement.Item); }
-                    return true;
+                    // stara droga 177 1:1: NoSmelt TAK - blokada, NIE - przetop, w ktorym stal ginie (postfiks: rejestr w dol, NoteLoss)
+                    if (!s.ValyrianNoSmelt)
+                    {
+                        if (r != null && _reg != null) { _smeltId = item.StringId; _smeltBefore = r.GetItemNumber(item); _smeltMeasures = Math.Max(1, Measures(item)); }
+                        return true;
+                    }
+                    _smeltBlocked++;
+                    Log.Player("Only the masters of Qohor can work Valyrian steel.", true);
+                    Log.Info("ValyrianBlades: przetop " + item.StringId + " zablokowany (zwykla kuznia).");
+                    return false;
                 }
-                _smeltBlocked++;
-                Log.Player("Only the masters of Qohor can work Valyrian steel.", true);
-                Log.Info("ValyrianBlades: przetop " + equipmentElement.Item.StringId + " zablokowany (zwykla kuznia).");
-                return false;
+                if (!SmeltAllowed(currentCraftingHero))
+                {
+                    _smeltBlocked++;
+                    Log.Player("Only the masters of Qohor - or a smith of " + s.ValyrianSmeltSkill + " Smithing - can work Valyrian steel.", true);
+                    Log.Info("ValyrianBlades: przetop " + item.StringId + " zablokowany - kowal " + (currentCraftingHero != null ? currentCraftingHero.Name.ToString() : "?")
+                             + " Smithing " + Smithing(currentCraftingHero) + " < " + s.ValyrianSmeltSkill + " (563).");
+                    return false;
+                }
+                if (r == null || _reg == null) return false;   // bez rejestru nie ma bilansu - nie przetapiamy
+                if (GuardNow(item.StringId) && r.GetItemNumber(item) <= 0)
+                {
+                    Log.Player("This blade was a forgery - there is no Valyrian steel in it.", true);
+                    Log.Info("ValyrianBlades: przetop " + item.StringId + " - klinga gracza byla kopia z niczego (straznik zamienil ja przed przetopem), przetop odwolany (563).");
+                    return false;
+                }
+                _smeltId = item.StringId; _smeltBefore = r.GetItemNumber(item); _smeltHero = currentCraftingHero; _smeltMeasures = Math.Max(1, Measures(item));
+                return true;
             }
-            catch { return true; }
+            catch (Exception e) { Stumble563("SmeltPrefix", e); return !Is(equipmentElement.Item); }   // VS przy bledzie - bez przetopu (bez bilansu)
         }
 
-        /// <summary>Recenzja 177: przetop dozwolony (ValyrianNoSmelt wylaczone) niszczy klinge - gra daje sztaby, a stal valyrianska ginie; rejestr
-        /// maleje o tyle sztuk, ile ubylo z taboru (niezaleznie od tego, ktory prefiks wykonal przetop), inaczej codzienny falszywy UBYTEK.</summary>
+        /// <summary>Postfiks DoSmelting (Priority.Last): sztuk ubylo z taboru (niezaleznie od tego, ktory prefiks wykonal przetop). 563 (ValyrianIngots):
+        /// klinga -> sztaby (rejestr klingi w dol, rejestr sztab w gore - stali nie ubywa). Bez sztab (recenzja 177): stal ginie, rejestr w dol, NoteLoss.</summary>
         public static void SmeltPostfix(EquipmentElement equipmentElement)
         {
             var id = _smeltId;
@@ -1045,19 +1079,24 @@ namespace Armoury
                 if (r == null || equipmentElement.Item == null || equipmentElement.Item.StringId != id) return;
                 int gone = _smeltBefore - r.GetItemNumber(equipmentElement.Item);
                 if (gone <= 0) return;
+                if (IngotsOn) { SmeltToIngots(id, equipmentElement.Item, gone, r); return; }
                 int was = Registered(id);
                 for (int i = 0; i < gone; i++) RegistryMove(new[] { id }, new string[0]);
+                NoteLoss(gone * Math.Max(1, _smeltMeasures) * IngotsPerMeasure);
                 Log.Info("Kronika unikatow: " + id + " przetopiona w kuzni gracza (Valyrian No Smelt wylaczone) - stal valyrianska stracona, rejestr " + was + " -> " + Registered(id) + ".");
             }
             catch (Exception e) { if (_stumbles++ < 3) Log.Error("ValyrianBlades.SmeltPostfix", e); }
+            finally { _smeltHero = null; _smeltMeasures = 0; }
         }
 
-        /// <summary>Lista Smelt bez klng valyrianskich (tylko odejmuje).</summary>
+        /// <summary>Lista Smelt bez klng valyrianskich (tylko odejmuje). 563: przy sztabach klingi zostaja, gdy ktos w partii moze je przetopic (faktycznego
+        /// kowala sprawdza SmeltPrefix - SmeltingVM.RefreshList kowala nie zna).</summary>
         public static void SmeltListPostfix(object __instance)
         {
             try
             {
                 if (!Settings.Current.ValyrianNoSmelt) return;
+                if (IngotsOn && AnySmelterInParty()) return;
                 var list = Traverse.Create(__instance).Property("SmeltableItemList").GetValue() as IList;
                 if (list == null) return;
                 for (int i = list.Count - 1; i >= 0; i--)

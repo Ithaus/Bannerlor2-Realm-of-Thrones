@@ -285,6 +285,14 @@ namespace Armoury
                 if (SmithCoal.On) { float kg = SmithCoal.WeaponKg(d); if (kg > 0f || cl > 0) b.Rows.Add(KgRow(coal, "coal", kg, SmithCoal.LumpKg, SmithCoal.OpenKg, cl)); }
                 else if (cl > 0) b.Rows.Add(PieceRow(coal, "coal", cl));
             }
+            // 563: klinga ze stali valyrianskiej - sztaby na pierwszym wierszu (te same liczby, ktore zdejmuje ValyrianBlades.OnCraftedVs)
+            try
+            {
+                var ing = ValyrianBlades.IngotsOn ? ValyrianBlades.Ingot : null;
+                if (ing != null && ValyrianBlades.UsesVs(d))
+                    b.Rows.Insert(0, PieceRow(ing, "piece", ValyrianBlades.IngotsPerMeasure * Math.Max(1, ValyrianBlades.DesignMeasures(d))));
+            }
+            catch (Exception e) { Stumble("OfWeapon(sztaby VS)", e); }
             Finish(b);
             return b;
         }

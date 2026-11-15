@@ -534,7 +534,8 @@ namespace Armoury
                 for (int i = roster.Count - 1; i >= 0; i--)
                 {
                     var e = roster.GetElementCopyAtIndex(i);
-                    if (e.Amount <= 0 || !Is(e.EquipmentElement.Item)) continue;
+                    // 563: sztaby stali valyrianskiej tez nie gina z partia (galaz "reszta": zwyciezca, wodz, polka)
+                    if (e.Amount <= 0 || !(Is(e.EquipmentElement.Item) || ValyrianBlades.IsIngot(e.EquipmentElement.Item))) continue;
                     if (got == null) got = new List<EquipmentElement>();
                     for (int n = 0; n < e.Amount; n++) got.Add(e.EquipmentElement);
                     roster.AddToCounts(e.EquipmentElement, -e.Amount);
@@ -546,7 +547,8 @@ namespace Armoury
                 if (destroyer == PartyBase.MainParty || claimed)
                 {
                     foreach (var el in got) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
-                    Log.Player("You find " + string.Join(", ", got.Select(x => x.Item.Name.ToString()).ToArray()) + " among the baggage of " + mp.Name + ".");
+                    // 563: nazwy zgrupowane (20 sztab = jedna pozycja "20 x Valyrian Steel")
+                    Log.Player("You find " + string.Join(", ", got.GroupBy(x => x.Item.Name.ToString()).Select(g => (g.Count() > 1 ? g.Count() + " x " : "") + g.Key).ToArray()) + " among the baggage of " + mp.Name + ".");
                     to = claimed ? "gracz (426: bitwa gracza, niszczyciel z gry " + (destroyer != null ? destroyer.Name.ToString() : "brak") + ")" : "gracz";
                     if (claimed) _cBaggage += got.Count;
                 }

@@ -3396,9 +3396,25 @@ namespace Armoury
         [SettingPropertyGroup("Valyrian steel")]
         public bool ValyrianGuard { get; set; } = true;
 
-        [SettingPropertyBool("Valyrian No Smelt", HintText = "no forge but the masters of Qohor can work Valyrian steel: Valyrian blades are not on the smelting list and cannot be melted down (other legendary pieces as before); off = a Valyrian blade melts like any other and its steel is lost to the world for good", RequireRestart = false)]
+        [SettingPropertyBool("Valyrian No Smelt", HintText = "no forge but the masters of Qohor can work Valyrian steel: Valyrian blades are not on the smelting list and cannot be melted down (other legendary pieces as before); off = a Valyrian blade melts like any other and its steel is lost to the world for good. With Valyrian Ingots on, a smith of the Smithing above may melt it into ingots; off = anyone may", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public bool ValyrianNoSmelt { get; set; } = true;
+
+        [SettingPropertyBool("Valyrian Ingots", HintText = "Valyrian steel can be melted into ingots and forged anew: a smith with enough Smithing melts a blade into 10 ingots for each measure (a greatsword 20), and a master with the Legendary Smith perk and enough Smithing forges a one-handed Valyrian blade from 10 ingots. Nothing is added and nothing is lost - the count of the world's Valyrian steel holds. Off = only the masters of Qohor work it, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Valyrian steel")]
+        public bool ValyrianIngots { get; set; } = true;
+
+        [SettingPropertyInteger("Valyrian Smelt Skill", 0, 330, "0", HintText = "Smithing needed to melt a Valyrian blade into ingots in your own forge; below it only the masters of Qohor can work the steel", RequireRestart = false)]
+        [SettingPropertyGroup("Valyrian steel")]
+        public int ValyrianSmeltSkill { get; set; } = 275;
+
+        [SettingPropertyInteger("Valyrian Forge Skill", 0, 330, "0", HintText = "Smithing needed - together with the Legendary Smith perk - to forge a Valyrian blade from ingots", RequireRestart = false)]
+        [SettingPropertyGroup("Valyrian steel")]
+        public int ValyrianForgeSkill { get; set; } = 300;
+
+        [SettingPropertyBool("Valyrian Legendary Smith At 300", HintText = "The Legendary Smith perk moves to 300 Smithing and unlocks forging Valyrian steel (smiths who already hold it keep it). Off = the perk stays at 275 and forging Valyrian steel needs it and the Smithing above. Takes effect after reloading the game", RequireRestart = false)]
+        [SettingPropertyGroup("Valyrian steel")]
+        public bool ValyrianLegendarySmithAt300 { get; set; } = true;
 
         [SettingPropertyBool("Unique Inheritance", HintText = "a Valyrian blade does not die with its bearer: the executioner takes it, otherwise the heir (clan leader, children, spouse, siblings, kin); with no heir it lies on the market of his clan's town; blades of your own clan come to your baggage", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
@@ -14753,6 +14769,10 @@ namespace Armoury
             s.UniqueNamesGold = UniqueNamesGold;
             s.ValyrianGuard = ValyrianGuard;
             s.ValyrianNoSmelt = ValyrianNoSmelt;
+            s.ValyrianIngots = ValyrianIngots;
+            s.ValyrianSmeltSkill = ValyrianSmeltSkill;
+            s.ValyrianForgeSkill = ValyrianForgeSkill;
+            s.ValyrianLegendarySmithAt300 = ValyrianLegendarySmithAt300;
             s.UniqueInheritance = UniqueInheritance;
             s.UniqueNeverLost = UniqueNeverLost;
             s.UniquesNotFolkGoods = UniquesNotFolkGoods;

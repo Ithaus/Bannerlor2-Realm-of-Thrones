@@ -144,7 +144,10 @@ namespace Armoury
                 new Rule { Id = "Crafting.MasterSmith", Get = () => DefaultPerks.Crafting.MasterSmith, Secondary = false, Text = (s, p) =>
                     V(p, false) + "% greater chance of creating masterwork weapons, armour, bows, crossbows and ammunition." },
                 new Rule { Id = "Crafting.LegendarySmith", Get = () => DefaultPerks.Crafting.LegendarySmith, Secondary = false, Text = (s, p) =>
-                    V(p, false) + "% greater chance of creating Legendary weapons, armour, bows, crossbows and ammunition, chance increases by 1% for every 5 skill points above 275." },
+                    V(p, false) + "% greater chance of creating Legendary weapons, armour, bows, crossbows and ammunition, chance increases by 1% for every 5 skill points above 275."
+                    + (!s.ValyrianIngots ? ""   // 563: odblokowanie kucia stali valyrianskiej (zamiast ikony perku)
+                       : s.ValyrianLegendarySmithAt300 && s.ValyrianForgeSkill <= 300 ? " Unlocks forging Valyrian steel: a blade of one measure takes " + ValyrianBlades.IngotsPerMeasure + " ingots of Valyrian steel."
+                       : " With " + s.ValyrianForgeSkill + " Smithing it also unlocks forging Valyrian steel: a blade of one measure takes " + ValyrianBlades.IngotsPerMeasure + " ingots of Valyrian steel.") },
 
                 // 512-E
                 new Rule { Id = "Scouting.BeastWhisperer", Get = () => DefaultPerks.Scouting.BeastWhisperer, Secondary = false, Text = (s, p) =>

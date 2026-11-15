@@ -203,7 +203,7 @@ namespace Armoury
                 var it = el.EquipmentElement.Item;
                 if (it == null || el.Amount <= 0) continue;
                 bool coal = it == Recipes.MaterialItem(CraftingMaterials.Charcoal);
-                bool bar = !coal && IsBar(it);
+                bool bar = !coal && (IsBar(it) || ValyrianBlades.IsIngot(it));   // 563: sztaba stali valyrianskiej nie powstaje w ladunku wedrowcow
                 if (!coal && !bar) continue;
                 roster.AddToCounts(el.EquipmentElement, -el.Amount);
                 if (coal) _dCoal += el.Amount;

@@ -35,7 +35,7 @@ namespace Armoury
     internal static partial class QohorMasters
     {
         internal const string OwnOut = "@own";
-        private static readonly string[] VsBlades = { "valsteelblade_1", "valsteelblade_2", "valyrian_short_blade", "val_red_blade", "val_blue_blade" };
+        internal static readonly string[] VsBlades = { "valsteelblade_1", "valsteelblade_2", "valyrian_short_blade", "val_red_blade", "val_blue_blade" };
         private static int _dOwnPlaced, _dOwnMade, _dOwnFailed;
 
         private static bool OwnOn { get { var s = Settings.Current; return s != null && s.QohorReworkEnabled && s.QohorOwnDesign; } }
