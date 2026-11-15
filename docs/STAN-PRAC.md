@@ -1,5 +1,9 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 243 (534 okienka wsi pobocznych, 535 bron boczna opcjonalna, 536 ludzie rodu we wsiach glownych), bez autotestu
+
+- Armoury.dll 7cbfb244 = noc/scal-perki. Kopie: .bak-2026-11-15-przed-wgranie243, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie243 i -przed). W toku: 537 konie i uprzeze (projekt docs/projekty/KONIE-UPRZEZE.md, E0-E6).
+
 ## STAN 15.11 - WGRANIE 242 (533 podpowiedz paska DTE = nasza liczba pustych slotow), bez autotestu
 
 - Armoury.dll 4090b559 = noc/scal-perki (241 + 533). Kopie: .bak-2026-11-15-przed-wgranie242, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie242 i -przed). Do sprawdzenia w logu: 'Pasek DTE na mapie (533): latka TAK'.
