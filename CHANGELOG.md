@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 565: pasek mapy - Pack pokazuje prog taboru kolumny marszowej (to, co naprawde hamuje), limit Herding w podpowiedzi jako druga informacja - Armoury (MarchHud.cs, MarchPace.cs, klucz MarchHudPackTrain w Settings.cs + McmSettings.cs recznie)
+
+**Problem:** audyt predkosci 15.11 (pkt 2), Jeff: "tak koniecznie". Pasek "Pack 81/147" ostrzegal tylko ponad limit Herding (juczne / ludzie - bydlo - wolne konie), a kolumna MarchPace uznaje partie za tabor juz przy jucznych + bydle ponad MarchPackAllowance (0.25) x ludzie i wtedy daje sufit MarchTrainPace 4.2 x tempo swiata. Log Armoury-2026-11-15_19-36-27.log, linia 13051 (Pary marszowe, gracz): ludzie 169, juczne 81, bydlo 2 -> tabor 83 przy przydziale ceil(169 x 0.25) = 43, a pasek pokazywal "81/147" bez koloru.
+
+**Przyczyna:** MarchHud.Sync liczyl pozycje Pack z rekordu par (r.CPack / r.PackLimit - regula Herding), a sufit taboru (MarchPace.Mounted: train > allowance -> MarchTrainPace) na pasku nie byl widoczny wcale.
+
+**Zmiana:**
+- MarchPace: `Allowance(c, men)` - jedna regula przydzialu (Mounted, Explain, pasek; wzor bez zmian: ceil(men x max(0, MarchPackAllowance))). `TrainOf(mp, out men, out train, out allowance)` - ludzie i juczne + bydlo jak CountColumn (z doczepionymi partiami armii, bez HorseState), te same warunki co ColumnPostfix (MarchPaceEnabled, morze, wies/karawana/zaloga/milicja, MarchPaceAiToo).
+- MarchHud: Pack = tabor / wolne od kary (u Jeffa teraz "83/43", czerwone); ostrzezenie ponad przydzial albo - jak dotad - ponad limit Herding. Ulamek "mam / limit" i zasady szerokosci 548 bez zmian (num = sam tabor).
+- Podpowiedz Pack (tytul "Baggage train"): tabor / wolne i ilu ludzi; zwierzeta (juczne, bydlo, w partiach armii); "Speed ceiling" = MarchTrainPace x tempo swiata (Scale z MarchPace.Explain) z odnosnikiem do wpisu 'Marching column: baggage train', "higher on roads" przy MapRoadSpeedBonus; "To lift it" - ile zwierzat zdjac (tabor - przydzial) albo wiecej ludzi (1 wolne na 1/MarchPackAllowance ludzi); "Now" - gdy wolniejszy sufit (piesi, piechota na luzakach) wiaze pierwszy; "Herding limit" jako druga informacja (juczne / limit, wzor, nadmiar).
+- Linia logu paska: "Pack 83/43 (565: tabor kolumny / wolne od kary, ludzie kolumny N)".
+- Klucz NOWY `MarchHudPackTrain` (domyslnie tak; w Armoury.json Jeffa go nie ma - wezmie domyslna). Off, albo regula kolumny nie dotyczy partii (MarchPaceEnabled off, morze) = Pack jak w 548 (juczne / limit Herding).
+
+**Ryzyko / co sprawdzic:** tylko wyswietlanie - predkosc, sufit i Herding bez zmian (Allowance = ten sam wzor co dotad w Mounted i Explain; grep MarchPackAllowance: tylko Allowance, Settings, McmSettings, opis podpowiedzi). Gracz i AI: regula taboru wspolna; pasek jest tylko gracza. TrainOf co odswiezenie paska (0.2 s) - tylko odczyt rostera partii i doczepionych, bez HorseState i par. MarchPace.Explain wolany tylko przy otwartej podpowiedzi (jak w oknie Review the army). Tabor liczy partie armii doczepione do gracza (jak sufit), rekord par (Herding) - sama partia gracza; wiersz "Animals" pokazuje roznice. Opis klucza March Pairs Hud nadal mowi o Herding dla Pack - nie ruszany (nowy klucz ma wlasny opis). Rownolegle zmiany 1 i 3 z audytu (tempo swiata jako mnoznik, Strong) moga zmienic Scale - podpowiedz bierze Scale z Explain, wiec pojdzie za nimi. W grze: Pack "83/43" czerwone; podpowiedz z sufitem ok. 3.2 (4.2 x 0.75) i "drop or sell 40 pack animals or livestock".
+
+**Status:** DO SPRAWDZENIA (galaz noc/565-pasek-tabor, nie wgrane)
+
 ## 562b: musztra - pasek Drill pokazuje postep w sztukach (%), podpowiedz mowi, czego brakuje najbardziej i dlaczego pobor nic nie bierze - Armoury (DrillKit.cs, MarchHud.cs)
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 262: Horses 165/165, Pack 80/139, Drill 0/164 czerwone - "mam rzeczy w armoury, ale wojsko nie pobiera - jak mam cos kliknac?". Log Armoury-2026-11-15_19-36-27.log, linia 953: migracja 562 - zapas 299 -> 255 szt., do zbrojowni 53, wzieto z nadwyzki 9 (wlocznie 14 -> 23/26), kontrola ZGODNE. Pokrycie rodzajow: 1H 88/88, 2H 3/3, wlocznie 23/26, tarcze 0/88, luki 0/73, strzaly 0/73, oszczepy 0/7, korpus 61/164, helmy 38/164, nogi 31/164, oponcze 0/164 = 244/1013 sztuk (24%).
