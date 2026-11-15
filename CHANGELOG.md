@@ -29,6 +29,41 @@ Projekt: `docs/projekty/KONIE-UPRZEZE.md` (15.11, wersja 2). Jeff, czat 15.11: "
 
 **Status:** DO SPRAWDZENIA (galaz noc/537-konie-uprzeze, nie wgrane). Test: linia "Pary marszowe (gracz)" recznie zgodna ze stanem oddzialu (okno handlu: konie, uprzeze; zbrojownia; Review the army); z niej przeliczamy przyklad 1.4 i HUD.
 
+### E1: MarchPairs z pamiecia + HUD na pasku mapy (Horses / Harness / Pack) - tylko wyswietlanie - Armoury (MarchPairs.cs, nowy MarchHud.cs, klucz NOWY MarchPairsHud)
+
+**Problem:** Jeff 15.11: "HUD: konie np. 23/31 uzywane przez ludzi, 21/31 uprzezy, ile koni jucznych 4/5 zanim beda kary za herding". Liczby z E0 byly tylko w linii doby.
+
+**Przyczyna:** brak pozycji na pasku mapy; rekord MarchPairs liczony bez pamieci raz na dobe (E0).
+
+**Zmiana (tylko wyswietlanie - predkosc, waga, udzwig i bitwa bez zmian):**
+- `MarchPairs.Main(force)` - JEDEN rekord gracza w pamieci dla linii doby i HUD. Klucz: wersja zbrojowni DTE, skladu, jencow i ladunku, dzien, morze, `SaddleLaw.On`. Liczony od nowa najwyzej raz na 1 s i tylko po zmianie klucza, albo co 10 s (sprzet bohaterow, przelaczniki podgladu - bez wersji). Przy otwartej zbrojowni (Escrow chowa sztuki) i w misji - ostatni rekord. Klucz zapisywany PO liczeniu (podglad DTE moze podbic wersje - bez petli). Potkniecie - zostaje stary rekord.
+- `Of(mp, light)`: na pasku (light) podglad DTE z pamieci `KitPreview.Last`, gdy zgadza sie wersja zbrojowni i skladu (poczatek klucza KitPreview) - sama zmiana ladunku (jedzenie co godzine gry) nie liczy podgladu od nowa (10-17 ms). Linia doby: `Main(true)` -> pelne `KitPreview.Get(false)` jak w E0.
+- `Of`: podglad DTE tylko przy `KitPreview.CsQuiet` (jak `ForArmoury` i meldunek QM); przy CrashScribe sprzed 133a - wlasny dobor ze zbrojowni, powod w linii.
+- Rekord: `Ridden` (pary jazdy + pary puli; na morzu 0), `AllHorses` (ladunek + zbrojownia), `AllHarness`, `SkillLowEn` (braki Jazdy po angielsku do podpowiedzi), `Day`, `Ms`.
+- `MarchHud` (wzor BK MapInfoPietyPatches, dekompilacja MapInfoVM 1.4.8): postfiksy `MapInfoVM.RefreshValues` i `MapInfoVM.UpdatePlayerInfo` (DeclaredMethod; MapBarVM.OnRefresh co 0.2 s, NavalMapInfoVM wola base). Pozycje:
+  - "Horses" (gorny rzad, ikona `speed`): konie pod ludzmi / wszystkie konie wierzchowe;
+  - "Harness" (dolny rzad, ikona `troops`): uprzeze na koniach pod ludzmi / wszystkie konie (D10 a);
+  - "Pack" (dolny rzad, ikona `food`): juczne / ludzie - bydlo - wolne konie w stadzie; kolor ostrzezenia, gdy juczne ponad limit.
+  Ulamek dluzszy niz 5 znakow (pole MaxWidth 52 przy FontSize 20) - sam licznik, pelny w podpowiedzi. Te same funkcje tekstu (`HorsesText`/`HarnessText`/`PackText`) w HUD i w linii doby.
+- Podpowiedz (po angielsku, z `MarchPairs.Last`, bez liczenia): Men mounted, On foot (no horse / no harness / Riding too low), Cavalry, Footmen on spare horses, Heroes on their own horses, Horses (ridden / not ridden / free in the herd), Harness (worn / unused, pary z wymogiem Riding), Pack animals (wzor limitu), Baggage pace (MarchPackAllowance), Riding too low (typy), uwaga "party speed and weight do not use these numbers yet" (E2/E3 musza ja zmienic).
+- Pozycje per obiekt `MapInfoVM` (ConditionalWeakTable) - nowy pasek (wczytanie, nowy ekran mapy) dostaje swoje; `Ensure`: nasza pozycja dokladnie raz (porownanie referencji), obca pozycja z naszym ItemId zdjeta (lekcja BkPietyBar). Przed OnSessionLaunched kampanii (flaga `_live`, gaszona w Reset konstruktora zachowania) pasek nie liczy niczego - pozycje dochodza przy pierwszym odswiezeniu po starcie sesji.
+- Klucz NOWY `MarchPairsHud` (Settings.cs + McmSettings.cs recznie, grupa "Crafts, raw materials and horses (stage 6)", domyslnie TAK; wylaczenie zdejmuje pozycje przy nastepnym odswiezeniu). W Armoury.json Jeffa go nie ma.
+- Log: linia startu `Pasek mapy - pary marszowe (537 E1): latki ...`; przy kazdej zmianie tekstu paska (20 pierwszych, potem co 50.) `pasek (N) -> Horses a/b, Harness a/b, Pack a/b | jedzie: jazda, pula, konie (ladunek, zbrojownia), uprzeze, juczne / limit`; linia doby "Pary marszowe (gracz)" dostaje "HUD (D10 a, E1 - te same liczby na pasku mapy)", "pamiec rekordu: liczen od startu sesji N, ostatnie X ms", stan paska (latki, klucz, paskow, dodan pozycji, zdjetych obcych duplikatow, zmian tekstu, ostatni tekst), a przy nieudanym liczeniu "REKORD Z PAMIECI".
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: zadnej zmiany predkosci, wagi, udzwigu, bitwy, zapisu. Linia doby E0 liczy teraz przez `Main(true)` - te same liczby; zmiana: "Horses/Harness" na morzu 0 (wczesniej pary jazdy), ulamek >5 znakow skrocony do licznika (pelne liczby sa wyzej w linii).
+- Kolizje: MapInfoVM patchuja tez BK (RefreshValues/UpdatePlayerInfo - poboznosc w gornym rzedzie) i CrashScribe BkPietyBar (zdejmuje tylko duplikaty "piety"); nasze ItemId inne (`armoury_horses`, `armoury_harness`, `armoury_pack`). DteMapBar533 i HUD dziela pamiec KitPreview (ten sam klucz) - jedno liczenie na zmiane.
+- Wydajnosc: co 0.2 s tylko porownania (klucz liczony najwyzej raz na 1 s). Pelny podglad DTE (10-17 ms) tylko po zmianie zbrojowni lub skladu (albo dnia w linii doby). Watek glowny (UI).
+- [P] do obejrzenia na ekranie: czy gorny rzad (vanilla 6 + statek NavalDLC + poboznosc BK + Horses = 9) miesci sie bez nachodzenia na zegar; czy "38/45" miesci sie w MaxWidth 52; czy ikony `speed`/`troops`/`food` (warstwy pedzla MapBar.Right.Icons, takze w pedzlu BK) wyswietlaja sie przez SetOverriddenVisualId. Jesli gorny rzad sie nie miesci - Horses do dolnego rzedu (jedna linia w Sync).
+- "On foot" = ludzie - jadacy; rozbicie (no horse / no harness / Riding too low) z puli piechoty - moze sie roznic od sumy o bohaterow na wlasnym koniu bez pasujacej uprzezy (licza sie jako jadacy do E2/D6).
+- Czyszczenie stanu: `MarchPairs.Reset` (rekord, klucz, licznik) i `MarchHud.Reset` (liczniki logu, `_live`) w konstruktorze ArmouryBehavior; pozycje paska ginacym obiektem MapInfoVM.
+- Bledy liczone (`MarchHud.Stumble`, `MarchPairs.Stumble`), bez wylacznika.
+- Asymetria gracz/AI (D3): HUD tylko gracza.
+- CHANGELOG: 49972 -> 50007 linii (podsekcja E1 dopisana pod E0, reszta bez zmian).
+- Build Armoury 0 bledow. Gra Jeffa moze byc wlaczona - NIE wgrane, w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA (galaz noc/537-konie-uprzeze, nie wgrane). Test: HUD = linia doby "Pary marszowe (gracz)" (HUD D10 a) i linia "pasek (N) ->"; po wczytaniu i po zmianie ekranu (handel, ekwipunek, miasto) kazda pozycja jeden raz ("zdjetych obcych duplikatow 0", "dodan pozycji" = 3 x "paskow").
+
 ## 534: wies poboczna - kazde okienko werbunku losowane osobno (mieszanka chlopow i ludzi rodu), okno z cena wedlug rodzaju - Armoury (SideVillageVisit.Levy / Screen / LevyProbe, klucz istniejacy SideVillageHouseRecruit)
 
 **Problem:** Jeff, czat 15.11, po wpisie 531: w Bluefork Bend okno werbunku `chlopi 8, ludzie rodu 0`. Wyjasnienie: wies poboczna losowala RAZ na dobe jeden rodzaj dla wszystkich rekrutow (`TroopFor` - jedna oferta `(wioska, doba) -> CharacterObject`), wiec albo wszyscy chlopi, albo wszyscy Blackwood Recruit. Jeff: "nie wszyscy tego samego rodzaju - losuje w kazdym okienku, jesli wioska ma 5 okienek to losuje kazde okienko 5 razy kto bedzie".

@@ -54,13 +54,22 @@ namespace Armoury
             // gra
             public int GameFoot, GameNum10, GameHerd, OurHerd, FreeHerd, PackLimit;
             public float GameFootF, OurFootF, GameHerdF, OurHerdF;
+            // E1: braki Jazdy wedlug typu po angielsku (podpowiedz HUD), dzien i czas liczenia rekordu
+            public readonly List<string> SkillLowEn = new List<string>();
+            public int Day; public double Ms;
+            /// <summary>E1: koni pod ludzmi (pary jazdy + pary puli); na morzu 0 - nikt nie jedzie (rozdz. 1.3). Ta sama liczba w linii doby i w HUD.</summary>
+            public int Ridden { get { return AtSea ? 0 : CavPairs + Ride; } }
+            /// <summary>E1: wszystkie konie wierzchowe - ladunek + zbrojownia DTE (mianownik HUD, D10 a).</summary>
+            public int AllHorses { get { return CMounts + AHorses; } }
+            /// <summary>E1: wszystkie pasujace uprzeze - ladunek + zbrojownia DTE.</summary>
+            public int AllHarness { get { return CHarFam + CHarSaddle + AHarness; } }
         }
 
         private static int _stumbles, _stumblesDay;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        internal static void Reset() { _stumbles = 0; _stumblesDay = 0; _errSites.Clear(); }
+        internal static void Reset() { _stumbles = 0; _stumblesDay = 0; _errSites.Clear(); _main = null; _mainKey = null; _mainAt = Environment.TickCount - 20000; _mainCount = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -184,7 +193,11 @@ namespace Armoury
                 foreach (var m in byDesc) { if (s <= 0) break; int w = m.N - m.Got; if (w <= 0) continue; int t = Math.Min(s, w); m.Skill = t; s -= t; }
                 foreach (var m in byDesc)
                     if (m.Skill > 0)
-                        r.SkillByType.Add((m.Ch.Name != null ? m.Ch.Name.ToString() : m.Ch.StringId) + " (" + KindPl(m.Kind) + ", Jazda " + m.Riding + ") " + m.Skill);
+                    {
+                        string nm = m.Ch.Name != null ? m.Ch.Name.ToString() : m.Ch.StringId;
+                        r.SkillByType.Add(nm + " (" + KindPl(m.Kind) + ", Jazda " + m.Riding + ") " + m.Skill);
+                        r.SkillLowEn.Add(m.Skill + "x " + nm + " (Riding " + m.Riding + ")");
+                    }
             }
         }
 
@@ -199,7 +212,11 @@ namespace Armoury
         }
 
         /// <summary>Rekord par jednej partii (bez pamieci - E0 woła tylko raz na dobe). Gracz: jazda z podgladu DTE; partia rodu: sam ladunek.</summary>
-        internal static Rec Of(MobileParty mp)
+        internal static Rec Of(MobileParty mp) { return Of(mp, false); }
+
+        /// <summary>light (E1, pasek mapy): podglad DTE z pamieci (KitPreview.Last), gdy zgadza sie wersja zbrojowni i skladu - sama zmiana ladunku
+        /// (jedzenie co godzine gry, przy szybkim czasie co chwile) nie liczy podgladu od nowa (10-17 ms). Linia doby - light false (pelny podglad).</summary>
+        internal static Rec Of(MobileParty mp, bool light)
         {
             var r = new Rec();
             if (mp == null || mp.MemberRoster == null || mp.Party == null) return r;
@@ -281,7 +298,12 @@ namespace Armoury
                     }
                 foreach (var kv in cavHealthy) r.CavMen += kv.Value;
                 KitPreview.Result pv = null;
-                try { pv = KitPreview.Get(false); } catch (Exception e) { Stumble("KitPreview", e); pv = null; }
+                // E1: przy CrashScribe sprzed 133a podglad pisze szum - jak ForArmoury / meldunek QM: bez podgladu (wlasny dobor ze zbrojowni)
+                bool quiet = false;
+                try { quiet = KitPreview.CsQuiet; } catch (Exception e) { Stumble("CsQuiet", e); }
+                if (quiet && light) { try { pv = LastIfSame(mp); } catch (Exception e) { Stumble("KitPreview.Last", e); pv = null; } }
+                if (quiet && pv == null) { try { pv = KitPreview.Get(false); } catch (Exception e) { Stumble("KitPreview", e); pv = null; } }
+                else pv = new KitPreview.Result { Why = "CrashScribe sprzed 133a - podglad pomijany" };
                 if (pv != null && pv.Ok)
                 {
                     r.Preview = true;
@@ -355,6 +377,69 @@ namespace Armoury
             return r;
         }
 
+        // ---------------------------------------------------------------- E1: pamiec rekordu gracza (jeden rekord dla linii doby i HUD)
+        private static Rec _main;
+        private static string _mainKey;
+        private static int _mainAt;              // Environment.TickCount ostatniego liczenia
+        private static int _mainCount;           // ile razy liczony od startu sesji (linia doby)
+
+        /// <summary>Klucz pamieci: wersje zbrojowni DTE, skladu, jencow i ladunku, dzien, morze, prawo siodla. Tanie (bez liczenia).</summary>
+        private static string MainKey(MobileParty mp)
+        {
+            var arm = HorseFate.PlayerArmory();
+            var ir = mp.ItemRoster;
+            return (arm != null ? arm.VersionNo : -1) + "|" + mp.MemberRoster.VersionNo + "|" + (mp.PrisonRoster != null ? mp.PrisonRoster.VersionNo : -1)
+                   + "|" + (ir != null ? ir.VersionNo : -1) + "|" + (int)CampaignTime.Now.ToDays + "|" + (mp.IsCurrentlyAtSea ? 1 : 0) + (SaddleLaw.On ? 1 : 0);
+        }
+
+        /// <summary>E1: rekord par gracza z pamieci. Liczony od nowa najwyzej raz na 1 s i tylko po zmianie klucza, albo co 10 s (sprzet bohaterow,
+        /// przelaczniki podgladu - bez wersji); force - od razu (linia doby). Przy otwartej zbrojowni (Escrow chowa sztuki) i w misji - ostatni rekord.
+        /// Watek glowny (takt doby, pasek mapy). Nigdy nie rzuca; null - jeszcze nic nie policzone.</summary>
+        internal static Rec Main(bool force)
+        {
+            try
+            {
+                var mp = MobileParty.MainParty;
+                if (Campaign.Current == null || mp == null || !mp.IsActive || mp.MemberRoster == null) return _main;
+                if (QuartermasterEscrow.Active || TaleWorlds.MountAndBlade.Mission.Current != null) return _main;
+                int now = Environment.TickCount;
+                int since = unchecked(now - _mainAt);
+                string key = null;
+                if (!force)
+                {
+                    if (_main != null && since < 1000) return _main;
+                    key = MainKey(mp);
+                    if (_main != null && key == _mainKey && since < 10000) return _main;
+                }
+                else key = MainKey(mp);
+                long t0 = Stopwatch.GetTimestamp();
+                Rec r = null;
+                try { r = Of(mp, !force); } catch (Exception e) { Stumble("Of(gracz)", e); }
+                _mainAt = now;
+                if (r == null || !r.Ok) return _main;   // potkniecie - zostaje stary rekord (HUD bez migania), proba za 1 s
+                r.Day = (int)CampaignTime.Now.ToDays;
+                r.Ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+                // klucz po liczeniu: podglad DTE mogl podbic wersje (bez petli - nastepne liczenie dopiero po zmianie albo za 10 s)
+                try { _mainKey = MainKey(mp); } catch { _mainKey = key; }
+                _main = r; _mainCount++;
+                return r;
+            }
+            catch (Exception e) { Stumble("Main", e); return _main; }
+        }
+
+        /// <summary>E1: KitPreview.Last, gdy udany i z ta sama wersja zbrojowni DTE i skladu (poczatek klucza KitPreview.Key: "zbrojownia|sklad|"); inaczej null.</summary>
+        private static KitPreview.Result LastIfSame(MobileParty mp)
+        {
+            var l = KitPreview.Last;
+            if (l == null || !l.Ok || l.Key == null) return null;
+            var arm = QuartermasterLaw.DteArmory();
+            string pre = (arm != null ? arm.VersionNo : -1) + "|" + mp.MemberRoster.VersionNo + "|";
+            return l.Key.StartsWith(pre, StringComparison.Ordinal) ? l : null;
+        }
+
+        /// <summary>Ostatni rekord gracza bez liczenia (podpowiedz HUD).</summary>
+        internal static Rec Last { get { return _main; } }
+
         private static string F3(float v) { return (v >= 0 ? "+" : "") + v.ToString("0.000", Inv); }
 
         /// <summary>Raz na dobe (ArmouryBehavior.OnDailyTick po HorsePace.Daily): linia "Pary marszowe (gracz)" (tylko log).</summary>
@@ -366,10 +451,13 @@ namespace Armoury
                 var mp = MobileParty.MainParty;
                 if (Campaign.Current == null || mp == null || !mp.IsActive) return;
                 int day = (int)CampaignTime.Now.ToDays - 1;
-                Rec r = null;
-                try { r = Of(mp); } catch (Exception e) { Stumble("Of(gracz)", e); }
+                // E1: ten sam rekord co HUD (pamiec Main) - liczony od nowa teraz; potkniecie - rekord z pamieci (zaznaczone w linii)
+                int cnt0 = _mainCount;
+                Rec r = Main(true);
+                bool fresh = _mainCount != cnt0;
                 var sb = new StringBuilder(1600);
                 sb.Append("Pary marszowe (gracz): dzien ").Append(day);
+                if (r != null && r.Ok && !fresh) sb.Append(" | REKORD Z PAMIECI (liczenie teraz nieudane - dzien rekordu ").Append(r.Day - 1).Append(')');
                 if (r != null && r.Ok)
                 {
                     sb.Append(" | ludzie ").Append(r.Men).Append(" (ranni ").Append(r.Wounded).Append(", bohaterowie ").Append(r.Heroes).Append(", jency ").Append(r.Prisoners)
@@ -398,10 +486,11 @@ namespace Armoury
                     sb.Append(" | pary: jedzie piechoty ").Append(r.Ride).Append(", Footmen ").Append(F3(r.OurFootF)).Append(" (roznica ").Append(F3(r.OurFootF - r.GameFootF)).Append(")")
                       .Append(", wolne konie w stadzie ").Append(r.FreeHerd).Append(", stado ").Append(r.OurHerd).Append(", Herding ").Append(F3(r.OurHerdF))
                       .Append(" (roznica ").Append(F3(r.OurHerdF - r.GameHerdF)).Append(")");
-                    int ridden = r.CavPairs + r.Ride, allHorses = r.CMounts + r.AHorses;
-                    sb.Append(" | HUD (D10 a): Horses ").Append(ridden).Append('/').Append(allHorses).Append(", Harness ").Append(ridden).Append('/').Append(allHorses)
-                      .Append(" (uprzezy wszystkich ").Append(r.CHarFam + r.CHarSaddle + r.AHarness).Append("), Pack ").Append(r.CPack).Append('/').Append(r.PackLimit)
-                      .Append(" (ludzie - bydlo - wolne konie)");
+                    sb.Append(" | HUD (D10 a, E1 - te same liczby na pasku mapy): Horses ").Append(MarchHud.HorsesText(r)).Append(", Harness ").Append(MarchHud.HarnessText(r))
+                      .Append(" (uprzezy wszystkich ").Append(r.AllHarness).Append("), Pack ").Append(MarchHud.PackText(r))
+                      .Append(" (ludzie - bydlo - wolne konie)").Append(r.AtSea ? " - na morzu nikt nie jedzie" : "")
+                      .Append(" | pamiec rekordu: liczen od startu sesji ").Append(_mainCount).Append(", ostatnie ").Append(r.Ms.ToString("0.0", Inv)).Append(" ms")
+                      .Append(" | ").Append(MarchHud.State());
                     // HorsePace dla porownania (krok 1 i 3 - E2 zastapi wpis "riders without horses")
                     try
                     {

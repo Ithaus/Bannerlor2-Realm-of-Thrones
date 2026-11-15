@@ -8724,6 +8724,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int RiderHorseCarryKg { get; set; } = 20;
 
+        [SettingPropertyBool("March Pairs Hud", HintText = "on the map bar: Horses (top row) - horses ridden by your men / all your riding horses (baggage and troops' armoury); Harness (lower row) - harness worn by those horses / all your riding horses; Pack (lower row) - pack animals / how many you may lead before the herding penalty (men - livestock - free horses), shown in warning colour when over. A man counts as riding only on a horse with a harness that fits it and that his Riding allows. Display only: party speed and weight are not changed by it (off = the map bar as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool MarchPairsHud { get; set; } = true;
+
         [SettingPropertyBool("Harness On Spare Horses", HintText = "every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside): that harness no longer weighs on the baggage, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HarnessOnSpareHorses { get; set; } = true;
@@ -15954,6 +15958,7 @@ namespace Armoury
             s.DteConvoyPacksStayWithConvoy = DteConvoyPacksStayWithConvoy;
             s.DteConvoyNoFreePacks = DteConvoyNoFreePacks;
             s.RiderHorseCarryKg = RiderHorseCarryKg;
+            s.MarchPairsHud = MarchPairsHud;
             s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;
