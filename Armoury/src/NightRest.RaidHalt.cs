@@ -32,9 +32,13 @@ namespace Armoury
         private static double _haltFrom = -1;             // CampaignTime.ToHours poczatku postoju
         private static float _haltHp0;                    // punkty wsi przy postoju (pasek) - do linii wznowienia (kontrola: pasek stal)
         private static int _haltStumbles, _haltErrLogged;
+        private static bool _haltOff;                     // recenzja 577: po MaxHaltStumbles postoj zdjety do switu (bez ponownego stawania i komunikatu co klatke)
         // liczniki doby od switu gracza (linia switu NocnyMarsz): godziny ksiegi z postojem, odpoczynek z nich, postoje, wznowienia, konce bez wznowienia
         private static int _haltTicksDay, _haltStartsDay, _haltResumesDay, _haltEndsDay;
         private static float _haltRestDay;
+        // recenzja 577: liczniki doby sprzed zerowania o swicie - tick switu bywa przed klatka wznowienia, wtedy linia wznowienia/konca podaje noc z nich
+        private static int _haltTicksPrev;
+        private static float _haltRestPrev;
 
         /// <summary>577: postoj nocny przy rabunku trwa (tick godzinowy ksiegi gracza).</summary>
         internal static bool RaidHaltNow { get { return _haltComp != null; } }
@@ -62,12 +66,14 @@ namespace Armoury
 
         private static void ResetRaidHalt()
         {
-            _haltComp = null; _haltName = null; _haltFrom = -1; _haltHp0 = 0f; _haltStumbles = 0; _haltErrLogged = 0;
+            _haltComp = null; _haltName = null; _haltFrom = -1; _haltHp0 = 0f; _haltStumbles = 0; _haltErrLogged = 0; _haltOff = false;
+            _haltTicksPrev = 0; _haltRestPrev = 0f;
             _haltTicksDay = _haltStartsDay = _haltResumesDay = _haltEndsDay = 0; _haltRestDay = 0f;
         }
 
         private static void RaidHaltDawnReset()
         {
+            _haltTicksPrev = _haltTicksDay; _haltRestPrev = _haltRestDay; _haltOff = false;
             _haltTicksDay = _haltStartsDay = _haltResumesDay = _haltEndsDay = 0; _haltRestDay = 0f;
         }
 
@@ -96,7 +102,8 @@ namespace Armoury
                 bool night = BedNight(CampaignTime.Now.GetHourOfDay);
                 if (_haltComp == null)
                 {
-                    if (!night || ForcedMarch.Active) return;
+                    if (!night) { _haltOff = false; return; }
+                    if (_haltOff || ForcedMarch.Active) return;
                     var def = cur.DefenderSide;
                     if (def == null || def.TroopCount > 0) return;                     // walka z milicja albo odsiecza - gra
                     var mp = MobileParty.MainParty;
@@ -125,7 +132,7 @@ namespace Armoury
                                         "Dawn - you and your companions take up the raid on " + name + " again."), Colors.White);
                     Log.Info("Nocleg: gracz - wznowienie rabunku o swicie (577): " + name + " o " + Hm(CampaignTime.Now.CurrentHourInDay) + ", postoj " + F1((float)(now - from))
                              + " h, pasek " + pct + (Math.Abs(hp1 - hp0) > 1e-4f ? " (ZMIENIL SIE w postoju o " + ((hp0 - hp1) * 100f).ToString("0.0", CultureInfo.InvariantCulture) + " pp)" : " (stal)")
-                             + "; godziny ksiegi z postojem tej doby " + _haltTicksDay + ", odpoczynek z nich " + F1(_haltRestDay) + " h; odpoczynek doby " + F1(_restTonight)
+                             + "; " + HaltNightCounts() + "; odpoczynek doby " + F1(_restTonight)
                              + " h, dlug " + Debt + ".");
                 }
             }
@@ -133,7 +140,13 @@ namespace Armoury
             {
                 _haltStumbles++;
                 if (_haltErrLogged++ < 3) Log.Error("NightRest.RaidHaltFrame", e);
-                if (_haltStumbles >= MaxHaltStumbles && _haltComp != null) { _haltComp = null; _haltStumbles = 0; Log.Info("Nocleg: gracz - postoj nocny przy rabunku zdjety po " + MaxHaltStumbles + " potknieciach (rabunek idzie dalej)."); }
+                if (_haltStumbles >= MaxHaltStumbles)
+                {
+                    // recenzja 577: zdjety do switu (_haltOff) - inaczej nastepna klatka nocy stanelaby od nowa z komunikatem; potkniecia liczone od nowa nastepnej nocy
+                    _haltStumbles = 0;
+                    if (!_haltOff) { _haltOff = true; Log.Info("Nocleg: gracz - postoj nocny przy rabunku zdjety do switu po " + MaxHaltStumbles + " potknieciach (rabunek idzie dalej)."); }
+                    _haltComp = null;
+                }
             }
         }
 
@@ -141,8 +154,15 @@ namespace Armoury
         {
             string name = _haltName; double from = _haltFrom;
             _haltComp = null; _haltEndsDay++;
-            Log.Info("Nocleg: gracz - postoj nocny przy rabunku (577) zakonczony: " + (name ?? "?") + " - " + why + "; postoj " + F1((float)(now - from)) + " h, godziny ksiegi z postojem tej doby "
-                     + _haltTicksDay + ", odpoczynek z nich " + F1(_haltRestDay) + " h.");
+            Log.Info("Nocleg: gracz - postoj nocny przy rabunku (577) zakonczony: " + (name ?? "?") + " - " + why + "; postoj " + F1((float)(now - from)) + " h, " + HaltNightCounts() + ".");
+        }
+
+        /// <summary>recenzja 577: godziny ksiegi z postojem i odpoczynek z nich tej nocy - po zerowaniu o swicie (tick switu przed klatka) z licznikow sprzed zerowania.</summary>
+        private static string HaltNightCounts()
+        {
+            int t = _haltTicksDay; float r = _haltRestDay; bool prev = false;
+            if (t == 0 && _haltTicksPrev > 0) { t = _haltTicksPrev; r = _haltRestPrev; prev = true; }
+            return "godziny ksiegi z postojem tej nocy " + t + ", odpoczynek z nich " + F1(r) + " h" + (prev ? " (doba juz rozliczona o swicie)" : "");
         }
     }
 }

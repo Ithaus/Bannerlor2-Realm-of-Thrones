@@ -30,6 +30,25 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 577
+
+Trzy niezalezne recenzje: BRAK BLEDOW blokujacych (bez SwitchToMenu, bez konca MapEvent, bez wizerunkow mapy; postep E7/R1 i gry stoi, TickDays z DeltaTime - bez nadrabiania nocy o swicie; ksiega 6 h w obu kolejnosciach ticku i klatki). Zgloszenia sprawdzone w kodzie:
+
+**Poprawione:**
+- Petla potkniec (recenzje 2a, 3.2): po 3 wyjatkach `RaidHaltFrame` zdejmowal postoj i zerowal licznik, a nastepna klatka tej samej nocy stawala od nowa z komunikatem "Night falls" (log "zdjety" klamal); wyjatek sprzed `_haltComp = cur` powtarzal sie co klatke bez konca. Teraz flaga `_haltOff` - po 3 potknieciach (z postojem albo bez) postoj zdjety DO SWITU (linia "zdjety do switu po 3 potknieciach" raz), czyszczona przy pierwszej klatce dnia, w `RaidHaltDawnReset` i `ResetRaidHalt`; potkniecia od nowa nastepnej nocy (funkcja dalej czynna).
+- Walka w postoju liczona jak sen (recenzje 1.2, 2b, 3.3): `raidHalt` w ksiedze gracza byl prawda takze przy walce w nocy (milicja/odsiecz, `DefenderSide.TroopCount > 0`). Teraz `raidHalt = RaidHaltNow && RaidHaltHolds(_haltComp) && !enl` - godzina walki to praca (sen przerwany, jak napad na oboz), `PlayerRaidingNow` w tej chwili i tak zwraca prawde. Po wygranej postoj wraca sam (ten sam komponent).
+- Linia wznowienia/konca z 0 godzin (recenzja 3.1): tick switu (3:00) przed klatka wznowienia zerowal liczniki, a linia wznowienia pisala "0, odpoczynek 0.0 h". `RaidHaltDawnReset` zapamietuje liczniki sprzed zerowania (`_haltTicksPrev`, `_haltRestPrev`); wspolne `HaltNightCounts()` w liniach wznowienia i konca podaje "godziny ksiegi z postojem tej nocy N, odpoczynek z nich X h (doba juz rozliczona o swicie)".
+
+**Odrzucone / bez zmiany:**
+- Komunikat "Night falls" po kazdym wczytaniu w nocy (recenzja 2c, watpliwosc 5) - stan postoju celowo tylko w pamieci (zapis bez nowego stanu); kosmetyka, wiadomosc prawdziwa.
+- Pierwsza aktualizacja MapEvent po wczytaniu przed klatka (recenzje 1.3, 2.5) - ulamek godziny postepu, pomijalne.
+- Odsiecz konczy caly rabunek po bitwie bez komunikatu 577 (recenzja 1.1) - zachowanie gry (MapEvent.cs:1022), gracz widzi bitwe; `EndHalt` loguje "bez wznowienia". Bez zmiany.
+- Zboze E7/R1 nie rosnie w postoju (recenzja 1.4) - spojne z "bez lupu w nocy", ludzie jedza z wlasnych zapasow.
+
+**Nierozstrzygniete (decyzja Jeffa):** (1) AI rabuje cala dobe, a ksiega AI liczy stanie przy wsi jako odpoczynek - lord AI rabuje ok. 1/4 doby szybciej niz gracz z 577 i bez kary snu (bylo przed 577). (2) Wioski poboczne (SideVillageVisit, bez MapEvent) poza 577 - rabunek w nocy dalej praca. (3) Okienko E7/R2 "about N days" liczy bez nocy (z postojem dluzej o ok. 1/4). (4) W cudzej armii gracz nie jest wodzem rabunku - brak postoju, rabunek dalej praca.
+
+Build Armoury 0 bledow (Release). NIE wgrane.
+
 ## 575: najtansze i wymiana w zestawie musztry - pobor po cenie z obu pul, codzienna wymiana drozszej sztuki na tansza, sztuka lepsza od wydanej wraca przed bitwa - Armoury (DrillKit.cs, Drill.cs, KitPreview.cs; nowy klucz DrillKitCheapestSwap w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "sprawdz czy w sprzecie do treningu zabieramy jest sprzet: * najtanszy ... * jesli zabral luk tier 6 do treningu a pojawily sie luki tansze w armoury to oddaje luk tier 6 i zabiera najtanszy jaki wpadl do armoury * zeby po prostu stos do nauki nie zabieral tier 6 sprzetu a jak zabiera to potem wymienia na tanszy i oddaje do armoury drozszy aby inne wojsko moglo go zalozyc do bitwy". Audyt A/B/C (sceptyk): najtanszy - CZESCIOWO/NIE (pobor `TakePlayer`/`TakeBook`/`AiKit` po `SwapMath.WorseFirst` - tier, sila, wrak, jakosc, BEZ ceny; pula ludzi zawsze przed lista gracza, 2H przed drzewcami); wymiana T6 na tansze u gracza - NIE (przy pelnym zestawie `Short(k) == 0`, nic sie nie dzieje; T6 wraca tylko jako nadmiar albo pod PUSTY slot podgladu bitwy); u AI - tak (rezerwacja liczona od nowa co dobe). Log `Armoury-2026-11-15_21-30-26.log` nie podaje tierow zapasu (l. 916, 10603, 11379, 21681 - same liczby sztuk), wiec obecnosci T6 w zapasie Jeffa nie da sie z niego dowiesc.

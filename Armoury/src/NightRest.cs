@@ -319,8 +319,9 @@ namespace Armoury
                 bool raided = false;
                 if (s.RaidCountsAsWork && !enl) { raided = PlayerRaidingNow(out sideRaid); if (!raided && RaidedLastHour) { raided = true; sideRaid = _lastRaidSide; } }
                 // 577 (Raid Night Halt): godzina ksiegi z nocnym postojem przy rabunku (postoj trwa w chwili ticku) to sen jak w obozie - nie praca, takze gdy poczatek
-                // godziny jeszcze rabowal (zmierzch w srodku godziny; jak oboz rozbity o 21:00). Godzina wznowienia o swicie (postoj juz zdjety) - jak dotad
-                bool raidHalt = RaidHaltNow && !enl;
+                // godziny jeszcze rabowal (zmierzch w srodku godziny; jak oboz rozbity o 21:00). Godzina wznowienia o swicie (postoj juz zdjety) - jak dotad.
+                // Recenzja 577: walka w nocy (milicja/odsiecz, DefenderSide.TroopCount > 0) to nie sen - wtedy godzina jak rabunek (praca), sen przerwany
+                bool raidHalt = RaidHaltNow && RaidHaltHolds(_haltComp) && !enl;
                 if (raidHalt) { raided = false; _haltTicksDay++; }
                 bool work = drilled || raided;
                 if (raided && resting && !forced && !drilled)
