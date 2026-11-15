@@ -18,7 +18,8 @@ namespace Armoury
     /// Dalej zaloga zyje wedlug zwyklych regul (zold pana, limit zalogi i przepelnienie W4c, zbrojownia zalogi dokupi sprzet).
     /// KIEDY: raz na kampanie, flaga w zapisie "arm_555_banefort" ("" czeka, "new" nowa kampania - nic, "done:dzien:wynik"). Proba co godzine gry (HourlyTickEvent).
     /// RECENZJA 555: dar tylko gdy 544 w tej kampanii naprawde oddal zamek (stan 544 "done:dzien:ok"; 544 czeka - czekamy; inny wynik - bez daru), gracz na mapie
-    /// (BookHoldings.PlayerOnMapFor jak 544), tansza mieszanka tierow (bez T6), ksiega ludzi - przyczyna FGift555. Limit zalogi gry i zold - DECYZJA JEFFA (CHANGELOG).
+    /// (BookHoldings.PlayerOnMapFor jak 544), tansza mieszanka tierow (bez T6), ksiega ludzi - przyczyna FGift555. Zold - DECYZJA JEFFA (CHANGELOG).
+    /// 555b (Jeff 15.11 "Banefort dajemy b"): dar = min(504 - zaloga, limit zalogi gry - wszyscy czlonkowie), nigdy ponad limit (przepelnienie gry zdjeloby nadwyzke).
     /// WARUNKI: pan Banefortu = House Banefort (ROTclan_59) albo rod panujacy korony "vlandia" (odbiorca zapasowy 544), nie rod gracza. Pan z Polnocy, gdy 544
     /// jeszcze czeka - czekamy na 544; inny pan - koniec bez zmian. OBLEZENIE: gra sama dopisuje ludzi do zalogi oblezonej twierdzy (GarrisonTroopsCampaignBehavior.
     /// OnSettlementEntered - lord wchodzacy do oblezonej osady zostawia ludzi, bez warunku oblezenia; dekompilacja 1.4.8), a wlasny werbunek zalogi wstrzymuje
@@ -186,11 +187,20 @@ namespace Armoury
                 if (g == null || g.MemberRoster == null || g.Party == null) { Wait(day, "brak partii zalogi (AddGarrisonParty bez skutku)"); return; }
 
                 int g0 = g.MemberRoster.TotalRegulars;
-                int add = Math.Max(0, Target - g0);
+                // 555b (Jeff 15.11: "Banefort dajemy b"): dar tylko do limitu zalogi gry. Gra (DefaultPartyDesertionModel.GetTroopsToDesertDueToWageAndPartySize,
+                // DesertionCampaignBehavior co dobe) liczy nadwyzke jako Party.NumberOfAllMembers - Party.PartySizeLimit i zdejmuje 25% nadwyzki na dobe
+                // (W4c odsyla ja do wsi) - dar ponad limit rozplynalby sie w tydzien. Ta sama miara co gra: wszyscy czlonkowie (z rannymi i bohaterami)
+                // i PartySizeLimit czynnego modelu (BK/ROT/BEE/Naval). Cel 504 (336 x 1.5) zostaje gorna granica.
+                int limitN, allN;
+                try { limitN = g.Party.PartySizeLimit; allN = g.Party.NumberOfAllMembers; }
+                catch { Wait(day, "brak odczytu limitu zalogi gry - dar czeka"); return; }
+                int room = Math.Max(0, limitN - allN);
+                int add = Math.Min(Math.Max(0, Target - g0), room);
                 _errors = 0;
                 if (add <= 0)
                 {
-                    Done(day, "pelna", "zaloga " + g0 + " >= cel " + Target + " (" + PreSiegeGarrison + " sprzed oblezenia x 1.5) - bez daru");
+                    Done(day, g0 >= Target ? "pelna" : "limit", "zaloga " + g0 + " (wszyscy " + allN + "), limit zalogi gry " + limitN + ", miejsce " + room + ", cel " + Target + " ("
+                         + PreSiegeGarrison + " sprzed oblezenia x 1.5) - dano 0, bez daru (555b: dar tylko do limitu)");
                     return;
                 }
                 var plan = Plan(tree, add);
@@ -209,8 +219,7 @@ namespace Armoury
                 catch (Exception e) { try { Log.Error("Banefort555.PeopleBook", e); } catch { } }
                 int g1 = g.MemberRoster.TotalRegulars;
 
-                string limit = "?", wage = "?";
-                try { limit = g.Party.PartySizeLimit.ToString(Inv); } catch { }
+                string wage = "?";
                 try { wage = g.GetAvailableWageBudget().ToString(Inv); } catch { }
                 string siege = "nie";
                 try { if (st.SiegeEvent != null) siege = "TAK (oblegajacy " + (st.SiegeEvent.BesiegerCamp != null && st.SiegeEvent.BesiegerCamp.LeaderParty != null ? st.SiegeEvent.BesiegerCamp.LeaderParty.Name.ToString() : "?") + ")"; } catch { siege = "TAK"; }
@@ -219,11 +228,11 @@ namespace Armoury
 
                 Done(day, "ok", "DAR 555 zalogi Banefort [" + StId + "] | pan " + Nm(owner) + (rightful ? "" : " (rod panujacy korony)") + " | cel " + Target + " = zaloga sprzed oblezenia "
                      + PreSiegeGarrison + " (OB1 dni 109003-109012) x 1.5 | zaloga " + g0 + " -> " + g1 + " (dodano " + added + ", kultura " + (cult.StringId ?? "?") + ": " + tiers + ") [" + sb
-                     + "] | oblezenie " + siege + ", milicja " + (int)st.Town.Militia + " | limit zalogi gry " + limit + ", budzet zoldu zalogi " + wage
-                     + ", zold dodanych ok. " + wageAdd + " na dobe (przed perkami; brak zoldu - gra: +5 dezercji zalogi na dobe)"
-                     + " (ponad limit: przepelnienie W4c - 25% nadwyzki na dobe do domu, ludnosc BK wsi) | dar 555 - jednorazowy wyjatek od zamknietej ekonomii z rozkazu Jeffa 15.11: ludzie z niczego, bez zlota, "
+                     + "] | 555b limit: limit zalogi gry " + limitN + ", obecnie (wszyscy) " + allN + ", miejsce " + room + ", dano " + added + " (cel " + Target + " - zaloga " + g0 + " = "
+                     + Math.Max(0, Target - g0) + ") | oblezenie " + siege + ", milicja " + (int)st.Town.Militia + " | budzet zoldu zalogi " + wage
+                     + ", zold dodanych ok. " + wageAdd + " na dobe (przed perkami; brak zoldu - gra: +5 dezercji zalogi na dobe) | dar 555 - jednorazowy wyjatek od zamknietej ekonomii z rozkazu Jeffa 15.11: ludzie z niczego, bez zlota, "
                      + "bez zdjecia z ludnosci; ksiega ludzi - bez pochodzenia; sprzet - zbrojownia zalogi dokupi braki");
-                try { Log.Player("Banefort's garrison is restored: " + added + " fresh troops join the defenders (" + g1 + " men in the castle)."); } catch { }
+                try { Log.Player("Banefort's garrison is reinforced" + (add < Target - g0 ? " up to the castle's limit" : "") + ": " + added + " fresh troops join the defenders (" + g1 + " men in the castle)."); } catch { }
             }
             catch (Exception e)
             {

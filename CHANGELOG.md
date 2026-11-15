@@ -41,6 +41,23 @@ Odrzucone: brak.
 
 Ryzyko: 555 zalezy teraz od stanu 544 - zapis, w ktorym 544 zakonczyl sie innym wynikiem niz ok, daru nie dostanie (zamierzone). Rejestracja 544 przed 555 bez zmian (ta sama godzina). Build Armoury 0 bledow. W grze nie sprawdzone.
 
+### 555b (Jeff: wariant b)
+
+Jeff, czat 15.11: po wyjasnieniu, ze gra co dobe zdejmuje 25% nadwyzki zalogi ponad limit (504 skurczyloby sie do limitu w tydzien) i wyborze (a) 504 i niech splywa, (b) tylko do limitu zalogi, (c) 504 chronione do konca oblezenia - "Banefort dajemy b".
+
+- **Limit sprawdzony w dekompilacji 1.4.8:** `DesertionCampaignBehavior` (DailyTickParty, partie lorda/karawany/zalogi bez MapEvent) -> `DefaultPartyDesertionModel.GetTroopsToDesertDueToWageAndPartySize`: nadwyzka = `Party.NumberOfAllMembers - Party.PartySizeLimit`, dezercja `max(1, 25% nadwyzki)` na dobe. Zaden mod (BK, ROT, BKROTPatch, BEE, Naval) nie podmienia modelu dezercji; `PartySizeLimit` liczy czynny model rozmiaru partii (BK/ROT/BEE/Naval) - 555b czyta te sama wlasciwosc co gra.
+- **Zmiana (Banefort555.Hourly):** dar = `min(504 - szeregowi zalogi, max(0, PartySizeLimit - NumberOfAllMembers))` w chwili daru - ta sama miara co gra (wszyscy czlonkowie z rannymi), wiec dar nigdy nie przekroczy limitu i nie uruchomi przepelnienia. Cel 504 zostaje gorna granica. Ta sama mieszanka tierow (T1 30 / T2 35 / T3 20 / T4 10 / T5 5), przeskalowana do liczby daru (Plan bez zmian).
+- Miejsce 0 (albo zaloga >= 504): linia `Banefort (555): ... dano 0, bez daru (555b: dar tylko do limitu)` z limitem, obecnymi i celem; flaga done z wynikiem "limit" albo "pelna" - nie powtarza sie. Blad odczytu limitu - dar czeka (linia raz na dobe), bez porzucenia.
+- Linia DAR 555: `555b limit: limit zalogi gry L, obecnie (wszyscy) A, miejsce M, dano N (cel 504 - zaloga G = X)`. Wiadomosc dla gracza: "Banefort's garrison is reinforced up to the castle's limit: N fresh troops join the defenders (M men in the castle)." (bez "up to the castle's limit", gdy ograniczyl cel 504).
+
+**Ryzyko / co sprawdzic:**
+- Dar moze byc duzo mniejszy niz 504: zamek ma ok. 200 + Przywodztwo pana + budynki/perki (modele BK/ROT moga to zmienic) - liczba w linii "555b limit". To zamierzone (wariant b).
+- Regresje/kolizje: zmiana tylko liczby daru w 555; reguly gry, W4c OverflowHome, 544, FrontGarrison bez zmian. Kolejnosc w dobie: dar w HourlyTick, dezercja w DailyTick - dar do limitu nie daje nadwyzki, chyba ze limit spadnie pozniej (np. zmiana pana/perkow) - wtedy zwykle przepelnienie.
+- Ludzie wchodzacy do zalogi po darze (lord zostawia ludzi) moga przekroczyc limit - zwykla regula gry, nie 555.
+- Build 0 bledow; w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".
