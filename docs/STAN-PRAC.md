@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 256 (556 log zbiorki armii wladcy i pierwszej mysli po zbiorce), bez autotestu
+
+- Armoury.dll 73ca1d37 = noc/scal-perki bd3b436c (255 + 556, tylko log). Kopie: .bak-2026-11-15-przed-wgranie256, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie256 i -przed).
+- Do sprawdzenia: 'Odsiecz (OB5) armia wladcy po zbiorce (556)' - czy Joffrey idzie na Banefort; 'Wojna kanonu - wladca' z 'armia w zbiorce'. Czeka: 555 a/b/c, kusze, 558.
+
 ## STAN 15.11 - WGRANIE 255 (554 srebro do zlotnikow z doplata warsztatu, 557 log strat bitwy gracza), bez autotestu
 
 - Armoury.dll db98fd91 = noc/scal-perki 1d79cefa (254 + 554 + 557). Kopie: .bak-2026-11-15-przed-wgranie255, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie255 i -przed). Klucz NOWY CaravanSilverSmithPays (TAK).
