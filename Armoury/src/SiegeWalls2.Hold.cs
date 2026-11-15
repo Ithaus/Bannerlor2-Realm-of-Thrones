@@ -32,6 +32,8 @@ namespace Armoury
         // 545 (Jeff 15.11 Willow Wood: "jak oblegaja to maja oblegac a nie dochodza"): klucz SiegeCampHoldsToEnd - trzymanie bez wygasniecia po FreshHours, ale tylko
         // tam, gdzie oblezenie konczy limit 471b/542 (TimeOn i Acts471 == null: bez gracza, Innych, skryptu fabuly) - oboz nie siedzi wiecznie. Wyjscia bez zmian:
         // jedzenie, przewazajaca odsiecz (OB5), obrona wlasnej twierdzy, odwrot 334e; pokoj / rozejm konczy oblezenie gra albo Lift384. NIE = FreshHours jak dotad.
+        // 546 (klucz SiegeNoTimeLimit): limitu (e) juz nie ma - trzymanie trwa do prawdziwych wyjsc: zdobycie, kapitulacja z glodu (b), glod obozu (FreshFoodDays),
+        // przewazajaca odsiecz (OB5 / 334e), obrona wlasnej twierdzy, pokoj / rozejm, oboz bez sily (OB6). Warunek trzymania bez zmian (TimeOn i Acts471).
         internal static bool HoldToEnd545Key { get { var s = Settings.Current; return s != null && s.SiegeCampHoldsToEnd; } }
         internal static int HoldOver545;                                                     // 545: godziny trzymania ponad dawny prog (doba, zeruje Time471Daily)
         private static readonly HashSet<SiegeEvent> _over545 = new HashSet<SiegeEvent>();    // 545: oblezenia trzymane dzis ponad dawny prog

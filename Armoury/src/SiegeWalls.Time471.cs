@@ -39,6 +39,10 @@ namespace Armoury
     /// 542 (Jeff 15.11, klucz SiegeYieldOnlyStarving): (a) wylaczone - zegar i R tylko do linii i bramki; (e) zawsze Lift471 (rozejm 30 dob), chyba ze obroncy glodza
     /// i (b) przyjdzie (StarveWait542, najwyzej StarveWaitMax542 = 30 dob po limicie albo do dnia (b) = poczatek glodu + laska GL + 2; oblezenie fabuly ROT
     /// nie czeka - (b) go nie dotyczy). Klucz NIE = (a)/(e) jak wyzej.
+    /// 546 (Jeff 15.11 "limit jest niepotrzebny, wywal go", klucz SiegeNoTimeLimit): (e) nie dziala wcale - bez Lift471 i bez Yield471 z wieku, StarveWait542
+    /// niepotrzebne. Oblezenie konczy tylko prawdziwa przyczyna: zdobycie (szturm / wyrwa), kapitulacja z glodu (b), glod obozu (m116), przewazajaca odsiecz
+    /// (OB5 / 334e), obrona wlasnej twierdzy, pokoj / rozejm, oboz bez sily (OB6), gra albo fabula. (a) bez zmian (rzadzi nia 542). Trzymanie 545 zostaje do tych
+    /// wyjsc. Linia doby: "546: oblezen ponad dawny limit N (najdluzsze M dob)". Klucz NIE = (e) jak 545 co do bitu.
     /// Yield471 (D4, kapitulacja z honorami): partie lordow obroncow wychodza, zaloga do swoich (BookHoldings.YieldOut), potem KingdomManager.SiegeCompleted -
     /// droga 374 "slowo dotrzymane" bez relacji gracza. Szturmem zdobyte - niewola jak w grze (bez zmian).
     /// U2: zegar i R licza sie przed LogOn (akcje takze bez logu). U8: zegar i doby z odsiecza w zapisie (dopisek "T|" do arm_siege_walls; brak = zegar od wieku).
@@ -72,6 +76,10 @@ namespace Armoury
         // (przerwa po odparciu, 307c, DR, OB1, machiny gry). Zostaje tylko czekanie na kapitulacje z glodu (b). NIE = bramka 471b(c) co do bitu jak dotad.
         private static bool NoMinDays545 { get { var s = Settings.Current; return s != null && s.SiegeNoMinDaysGate; } }
         private static int _d545Gate;   // 545: oblezenia (raz na dobe), ktore dawna bramka by wstrzymala, a teraz decyduja reguly szans
+        // 546 (Jeff 15.11 "limit jest niepotrzebny, wywal go"): klucz SiegeNoTimeLimit - droga (e) wylaczona; NIE = (e) jak dotad (545)
+        internal static bool NoLimit546 { get { var s = Settings.Current; return s != null && s.SiegeNoTimeLimit; } }
+        private static int _d546Over;            // 546: oblezenia w regule ponad dawny limit (doba)
+        private static double _d546Max;         // 546: najdluzsze oblezenie w regule (wiek w dobach, doba)
         internal const int LiftTruceDays = 30;   // 471b-4 (e): oboz slabszy niz obroncy odchodzi po limicie - rozejm tej osady dla jego frakcji i rodow (droga 384)
         private static string _yield471;          // okno SiegeCompleted kapitulacji 471b (BesiegedRelief: wynik "ZDOBYTE" bez bitwy)
         private static int _d471Yield, _d471Lift, _d471Gate, _d471Refused, _d471Starve;
@@ -256,7 +264,7 @@ namespace Armoury
         /// kapitulacja, inaczej odejscie z rozejmem). Akcje po petli (SiegeCompleted / RemoveAllSiegeParties zmieniaja oblezenia).</summary>
         private static void Time471Daily()
         {
-            bool log = LogOn, act = TimeOn;
+            bool log = LogOn, act = TimeOn, noLim = NoLimit546;
             var todo = new List<KeyValuePair<SiegeEvent, string>>();
             try
             {
@@ -321,11 +329,11 @@ namespace Armoury
                             r.StartDone = true;
                             r.R0 = R; r.Q0 = q; r.S0 = sq; _d471Start++;
                             if (log) Log.Info("Czas oblezenia (471) start: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ")" + (r.PlayerClan ? " [osada klanu gracza - D5]" : "")
-                                + " | kategoria " + CatName[r.Cat] + " (mury " + r.Lvl + "), cel " + CatLo[r.Cat] + "-" + CatHi[r.Cat] + " dob, limit " + F(lim, "0")
+                                + " | kategoria " + CatName[r.Cat] + " (mury " + r.Lvl + "), cel " + CatLo[r.Cat] + "-" + CatHi[r.Cat] + " dob, " + (noLim ? "limit wylaczony (546, dawny " + F(lim, "0") + ")" : "limit " + F(lim, "0"))
                                 + " | wodz " + Hn(lp) + " | wiek " + F(age, "0.0") + " dob"
                                 + " | termin obrony R " + F(R, "0.0") + " dob (q " + F(q, "0.00") + " -> s " + F(sq, "0.00") + ") | " + txt + " | " + SiegeCamp471.StartText(ev)
                                 + " | 471b: " + (acts == null ? "regula DZIALA (" + (NoMinDays545 ? "szturm wedlug szans - 545, bez dolnej granicy" : "szturm od " + CatLo[r.Cat] + " doby" + (r.Cat == 0 ? "" : ", potem tylko przez wyrwe"))
-                                    + (OnlyStarve542 ? ", kapitulacja tylko z glodu (542 - termin R bez kapitulacji), limit - odejscie)" : ", kapitulacja z terminu / glodu, limit)") : "bez akcji (" + acts + ") - tylko przewidywanie") + ".");
+                                    + (OnlyStarve542 ? ", kapitulacja tylko z glodu (542 - termin R bez kapitulacji)" + (noLim ? ", bez limitu - 546)" : ", limit - odejscie)") : ", kapitulacja z terminu / glodu" + (noLim ? ", bez limitu - 546)" : ", limit)")) : "bez akcji (" + acts + ") - tylko przewidywanie") + ".");
                         }
                         if (r.Clock >= R)
                         {
@@ -335,14 +343,20 @@ namespace Armoury
                                 r.Over = true;
                                 if (log) Log.Info("Czas oblezenia (471) termin minal: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + CatName[r.Cat] + ")" + (r.PlayerClan ? " [osada klanu gracza - D5]" : "")
                                     + " | zegar " + F(r.Clock, "0") + " >= R " + F(R, "0.0") + " (wiek " + F(age, "0.0") + ") | " + txt
-                                    + " | 471b: " + (acts != null ? "bez akcji (" + acts + ")" : OnlyStarve542 ? "termin minal - bez kapitulacji (542): zaloga poddaje sie tylko z glodu (b), po limicie " + F(lim, "0") + " dob oboz odchodzi"
-                                        : pz ? "odsiecz w drodze - czeka" : ratio > 1.0 ? "KAPITULACJA z terminu" : "oboz nie liczniejszy od obroncow - czeka (limit)") + ".");
+                                    + " | 471b: " + (acts != null ? "bez akcji (" + acts + ")" : OnlyStarve542 ? "termin minal - bez kapitulacji (542): zaloga poddaje sie tylko z glodu (b)" + (noLim ? ", bez limitu (546)" : ", po limicie " + F(lim, "0") + " dob oboz odchodzi")
+                                        : pz ? "odsiecz w drodze - czeka" : ratio > 1.0 ? "KAPITULACJA z terminu" : "oboz nie liczniejszy od obroncow - czeka" + (noLim ? "" : " (limit)")) + ".");
                             }
                         }
-                        if (age >= lim) { overLim++; r.OverLimit = true; }
+                        if (age >= lim) { overLim++; r.OverLimit = true; if (noLim) _d546Over++; }
+                        if (age > _d546Max) _d546Max = age;
                         if (acts == null)
                         {
-                            if (OnlyStarve542)
+                            if (noLim)
+                            {
+                                // 546: droga (e) nie istnieje - bez Lift471 / Yield471 z wieku; (a) z terminu R jak dotad (tylko przy 542 NIE)
+                                if (!OnlyStarve542 && r.Clock >= R && !pz && ratio > 1.0) todo.Add(new KeyValuePair<SiegeEvent, string>(ev, "a"));
+                            }
+                            else if (OnlyStarve542)
                             {
                                 // 542: (a) bez kapitulacji z terminu; (e) limit - oboz odchodzi, chyba ze obroncy glodza i (b) przyjdzie (te same warunki co bramka Gate471),
                                 // najwyzej StarveWaitMax542 dob po limicie
@@ -388,10 +402,11 @@ namespace Armoury
                         + " | 542 " + (OnlyStarve542 ? "TAK (bez kapitulacji z terminu; odejscia zamiast kapitulacji po limicie " + _d542Lift + ", czekaja po limicie na glod " + _d542Wait + ")" : "NIE (kapitulacja z terminu jak dotad)")
                         + " | 545: szturmow przed dawna bramka " + _d545Gate + " (klucz " + (NoMinDays545 ? "TAK" : "NIE") + "), trzyman obozu ponad " + SiegeWalls2.FreshHoursLog545 + " h " + SiegeWalls2.HoldOver545 + " druzyno-h (oblezen " + SiegeWalls2.HoldOver545Sieges
                         + ", klucz " + (SiegeWalls2.HoldToEnd545Key ? "TAK" : "NIE") + ")"
+                        + " | 546: " + (noLim ? "limit wylaczony, " : "klucz NIE (limit " + F(LimitK, "0.0") + " x gorna granica), ") + "oblezen ponad dawny limit " + _d546Over + " (najdluzsze " + F(_d546Max, "0") + " dob)"
                         + " | wiek/R: " + (sbList.Length == 0 ? "-" : sbList.ToString()) + ".");
             }
             catch (Exception e) { Stumble("Time471Daily", e); }
-            finally { _d471Start = _d471End = _d471Out = _d471Yield = _d471Lift = _d471Gate = _d471Refused = _d471Starve = _d471PauseCut = _d542Wait = _d542Lift = _d545Gate = 0; SiegeWalls2.ZeroHold545(); }
+            finally { _d471Start = _d471End = _d471Out = _d471Yield = _d471Lift = _d471Gate = _d471Refused = _d471Starve = _d471PauseCut = _d542Wait = _d542Lift = _d545Gate = _d546Over = 0; _d546Max = 0.0; SiegeWalls2.ZeroHold545(); }
         }
 
         /// <summary>542 (e): obroncy glodza i kapitulacja z glodu (b) moze przyjsc - te same warunki co bramka Gate471 i StarveYield471 (glod GL wlaczony, zapas 0,
@@ -650,7 +665,7 @@ namespace Armoury
                 Log.Info("Czas oblezenia (471) koniec: dzien " + Today + " | osada " + r.St + " (" + Nm(st) + ", " + CatName[c] + ", mury " + r.Lvl + ") | trwalo " + F(age, "0.0") + " dob, " + vs + " " + CatLo[c] + "-" + CatHi[c]
                     + " | droga 471b: " + (r.EndWay ?? "inna (szturm / odejscie / gra - patrz linia KO)")
                     + " | R na starcie " + F(r.R0, "0.0") + " (q " + F(r.Q0, "0.00") + " -> s " + F(r.S0, "0.00") + "), R ostatnie " + F(r.R, "0.0") + ", zegar " + F(r.Clock, "0") + (r.Over ? " (termin minal)" : "")
-                    + ", dob z odsiecza " + r.PausedDays + (r.OverLimit ? ", PONAD LIMITEM " + F(LimitK * CatHi[c], "0") : "") + ", oboz / obroncy ostatnio " + (r.Ratio < 0 ? "-" : F(r.Ratio, "0.0") + ":1") + " | HP murow " + F(WallHp(st) * 100, "0") + "%"
+                    + ", dob z odsiecza " + r.PausedDays + (r.OverLimit ? (NoLimit546 ? ", ponad dawnym limitem " : ", PONAD LIMITEM ") + F(LimitK * CatHi[c], "0") + (NoLimit546 ? " (546 - bez limitu)" : "") : "") + ", oboz / obroncy ostatnio " + (r.Ratio < 0 ? "-" : F(r.Ratio, "0.0") + ":1") + " | HP murow " + F(WallHp(st) * 100, "0") + "%"
                     + " | wlasciciel w chwili konca " + (st != null && st.OwnerClan != null ? st.OwnerClan.StringId : "-")
                     + " (gra zmienia wlasciciela PO tym zdarzeniu - zdobycie widac w linii KO)"   // 471-p U10: SiegeCompleted: RemoveAllSiegeParties -> koniec oblezenia -> ApplyBySiege
                     + (r.PlayerClan ? " [osada klanu gracza - D5]" : "") + " | " + SiegeCamp471.EndText(ev) + " | " + SiegeForage471.EndText(ev) + ".");
