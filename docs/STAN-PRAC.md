@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 244 (537 konie i uprzeze: pary marszowe, pasek Horses/Harness/Pack, waga par ze stash, stajnia Footmen's mounts), bez autotestu
+
+- Armoury.dll b87afb85 = noc/scal-perki 37e6891f (243 + scalenie 537). Kopie: .bak-2026-11-15-przed-wgranie244, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie244 i -przed). Nowe klucze FootmenMountsStable, StableRidersFirst (TAK, nie ma ich w Armoury.json Jeffa = domyslne); MarchPairsSpeed/RiddenHarnessWeightless/MarchPairsHud tez z domyslnych TAK, TroopsFightWithOwnKitOnly w pliku true.
+- Do sprawdzenia w logu Jeffa: linia paska 'pasek (N) -> Horses ...' = te same pary jazdy co linia doby 'Pary marszowe'; StashWeight 'w tym pary piechoty ze zbrojowni (D11) N szt.'; stajnia 'dziala: TAK'; plus z 243: 534/536 rekruci rodu, 535 braki, drogi, 529/530/533.
+
 ## STAN 15.11 - WGRANIE 243 (534 okienka wsi pobocznych, 535 bron boczna opcjonalna, 536 ludzie rodu we wsiach glownych), bez autotestu
 
 - Armoury.dll 7cbfb244 = noc/scal-perki. Kopie: .bak-2026-11-15-przed-wgranie243, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie243 i -przed). W toku: 537 konie i uprzeze (projekt docs/projekty/KONIE-UPRZEZE.md, E0-E6).
