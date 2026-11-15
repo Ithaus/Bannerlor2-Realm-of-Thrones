@@ -80,7 +80,8 @@ namespace Armoury
                     : "Shields of the troops in your formation are " + Pc(s.ArrowCatcherCaptainDurability) + "% tougher in combat." },
                 new Rule { Id = "Crossbow.Pavise", Get = () => DefaultPerks.Crossbow.Pavise, Secondary = false, Text = (s, p) =>
                     !_rbm || !s.PerkShieldsAfterRbm ? null
-                    : "A shield on your back is " + Pc(s.PaviseBackShieldDurability) + "% tougher against missiles it stops and wears " + Pc(s.PaviseBackShieldWearCut) + "% slower." },
+                    : "A shield on your back is " + Pc(s.PaviseBackShieldDurability) + "% tougher against missiles it stops and wears " + Pc(s.PaviseBackShieldWearCut) + "% slower."
+                      + (s.PaviseBackShieldMelee ? " It is also " + Pc(s.PaviseBackShieldDurability) + "% tougher against melee blows that hit it." : "") },
 
                 // 512: amunicja (dodatkowa amunicja martwa pod ROT - InitializeMissionEquipment nie wolany)
                 new Rule { Id = "Bow.DeepQuivers", Get = () => DefaultPerks.Bow.DeepQuivers, Secondary = false, Text = (s, p) =>
@@ -162,7 +163,7 @@ namespace Armoury
                     !s.RaidCacheByRoguery && !s.CampInterrogation ? null
                     : "+30% chance for bandits, villagers and caravans to surrender."
                       + (s.RaidCacheByRoguery ? " Villagers you raid give up 25% more of their hidden coin." : "")
-                      + (s.CampInterrogation ? " Outlaws you put to the question are 10% more likely to talk." : "") },
+                      + (s.CampInterrogation ? " Outlaws you put to the question are 10% more likely to talk under torture." : "") },
                 new Rule { Id = "Roguery.SaltTheEarth", Get = () => DefaultPerks.Roguery.SaltTheEarth, Secondary = false, Text = (s, p) =>
                     !s.RaidCacheByRoguery ? null
                     : "+20% more loot when villagers comply to your hostile actions, and 20% more hidden coin forced out of a village you raid." },
