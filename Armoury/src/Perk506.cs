@@ -235,6 +235,14 @@ namespace Armoury
 
         /// <summary>Recenzja 506: czy RBM liczy obrazenia tarcz (prefiks RBMCombat) i czy ShieldGuard 414 tnie pociski po nas - przy zakladaniu
         /// i na starcie misji. Bez RBM 506 nie rusza tarcz (gra daje ArrowCatcher jako oslone, Pavise rzut 75% - bez podwojnego liczenia).</summary>
+        /// <summary>540 (opisy perkow): czy RBM liczy tarcze teraz (ten sam odczyt co przy misji) - bez RBM ArrowCatcher/Pavise zostaja przy opisie gry.</summary>
+        internal static bool RbmShieldNow()
+        {
+            // Recenzja 540: PerkTexts.SessionStart biegnie przed NightHooks.InCampaign (ApplyInCampaign) - przy pierwszej sesji _shieldM byl null i RBM "nieobecny"
+            if (_shieldM == null) { try { _shieldM = AccessTools.DeclaredMethod(typeof(MissionCombatMechanicsHelper), "ComputeBlowDamageOnShield"); } catch { } }
+            RefreshShieldState(); return _rbmShield;
+        }
+
         private static void RefreshShieldState()
         {
             bool rbm = false, g = false;

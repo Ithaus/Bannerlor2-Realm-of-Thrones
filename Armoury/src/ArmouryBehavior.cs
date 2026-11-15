@@ -2796,6 +2796,7 @@ namespace Armoury
             try { CleanseTrashInBags(); } catch (Exception e) { Log.Error("CleanseTrashInBags", e); }
             try { QualityRich.Enrich(); } catch (Exception e) { Log.Error("QualityRich.Enrich", e); }
             try { CastleSteel.Rename(); } catch (Exception e) { Log.Error("CastleSteel.Rename", e); }   // 177-1: Iron6 = "Castle-forged Steel", perk Steel Maker 3, "Thamaskene" w nazwach
+            try { PerkTexts.SessionStart(); } catch (Exception e) { Log.Error("PerkTexts.SessionStart", e); }   // 540: opisy perkow wedlug dzialania - PO CastleSteel (Steel Maker 3) i Drill.SessionStart (CampDrill)
             try { Restitution0831(); } catch (Exception e) { Log.Error("Restitution0831", e); }
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
