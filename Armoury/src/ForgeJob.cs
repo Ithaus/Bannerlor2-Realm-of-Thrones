@@ -103,6 +103,7 @@ namespace Armoury
                     }
                 if (Hero.MainHero != null && !_stam0.ContainsKey(Hero.MainHero)) _stam0[Hero.MainHero] = Forge.Stamina(Hero.MainHero);
                 _pieceOld = _pieceNew = 0f; _pieceActs = _pieceItems = 0;
+                _getCalls = _textSets = 0;   // 539 (mixin zostaje - OnRefresh nowego ekranu podmienia go; BK moze odswiezyc przed tym postfiksem)
                 ForgeClock.ResetBkQueued();
             }
             catch (Exception e) { Log.Error("ForgeJob.Begin", e); _open = false; }
@@ -120,6 +121,7 @@ namespace Armoury
                 _pieceNew += Math.Max(0f, hours);
                 _pieceActs++;
                 _pieceItems += Math.Max(1, count);
+                SetHoursText();   // 539: kolejka urosla po odswiezeniu ekranu
             }
             catch { }
         }
@@ -144,7 +146,31 @@ namespace Armoury
         /// <summary>Postfiks BK CraftingMixin.GetSpentHours: napis "Hours spent for all actions" = godziny tej wizyty, ktore odliczy pasek.</summary>
         public static void SpentHoursPost(ref float __result)
         {
-            try { if (_open && On) __result = SessionHours(); } catch { }
+            try { if (_open && On) { __result = SessionHours(); _getCalls++; } } catch { }
+        }
+
+        // 539 (Jeff 15.11: "kuje luk, pokazuje 2 h, a potem leci 4 h"): GetSpentHours (spentStamina / 6, kilka bajtow kodu) JIT wkleja w OnRefresh,
+        // wiec postfiks wyzej nie dziala - napis BK pokazywal stamine samego gracza / 6 (z PracticalSmith polowa), a pasek liczy kolejke
+        // (stamina wszystkich kowali, PracticalSmith tylko -25% czasu, x Forge Time Mult) - ok. 1.9 x dluzej. Teraz napis ustawiamy sami: po OnRefresh
+        // mixinu i po kazdej sztuce w kolejce (NotePiece - kolejka rosnie juz po odswiezeniu ekranu przez BK).
+        private static object _mixin;
+        private static System.Reflection.PropertyInfo _hoursProp;
+        private static int _getCalls, _textSets;
+
+        /// <summary>Postfiks BK CraftingMixin.OnRefresh: napis godzin = godziny tej wizyty (te same, ktore odliczy pasek).</summary>
+        public static void MixinRefreshPost(object __instance)
+        {
+            try { _mixin = __instance; SetHoursText(); } catch { }
+        }
+
+        private static void SetHoursText()
+        {
+            if (!_open || !On || _mixin == null || _hoursProp == null) return;
+            var cur = _hoursProp.GetValue(_mixin, null) as string;
+            if (string.IsNullOrEmpty(cur)) return;   // BK CraftingWaitingTime wylaczone - napisu nie ma
+            string txt = new TaleWorlds.Localization.TextObject("{=G1NUDN2i}Hours spent for all actions: {HOURS} hours.")
+                .SetTextVariable("HOURS", SessionHours().ToString("0.0")).ToString();
+            if (txt != cur) { _hoursProp.SetValue(_mixin, txt, null); _textSets++; }
         }
 
         /// <summary>Postfiks CraftingVM.ExecuteCancel (przycisk Done przez BK CloseWithWait i klawisz Esc): ekran zamkniety - robota do kolejki i pasek.</summary>
@@ -172,6 +198,7 @@ namespace Armoury
         private static void Close(bool openBar, string why)
         {
             _open = false;
+            _mixin = null;   // 539 (recenzja): bez starego VM; nowy ekran podaje swoj mixin w OnRefresh
             try
             {
                 float spent = SpentHours();
@@ -215,7 +242,7 @@ namespace Armoury
                 Log.Info("Robota w kuzni (m96): " + here.Name + " - " + why + " | ta wizyta: godzin " + F1(session) + " (praca bez sztuki - wytop, rafinacja, zlecenia, spartaczone - "
                          + F1(prep) + (prepIn ? " h na czele roboty tej kuzni" : " h, za malo na wpis") + "; sztuk " + _pieceItems + " w " + _pieceActs + " czynnosciach, " + F1(_pieceNew)
                          + " h, miara BK " + F1(_pieceOld) + " h), stamina kowali z ekranu " + _stam0.Count + " / 6 = " + F1(spent) + " h | robota sprzed wizyty w tej kuzni " + F1(before)
-                         + " h | czas kuzni x" + ForgeClock.TimeMult.ToString("0.##", Inv) + " (m109) | razem w tej kuzni " + F1(total) + " h - pasek " + (bar ? "TAK" : (menu ? "NIE" : "NIE (brak menu gry)")) + rent + ", odsiadka BK pominieta | " + Summary(b));
+                         + " h | czas kuzni x" + ForgeClock.TimeMult.ToString("0.##", Inv) + " (m109) | napis godzin (539): wywolan GetSpentHours " + _getCalls + ", ustawien napisu " + _textSets + " | razem w tej kuzni " + F1(total) + " h - pasek " + (bar ? "TAK" : (menu ? "NIE" : "NIE (brak menu gry)")) + rent + ", odsiadka BK pominieta | " + Summary(b));
                 if (bar)
                 {
                     ReturnMenu = _back;
@@ -515,6 +542,11 @@ namespace Armoury
                 var tMixin = QuartermasterLaw.FindType("BannerKings.UI.Extensions.CraftingMixin");
                 var m = tMixin != null ? AccessTools.DeclaredMethod(tMixin, "GetSpentHours") : null;
                 if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(ForgeJob), nameof(SpentHoursPost))); t = "wpiety"; }
+                // 539: napis po OnRefresh (GetSpentHours bywa wklejony przez JIT)
+                var r = tMixin != null ? AccessTools.DeclaredMethod(tMixin, "OnRefresh") : null;
+                _hoursProp = tMixin != null ? AccessTools.Property(tMixin, "HoursSpentText") : null;
+                if (r != null && _hoursProp != null) { h.Patch(r, postfix: new HarmonyMethod(typeof(ForgeJob), nameof(MixinRefreshPost)) { priority = Priority.Last }); t += ", napis po OnRefresh wpiety"; }
+                else t += ", napis po OnRefresh BRAK (" + (r == null ? "OnRefresh" : "HoursSpentText") + ")";
             }
             catch (Exception e) { Log.Error("ForgeJob.ApplyAll(BK)", e); }
             var s = Settings.Current;

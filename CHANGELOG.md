@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
+
+**Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).
+
+**Przyczyna:** napis BK = GetSpentHours (spentStamina / 6 - tylko gracz, z PracticalSmith stamina o polowe). Nasz postfiks GetSpentHours (m96-czaskuzni) nie dzialal: metoda ma kilka bajtow i JIT wkleja ja w OnRefresh, mimo linii "napis godzin BK wpiety" - przy lukach NotePiece idzie przed OnRefresh, wiec dzialajacy postfiks dalby 8.1 h, a ekran pokazal 4.3 h. Pasek liczy kolejke: stamina wszystkich kowali / 6, PracticalSmith tylko -25% czasu (D7, 511), x Forge Time Mult 1.25 (m109).
+
+**Zmiana:** postfiks CraftingMixin.OnRefresh (Priority.Last) ustawia HoursSpentText odbiciem na SessionHours() (praca bez sztuki + sztuki w kolejce - to samo co pasek); po kazdym NotePiece napis ustawiany jeszcze raz (zbroja CRAFT: CraftPost po odswiezeniu ekranu). Tylko gdy ekran kuzni nasz (_open, ForgeOneJob) i BK ma napis (CraftingWaitingTime). Recenzja: _mixin czyszczony w Close (bez starego VM). Linia "Robota w kuzni (m96)" ma licznik "napis godzin (539): wywolan GetSpentHours N, ustawien napisu M". Czas pracy bez zmian.
+
+**Ryzyko / co sprawdzic:**
+- Tylko napis; godziny kolejki, pasek, stamina, XP bez zmian. ForgeView BkVmFixes.AfterRefresh (drugi postfiks OnRefresh) nie rusza napisu godzin.
+- Napis liczy te wizyte; pasek doda robote sprzed wizyty (WaitText mowi o niej) i noc 23-5 (Workshop Night Rest).
+- W logu po kuciu: "ustawien napisu" > 0, "wywolan GetSpentHours" 0 (dowod wklejenia).
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 538: piechur na koniu tylko w marszu - wymog Jazdy konia i uprzezy do 20 go nie dotyczy - Armoury (MarchPairs.Eff/Assign/Take, MarchHud, RiddenBy; klucz NOWY FootmenRidingWaiver = 20)
 
 **Problem:** Jeff, czat 15.11 (po WGRANIU 244): "riding skill sa niepotrzebne dla piechoty ktore wymagaja riding skill do 20 ... to samo dla uprzezy ... anulejmy wymagania bo inaczej nie ma sensu, piechota nie jedzi na nich w bitwie tylko sie wolno przemieszcza". Rekrut z Jazda 0-19 szedl pieszo obok konia z uprzeza o wymogu 10-20.
