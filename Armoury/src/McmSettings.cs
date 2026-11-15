@@ -7781,6 +7781,10 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillKitSkillCheck { get; set; } = true;
 
+        [SettingPropertyBool("Drill Kit Cheapest Swap", HintText = "your men's drill kit holds the cheapest pieces they can use: they take what the kit lacks cheapest first, from their own spare kit and from your list alike; each day, if a cheaper usable piece of the same kind lies in the troops' armoury, the kit takes it and gives the dearer one back (yours back to your list), at most 100 swaps a day; and a piece in the kit that would give a man a better weapon or armour in the next battle than the one he gets goes back to the armoury before the battle. Dear pieces given back that nobody in your party can use are the men's spare kit and may be sold in town (off = worst pieces first, the men's own spare kit before your list, no swaps, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillKitCheapestSwap { get; set; } = true;
+
         [SettingPropertyBool("Drill Stock Ai", HintText = "AI lords' men drill with the same full drill kit for their role as your men, set aside each day from the spare arms and armour of their armoury (their baggage - loot and Banner Kings supplies - does not count, just as your own packs do not); the set-aside pieces stay in the armoury, the merchants do not get them, and in battle the men use the whole armoury as before: up to 20-30% faster, the kit wears out and the smiths of the next town buy the scrap - a third to the lord, the rest to the men (off = AI drill without a kit, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillStockAi { get; set; } = true;
@@ -15947,6 +15951,7 @@ namespace Armoury
             s.DrillStock = DrillStock;
             s.DrillTakesPlayerStash = DrillTakesPlayerStash;
             s.DrillKitSkillCheck = DrillKitSkillCheck;
+            s.DrillKitCheapestSwap = DrillKitCheapestSwap;
             s.DrillStockAi = DrillStockAi;
             s.DrillMenPerPiece = DrillMenPerPiece;
             s.DrillPenaltyAi = DrillPenaltyAi;

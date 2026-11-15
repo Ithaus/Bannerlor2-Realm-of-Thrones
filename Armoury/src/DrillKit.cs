@@ -23,7 +23,7 @@ namespace Armoury
     ///    bitwa wydaje); sztuka schodzi ze stanu zbrojowni do zapasu musztry (_stock). Nadmiar (smierc, awans, zmiana roli) wraca do zbrojowni, brak bitwy
     ///    tez (zestaw bitewny ma pierwszenstwo). Codziennie, po zmianie skladu, przy starcie bitwy (sam zwrot) i w miescie przed sprzedaza (sam zwrot).
     ///  - 571 (klucz DrillTakesPlayerStash): czego nadwyzka ludzi nie da, ludzie biora z NIENOSZONYCH sztuk gracza w zbrojowni (lista gracza), najgorsze najpierw,
-    ///    nigdy tego, co wyda nastepna bitwa; zwrot takiej sztuki wraca na liste gracza (opis przy TakeBook).
+    ///    nigdy tego, co wyda nastepna bitwa; zwrot takiej sztuki wraca na liste gracza (opis przy sekcji 571; 575 - pobor w Candidates/Move).
     ///  - AI: ta sama regula, ale zapasem jest rezerwacja w slowniku zbrojowni DTE (sztuki zostaja w zbrojowni - DTE i tak wydaje cala w bitwie), liczona
     ///    od nowa raz na dobe; sprzedaz nadwyzek AI (MenPurse.SellArmorySurplus) omija zarezerwowane.
     ///  - S = 1 + 0.10 x uB x kB + 0.10 x uZ x kZ, u = pokrycie sztuk polowy (562c: suma min(Cov, Need) / suma Need rodzajow broni / zbroi - ta sama miara,
@@ -32,6 +32,11 @@ namespace Armoury
     ///  - 574 (Jeff 15.11 "jesli ma lucznictwo 30 a luk lezy 40 ... nie moze uzyc"; klucz DrillKitSkillCheck): do zestawu trafia tylko sztuka, ktora udzwignie
     ///    typ z brakiem jej rodzaju (GearFit.ForTroop - umiejetnosc, siodlo, kultura, jak kwatermistrz bitwy; bohater ItemReq.MeetsHero). Pokrycie per typ:
     ///    typ z n ludzmi pokrywaja najwyzej Units(n) sztuk, ktore sam udzwignie (FitMatch); sztuki, ktorych nikt w roli nie udzwignie, wracaja do zbrojowni.
+    ///  - 575 (Jeff 15.11 "najtanszy ... jesli zabral luk tier 6 ... a pojawily sie luki tansze w armoury to oddaje luk tier 6 i zabiera najtanszy"; klucz
+    ///    DrillKitCheapestSwap): pobor po CENIE (EquipmentElement.ItemValue rosnaco) z obu pul razem (nadwyzka ludzi i lista gracza; przy rownej cenie ludzi
+    ///    najpierw) i z obu typow 2H razem; codziennie wymiana na tansze (SwapCheaper - tansza uzywalna sztuka tej samej klasy z puli, drozsza wraca do zbrojowni);
+    ///    sztuka zapasu, ktora dalaby zolnierzowi w nastepnej bitwie lepsza bron/zbroje niz wydana, wraca przed bitwa (ReturnForUpgrade, z proba podgladu).
+    ///    AI: rezerwacja po cenie (liczona od nowa co dobe, wiec wymiana dzieje sie sama). Zuzycie zostaje "najtansza pierwsza" (w zapasie i tak leza najtansze).
     /// </summary>
     internal static partial class Drill
     {
@@ -562,14 +567,21 @@ namespace Armoury
                 if (pv == null) _pvNone++;
                 int bb = ReturnForBattle(pv, arm);
                 if (bb > 0) { pv = KitPreview.ForArmoury(); _settlePv++; }
-                int took = 0;
-                if (why == WhyDaily || why == WhyRoster) { took = TakePlayer(MeasurePlayer(), arm, pv); _lastTook = took; _hudDirty = true; }   // 562b: wynik ostatniego poboru do podpowiedzi paska
+                int ub = ReturnForUpgrade(pv, arm);   // 575: sztuki, ktore w bitwie dalyby komus lepsza bron/zbroje niz wydana (sprawdzone proba podgladu)
+                if (ub > 0) { pv = KitPreview.ForArmoury(); _settlePv++; bb += ub; }
+                int took = 0, sw = 0;
+                if (why == WhyDaily || why == WhyRoster)
+                {
+                    var tc = NewTakeCtx(arm, pv);   // 575: plany wspolne dla poboru i wymiany (Sell zmniejszany przy kazdym ruchu)
+                    took = TakePlayer(MeasurePlayer(), tc); _lastTook = took; _hudDirty = true;   // 562b: wynik ostatniego poboru do podpowiedzi paska
+                    if (why == WhyDaily) sw = SwapCheaper(tc);   // 575: raz na dobe - tansze z puli za drozsze z zapasu, 1:1
+                }
                 _settleSig = m.Sig;
                 _settleArmVer = arm.VersionNo;
                 _settleN++; _settleBy[Math.Max(0, Math.Min(3, why))]++;
                 int after = Pieces(arm) + Pieces(_stock);
                 if (after != before) _settleBad++;
-                if (back + bb + took > 0) { _hudDirty = true; try { MarchPairs.InvalidateWeight(main); } catch { } }
+                if (back + bb + took + sw > 0) { _hudDirty = true; try { MarchPairs.InvalidateWeight(main); } catch { } }
                 if (migr)
                 {
                     _migrPending = false;
@@ -797,48 +809,334 @@ namespace Armoury
         /// <summary>Typy, z ktorych rodzaj bierze sztuki (bez zastepstw - zestaw kanoniczny; jedyny wyjatek: 2H takze z drzewc z uzyciem dwurecznym).</summary>
         private static ItemObject.ItemTypeEnum[] TakeTypes(int k) { return k == K2H ? Take2H : new[] { KindType[k] }; }
 
-        /// <summary>c) Braki zestawu (rodzaje w TakeOrder) z nadwyzki K1 ludzi (Sell > 0, lista WorseFirst - do musztry najgorsze), plan tylko typu z brakiem.
-        /// Sztuka schodzi ze zbrojowni do zapasu.</summary>
-        private static int TakePlayer(KitM m, ItemRoster arm, KitPreview.Result pv)
+        private static bool CheapOn { get { var s = Settings.Current; return s != null && s.DrillKitCheapestSwap; } }
+
+        /// <summary>575: plany jednego rozliczenia - pula ludzi (PlayerSurplusPlan z podgladem, KeepGiven) i lista gracza (PlayerBookPlan), budowane leniwie na typ;
+        /// wspolne dla poboru (TakePlayer) i wymiany (SwapCheaper): Sell planu maleje przy kazdym ruchu, wiec ta sama sztuka nie idzie dwa razy. Keep - KeepFor(pv):
+        /// na przedmiot zostaje w zbrojowni co najmniej tyle, ile wyda nastepna bitwa - lista gracza zawsze (571), pula ludzi przy 575 (KeepMen; dotad tylko
+        /// przez KeepGiven przy KitPreview.SideOptional).</summary>
+        private sealed class TakeCtx
         {
-            var plans = new Dictionary<int, List<SwapMath.Piece>>();
-            int took = 0;
-            // 571: po nadwyzce ludzi - nienoszone sztuki gracza (tylko z podgladem bitwy: bez niego nie wiadomo, czego bitwa nie wyda)
-            var keep = BookOn ? MenPurse.KeepFor(pv) : null;
-            bool book = keep != null;
-            var bookPlans = book ? new Dictionary<int, List<SwapMath.Piece>>() : null;
-            foreach (int k in TakeOrder)
+            internal ItemRoster Arm; internal KitPreview.Result Pv;
+            internal Dictionary<ItemObject, int> Keep;
+            internal bool Book, KeepMen, Cheap;
+            private readonly Dictionary<int, List<SwapMath.Piece>> _men = new Dictionary<int, List<SwapMath.Piece>>(), _bk = new Dictionary<int, List<SwapMath.Piece>>();
+            internal List<SwapMath.Piece> MenPlan(ItemObject.ItemTypeEnum t)
+            { List<SwapMath.Piece> pl; if (!_men.TryGetValue((int)t, out pl)) _men[(int)t] = pl = MenPurse.PlayerSurplusPlan(Arm, t, Pv); return pl; }
+            internal List<SwapMath.Piece> BookPlan(ItemObject.ItemTypeEnum t)
+            { List<SwapMath.Piece> pl; if (!_bk.TryGetValue((int)t, out pl)) _bk[(int)t] = pl = MenPurse.PlayerBookPlan(Arm, t); return pl; }
+        }
+
+        private static TakeCtx NewTakeCtx(ItemRoster arm, KitPreview.Result pv)
+        {
+            var c = new TakeCtx { Arm = arm, Pv = pv, Cheap = CheapOn };
+            bool book = BookOn;
+            if (pv != null && (book || c.Cheap)) c.Keep = MenPurse.KeepFor(pv);   // 571: bez podgladu z listy gracza nic (nie wiadomo, czego bitwa nie wyda)
+            c.Book = book && c.Keep != null;
+            c.KeepMen = c.Cheap && c.Keep != null;
+            return c;
+        }
+
+        /// <summary>575: kandydat poboru - sztuka planu (P), pula (Book - lista gracza), typ w TakeTypes (T), miejsce w planie (Ix - porzadek WorseFirst), cena.</summary>
+        private sealed class TakeC { internal SwapMath.Piece P; internal EquipmentElement El; internal bool Book, Dead; internal int T, Ix, Price; }
+
+        /// <summary>575: kandydaci rodzaju k z obu pul i wszystkich typow TakeTypes(k) (te same limity co dotad: Sell &gt; 0, Eligible, drzewce do 2H tylko z F2H,
+        /// lista gracza bez id z rozkazem ksiegi musztry; przy 575 bez sztuk oddanych pod bitwe w ostatnich UpgBlockDays dniach). Kolejnosc: przy 575 cena rosnaco,
+        /// przy rownej - pula ludzi przed lista gracza, potem typ i WorseFirst; bez 575 - jak dotad: pula ludzi (typ po typie, WorseFirst), potem lista gracza.</summary>
+        private static List<TakeC> Candidates(int k, TakeCtx c)
+        {
+            var l = new List<TakeC>();
+            var types = TakeTypes(k);
+            for (int pool = 0; pool < 2; pool++)
             {
-                int want = m.Short(k);
-                if (want <= 0) continue;
-                foreach (var t in TakeTypes(k))
+                if (pool == 1 && !c.Book) break;
+                for (int ti = 0; ti < types.Length; ti++)
                 {
-                    if (want <= 0) break;
-                    List<SwapMath.Piece> pl;
-                    if (!plans.TryGetValue((int)t, out pl)) plans[(int)t] = pl = MenPurse.PlayerSurplusPlan(arm, t, pv);
+                    var t = types[ti];
+                    var pl = pool == 0 ? c.MenPlan(t) : c.BookPlan(t);
                     if (pl == null) continue;
-                    foreach (var p in pl)
+                    for (int ix = 0; ix < pl.Count; ix++)
                     {
+                        var p = pl[ix];
                         if (p.Sell <= 0) continue;
                         var el = QuartermasterLaw.ElOf(p);
                         var it = el.Item;
                         if (it == null || !Eligible(it) || (k == K2H && t == ItemObject.ItemTypeEnum.Polearm && (KindInfo(it) & F2H) == 0)) continue;
-                        int idx = arm.FindIndexOfElement(el);
-                        int inArm = idx >= 0 ? arm.GetElementCopyAtIndex(idx).Amount : 0;
-                        int x = Math.Min(Math.Min(p.Sell, want), inArm);
-                        if (x <= 0) continue;
-                        x = ClaimTake(m, k, it, x, false);   // 574: tylko dla typu z brakiem, ktory sztuke udzwignie
-                        if (x <= 0) continue;
-                        arm.AddToCounts(el, -x);
-                        _stock.AddToCounts(el, x);
-                        p.Sell -= x; want -= x; took += x;
-                        if (want <= 0) break;
+                        if (pool == 1 && MusterBook.IsPinnedItem(it.StringId)) continue;
+                        if (c.Cheap && UpgBlocked(it)) continue;
+                        l.Add(new TakeC { P = p, El = el, Book = pool == 1, T = ti, Ix = ix, Price = el.ItemValue });
                     }
                 }
-                if (want > 0 && book) took += TakeBook(m, k, want, arm, keep, bookPlans);   // 571: reszta braku z listy gracza
+            }
+            if (c.Cheap) l.Sort(ByPrice);
+            else l.Sort((a, b) => { int d = a.Book.CompareTo(b.Book); if (d != 0) return d; d = a.T.CompareTo(b.T); return d != 0 ? d : a.Ix.CompareTo(b.Ix); });
+            return l;
+        }
+
+        private static int ByPrice(TakeC a, TakeC b)
+        {
+            int d = a.Price.CompareTo(b.Price); if (d != 0) return d;
+            d = a.Book.CompareTo(b.Book); if (d != 0) return d;
+            d = a.T.CompareTo(b.T); return d != 0 ? d : a.Ix.CompareTo(b.Ix);
+        }
+
+        /// <summary>575: ile sztuk kandydata mozna wziac teraz - Sell planu, zywy stan egzemplarza w zbrojowni, ochrona nastepnej bitwy na przedmiot (KeepFor:
+        /// lista gracza zawsze, pula ludzi przy 575).</summary>
+        private static int Avail(TakeC x, TakeCtx c)
+        {
+            if (x.Dead || x.P.Sell <= 0) return 0;
+            int idx = c.Arm.FindIndexOfElement(x.El);
+            int n = Math.Min(x.P.Sell, idx >= 0 ? c.Arm.GetElementCopyAtIndex(idx).Amount : 0);
+            if (n > 0 && (x.Book || c.KeepMen))
+            {
+                int kp; c.Keep.TryGetValue(x.El.Item, out kp);
+                n = Math.Min(n, ArmCount(c.Arm, x.El.Item) - kp);   // nastepna bitwa ma pierwszenstwo: na przedmiot zostaje co najmniej KeepFor
+            }
+            return Math.Max(0, n);
+        }
+
+        /// <summary>575: n sztuk kandydata ze zbrojowni do zapasu (para AddToCounts); lista gracza - StockWithdrawKey i _fromBook (jak 571). Sell planu - n.</summary>
+        private static void Move(TakeC x, int n, TakeCtx c)
+        {
+            c.Arm.AddToCounts(x.El, -n);
+            _stock.AddToCounts(x.El, n);
+            if (x.Book)
+            {
+                ArmouryBehavior.StockWithdrawKey(x.El, n);
+                string key = QuartermasterLaw.KeyOf(x.El);
+                int v; _fromBook.TryGetValue(key, out v); _fromBook[key] = v + n;
+            }
+            x.P.Sell -= n;
+        }
+
+        /// <summary>c) Braki zestawu (rodzaje w TakeOrder) z nadwyzki K1 ludzi (Sell &gt; 0) i (571) z nienoszonych sztuk gracza; 575: jedna lista kandydatow
+        /// po cenie (Candidates), bez 575 - jak dotad (najgorsze najpierw, ludzie przed lista gracza). 574: tylko dla typu z brakiem, ktory sztuke udzwignie.
+        /// Sztuka schodzi ze zbrojowni do zapasu.</summary>
+        private static int TakePlayer(KitM m, TakeCtx c)
+        {
+            int took = 0, book = 0;
+            foreach (int k in TakeOrder)
+            {
+                int want = m.Short(k);
+                if (want <= 0) continue;
+                foreach (var x in Candidates(k, c))
+                {
+                    int n = Math.Min(Avail(x, c), want);
+                    if (n <= 0) continue;
+                    n = ClaimTake(m, k, x.El.Item, n, false);   // 574
+                    if (n <= 0) continue;
+                    Move(x, n, c);
+                    want -= n; took += n;
+                    if (x.Book) book += n;
+                    if (want <= 0) break;
+                }
             }
             _pTaken += took;
+            _pTakenBook += book;
             return took;
+        }
+
+        // ------------------------------------------------------------ 575: najtansze i wymiana
+        // 575 (Jeff 15.11 "jesli zabral luk tier 6 do treningu a pojawily sie luki tansze w armoury to oddaje luk tier 6 i zabiera najtanszy ... zeby stos do nauki
+        // nie zabieral tier 6 sprzetu a jak zabiera to potem wymienia na tanszy i oddaje do armoury drozszy aby inne wojsko moglo go zalozyc do bitwy"; audyt A/B/C:
+        // pobor szedl po WorseFirst - tier i sila, bez ceny - pula ludzi zawsze przed lista gracza; pelny zestaw nigdy sie nie wymienial; ReturnForBattle oddawal
+        // tylko pod PUSTE sloty, nie pod ulepszenie).
+        private const int SwapPerDay = 100;     // limit wymian na dobe (gracz)
+        private const int UpgBlockDays = 7;     // sztuka oddana pod bitwe nie wraca do zapasu przez tyle dni (bez ping-ponga przy losowym pancerzu podgladu - K7)
+        private static readonly Dictionary<ItemObject, int> _upgBlock = new Dictionary<ItemObject, int>(), _upgNo = new Dictionary<ItemObject, int>();   // przedmiot -> dzien
+        private static int _pSwapN, _pSwapCovDrop, _pUpgBack, _pUpgNo, _pUpgTrial;
+        private static long _pSwapOutV, _pSwapInV;
+        private static readonly int[] _pSwapOutT = new int[7], _pSwapInT = new int[7];
+
+        private static int TierIx(ItemObject it) { int t = 1; try { t = AiGear.TierOf(it); } catch (Exception e) { Stumble("TierOf", e); } return Math.Max(1, Math.Min(6, t)); }
+
+        private static bool UpgBlocked(ItemObject it) { int d; return it != null && _upgBlock.TryGetValue(it, out d) && (int)CampaignTime.Now.ToDays - d < UpgBlockDays; }
+
+        /// <summary>575: tansza sztuka moze zastapic drozsza - kazdy typ z rola, ktorej drozsza sluzy (KindsMask), i ktory drozsza udzwignie, udzwignie tez tansza
+        /// (pokrycie per typ - 574 - nie spada). Bez 574 - zawsze.</summary>
+        private static bool FitsSuper(KitM m, ItemObject cheap, ItemObject dear)
+        {
+            if (m == null || !m.Skill || m.Types.Count == 0) return true;
+            int mk = KindsMask(dear);
+            foreach (var t in m.Types) if ((t.Mask & mk) != 0 && Fits(t, dear) && !Fits(t, cheap)) return false;
+            return true;
+        }
+
+        /// <summary>575: codzienna wymiana na tansze (gracz, po poborze): dla kazdego rodzaju sztuki zapasu od najdrozszej; dopoki w pulach (te same limity co pobor:
+        /// Sell, stan zbrojowni, KeepFor, Eligible, rozkaz ksiegi, blokada UpgBlockDays) lezy sztuka TANSZA tej samej klasy (KindInfo - rodzaj i uzycie 1H/2H, wiec
+        /// przydzial Allocate sie nie zmienia), ktora udzwigna wszyscy, ktorzy udzwigna drozsza (FitsSuper) - tansza do zapasu (Move), drozsza do zbrojowni
+        /// (BackToArmory - czesc gracza na liste gracza). Bilans 1:1; najwyzej SwapPerDay na dobe. Bez ping-ponga: kazda wymiana scisle obniza wartosc zapasu,
+        /// a pobor bierze tylko na brak i najtansze najpierw - oddana drozsza wraca do zapasu tylko wtedy, gdy nie ma tanszej (i wtedy nie ma z czym jej wymienic).</summary>
+        private static int SwapCheaper(TakeCtx c)
+        {
+            if (!c.Cheap || _stock.Count == 0) return 0;
+            int n = 0;
+            try
+            {
+                var m = MeasurePlayer();
+                int cov0 = Sum(m.Cov);
+                foreach (int k in TakeOrder)
+                {
+                    if (k == KCape || n >= SwapPerDay) continue;   // 562c: oponcze-dodatek - ludzie nowych nie biora
+                    var dear = new List<ItemRosterElement>();
+                    for (int i = 0; i < _stock.Count; i++)
+                    {
+                        var el = _stock.GetElementCopyAtIndex(i);
+                        var it = el.EquipmentElement.Item;
+                        if (el.Amount <= 0 || it == null || KindOf(it) != k) continue;
+                        if (m.Skill && !UsableAny(m, it)) continue;   // 574: za trudne wraca przez ReturnExcess
+                        dear.Add(el);
+                    }
+                    if (dear.Count == 0) continue;
+                    dear.Sort((a, b) => b.EquipmentElement.ItemValue.CompareTo(a.EquipmentElement.ItemValue));
+                    List<TakeC> cands = null;
+                    foreach (var del in dear)
+                    {
+                        var dIt = del.EquipmentElement.Item;
+                        int dv = del.EquipmentElement.ItemValue, dInfo = KindInfo(dIt), left = del.Amount;
+                        while (left > 0 && n < SwapPerDay)
+                        {
+                            if (cands == null) cands = Candidates(k, c);   // przy 575 - cena rosnaco
+                            TakeC pick = null;
+                            foreach (var x in cands)
+                            {
+                                if (x.Dead) continue;
+                                if (x.Price >= dv) break;   // dalej juz nie tansze
+                                var it = x.El.Item;
+                                if (KindInfo(it) != dInfo || !FitsSuper(m, it, dIt)) continue;
+                                if (Avail(x, c) <= 0) { x.Dead = true; continue; }
+                                pick = x; break;
+                            }
+                            if (pick == null) break;
+                            Move(pick, 1, c);
+                            BackToArmory(c.Arm, del.EquipmentElement, 1);   // 571: czesc gracza na liste gracza, reszta na stan wojska
+                            left--; n++;
+                            _pSwapOutT[TierIx(dIt)]++; _pSwapInT[TierIx(pick.El.Item)]++; _pSwapOutV += dv; _pSwapInV += pick.Price;
+                        }
+                    }
+                }
+                if (n > 0) { int cov1 = Sum(MeasurePlayer().Cov); if (cov1 < cov0) _pSwapCovDrop += cov0 - cov1; }   // kontrola: wymiana nie moze obnizyc pokrycia
+            }
+            catch (Exception e) { Stumble("SwapCheaper", e); }
+            _pSwapN += n;
+            return n;
+        }
+
+        private sealed class Slot { internal CharacterObject Ch; internal SwapMath.Piece P; internal int Left; }
+
+        /// <summary>575: wydane w podgladzie sztuki grupy (typ, sztuka, ilu ludzi) - najgorsze najpierw (WorseFirst).</summary>
+        private static List<Slot> SlotsOf(Dictionary<CharacterObject, Dictionary<ItemObject, int>> by)
+        {
+            var l = new List<Slot>();
+            foreach (var kv in by)
+            {
+                if (kv.Key == null) continue;
+                foreach (var kv2 in kv.Value)
+                    if (kv2.Key != null && kv2.Value > 0) l.Add(new Slot { Ch = kv.Key, P = QuartermasterLaw.PieceOf(new EquipmentElement(kv2.Key), 1), Left = kv2.Value });
+            }
+            l.Sort((a, b) => SwapMath.WorseFirst(a.P, b.P));
+            return l;
+        }
+
+        /// <summary>575 (rozszerzenie ReturnForBattle): pierwszenstwo bitwy takze przy ULEPSZENIU - sztuka zapasu (najdrozsze najpierw), ktora w podgladzie nastepnej
+        /// bitwy dalaby czlowiekowi lepsza sztuke tej samej grupy broni niz wydana (SwapMath.Better &gt; 0 - tier, sila, wrak, jakosc) i ktora ten typ udzwignie
+        /// (GearFit.ForTroop, jak FitsAny), idzie do proby podgladu (KitPreview.Trial - ten sam rozdzielacz DTE z ta sztuka w zbrojowni); wraca tylko tyle, o ile
+        /// proba wydaje jej wiecej (Given), reszta - "odrzucone" do konca doby. Oddana sztuka nie wraca do zapasu przez UpgBlockDays dni (UpgBlocked).
+        /// Po zwrocie wolajacy liczy podglad od nowa (jak po ReturnForBattle).</summary>
+        private static int ReturnForUpgrade(KitPreview.Result pv, ItemRoster arm)
+        {
+            if (!CheapOn || pv == null || pv.GivenBy == null || pv.GivenBy.Count == 0 || _stock.Count == 0) return 0;
+            int n = 0;
+            try
+            {
+                int day = (int)CampaignTime.Now.ToDays;
+                var cand = new List<ItemRosterElement>();
+                for (int i = 0; i < _stock.Count; i++)
+                {
+                    var el = _stock.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount <= 0 || it == null || KindInfo(it) < 0) continue;
+                    int nd; if (_upgNo.TryGetValue(it, out nd) && nd == day) continue;   // proba dzis juz odrzucila
+                    if (!pv.GivenBy.ContainsKey(KitGaps.Group(it))) continue;
+                    cand.Add(el);
+                }
+                if (cand.Count == 0) return 0;
+                cand.Sort((a, b) => b.EquipmentElement.ItemValue.CompareTo(a.EquipmentElement.ItemValue));
+                var slots = new Dictionary<int, List<Slot>>();
+                var pending = new List<Tuple<EquipmentElement, int>>();
+                bool q = GearFit.Quiet; GearFit.Quiet = true;
+                try
+                {
+                    foreach (var el in cand)
+                    {
+                        var it = el.EquipmentElement.Item;
+                        int g = KitGaps.Group(it);
+                        List<Slot> sl;
+                        if (!slots.TryGetValue(g, out sl)) slots[g] = sl = SlotsOf(pv.GivenBy[g]);
+                        var pc = QuartermasterLaw.PieceOf(el.EquipmentElement, 1);
+                        int got = 0;
+                        foreach (var s in sl)
+                        {
+                            if (s.Left <= 0 || SwapMath.Better(pc, s.P) <= 0 || !GearFit.ForTroop(s.Ch, it, GearFit.On)) continue;
+                            int x = Math.Min(el.Amount - got, s.Left);
+                            s.Left -= x; got += x;
+                            if (got >= el.Amount) break;
+                        }
+                        if (got > 0) pending.Add(Tuple.Create(el.EquipmentElement, got));
+                    }
+                }
+                finally { GearFit.Quiet = q; }
+                if (pending.Count == 0) return 0;
+                _pUpgTrial++;
+                var tr = KitPreview.Trial(pending);
+                if (tr == null) return 0;
+                var acc = new Dictionary<ItemObject, int>();
+                foreach (var kv in tr.Given) { int b; pv.Given.TryGetValue(kv.Key, out b); if (kv.Value > b) acc[kv.Key] = kv.Value - b; }
+                foreach (var t in pending)
+                {
+                    var it = t.Item1.Item;
+                    int a; acc.TryGetValue(it, out a);
+                    int x = Math.Min(t.Item2, a);
+                    if (x > 0) { BackToArmory(arm, t.Item1, x); acc[it] = a - x; n += x; _upgBlock[it] = day; }   // 571: czesc gracza na liste gracza
+                    if (x < t.Item2) { _upgNo[it] = day; _pUpgNo += t.Item2 - x; }
+                }
+            }
+            catch (Exception e) { Stumble("ReturnForUpgrade", e); }
+            _pUpgBack += n;
+            return n;
+        }
+
+        /// <summary>575: rozklad zapasu musztry wedlug tierow T1..T6 (sztuki rodzajow zestawu) - do linii doby.</summary>
+        private static string StockTiers()
+        {
+            var t = new int[7];
+            for (int i = 0; i < _stock.Count; i++)
+            {
+                var el = _stock.GetElementCopyAtIndex(i);
+                if (el.Amount > 0 && KindOf(el.EquipmentElement.Item) >= 0) t[TierIx(el.EquipmentElement.Item)] += el.Amount;
+            }
+            return t[1] + "/" + t[2] + "/" + t[3] + "/" + t[4] + "/" + t[5] + "/" + t[6];
+        }
+
+        private static string TierList(int[] t)
+        {
+            var sb = new StringBuilder();
+            for (int i = 6; i >= 1; i--) { if (t[i] <= 0) continue; if (sb.Length > 0) sb.Append(", "); sb.Append('T').Append(i).Append(" x").Append(t[i]); }
+            return sb.Length > 0 ? sb.ToString() : "-";
+        }
+
+        /// <summary>575: fragment linii doby gracza (wymiana, oddane pod bitwe, tiery zapasu).</summary>
+        private static string SwapLog()
+        {
+            var sb = new StringBuilder(", 575: wymieniono na tansze ").Append(_pSwapN);
+            if (_pSwapN > 0)
+                sb.Append(" (oddane: ").Append(TierList(_pSwapOutT)).Append(" / sr. cena ").Append(_pSwapOutV / _pSwapN).Append(" d, wziete: ").Append(TierList(_pSwapInT))
+                  .Append(" / sr. cena ").Append(_pSwapInV / _pSwapN).Append(" d; bilans 1:1)");
+            if (_pSwapCovDrop > 0) sb.Append(", SPADEK pokrycia po wymianie ").Append(_pSwapCovDrop);
+            sb.Append(", oddane pod bitwe (lepsze niz wydane) ").Append(_pUpgBack).Append(" (prob podgladu ").Append(_pUpgTrial).Append(", odrzucone proba ").Append(_pUpgNo).Append(')');
+            sb.Append(", zapas wedlug tierow T1..T6 ").Append(StockTiers());
+            if (!CheapOn) sb.Append(" (klucz Drill Kit Cheapest Swap wylaczony)");
+            return sb.ToString();
         }
 
         // ------------------------------------------------------------ 571: musztra z listy gracza
@@ -900,48 +1198,10 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>571: brak rodzaju k (want sztuk) z nienoszonych sztuk gracza (plan PlayerBookPlan na typ, pamiec planow na rozliczenie). Zwraca liczbe wzietych.</summary>
-        private static int TakeBook(KitM m, int k, int want, ItemRoster arm, Dictionary<ItemObject, int> keep, Dictionary<int, List<SwapMath.Piece>> plans)
-        {
-            int took = 0;
-            foreach (var t in TakeTypes(k))
-            {
-                if (want <= 0) break;
-                List<SwapMath.Piece> pl;
-                if (!plans.TryGetValue((int)t, out pl)) plans[(int)t] = pl = MenPurse.PlayerBookPlan(arm, t);
-                if (pl == null) continue;
-                foreach (var p in pl)
-                {
-                    if (p.Sell <= 0) continue;
-                    var el = QuartermasterLaw.ElOf(p);
-                    var it = el.Item;
-                    if (it == null || !Eligible(it) || (k == K2H && t == ItemObject.ItemTypeEnum.Polearm && (KindInfo(it) & F2H) == 0)) continue;
-                    if (MusterBook.IsPinnedItem(it.StringId)) continue;
-                    int idx = arm.FindIndexOfElement(el);
-                    int inArm = idx >= 0 ? arm.GetElementCopyAtIndex(idx).Amount : 0;
-                    int kp; keep.TryGetValue(it, out kp);
-                    int free = ArmCount(arm, it) - kp;   // nastepna bitwa ma pierwszenstwo: na przedmiot zostaje co najmniej KeepFor
-                    int x = Math.Min(Math.Min(Math.Min(p.Sell, want), inArm), free);
-                    if (x <= 0) continue;
-                    x = ClaimTake(m, k, it, x, false);   // 574
-                    if (x <= 0) continue;
-                    arm.AddToCounts(el, -x);
-                    _stock.AddToCounts(el, x);
-                    ArmouryBehavior.StockWithdrawKey(el, x);
-                    string key = QuartermasterLaw.KeyOf(el);
-                    int v; _fromBook.TryGetValue(key, out v); _fromBook[key] = v + x;
-                    p.Sell -= x; want -= x; took += x;
-                    if (want <= 0) break;
-                }
-            }
-            _pTakenBook += took;
-            return took;
-        }
-
         /// <summary>571: ile sztuk zapasu to sztuki gracza (pamiec _fromBook) - do linii doby.</summary>
         private static int BookPieces() { int n = 0; foreach (var v in _fromBook.Values) n += v; return n; }
 
-        // 574: liczniki doby - za trudne oddane z zapasu gracza, pominiete przy braniu (gracz: TakePlayer, TakeBook, Accept; AI: rezerwacja)
+        // 574: liczniki doby - za trudne oddane z zapasu gracza, pominiete przy braniu (gracz: TakePlayer z Candidates, Accept; AI: rezerwacja)
         private static int _pBackHard, _pHardSkip, _aHardSkip;
 
         /// <summary>574: Claim przy braniu sztuki do zestawu + licznik "za trudne" (nikt w roli z rodzajem k jej nie udzwignie).</summary>
@@ -1008,34 +1268,46 @@ namespace Armoury
             {
                 var plans = new Dictionary<int, List<SwapMath.Piece>>();
                 int meleeLeft = -1;   // -1 = jeszcze nie liczone; int.MaxValue = bez grupy
+                bool cheap = CheapOn;   // 575: rezerwacja po cenie z obu typow 2H razem (liczona od nowa co dobe - wymiana na tansze dzieje sie sama)
                 foreach (int k in TakeOrder)
                 {
                     int want = m.Need[k];
                     if (want <= 0) continue;
-                    foreach (var t in TakeTypes(k))
+                    var types = TakeTypes(k);
+                    var cl = new List<TakeC>();
+                    for (int ti = 0; ti < types.Length; ti++)
                     {
-                        if (want <= 0) break;
-                        bool melee = AiGear.Melee((int)t);
-                        if (melee && meleeLeft < 0) meleeLeft = MenPurse.AiMeleeLeft(arm, mp.MemberRoster);
+                        var t = types[ti];
                         List<SwapMath.Piece> pl;
                         if (!plans.TryGetValue((int)t, out pl)) plans[(int)t] = pl = MenPurse.AiSurplusPlan(arm, mp.MemberRoster, t);
                         if (pl == null) continue;
-                        foreach (var p in pl)
+                        for (int ix = 0; ix < pl.Count; ix++)
                         {
-                            var it = QuartermasterLaw.ElOf(p).Item;
+                            var p = pl[ix];
+                            var el = QuartermasterLaw.ElOf(p);
+                            var it = el.Item;
                             if (it == null || p.Sell <= 0 || !Eligible(it) || (k == K2H && t == ItemObject.ItemTypeEnum.Polearm && (KindInfo(it) & F2H) == 0)) continue;
-                            int have; res.TryGetValue(it, out have);
-                            int inArm; arm.TryGetValue(it, out inArm);
-                            int n = Math.Min(Math.Min(p.Sell, inArm) - have, want);
-                            if (melee) n = Math.Min(n, meleeLeft);
-                            if (n <= 0) continue;
-                            n = ClaimTake(m, k, it, n, true);   // 574
-                            if (n <= 0) continue;
-                            res[it] = have + n; want -= n;
-                            AddHave(m, it, n);
-                            if (melee && meleeLeft != int.MaxValue) meleeLeft -= n;
-                            if (want <= 0) break;
+                            cl.Add(new TakeC { P = p, El = el, T = ti, Ix = ix, Price = el.ItemValue });
                         }
+                    }
+                    if (cheap) cl.Sort(ByPrice);
+                    else cl.Sort((a, b) => { int d = a.T.CompareTo(b.T); return d != 0 ? d : a.Ix.CompareTo(b.Ix); });   // jak dotad: typ po typie, WorseFirst
+                    foreach (var x in cl)
+                    {
+                        var it = x.El.Item;
+                        bool melee = AiGear.Melee((int)types[x.T]);
+                        if (melee && meleeLeft < 0) meleeLeft = MenPurse.AiMeleeLeft(arm, mp.MemberRoster);
+                        int have; res.TryGetValue(it, out have);
+                        int inArm; arm.TryGetValue(it, out inArm);
+                        int n = Math.Min(Math.Min(x.P.Sell, inArm) - have, want);
+                        if (melee) n = Math.Min(n, meleeLeft);
+                        if (n <= 0) continue;
+                        n = ClaimTake(m, k, it, n, true);   // 574
+                        if (n <= 0) continue;
+                        res[it] = have + n; want -= n;
+                        AddHave(m, it, n);
+                        if (melee && meleeLeft != int.MaxValue) meleeLeft -= n;
+                        if (want <= 0) break;
                     }
                 }
             }
@@ -1426,7 +1698,7 @@ namespace Armoury
                 var acc = AccOf(main, false);
                 if (acc != null) Array.Copy(acc.WK, k.Acc, NK); else Array.Clear(k.Acc, 0, NK);
                 k.LastTook = _lastTook;
-                k.Taken = _pTaken; k.Back = _pBack + _pBackOther + _pBackOff; k.BackBattle = _pBackBattle;
+                k.Taken = _pTaken; k.Back = _pBack + _pBackOther + _pBackOff; k.BackBattle = _pBackBattle + _pUpgBack;   // 575: takze oddane pod bitwe jako lepsze
                 k.TakenBook = _pTakenBook; k.BookBack = _pBookBack;   // 571
                 k.PerkW = main.HasPerk(DefaultPerks.Steward.GivingHands);
                 k.PerkA = main.HasPerk(DefaultPerks.Steward.PaidInPromise, true);

@@ -119,6 +119,10 @@ namespace Armoury
             internal List<Left> LeftList;               // resztka z przyczynami - leniwie (strona "Unused in the troops' armoury")
             internal Dictionary<string, List<Man>> PerMan;   // K15: wedlug typu, w kolejnosci przydzialow (tak wystawia DTE)
             internal List<object> Asg;                       // K15: przydzialy podgladu w misji (porownanie z bitwa), potem null
+            // 575 (Jeff 15.11 "oddaje do armoury drozszy aby inne wojsko moglo go zalozyc do bitwy"): wydane sztuki wedlug grupy broni (KitGaps.Group) i typu
+            // (sloty 0-3 i 5-9, bez konia i uprzezy, bez slotow tymczasowych) - Drill.ReturnForUpgrade szuka czlowieka, ktory dostaje gorsza sztuke niz ta w zapasie
+            // musztry. Tylko podglad mapy (mirror == null, screen == null); inaczej null.
+            internal Dictionary<int, Dictionary<CharacterObject, Dictionary<ItemObject, int>>> GivenBy;
             internal int LeftPieces { get { int n = 0; foreach (var v in Rem.Values) n += v; return n; } }
             internal int Foot { get { return NoHorse + NoSaddle; } }
         }
@@ -548,16 +552,19 @@ namespace Armoury
             var C = ReadPool(pool, inC);
 
             // przydzielone przed wystawieniem (bez slotow tymczasowych - zestaw awaryjny DTE nie jest z polki)
+            if (mirror == null && screen == null) res.GivenBy = new Dictionary<int, Dictionary<CharacterObject, Dictionary<ItemObject, int>>>();   // 575
             foreach (var a in made)
             {
                 var eq = _fEq.GetValue(a) as Equipment;
                 if (eq == null) continue;
+                CharacterObject gch = res.GivenBy != null ? _getChar.Invoke(a, null) as CharacterObject : null;   // 575
                 for (int s = 0; s < 12; s++)
                 {
                     if (s == 4) continue;
                     var it = eq[(EquipmentIndex)s].Item;
                     if (it == null || Temp(a, s, it)) continue;
                     Add(res.Given, it, 1);
+                    if (gch != null && !gch.IsHero && s < 10) AddBy(res.GivenBy, KitGaps.Group(it), gch, it);   // 575: bez konia (10) i uprzezy (11)
                 }
             }
             // resztka zbrojowni po rozdaniu
@@ -729,6 +736,26 @@ namespace Armoury
         }
 
         private static void Add(Dictionary<ItemObject, int> d, ItemObject it, int n) { int v; d.TryGetValue(it, out v); d[it] = v + n; }
+
+        /// <summary>575: GivenBy[grupa][typ][sztuka] += 1.</summary>
+        private static void AddBy(Dictionary<int, Dictionary<CharacterObject, Dictionary<ItemObject, int>>> by, int grp, CharacterObject ch, ItemObject it)
+        {
+            Dictionary<CharacterObject, Dictionary<ItemObject, int>> g;
+            if (!by.TryGetValue(grp, out g)) by[grp] = g = new Dictionary<CharacterObject, Dictionary<ItemObject, int>>();
+            Dictionary<ItemObject, int> d;
+            if (!g.TryGetValue(ch, out d)) g[ch] = d = new Dictionary<ItemObject, int>();
+            Add(d, it, 1);
+        }
+
+        /// <summary>575: proba podgladu mapy z dodatkowymi sztukami w zbrojowni (pending - np. sztuki zapasu musztry, ktore moglyby wrocic): ten sam Compute co
+        /// okno (bez sakw i przyczyn), BEZ pamieci (_last nietkniety). null - podglad niedostepny albo potkniecie. Tylko watek glowny, poza misja.</summary>
+        internal static Result Trial(List<Tuple<EquipmentElement, int>> pending)
+        {
+            var mp = MobileParty.MainParty;
+            if (pending == null || pending.Count == 0 || Gate(mp) != null || !CsQuiet) return null;
+            try { var r = Compute(mp, null, true, false, null, pending); r.Ok = r.Why == null; return r.Ok && r.Men > 0 ? r : null; }
+            catch (Exception e) { Stumble("Trial", e); return null; }
+        }
         private static void AddT(Dictionary<ItemObject.ItemTypeEnum, int> d, ItemObject.ItemTypeEnum t, int n) { int v; d.TryGetValue(t, out v); d[t] = v + n; }
 
         private static void AddWant(Result res, ItemObject it, bool side, CharacterObject ch)

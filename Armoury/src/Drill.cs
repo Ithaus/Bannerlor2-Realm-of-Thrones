@@ -214,7 +214,7 @@ namespace Armoury
             _pendingBook = null; _fromBook.Clear();   // 571
             _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length); _profReads = 0;   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
-            _kindOf.Clear(); _roleOf.Clear(); _aiKit.Clear(); _fitMemo.Clear(); _fitMemoDay = int.MinValue; _fitMemoN = 0; _settleSig = 0; _settleArmVer = int.MinValue; _migrPending = false; _importLegacy = 0; _kgOk = false; _kgVer = int.MinValue;   // 562: jak _ore
+            _kindOf.Clear(); _roleOf.Clear(); _aiKit.Clear(); _upgBlock.Clear(); _upgNo.Clear(); _fitMemo.Clear(); _fitMemoDay = int.MinValue; _fitMemoN = 0; _settleSig = 0; _settleArmVer = int.MinValue; _migrPending = false; _importLegacy = 0; _kgOk = false; _kgVer = int.MinValue;   // 562: jak _ore
             HudKitReset();       // 541: pamiec paska mapy
             CampDrill.Reset();   // m97-szkolenie
             VetReset();          // 319b
@@ -228,6 +228,7 @@ namespace Armoury
             _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
             _pTakenBook = _pBookBack = _pBookGone = 0;   // 571
             _pBackHard = _pHardSkip = _aHardSkip = 0;    // 574
+            _pSwapN = _pSwapCovDrop = _pUpgBack = _pUpgNo = _pUpgTrial = 0; _pSwapOutV = _pSwapInV = 0; Array.Clear(_pSwapOutT, 0, _pSwapOutT.Length); Array.Clear(_pSwapInT, 0, _pSwapInT.Length);   // 575
             Array.Clear(_pWorn, 0, NK); Array.Clear(_aWorn, 0, NK); _aKitParties = _aKitPieces = _aiKept = _aiNoKitSale = 0;
             _cParties = _cMen = _cRest = _cOff = 0; _cXp = _cL = 0;
             _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;
@@ -1762,7 +1763,7 @@ namespace Armoury
                 int given = w + a;
                 int inToday = _in[0] + _in[1] + _in[2] + _in[3];
                 string bal;
-                int backAll = _pBack + _pBackOther + _pBackBattle + _pBackOff + _pLost;   // recenzja 562: zwrot przy wylaczonym zapasie / pojmaniu i strata przy pojmaniu
+                int backAll = _pBack + _pBackOther + _pBackBattle + _pUpgBack + _pBackOff + _pLost;   // recenzja 562: zwrot przy wylaczonym zapasie / pojmaniu i strata przy pojmaniu; 575: oddane pod bitwe jako lepsze (wymiana na tansze 1:1 - bez wplywu)
                 if (_givenYday < 0) bal = "bilans zapasu musztry od jutra (dzis " + given + ")";
                 else
                 {
@@ -1838,7 +1839,7 @@ namespace Armoury
               .Append("; rozliczenia 562: ").Append(_settleN).Append(" (doba ").Append(_settleBy[WhyDaily]).Append(", sklad ").Append(_settleBy[WhyRoster]).Append(", bitwa ").Append(_settleBy[WhyBattle])
               .Append(", miasto ").Append(_settleBy[WhyTown]).Append("; ").Append((_settleTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", CultureInfo.InvariantCulture)).Append(" ms, podgladow bitwy ")
               .Append(_settlePv).Append(_pvNone > 0 ? ", bez podgladu " + _pvNone : "").Append("), wzieto ze zbrojowni ").Append(_pTaken).Append(" (571: z listy gracza ").Append(_pTakenBook).Append(BookOn ? "" : ", klucz Drill Takes Player Stash wylaczony").Append(')').Append(", zwrocono ponad komplet ").Append(_pBack)
-              .Append(", spoza zestawu ").Append(_pBackOther).Append(", pod braki bitwy ").Append(_pBackBattle).Append(", przy wylaczonym zapasie / pojmaniu ").Append(_pBackOff).Append(", stracone przy pojmaniu ").Append(_pLost).Append(", 574: za trudne - oddane do zbrojowni ").Append(_pBackHard).Append(", pominiete przy braniu ").Append(_pHardSkip).Append(SkillOn ? "" : " (klucz Drill Kit Skill Check wylaczony)").Append(", 571: na liste gracza wrocilo ").Append(_pBookBack).Append(", zuzyte/stracone sztuki gracza ").Append(_pBookGone).Append(", sztuk gracza w zapasie ").Append(BookPieces()).Append(", kontrola sztuk zbrojownia + zapas ").Append(_settleBad == 0 ? "ZGODNE" : "NIEZGODNE x" + _settleBad)
+              .Append(", spoza zestawu ").Append(_pBackOther).Append(", pod braki bitwy ").Append(_pBackBattle).Append(", przy wylaczonym zapasie / pojmaniu ").Append(_pBackOff).Append(", stracone przy pojmaniu ").Append(_pLost).Append(", 574: za trudne - oddane do zbrojowni ").Append(_pBackHard).Append(", pominiete przy braniu ").Append(_pHardSkip).Append(SkillOn ? "" : " (klucz Drill Kit Skill Check wylaczony)").Append(SwapLog()).Append(", 571: na liste gracza wrocilo ").Append(_pBookBack).Append(", zuzyte/stracone sztuki gracza ").Append(_pBookGone).Append(", sztuk gracza w zapasie ").Append(BookPieces()).Append(", kontrola sztuk zbrojownia + zapas ").Append(_settleBad == 0 ? "ZGODNE" : "NIEZGODNE x" + _settleBad)
               .Append(", waga zapasu ").Append(F1(StockKg(MobileParty.MainParty, MobileParty.MainParty != null && MobileParty.MainParty.IsCurrentlyAtSea, true))).Append(" kg")
               .Append("; zuzyto ").Append(_pWornN).Append(" (").Append(IntLog(_pWorn))
               .Append("; bez metalu ").Append(_pNoMetal).Append("), zlom +").Append(F2(_pOreAdd)).Append(" rudy, czeka ").Append(F2(ore)).Append(", sprzedano ").Append(_pSoldU)
