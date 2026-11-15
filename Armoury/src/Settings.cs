@@ -2814,6 +2814,8 @@ namespace Armoury
         public int HideoutClearedMemoryDays = 60;          // with Hideout Relocate After Clear: for how many days a cleared hideout keeps new hideouts away from its area
         public float HideoutClearedRadius = 25f;           // with Hideout Relocate After Clear: how far (map units) from a recently cleared hideout no new hideout appears
         public bool HideoutGuideBanditAi = true;           // with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game
+        // 569 (C, Jeff 15.11 "ABCDE tak rob"): HideoutNightLoot569 - HideoutCampaignBehavior.OnCollectLootItems nie doklada towaru z niczego
+        public bool HideoutNightNoFreeLoot = true;         // after a night attack on a bandit hideout the game no longer adds trade goods out of nothing to your loot - you keep only what the bandits really had. Counted in the Armoury log (line 569). Off = the game adds its extra goods as before
 
         // --- House levies ---
         public bool HouseLeviesEnabled = true;             // in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice

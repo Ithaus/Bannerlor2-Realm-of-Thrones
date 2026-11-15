@@ -7285,6 +7285,10 @@ namespace Armoury
         [SettingPropertyGroup("Hideout spotted")]
         public bool HideoutGuideBanditAi { get; set; } = true;
 
+        [SettingPropertyBool("Hideout Night No Free Loot", HintText = "after a night attack on a bandit hideout the game no longer adds trade goods out of nothing to your loot - you keep only what the bandits really had. Counted in the Armoury log (line 569). Off = the game adds its extra goods as before", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutNightNoFreeLoot { get; set; } = true;
+
         [SettingPropertyBool("House Levies Enabled", HintText = "in settlements owned by a house with its own troop line (Blackwood, Tully, Karstark, Lannister...) the NOBLE volunteers the game already offers are that house's men of the same tier - same rule and frequency as noble recruits anywhere, no extra dice", RequireRestart = false)]
         [SettingPropertyGroup("House levies")]
         public bool HouseLeviesEnabled { get; set; } = true;
@@ -15743,6 +15747,7 @@ namespace Armoury
             s.HideoutClearedMemoryDays = HideoutClearedMemoryDays;
             s.HideoutClearedRadius = HideoutClearedRadius;
             s.HideoutGuideBanditAi = HideoutGuideBanditAi;
+            s.HideoutNightNoFreeLoot = HideoutNightNoFreeLoot;   // 569
             s.HouseLeviesEnabled = HouseLeviesEnabled;
             s.HouseRecruitShare = HouseRecruitShare;
             s.NorthernFareEnabled = NorthernFareEnabled;

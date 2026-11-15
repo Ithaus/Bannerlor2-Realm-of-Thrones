@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 569 (C): nocny atak na kryjowke bez towaru z niczego - Armoury (HideoutNightLoot569.cs nowy, SubModuleMain.cs, nowy klucz HideoutNightNoFreeLoot w Settings.cs + McmSettings.cs recznie)
+
+**Problem:** audyt kryjowek 15.11, pkt C (Jeff: "ABCDE tak rob"): po nocnym ataku gracza na kryjowke gra doklada do lupu towar, ktorego bandyci nie mieli - 350-4750 zl (stara moneta) na kazda kryjowke, bez platnika. Lamie zamknieta ekonomie. Bez dowodu z logu gry - wynik dekompilacji; dotad slad tylko w linii "Kryjowka nocna (n20): gra dolozyla do lupu N szt. towaru" (Wyceny20.HidePost).
+
+**Przyczyna:** `HideoutCampaignBehavior.OnCollectLootItems` (gra 1.4.8, sluchacz `OnCollectLootsItemsEvent`, dek. HideoutCampaignBehavior.cs:107-161): gdy zwyciezca to gracz, bitwa w kryjowce, nie "wyslij wojsko" i jest noc - cel = clamp(zloto lupu x populacja x 135, najtanszy towar ~350, 4750); najpierw sztuki z `_potentialLootItems` (towary handlowe, do 5 pozycji w lupie), potem petla do-while kopiuje sztuki juz lezace w lupie. Kazda dolozona sztuka bez modyfikatora (`AddToCounts(ItemObject, 1)`). Zlota gra nie dosypuje.
+
+**Zmiana:** `HideoutNightLoot569` (CampaignBehavior, rejestrowany obok HideoutSight). W `OnSessionLaunched` przy kluczu TAK - raz na proces latka na `HideoutCampaignBehavior.OnCollectLootItems` (AccessTools.DeclaredMethod, wlasna instancja Harmony "com.jeff.armoury.hideoutnight569"): prefiks (tylko lup gracza) zapamietuje liczbe sztuk BEZ modyfikatora per przedmiot, postfiks `Priority.Last` zdejmuje z lupu to, czego przybylo w metodzie gry. Metoda gry biegnie jak dotad (zerowanie `_initialHideoutPopulation`, transpiler Wyceny20 D zostaja) - schodzi tylko jej doklad. Log: start sesji "Kryjowka noca (569, klucz Hideout Night No Free Loot): CZYNNE - wpiete ..." / "WYLACZONE (MCM) - nic nie wpiete"; zdarzenie "Kryjowka noca (569): zablokowano towar z niczego po nocnym ataku na kryjowke - N szt., wartosc dzis V d (id xN, ...); razem w procesie ..." (do 50 linii). MCM (grupa Hideout spotted): "Hideout Night No Free Loot" (TAK). Klucz NIE = jak w grze (postfiks sprawdza klucz przy kazdym wywolaniu; wlaczenie w trakcie gry - latka przy nastepnym wczytaniu).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Ten sam cel patchuje Wyceny20 D (HistHideoutLootOldCoin): transpiler wartosci + prefiks/postfiks logujacy. Nasz postfiks Priority.Last biegnie PO HidePost, wiec linia "Kryjowka nocna (n20): gra dolozyla ..." dalej sie pojawi, a zaraz po niej "Kryjowka noca (569): zablokowano ..." z ta sama liczba sztuk. Wyceny20 D przy kluczu 569 TAK nie ma juz skutku w grze (tylko log) - nie usuwane (jedna zmiana naraz).
+- Prawdziwy lup jest nietkniety: roster jest wypelniony PRZED wywolaniem metody gry; w jej wnetrzu nie dziala zaden inny kod. Zdejmujemy tylko przyrost sztuk bez modyfikatora tego samego przedmiotu - dokladnie to, co gra dolozyla. Inne sluchacze OnCollectLootsItemsEvent (BattleCampaignBehavior, BannerCampaignBehavior) i latki DTE/Spoils na `CampaignEventDispatcher.OnCollectLootItems` nie sa zmieniane; sluchacze po naszym widza roster bez dokladu.
+- Zadna ksiega Armoury nie liczyla dokladu (sztuki z niczego) - nic nie trzeba korygowac. Zloto: bez zmian (gra nie dosypuje).
+- Sprawdzone w dekompilacji: nikt z BK/ROT nie zastepuje HideoutCampaignBehavior (sprawdzone tylko w zdekompilowanym zestawie - linia startu pokaze "wpiete" albo "BRAK").
+- Latka W KAMPANII (CLAUDE.md 7), wyjatki per wywolanie licza potkniecia (bez wylacznika). Brak zapisu.
+
+**Testy:** linia startu "Kryjowka noca (569 ...): CZYNNE - wpiete"; w grze: nocny atak na kryjowke - w ekranie lupu tylko to, co bandyci mieli (bez dodatkowych towarow handlowych), linia "zablokowano N szt."; atak za dnia i "Send troops" - brak linii 569; klucz NIE - towar gry jak dotad.
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane, nie testowane w grze).
+
+**Pliki do wgrania (gra zamknieta):**
+- `Armoury/bin/Release/Armoury.dll` -> `Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll`
+
 ## 563: stal valyrianska w sztabach - przetop od 275 (10 sztab na miare), kucie klingi jednorecznej z 10 sztab (perk Legendary Smith + 300), sztaba jako towar; zgodne z 177 (bilans stali) - Armoury (ValyrianBlades.Ingots.cs nowy, ValyrianBlades.cs, SmeltTab.cs, ForgeBill.cs, HistoricalPrices.cs, RareMaterials.cs, UniqueShelf.cs, UniqueSpoils.cs, CastleSteel.cs, PerkTexts.cs, QohorMasters.Own.cs, ArmouryBehavior.cs; ModuleData/arm_items_rare.xml - nowy przedmiot arm_valyrian_steel; nowe klucze ValyrianIngots, ValyrianSmeltSkill, ValyrianForgeSkill, ValyrianLegendarySmithAt300 w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "dodaj valyrianska stal: jesli przetapiam valyrianska stal, to otrzymuje x valyrianskiej stali - jesli do miecza potrzeba 10, a przetopilem ten sam miecz, to dostane 10; valyrianska stal - znajdz lub stworz ikone do handlu; w kuzni przy wykuwaniu mieczy moze byc nad innymi surowcami ...; zeby wytopic valyrianska stal trzeba miec 275 smithing; zmien tez umiejetnosc [perk], ze pozwala wykuwac bron z valyrianskiej stali - daj na poziomie 300; stworz ikone, ze odblokowuje ..." oraz "i jak teraz jest to z valyrianska stala - cos podobno jest w grze, ze mozna wykuc - zeby sie nie gryzlo". Dzis (177) przetop VS w zwyklej kuzni jest zablokowany ("Only the masters of Qohor can work Valyrian steel."), jedyna droga do nowej klingi to Qohor. Bez dowodu z logu - nowa funkcja.
