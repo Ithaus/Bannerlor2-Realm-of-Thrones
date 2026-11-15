@@ -27,6 +27,20 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 558 (galaz noc/558-towarzysze-cwicza-fix -> noc/558-towarzysze-cwicza)
+
+Przyjete (sprawdzone w kodzie):
+- **(2) Podpowiedz paska przy wylaczonym Drill Heroes** (MarchHud.cs). Tekst "you lead the drill and are not counted" i "drill XP of troops and companions" byl bez wzgledu na klucz. Zmiana: `Drill.HudHeroesOn` (ten sam `HeroesOn` co komplet, dla gracza) - przy wylaczonym kluczu wraca stary tekst "heroes do not drill and are not counted" i "troop XP from drill". Liczby bez zmian.
+- **(3) "X XP each" pokazywal surowe XP** (Drill.cs `HeroClause`). Zmiana: w druzynie gracza `HeroDrill` mierzy `HeroDeveloper.GetSkillXp` przed i po `AddSkillXp` (nowe pole `PlayerRec.HGot`); napis: "X XP each learned", a gdy rozne od surowego - "of Y drilled - their learning rate and limit". Towarzysz ponad limitem nauki widzi 0. Pomiar tylko dla druzyny gracza (AI bez kosztu); log 558 bez zmian.
+- **(4) "up to 6" w opisie** (Settings.cs, McmSettings.cs recznie). Kod bierze `MaxCharacterTier`; opis: "up to the game's top troop tier - 6 unless a mod changes it".
+- Kosmetyka: komentarz m114 wrocil na linie `CutMessage` (Drill.cs `DayMessage`).
+
+Nie zmieniane:
+- **(1) Druzyna z samymi towarzyszami przy Drill Camp Only nie cwiczy** - potwierdzone (CampDrill: menu "Train the men" i godziny w osadzie / armii wymagaja `TotalRegulars > 0`). To zmiana zasady obozu, nie blad 558 - **do decyzji Jeffa**: wpuscic "Train the men" przy samych towarzyszach albo zostawic. Szkody brak (bez cwiczen bez zuzycia; zapas przyjmuje tylko discard / lup).
+- Decyzja Jeffa (bez zmian): czy dowodcy partii AI tez maja cwiczyc.
+
+Ryzyko: `GetSkillXp` to odczyt slownika (bez skutkow ubocznych), w petli tylko dla druzyny gracza. `HudHeroesOn` w try/catch. Build Armoury 0 bledow. Nie wgrane, w grze nie sprawdzone.
+
 ## 550: AI przy sztandarze - biegacz tylko bez zagrozenia, straz reaguje na podejscie (smycz od miejsca ofiary), kusznicy szyku piechoty wrecz albo czysty strzal - Armoury (BannerCompanies.Pickup.cs, BannerCompanies.Guard550.cs NOWY, BannerCompanies.cs, HorsePursuit.React.cs / ReactFire.cs / Hunt.cs; klucze NOWE BannerPickupSafeRadius = 10, BannerGuardsAnswer = TAK, MCM "Banner Pickup Safe Radius", "Standard Guards Close In")
 
 **Problem:** Jeff, czat 15.11, w trakcie bitwy: "podszedlem do goscia z banerem, armia przeciwnika stoi w obronie, atakuje go, zabilem, reszta jego ludzi gapi sie jak idioci, stoja, ludzie z wloczniami i kusznicy - zabijam jednego po drugim, normalnie rzucili by sie na mnie od razu jak tylko podejde do baneru, nie pozwolili go przechwycic; a druga rzecz jak upadnie baner nastepny uruchamia marsz ze idzie go przejac, ale ja stoje miedzy nim a banerem, ma to gdzies, idzie jak zombie, jak go bije on sie nie broni bo ma misje podniesc baner - podniesc baner tak, jak nie ma zagrozenia; oni zachowuja sie jak boty!" Log 16:09:31-16:10:09: 7 biegaczy 158, 3 zgineli w biegu, 0 rezygnacji "wrogowie przy sztandarze"; kusznicy z kusza w rece 2-3 m od Jeffa (16:14:34, 16:14:46); start 283 przy sztandarze z "piechoty 0", szyk 153 m szerokosci, Jeff 60-76 m od jego mediany.

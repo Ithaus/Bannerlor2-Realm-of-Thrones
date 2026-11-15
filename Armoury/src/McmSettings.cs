@@ -7701,7 +7701,7 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillCampOnlyAi { get; set; } = true;
 
-        [SettingPropertyBool("Drill Heroes", HintText = "companions and kin in a lord's party drill with the men: on a day of drill they gain experience in the skills of the weapons they carry (one-handed, two-handed, polearm, bow, crossbow, throwing - shared evenly), by the troops' rule: 10 + 2 x tier (a hero's tier is his level / 4 + 1, up to 6), the commander's Leadership, the hours of drill, the drill kit; nothing when starving, after a dawn short of sleep, on a battle day or while badly wounded. You and every party's commander do not drill - you lead it. They count in the drill kit, one set each. The same rule for AI lords' parties (off = heroes do not drill and are not counted in the kit)", RequireRestart = false)]
+        [SettingPropertyBool("Drill Heroes", HintText = "companions and kin in a lord's party drill with the men: on a day of drill they gain experience in the skills of the weapons they carry (one-handed, two-handed, polearm, bow, crossbow, throwing - shared evenly), by the troops' rule: 10 + 2 x tier (a hero's tier is his level / 4 + 1, up to the game's top troop tier - 6 unless a mod changes it), the commander's Leadership, the hours of drill, the drill kit; nothing when starving, after a dawn short of sleep, on a battle day or while badly wounded. You and every party's commander do not drill - you lead it. They count in the drill kit, one set each. The same rule for AI lords' parties (off = heroes do not drill and are not counted in the kit)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillHeroes { get; set; } = true;
 

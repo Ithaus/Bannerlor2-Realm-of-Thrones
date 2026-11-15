@@ -174,7 +174,7 @@ namespace Armoury
             // m114-musztra: uciete XP i ludzie wedlug powodu (CutTop..CutSaddle), nazwa brakujacego przedmiotu, opis oddzialow do logu
             internal readonly long[] CutBy = new long[CutKinds]; internal readonly int[] MenBy = new int[CutKinds]; internal string ItemName, CutLog;
             internal VetRec V;                             // 319b: nauka weteranow w tiku gracza (DrillVeterans.cs)
-            internal int HN, HAll, HWound; internal double HXp;   // 558: bohaterowie druzyny gracza w tym ticku (do wiadomosci w grze)
+            internal int HN, HAll, HWound; internal double HXp, HGot;   // 558: bohaterowie druzyny gracza w tym ticku (do wiadomosci w grze); HGot - XP przyjete po wspolczynniku i limicie nauki (recenzja 558 pkt 3)
         }
         private static PlayerRec _pr, _prLast;
         private static int _msgDay = -1;                   // MUSZTRA-m: doba ostatniej linii musztry gracza w grze (raz na dobe)
@@ -323,6 +323,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ 558: bohaterowie cwicza (Jeff 15.11: "towarzysze maja cwiczyc")
         private static bool HeroesOn(Settings s, bool noBase) { return s != null && s.DrillHeroes && (noBase ? s.DrillLaw : s.DrillLawAi); }
+        /// <summary>recenzja 558 pkt 2: pasek mapy - czy towarzysze gracza cwicza (tekst podpowiedzi).</summary>
+        internal static bool HudHeroesOn { get { try { return HeroesOn(Settings.Current, true); } catch { return false; } } }
 
         /// <summary>558: bohater, ktory cwiczy i liczy sie do kompletu: zywy, dorosly, nie dowodca partii (dowodca prowadzi musztre - jego Przywodztwo to L),
         /// nigdy gracz. Ranny liczy sie do kompletu jak ranny zolnierz, ale nie cwiczy (HeroDrill).</summary>
@@ -424,12 +426,15 @@ namespace Armoury
                         bool log = row == 0 && s.DrillLog && _hPlayerLog.Length < 1500;
                         if (log) _hPlayerLog.Append(_hPlayerLog.Length > 0 ? "; " : "").Append(h.Name).Append(" (poz. ").Append(h.Level).Append(", B ").Append(F1(b)).Append(')');
                         int prev = SkillLedger.Enter(SkillLedger.SDrill);
+                        var dev = rec != null ? h.HeroDeveloper : null;   // recenzja 558 pkt 3: ile naprawde weszlo (wspolczynnik nauki, limit) - tylko druzyna gracza, do napisu
                         try
                         {
                             for (int j = 0; j < k; j++)
                             {
                                 int v0 = h.GetSkillValue(sks[j]);
+                                float g0 = dev != null ? dev.GetSkillXp(sks[j]) : 0f;
                                 h.AddSkillXp(sks[j], per);
+                                if (dev != null) rec.HGot += Math.Max(0f, dev.GetSkillXp(sks[j]) - g0);
                                 int v1 = h.GetSkillValue(sks[j]);
                                 if (v1 > v0) _hLevels[row] += v1 - v0;
                                 if (log) _hPlayerLog.Append(' ').Append(sks[j].StringId).Append(' ').Append(v0).Append(v1 > v0 ? "->" + v1 : "").Append(" +").Append(F1(per));
@@ -445,7 +450,10 @@ namespace Armoury
 
         private static string HeroClause(PlayerRec r)
         {
-            return r.HN + " of " + r.HAll + " (" + F1(r.HXp / Math.Max(1, r.HN)) + " XP each, shared among the weapons they carry"
+            // recenzja 558 pkt 3: XP naprawde przyjete (po wspolczynniku i limicie nauki); surowe XP musztry obok, gdy rozne
+            double got = r.HGot / Math.Max(1, r.HN), raw = r.HXp / Math.Max(1, r.HN);
+            return r.HN + " of " + r.HAll + " (" + F1(got) + " XP each learned" + (Math.Abs(got - raw) >= 0.05 ? " of " + F1(raw) + " drilled - their learning rate and limit" : "")
+                   + ", shared among the weapons they carry"
                    + (r.HWound > 0 ? "; " + r.HWound + " wounded lie abed" : "") + ")";
         }
 
@@ -1210,8 +1218,8 @@ namespace Armoury
                 sb.Append(", drill kit x").Append(F2(sk))
                     .Append(", armed ").Append(Pct(armed, 1.0)).Append(", perks +").Append(F1(perks)).Append(" per man");
                 if (r.V != null) VetMessage(sb, r.V);   // 319b: "N XP passed on - V veterans taught L riders, ..."
-                if (r.Cut > 0) CutMessage(sb, r);
-                if (r.HN > 0) sb.Append("; companions drilled too: ").Append(HeroClause(r));   // 558   // m114-musztra: dotad zawsze "men are waiting to be upgraded" - takze dla ludzi bez dalszego awansu
+                if (r.Cut > 0) CutMessage(sb, r);   // m114-musztra: dotad zawsze "men are waiting to be upgraded" - takze dla ludzi bez dalszego awansu
+                if (r.HN > 0) sb.Append("; companions drilled too: ").Append(HeroClause(r));   // 558
                 Log.Player(sb.Append('.').ToString());
             }
             catch (Exception e) { Stumble("DayMessage", e); }
