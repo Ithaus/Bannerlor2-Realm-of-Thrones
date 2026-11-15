@@ -747,6 +747,19 @@ namespace Armoury
             return lo;
         }
 
+        /// <summary>554 (CaravanSilver492.Plan): cena PO MYCIE miasta k-tej sztuki (1 = pierwsza) sprzedanej teraz w town - ta sama miara co MaxAtCost (PriceAt, ShelfWorth,
+        /// stawka myta TownToll.CaravanRateFor). Brak modelu albo kategorii - NaN.</summary>
+        internal static double NetAt(Town town, Settlement st, MobileParty mp, EquipmentElement el, int k)
+        {
+            var model = Campaign.Current != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
+            var cat = el.Item != null ? el.Item.ItemCategory : null;
+            if (model == null || cat == null || town == null || town.MarketData == null) return double.NaN;
+            var d = town.MarketData.GetCategoryData(cat);
+            int wv = Math.Max(1, HistoricalPrices.ShelfWorth(el.Item));
+            double keep = 1.0 - TownToll.CaravanRateFor(mp, st);
+            return PriceAt(model, el, mp, d, k, wv) * keep;
+        }
+
         /// <summary>Wpis ksiegi dla `have` sztuk: brakujace sztuki z gornym oszacowaniem ceny zakupu (atStart - migawka: dzien z dziennika BK albo 7 dob wstecz;
         /// pozniej - sztuki bez zakupu w ksiedze: doba teraz).</summary>
         private static Lot Restore(MobileParty mp, ItemObject it, int have, Dictionary<ItemObject, BkRow> bk, bool atStart)

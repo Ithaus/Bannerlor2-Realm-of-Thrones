@@ -712,6 +712,22 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteSale", e); }
         }
 
+        /// <summary>554 (recenzja 1): doplata zlotnika (CaravanSilver492) wplynela do kiesy karawany PO NoteSale (SellItemsAction) - dopisana do zysku zrealizowanego
+        /// tej karawany (pierscien 294: seria stratnej karawany, zwijanie, CaravanSizeByTrade) i do drogi 'surowce masowe - brak miasta' (284, 259 dla gracza).
+        /// Liczniki sztuk/utargu i straty (_pLoss*) bez zmian - to zapis samej sprzedazy. Same liczniki, nie rzuca.</summary>
+        internal static void NoteBonus(MobileParty mp, int paid)
+        {
+            try
+            {
+                if (mp == null || paid <= 0) return;
+                int p = PathBulkShort;
+                _pR[p] += paid;
+                if (mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan) _plR[p] += paid;
+                AddReal(mp, (int)CampaignTime.Now.ToDays, paid);
+            }
+            catch (Exception e) { Stumble("NoteBonus", e); }
+        }
+
         /// <summary>294: okno ksiegi zysku karawany (doby) - seria stratnej karawany liczy sie w tych dobach.</summary>
         internal const int RingDays = Ring;
 
