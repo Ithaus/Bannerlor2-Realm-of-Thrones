@@ -610,6 +610,9 @@ namespace Armoury
 
         /// <summary>Pamiec predkosci gry gracza (MobileParty._partyPureSpeedLastCheckVersion = -1: CalculateSpeedForPartyUnified liczy baze i wynik od nowa).
         /// Watek glowny, tylko przy zmianie liczb. Bez pola - linia doby mowi BRAK (predkosc dojdzie przy nastepnej zmianie wersji partii).</summary>
+        /// <summary>537 E4: odswiezenie pamieci wagi i predkosci gry po zmianie wagi zbrojowni (StashWeight.Refresh - watek glowny, tylko przy zmianie wyniku).</summary>
+        internal static void InvalidateWeight(MobileParty mp) { if (mp != null) Invalidate(mp); }
+
         private static void Invalidate(MobileParty mp)
         {
             // E3: pamiec wagi gry (MobileParty._partyWeightLastCheckVersionNo = -1: TotalWeightCarried liczy wage od nowa; NIE wersja partii - bez kaskady
@@ -816,9 +819,13 @@ namespace Armoury
         /// Na morzu nic. Dowolny watek: gracz - rekord z pamieci; rod - pamiec po kluczu wersji (liczona tu, tania - bez podgladu DTE).</summary>
         public static void WeightPostfix(MobileParty __0, bool __1, ref ExplainedNumber __result)
         {
+            if (__0 == null) return;
+            // 537 E4: wpisy "Troops' armoury (unused)" (waga zbrojowni DTE gracza minus to, co na ludziach) - ten sam postfiks, wlasny klucz ArmouryHasWeight,
+            // takze na morzu (zbrojownia plynie na statku; waga przez model z flaga morza)
+            StashWeight.Add(__0, __1, ref __result);
             try
             {
-                if (__0 == null || __1 || !WeightOn) return;
+                if (__1 || !WeightOn) return;
                 Interlocked.Increment(ref _wCalls);
                 var r = PairsRec(__0);
                 if (r == null || r.AtSea) return;

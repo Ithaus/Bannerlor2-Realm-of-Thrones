@@ -8736,6 +8736,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool RiddenHarnessWeightless { get; set; } = true;
 
+        [SettingPropertyBool("Armoury Has Weight", HintText = "the troops' armoury (the stash of Dynamic Troop Equipment) weighs on your baggage like cargo - what you move from the baggage to the stash no longer leaves your carry capacity. What your men wear and ride for the next battle (the same hand-out as Review the army; the wounded count as wearing their kit) does not weigh, and is what the quartermaster hides when you open the stash. Shown in cargo weight as Troops' armoury (unused): yours and men's - the men's own spare gear weighs too. Without Troops Fight With Own Kit Only the whole stash weighs. Your party only - lords' armouries still weigh nothing (off = as before: the stash weighs nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ArmouryHasWeight { get; set; } = true;
+
         [SettingPropertyBool("Harness On Spare Horses", HintText = "the old rule, used only while Ridden Harness Weightless is off: every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside) and that harness adds its weight to your carry capacity, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HarnessOnSpareHorses { get; set; } = true;
@@ -15969,6 +15973,7 @@ namespace Armoury
             s.MarchPairsHud = MarchPairsHud;
             s.MarchPairsSpeed = MarchPairsSpeed;
             s.RiddenHarnessWeightless = RiddenHarnessWeightless;
+            s.ArmouryHasWeight = ArmouryHasWeight;
             s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;

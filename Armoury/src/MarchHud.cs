@@ -111,6 +111,7 @@ namespace Armoury
             try
             {
                 if (vm == null || vm.PrimaryInfoItems == null || vm.SecondaryInfoItems == null) return;
+                if (_live) StashWeight.Refresh();   // 537 E4: waga zbrojowni (lista na ludziach z pamieci, najwyzej raz na 1 s) - takze bez pozycji paska
                 Items it;
                 if (!On)
                 {
