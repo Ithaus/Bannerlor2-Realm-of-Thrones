@@ -759,6 +759,7 @@ RANGES = {
     'BannerBreakChance': (0.0, 1.0, "0.00"),
     # 158 biegacz po wlasny sztandar: zasieg 0..40 m (0 = wylaczone; BannerCompaniesMission.Pick przycina do 40)
     'BannerPickupRange': (0.0, 40.0, "0"),
+    'BannerPickupSafeRadius': (0.0, 20.0, "0"),   # 550a
     # P5 okno lupu: prog wartosci 0..5000 denarow
     'SpoilsWindowMinWorth': (0, 5000, "0"),
     # P6 friendly fire: procent obrazen 0..100
@@ -820,6 +821,7 @@ RANGES = {
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze
 # po angielsku); id pola w Armoury.json zostaje nazwa klucza. Reszta pol - jak dotad (podzial nazwy na slowa).
 LABELS = {
+    'BannerGuardsAnswer': 'Standard Guards Close In',   # 550b (jak w recznym McmSettings.cs)
     'BlowDecidesDeathEnabled': 'Blow Decides Death Or Wound',   # 421 (436-p: nazwa jak w recznym McmSettings.cs - odwoluja sie do niej opisy 421 i 436)
     'SimulatedBattlesMatchPlayed': 'Simulated Battles Match Fought Battles',   # 436 (436-p: jak w recznym McmSettings.cs)
     'BattleAiMeasurements': 'Battle AI Measurements',   # 437 (jak w recznym McmSettings.cs)

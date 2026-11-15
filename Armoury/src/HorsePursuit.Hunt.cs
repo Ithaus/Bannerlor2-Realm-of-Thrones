@@ -103,6 +103,8 @@ namespace Armoury
             public float FootCool;   // recenzja 283 (3): do kiedy piechota (R2) nie rusza na tego nekajacego po powrocie ze smyczy / czasu / konny uszedl
             public bool Lone, Leader, OnArchers, OnBanner, H4Used, H5Used, Line204, Rx, DownByResp;
             public Formation VicF, LeaderF;
+            public Vec2 VicAt = Vec2.Invalid;   // 550: miejsce ofiary / sztandaru (smycz R2 szyku ofiary przy szerokiej linii)
+            public readonly HashSet<Formation> BannerFs = new HashSet<Formation>();   // recenzja 550 (1): szyki, przy ktorych sztandarze byl juz pierwszy kontakt (szkoda raz na szyk)
             public float LastHarm = -1f;   // 311a: ostatnie trafienie czlowieka strony pociskiem (zegar epizodu oslony)
             public CovEp Cov;              // 311a: epizod oslony (null - brak)
             public bool Z333;              // 333: brama strefy armii strzelca dziala (konny i pieszy strzelec, klucz; bez nekajacego wrecz 283)
@@ -126,6 +128,7 @@ namespace Armoury
             public bool Hold;                     // poprawka 132b: krok z NoAttack (nekajacy wrecz w zwarciu ze swoimi)
             public Formation Home;                // poprawka 132b: R2 straz strzelcow - smycz od szyku strzezonego, nie od swojego
             public Vec2 Anchor = Vec2.Invalid;    // 291: R2 - smycz od miejsca wyslania (szyk idzie dalej z armia, ArmyMarchesPastHarassers)
+            public bool Anchor550;                // 550b: Anchor = miejsce ofiary / sztandaru (nie 291 - bez licznika _l291LeashBack)
             public Vec2 RideFrom = Vec2.Invalid;  // 291b: jezdziec - srodek ludzi szyku przy wyslaniu (smycz LeashHome, gdy w poscigu jedzie caly szyk)
             public float LeashAt = -1f;           // 305c: chwila ostatniego sprawdzenia smyczy piechoty (czas do nastepnego - z odstepu)
             public byte Cov, CovSt;               // 311a: rola oslony (CvFlankL/R, CvRushL/R; 0 - brak), stan obchodzacego (w drodze / stoi)
@@ -595,6 +598,7 @@ namespace Armoury
                 _leashAhead = c != null && c.InfantryLeashLookahead;         // 305c
                 _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
                 _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;             // 291
+                _bannerGuard = _rKey && c.BannerGuardsAnswer;                // 550
                 CoverKeys(c);                                                // 311a
                 _zOn = _hKey && c.CavalryFaceShooterAtArmyEdge;             // 344: konnica z glowa wobec strzelca (strefa armii strzelca 333, stany F / K / PS / R)
                 Volatile.Write(ref _rLive, _rKey ? 1 : 0);                   // OnHit: kolejka wrecz tylko po rozstawieniu (Tick wola pass po IsDeploymentFinished)
@@ -823,7 +827,7 @@ namespace Armoury
                 float dk = FootLeash(h, a.Position.AsVec2);
                 if (dk > _rFootFar) _rFootFar = dk;
                 float lk = FootLim(h);   // 311a
-                if (dk > lk || LeashAhead(h, a, dk, now, false, lk)) { if (h.Anchor.IsValid && h.Cov == 0) _l291LeashBack++; _rLeashStep++; return ULeash; }
+                if (dk > lk || LeashAhead(h, a, dk, now, false, lk)) { if (h.Anchor.IsValid && h.Cov == 0 && !h.Anchor550) _l291LeashBack++; _rLeashStep++; return ULeash; }
             }
             if (!pass) return rider && a.MountAgent == null ? UOther : -1;
             // klucze: jezdzcy 204, piechota 283, lucznicy - ktorykolwiek (283 sam strzela, gdy jazda wylaczona)
@@ -844,8 +848,8 @@ namespace Armoury
                 float dh = FootLeash(h, a.Position.AsVec2);   // poprawka 132b: straz strzelcow - od drogi do szyku strzezonego
                 if (dh > _rFootFar) _rFootFar = dh;
                 float lim = FootLim(h);   // 311a: szturmujacy - smycz do celu + 25 m
-                if (dh > lim) { if (h.Anchor.IsValid && h.Cov == 0) _l291LeashBack++; return ULeash; }   // recenzja 311a (4): szturmujacy - bez licznika 291
-                if (_leashAhead && LeashAhead(h, a, dh, now, true, lim)) { if (h.Anchor.IsValid && h.Cov == 0) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
+                if (dh > lim) { if (h.Anchor.IsValid && h.Cov == 0 && !h.Anchor550) _l291LeashBack++; return ULeash; }   // recenzja 311a (4): szturmujacy - bez licznika 291
+                if (_leashAhead && LeashAhead(h, a, dh, now, true, lim)) { if (h.Anchor.IsValid && h.Cov == 0 && !h.Anchor550) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
                 if (now - h.Start >= MaxSeconds) return UTime;
                 if (s.MountAgent != null && !MeleeKind(h.T) && a.Position.AsVec2.Distance(s.Position.AsVec2) > HuntScreen) return URange;
                 return -1;

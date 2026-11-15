@@ -2398,6 +2398,10 @@ namespace Armoury
         [SettingPropertyGroup("Shields under fire")]
         public bool FormationsAnswerHarassers { get; set; } = true;
 
+        [SettingPropertyBool("Standard Guards Close In", HintText = "with Formations Answer Harassers, a lone enemy who comes within 8 m of a standard - its bearer or the standard on the ground - is answered at once, not only after he strikes. The infantry of that formation goes for him even when he stands at the far wing of a wide line, holding to the place where he struck rather than to the middle of the formation. Their crossbowmen and archers with a side weapon close in, the others shoot only when no friend is near him or in the way. At least half of the formation stays in line. Your own formations never do it. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool BannerGuardsAnswer { get; set; } = true;
+
         [SettingPropertyBool("Army Halts For Harassers", HintText = "with Formations Answer Harassers: an AI army on the march does not leave its rear strung out - when a lone harasser has downed a man or keeps hitting them, or goes for their general, every marching AI formation of that army halts, closes ranks and fires at will while the rear deals with him (otherwise only the formation he struck halts). Once per harasser, at most 60 seconds, and only while the enemy army is more than 110 m away; a charge order, a retreat or the enemy coming close ends it at once. Horse archers keep skirmishing. Off = the march goes on", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool ArmyHaltsForHarassers { get; set; } = true;
@@ -12685,13 +12689,17 @@ namespace Armoury
         [SettingPropertyGroup("Banner companies")]
         public bool BannerCompanyMessages { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Banner Pickup Range", 0.00f, 40.00f, "0", HintText = "when a standard falls in a field battle, the nearest man of its own formation within this many metres runs to it and raises it again - unless the enemy holds the spot (more foes than friends plus one within 6 m), his formation is falling back or his company has broken. He gives up after 8 seconds, when he stops getting closer, panics or is badly wounded, and the next man tries. Only then does the commander call to save the banner. 0 = off: as in the game, a standard is picked up only by a man who happens to stand right next to it", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Banner Pickup Range", 0.00f, 40.00f, "0", HintText = "when a standard falls in a field battle, the nearest man of its own formation within this many metres runs to it and raises it again - unless a foe who is not fleeing stands within Banner Pickup Safe Radius of the standard or of the man who would run, his formation is falling back or his company has broken. A runner who is struck or meets a foe on the way drops the errand and fights. He gives up after 8 seconds, when he stops getting closer, panics or is badly wounded, and the next man tries. Only then does the commander call to save the banner. 0 = off: as in the game, a standard is picked up only by a man who happens to stand right next to it", RequireRestart = false)]
         [SettingPropertyGroup("Banner companies")]
         public float BannerPickupRange { get; set; } = 20f;
 
         [SettingPropertyBool("Banner Pickup Your Formations", HintText = "with Banner Pickup Range: formations under your orders also send a man for their fallen standard, but only from within 12 m. Off = your formations leave their fallen standard to you", RequireRestart = false)]
         [SettingPropertyGroup("Banner companies")]
         public bool BannerPickupYourFormations { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Banner Pickup Safe Radius", 0.00f, 20.00f, "0", HintText = "no man runs for a fallen standard while a foe who is not fleeing stands within this many metres of it, or within 6 m of the man himself, or while that man was struck in the last 3 seconds. A runner who is struck or meets a foe on the way gives up and fights; he does not use up one of the tries. 0 = as before (only more foes than friends plus one within 6 m stop the runners)", RequireRestart = false)]
+        [SettingPropertyGroup("Banner companies")]
+        public float BannerPickupSafeRadius { get; set; } = 10f;
 
         [SettingPropertyBool("Army Review Enabled", HintText = "'Review the army' in your camp menu: your men by kind, horses and harness in use and missing, why riders will fight on foot and why the column marches afoot, and your banners for the next battle. Off = no option; banners saved before stay in the game's order - use Return to the game's own order before turning it off", RequireRestart = false)]
         [SettingPropertyGroup("Army review")]
@@ -14459,6 +14467,7 @@ namespace Armoury
             s.BattleAiMeasurements = BattleAiMeasurements;
             s.FormationOrderArbiter = FormationOrderArbiter;
             s.FormationsAnswerHarassers = FormationsAnswerHarassers;
+            s.BannerGuardsAnswer = BannerGuardsAnswer;
             s.ArmyHaltsForHarassers = ArmyHaltsForHarassers;
             s.ArmyMarchesPastHarassers = ArmyMarchesPastHarassers;
             s.DuelAiEnabled = DuelAiEnabled;
@@ -17027,6 +17036,7 @@ namespace Armoury
             s.BannerCompanyMessages = BannerCompanyMessages;
             s.BannerPickupRange = BannerPickupRange;
             s.BannerPickupYourFormations = BannerPickupYourFormations;
+            s.BannerPickupSafeRadius = BannerPickupSafeRadius;
             s.ArmyReviewEnabled = ArmyReviewEnabled;
             s.ArmyReviewWritesOrderOfBattle = ArmyReviewWritesOrderOfBattle;
             s.ArmyReviewPinTroopTypes = ArmyReviewPinTroopTypes;
