@@ -27,6 +27,17 @@ Liczby (bolt_a 0.15 kg, projekt xb559.py): crossbow_a 120 lb 37 m/s 103 J, cross
 
 **Status:** DO SPRAWDZENIA (zbudowane 0 bledow, niewgrane).
 
+### Recenzja 559
+
+Przeglad 870d0517: brak uwag blokujacych. Energie przeliczone wedlug RBM Utilities.cs:246-277 z beltem bolt_a 0.15 kg zgadzaja sie z wpisem (crossbow_a 103 J, 200/230 lb bez zmian, 270/300/330 lb -> 50 m/s, 187.5 J). Sprawdzone: nazwy parametrow prefiksu/postfiksu, `__state` (RBM nadpisuje argument), pulap obejmuje rozmieszczenie (RangedRework.cs:381), strzal (:630) i podpowiedz (MagnitudeChanges.cs:809, :908), obrazenia RBM licza sie z predkosci pocisku (MagnitudeChanges.cs:297), jednostki 469 (funty na mapie, LbAtStart w misji), kolejnosc OnSessionLaunched -> OnAfterSessionLaunched, luki i proce pominiete, klucz 0 = zachowanie sprzed 559, try/catch z licznikiem, NaN bez przyciecia. `calculateMissileSpeed` wystepuje tylko w RBMCombat.dll - nikt inny tej metody nie patchuje (sprawdzone wszystkie DLL w Modules).
+
+Uwagi drobne - zadna nie wymaga zmiany kodu w 559 (jako poprawki odrzucone, zostaja jako informacja):
+1. Wycena i zakupy (XbowPrice.Energy, AiGear/MenPurse BuyScore, RangedRank) nie znaja pulapu - 270/300/330 lb z bolt_a daja te same 187.5 J, a kosztuja wedlug funtow. Nie blad 559; to opisane wyzej 559-b, do decyzji Jeffa (polecenie obejmowalo tylko energie i zasieg).
+2. Zmiana pulapu w MCM w trakcie bitwy: celowanie AI i cache `Weap` 469 zostaja ze starym pulapem do nastepnej bitwy, strzal bierze nowy. Skutek znikomy - bez zmian.
+3. Kusznicy AI moga strzelac beltami 0.04 kg (131-145 J), wtedy pulap nic nie zmienia - po wgraniu sprawdzic w "Ogien w zasiegu (469)", czy licznik przycietych > 0.
+
+Kod bez zmian po recenzji; Armoury.dll zbudowane 0 bledow (md5 e60232223c06ffb5103cc18993e0bf2b), niewgrane.
+
 ## 560: musztra - druzyna z samymi towarzyszami cwiczy w obozie, dowodcy partii (AI i rodu gracza) cwicza z ludzmi - Armoury (Drill.cs, CampDrill.cs; opis klucza DrillHeroes w Settings.cs + McmSettings.cs recznie, bez nowego klucza)
 
 **Problem:** Jeff, czat 15.11 (po 558, WGRANIE 257): (1) druzyna z samymi towarzyszami, bez zolnierzy - przy Drill Camp Only menu obozu odpowiada "You have no men to drill"; Jeff: "Moze z samymi towarzyszami". (2) czy dowodcy partii AI tez maja cwiczyc (wtedy cwiczylby tez dowodca partii z rodu gracza); Jeff: "tez moga cwiczyc AI" (zasada wczesniejsza: "bohaterowie tez cwicza i dostaja xp, tylko gracz nie dostaje").
