@@ -1,5 +1,43 @@
 # DZIENNIK ZMIAN
 
+## 559: kusze - pulap energii beltu 190 J (latka na predkosc RBM), zasieg 469 z tym samym pulapem, waga bolt_a w linii startu - Armoury (XbowCap559.cs nowy, FireRange469.cs, NightHooks.cs; nowy klucz CrossbowBoltEnergyCap w Settings.cs + McmSettings.cs recznie)
+
+**Problem:** Jeff, czat 15.11: "tak popraw kusze" - odpowiedz na propozycje po kwerendzie historycznej (Williams, Payne-Gallwey, Tod): (1) belty NIE ignoruja pancerza (551 odrzucone); (2) ciezkie kusze w dol do ok. 190 J, zeby zadna kusza reczna nie przekraczala historycznego sufitu ok. 200 J - wzor RBM (Utilities.cs:269-277, 0.994 J na funt) daje kuszy 330 lb z beltem bolt_a (0.15 kg) ok. 244 J, 120 lb = 103 J (zostaje); (3) kod 469 mial zakladac belt 0.06 kg (FireRange469.cs:67 BoltW), a bolt_a wazy 0.15 kg - AI za daleko.
+Sprawdzenie (3): w bitwie 469 juz liczy z prawdziwa waga amunicji (`WeaponAt` - naladowana albo pierwszy kolczan, jak RBM RangedRework.cs:555-576); stale 0.06 kg uzywala tylko linia logu "Zasieg lukow (469)" na start sesji (tabela pokazywala crossbow_a 55 m/s, w bitwie z bolt_a 37 m/s).
+
+**Przyczyna:** RBM liczy predkosc kuszy z naciagu bez gornej granicy: E = 0.5 x lb x 4.448 x 0.508 x 0.88, v = sqrt(2E / (belt + lb x 0.00015)). Z bolt_a: 270 lb 211 J, 300 lb 227 J, 330 lb 244 J.
+
+**Zmiana:**
+- `XbowCap559` (nowy): prefiks + postfiks (Priority.Last) na `RBMCombat.Utilities.calculateMissileSpeed(float, string, int)` (`AccessTools.DeclaredMethod`, wejscie sprawdzone `Harmony.GetPatchInfo`). Prefiks zapamietuje wage beltu w `__state` (RBM nadpisuje argument w srodku: ammoWeight += lb x 0.00015). Postfiks tylko dla "crossbow" / "crossbow_fast": `v <= floor(sqrt(2 x pulap / waga beltu))`. Z tej funkcji RBM bierze predkosc przy rozmieszczeniu (celowanie AI i gracza, RangedRework.cs:381), przy strzale (:630) i w podpowiedzi "RBM Stats" - obrazenia RBM (0.5 m v^2), zasieg i opad spadaja razem. Luki, proce, machiny bez zmian. Potkniecia liczone, wynik RBM wtedy zostaje.
+- Wpiecie: `NightHooks.InCampaign` (raz na proces, jak 413), czesc "pulap energii beltu (559)" w linii "Latki nocy (K3): kampania" + wlasna linia "Pulap energii beltu (559): latka ...". Bez RBM / bez metody: "nie wpiete", nic nie przycina.
+- `FireRange469.RbmSpeed` = `XbowCap559.Clamp(RbmSpeedRaw(...))` - ten sam pulap w G 469, ale tylko gdy latka weszla; `RbmSpeedRaw` = stary wzor.
+- `FireRange469.StartTable`: stala `BoltW = 0.06f` usunieta, waga `bolt_a` z `MBObjectManager` (zapas 0.15 kg); w linii "belt X kg (bolt_a), pulap beltu 559 wpiety/nie". Po niej nowa linia "Pulap energii beltu (559): start sesji" - wszystkie kusze w grze pogrupowane wedlug uzytku i naciagu: ile, przyklad, v przed->po, J przed->po z bolt_a, liczba przycietych.
+- Linia "Ogien w zasiegu (469)": dopisek "pulap beltu 559: wywolan predkosci kusz N, przycietych K (sr. o X m/s), potkniec E" (liczniki od poczatku misji, `ResetMission` w `FireRange469.Begin`).
+- Klucz MCM "Crossbow Bolt Energy Cap" (float J, 0-400, domyslnie 190, 0 = wylaczony), grupa "Crossbows by draw strength"; czytany przy kazdym wywolaniu.
+
+Liczby (bolt_a 0.15 kg, projekt xb559.py): crossbow_a 120 lb 37 m/s 103 J, crossbow_c 200 lb i crossbow_e 230 lb bez zmian; crossbow_d 270 lb 53->50 m/s 211->188 J (G 153->142 m); crossbow_g 300 lb 55->50, 227->188 J; crossbow_f 330 lb 57->50, 244->188 J (zasieg maks. 198->167 m, G 168->142 m). Pulap zaczyna dzialac od ok. 245 lb z bolt_a, 260 lb z 0.12 kg, 281 lb z 0.09 kg; crossbow_fast (do 120 lb) nigdy.
+
+**Ryzyko / co sprawdzic:**
+- Regresje / kolizje (sprawdzone w kodzie): `calculateMissileSpeed` w naszym kodzie tylko odtwarzane wlasnymi wzorami (FireRange469, RangedRank, XbowPrice - nie wolaja RBM); nikt z naszych nie patchuje tej metody (cudzych modow pod tym katem nie dekompilowalem). Cena (`XbowPrice.Energy`), tier RBM (z funtow), kuznia (`ForgeTier`), zakupy (`XbowBuyByPower`, Effectiveness z funtow), `KitPreview`, `Perk512`, `HistRange` - nie czytaja predkosci RBM, bez zmian. Skutek: crossbow_d/g/f z bolt_a daja te same 188 J, a kosztuja wedlug funtow - z lzejszymi beltami nadal mocniejsze; ewentualne 559-b (wycena przycieta do ok. 245 lb) do decyzji Jeffa.
+- Kolejnosc: latka w OnSessionLaunched, `StartTable` w OnAfterSessionLaunched - linia startu widzi juz stan latki. Bitwa wlasna przed pierwsza kampania w procesie - bez pulapu (latki jeszcze nie ma), 469 tez bez, spojnie.
+- Zmiana beltu w bitwie: celowanie z kolczana przy rozmieszczeniu, strzal z naladowanego - tak bylo w RBM; pulap liczony z masy w obu miejscach.
+- Poszlaka z logow 14-15.11 (projekt 559): kusznicy AI z crossbow_f/d/c maja v 85/81/75 - wyglada na belt 0.04 kg (repeater_heavy_bolts), wtedy 131-145 J i pulap ich nie dotyczy. Osobna sprawa zakupow amunicji (AiGear) - do decyzji Jeffa.
+- Poza 559: `CleanShot.cs:250` i `HorsePursuit.ReactFire.cs:86` czytaja `u.MissileSpeed` (poza oknem RBM funty) jako m/s - bez zmian.
+- W logu po wgraniu: "Pulap energii beltu (559): latka ... wpiete, pulap 190 J"; "Pulap energii beltu (559): start sesji" z "crossbow 330 ... 57->50 244->188"; "Zasieg lukow (469)" z "belt 0.150 kg (bolt_a), pulap beltu 559 wpiety" i crossbow_a 37 m/s; w "Ogien w zasiegu" kusznicy z bolt_a `crossbow_f 330/50` i licznik przycietych > 0, potkniec 0.
+
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, niewgrane).
+
+### Recenzja 559
+
+Przeglad 870d0517: brak uwag blokujacych. Energie przeliczone wedlug RBM Utilities.cs:246-277 z beltem bolt_a 0.15 kg zgadzaja sie z wpisem (crossbow_a 103 J, 200/230 lb bez zmian, 270/300/330 lb -> 50 m/s, 187.5 J). Sprawdzone: nazwy parametrow prefiksu/postfiksu, `__state` (RBM nadpisuje argument), pulap obejmuje rozmieszczenie (RangedRework.cs:381), strzal (:630) i podpowiedz (MagnitudeChanges.cs:809, :908), obrazenia RBM licza sie z predkosci pocisku (MagnitudeChanges.cs:297), jednostki 469 (funty na mapie, LbAtStart w misji), kolejnosc OnSessionLaunched -> OnAfterSessionLaunched, luki i proce pominiete, klucz 0 = zachowanie sprzed 559, try/catch z licznikiem, NaN bez przyciecia. `calculateMissileSpeed` wystepuje tylko w RBMCombat.dll - nikt inny tej metody nie patchuje (sprawdzone wszystkie DLL w Modules).
+
+Uwagi drobne - zadna nie wymaga zmiany kodu w 559 (jako poprawki odrzucone, zostaja jako informacja):
+1. Wycena i zakupy (XbowPrice.Energy, AiGear/MenPurse BuyScore, RangedRank) nie znaja pulapu - 270/300/330 lb z bolt_a daja te same 187.5 J, a kosztuja wedlug funtow. Nie blad 559; to opisane wyzej 559-b, do decyzji Jeffa (polecenie obejmowalo tylko energie i zasieg).
+2. Zmiana pulapu w MCM w trakcie bitwy: celowanie AI i cache `Weap` 469 zostaja ze starym pulapem do nastepnej bitwy, strzal bierze nowy. Skutek znikomy - bez zmian.
+3. Kusznicy AI moga strzelac beltami 0.04 kg (131-145 J), wtedy pulap nic nie zmienia - po wgraniu sprawdzic w "Ogien w zasiegu (469)", czy licznik przycietych > 0.
+
+Kod bez zmian po recenzji; Armoury.dll zbudowane 0 bledow (md5 e60232223c06ffb5103cc18993e0bf2b), niewgrane.
+
 ## 560: musztra - druzyna z samymi towarzyszami cwiczy w obozie, dowodcy partii (AI i rodu gracza) cwicza z ludzmi - Armoury (Drill.cs, CampDrill.cs; opis klucza DrillHeroes w Settings.cs + McmSettings.cs recznie, bez nowego klucza)
 
 **Problem:** Jeff, czat 15.11 (po 558, WGRANIE 257): (1) druzyna z samymi towarzyszami, bez zolnierzy - przy Drill Camp Only menu obozu odpowiada "You have no men to drill"; Jeff: "Moze z samymi towarzyszami". (2) czy dowodcy partii AI tez maja cwiczyc (wtedy cwiczylby tez dowodca partii z rodu gracza); Jeff: "tez moga cwiczyc AI" (zasada wczesniejsza: "bohaterowie tez cwicza i dostaja xp, tylko gracz nie dostaje").

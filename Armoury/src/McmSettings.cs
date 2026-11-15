@@ -4271,6 +4271,10 @@ namespace Armoury
         [SettingPropertyGroup("Crossbows by draw strength")]
         public bool XbowBuyByPower { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Crossbow Bolt Energy Cap", 0f, 400f, "0", HintText = "highest energy (joules) a crossbow bolt can leave the bow with; no hand crossbow of history went far past 200 J (Realistic Battle Mod gives a 330 lb crossbow about 244 J). Caps the bolt speed of the heaviest crossbows, and with it range and hitting power; bows and slings untouched. Needs Realistic Battle Mod. 0 = off", RequireRestart = false)]
+        [SettingPropertyGroup("Crossbows by draw strength")]
+        public float CrossbowBoltEnergyCap { get; set; } = 190f;
+
         [SettingPropertyBool("Town Household Use", HintText = "townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool TownHouseholdUse { get; set; } = true;
@@ -14963,6 +14967,7 @@ namespace Armoury
             s.XbowPriceVsBow = XbowPriceVsBow;
             s.XbowForgeEquivTier = XbowForgeEquivTier;
             s.XbowBuyByPower = XbowBuyByPower;
+            s.CrossbowBoltEnergyCap = CrossbowBoltEnergyCap;   // 559
             s.TownHouseholdUse = TownHouseholdUse;
             s.TownUseFlax = TownUseFlax;
             s.TownUseWool = TownUseWool;

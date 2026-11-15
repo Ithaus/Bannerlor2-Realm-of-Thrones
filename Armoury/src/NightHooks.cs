@@ -83,6 +83,8 @@ namespace Armoury
             Part(sb, "cios z tylu (549)", RoutHold.SiteBanner, () => Backstab549.ApplyInCampaign(_h));   // 549: prefiks First (pancerz x(1-przebicie)) + postfiks Last (obrazenia x mnoznik) na ComputeBlowDamage - cios wrecz w plecy
             sb.Append(" | ");
             Part(sb, "pancerz i tarcze z perkow (506)", RoutHold.SiteBanner, () => Perk506.ApplyInCampaign(_h));   // 506: postfiksy po RBM (pancerz po 415, tarcza przed 414, ShieldWall po RBM)
+            sb.Append(" | ");
+            Part(sb, "pulap energii beltu (559)", RoutHold.SiteBanner, () => XbowCap559.ApplyInCampaign(_h));   // 559: prefiks + postfiks Last na RBMCombat.Utilities.calculateMissileSpeed - kusza najwyzej N J
             sb.Append('.');
             Log.Info(sb.ToString());
         }
