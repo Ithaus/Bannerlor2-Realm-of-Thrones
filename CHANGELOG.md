@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 566: perk Strong (Athletics) liczy tylko ludzi, ktorzy naprawde ida pieszo - Armoury (MarchPairs.cs, HorsePace.cs, Settings.cs, McmSettings.cs)
+
+**Problem:** Jeff, czat 15.11, po audycie predkosci partii (pkt 3: "tak"): "Strong" gry dostaja tez piechurzy jadacy na koniach stajni 537. Log Armoury-2026-11-15_19-36-27.log linia 4084: "Strong +0.17 ... Footmen on horses: footmen's mounts +0.55" - prawie cala piechota gracza jedzie na parach, a premia za marsz pieszo liczy sie w calosci.
+
+**Przyczyna:** gra (DefaultPartySpeedCalculatingModel.GetFootmenPerkBonus 1.4.8) daje AddFactor(NumberOfMenWithoutHorse / N x Athletics.Strong.SecondaryBonus) - piesi = kazdy bez konia we wzorcu (z doczepionymi), takze piechur na luzaku gry, na parze ze stajni / ladunku / zbrojowni (537), wiec ten sam czlowiek ma "Footmen on horses" i "Strong".
+
+**Zmiana:** nowy klucz MCM `StrongWalkersOnly` (Strong Walkers Only, domyslnie TAK; NIE = jak gra). MarchPairs.Compute -> StrongOf: gdy partia ma perk (HasPerk(Strong, checkSecondaryRole) jak gra), idacy naprawde = pula piechoty z rekordu par (u gracza przy TroopsFightWithOwnKitOnly z jezdzcami bez pary, rannymi jezdzcami i bohaterami bez konia) - piechota na parach (RideO) + piesi doczepionych - doczepieni na luzakach gry (AttRide); u partii rodu dodatkowo jak HorsePace.Apply: + jezdzcy bez konia idacy pieszo (krok 3 Walk) - piechurzy niesieni przez wolne konie zbrojowni ponad gre (krok 1 Extra) - nowe HorsePace.FootOf zwraca te liczby z pamieci tego samego wywolania. ApplySpeed (MarchPace.SpeedPostfix, SpeedDepth.OutermostFinal, przed sufitem kolumny) dopisuje wpis roznicy "Strong: only men on foot" = (idacy - piesi gry) / N x SecondaryBonus (zwykle ujemny; dodatni, gdy jezdzcy bez pary ida pieszo). Linia doby "Pary marszowe" (E2) i dopiski rodu pokazuja idacych / pieszych gry i wpis. SpeedSig zawiera klucz (przelaczenie liczy predkosc gracza od nowa).
+Zasieg: gracz i partie jego rodu (zasieg rekordu par MarchPairs; potrzebny klucz MarchPairsSpeed). Pozostale AI - BEZ ZMIAN (gra: Strong za kazdego bez konia we wzorcu, takze piechura na luzaku) - regula par dotyczy dzis tylko gracza i rodu.
+
+**Ryzyko / co sprawdzic:**
+- Regresje/kolizje: Strong dodaje tylko gra (grep: nikt w repo nie dotyka Athletics.Strong); wpis idzie w tym samym ExplainedNumber co "Footmen on horses: ..." i sumuje sie przed sufitem kolumny MarchPace, ScoutPace515 i drogami (MapRoads dzieli przez 1+F - mniejsze F po naszym wpisie, jak przy kazdym wpisie). Liczby jazdy te same co wpisy MarchPairs/HorsePace (RideO, AttRide, Extra, Walk) - jeden czlowiek albo jedzie, albo ma Strong. Bez perka wpisu nie ma (liczenie konczy sie na HasPerk).
+- WorldPace / 565 (tempo swiata jako mnoznik) - inna galaz; tu nie ruszane.
+- W logu: linia "Pary marszowe (gracz)" -> "566 Strong (klucz StrongWalkersOnly TAK): idacy X/piesi gry Y, wpis -0.xxx"; audyt predkosci: przy linii 4084 oczekiwane "Strong: only men on foot" okolo -0.15 (prawie cala piechota na parach), Strong netto bliski zera.
+- Koszt: HasPerk + kilka dodawan na wywolanie modelu predkosci gracza/rodu (bez nowych pamieci).
+
+**Status:** DO SPRAWDZENIA (galaz noc/566-strong-pieszo, nie wgrane)
+
 ## 562b: musztra - pasek Drill pokazuje postep w sztukach (%), podpowiedz mowi, czego brakuje najbardziej i dlaczego pobor nic nie bierze - Armoury (DrillKit.cs, MarchHud.cs)
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 262: Horses 165/165, Pack 80/139, Drill 0/164 czerwone - "mam rzeczy w armoury, ale wojsko nie pobiera - jak mam cos kliknac?". Log Armoury-2026-11-15_19-36-27.log, linia 953: migracja 562 - zapas 299 -> 255 szt., do zbrojowni 53, wzieto z nadwyzki 9 (wlocznie 14 -> 23/26), kontrola ZGODNE. Pokrycie rodzajow: 1H 88/88, 2H 3/3, wlocznie 23/26, tarcze 0/88, luki 0/73, strzaly 0/73, oszczepy 0/7, korpus 61/164, helmy 38/164, nogi 31/164, oponcze 0/164 = 244/1013 sztuk (24%).

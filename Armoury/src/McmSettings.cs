@@ -8797,6 +8797,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MarchPairsSpeed { get; set; } = true;
 
+        [SettingPropertyBool("Strong Walkers Only", HintText = "the game's Strong perk (Athletics, party role) speeds the party up only for the men who really walk: a footman riding a horse with a harness that fits it (from the baggage, Footmen's mounts or the troops' armoury - the same pairs as Horses on the map bar) gets the Footmen on horses bonus and no longer Strong as well, while a soldier left without a pair, who walks, gets it ('Strong: only men on foot' in party speed). Needs March Pairs Speed; you and your clan's parties - other parties as in the game (off = as in the game: every man without a horse in his troop's kit counts, riding or not)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool StrongWalkersOnly { get; set; } = true;
+
         [SettingPropertyBool("Ridden Harness Weightless", HintText = "a horse harness from your baggage that sits on a horse ridden by one of your footmen (a pair: a horse, a harness that fits it and a man whose Riding allows both - the same pairs as Horses on the map bar) no longer weighs on the baggage ('Harness on ridden horses' in the cargo weight); a harness with no horse, on a horse nobody rides, or that does not fit, weighs as before. Carry capacity follows the same pairs: a spare horse in such a pair (under a footman or a prisoner) takes saddlebags (Saddled spare horses), a spare horse with no pair carries packs (Spare Horse Carry Kg), and Ridden horses (saddlebags) counts your cavalry's pairs, heroes on their own horses and footmen on horses from the troops' armoury. The old 'Harness worn by spare horses' capacity no longer counts. On land only; you and your clan's parties (off = as before, with Harness On Spare Horses)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool RiddenHarnessWeightless { get; set; } = true;
@@ -16101,6 +16105,7 @@ namespace Armoury
             s.RiderHorseCarryKg = RiderHorseCarryKg;
             s.MarchPairsHud = MarchPairsHud;
             s.MarchPairsSpeed = MarchPairsSpeed;
+            s.StrongWalkersOnly = StrongWalkersOnly;
             s.RiddenHarnessWeightless = RiddenHarnessWeightless;
             s.ArmouryHasWeight = ArmouryHasWeight;
             s.RiddenByView = RiddenByView;
