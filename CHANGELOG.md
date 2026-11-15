@@ -36,6 +36,20 @@
 
 **Status:** DO SPRAWDZENIA (nie wgrane).
 
+### Recenzja 570
+
+Recenzja kodu (19c76b3d) - 4 usterki potwierdzone w kodzie i poprawione, 2 uwagi informacyjne bez zmian w kodzie:
+- **(1) Odwet liczyl sile, ktora nie idzie w pole** (HideoutPurge.Reprisal, klucz HideoutReprisalKinOnly): `theirs` sumowal tez bandy z bohaterem BK i eskorty bohatera, ktore nie sa scalane i nie dostaja rozkazow - np. bohater 80 + boss 20 vs gracz 250 nie uciekali (250 < 3 x 100), a na gracza szarzowal sam boss z 20 ludzmi z twardym rozkazem na 48 h (wbrew "AI walczy o zycie"). Poprawka: przy kin do decyzji ucieczka/atak liczy sie tylko sila band Mergeable (boss + scalani); sila bohaterow/eskort tylko w logu ("sojusznicy bez rozkazow N poza rachunkiem"). Same bandy z bohaterem w promieniu - linia "nikt ich nie scala ani nie prowadzi" PRZED decyzja ucieczki (bez falszywego komunikatu "melt away"). To samo w poscigu (HideoutVendetta): `sAll` (decyzja "odpuszczaja") liczy juz tylko bandy bez bohatera i nie-eskorty; sila bohaterow w linii fazy jako "bohaterowie / eskorty poza rachunkiem".
+- **(2) Opis MCM nieprawdziwy** ("it follows the warband as an ally" - kod nie daje bohaterom rozkazow): Settings.cs + McmSettings.cs, teraz "is never merged and takes no orders - it goes its own way and does not count in the warband's strength". Komentarz klasy HideoutVendetta poprawiony tak samo.
+- **(3) Migotanie atak/sledzenie co godzine:** histereza - wejscie w atak od HideoutVendettaAttackOdds, wyjscie dopiero ponizej AttackOdds x 0.8 (stala AttackHold); do sily gracza licza sie tylko partie wojskowe jego frakcji (`IsLordParty`), bez karawan i chlopow w promieniu 6.
+- **(4) Gracz na morzu:** `Shadow` przy `me.IsCurrentlyAtSea` daje przewodnikowi `SetMoveModeHold` (dotad mogl dostac punkt gracza na wodzie).
+- **(5) Odrzucone jako usterka (informacyjne):** `_ordered` nie jest zapisywane - po wczytaniu z wylaczonym kluczem HideoutVendetta bandy z rozkazem EngageParty (inicjatywa do 2 h) scigaja gracza do wlasnego przemyslenia AI (najwyzej kilka godzin), przez pierwsza godzine po wczytaniu nie sa chronione przed drzemka band. Nieszkodliwe; wiedziec przy tescie.
+- **(6) Informacyjne:** przy WYLACZONYM kluczu HideoutReprisalKinOnly zostaje stary blad odwetu - towar scalanej bandy kopiowany do bossa i zostawiany w znikajacej bandzie (nasluchy zniszczenia rozdaja go drugi raz). Swiadomie: klucz off = stare zachowanie.
+
+**Ryzyko / co sprawdzic (recenzja):** odwet przy kin czesciej stchorzy (bez sily bohaterow) - to zamierzone; poscig moze szybciej odpuscic przy samych bohaterach w promieniu (zostaja wtedy w swoich sprawach jak dotad). Histereza: atak trwa przy stosunku 1.04-1.3 jesli juz trwal. W tescie: linia "odwet rusza ... (sila N, poza rachunkiem odwetu)", linie fazy poscigu z "bohaterowie / eskorty poza rachunkiem", liczba linii ATAK/sledza bez przeskokow co godzine.
+
+**Status recenzji:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane). Plik do wgrania jak w wpisie wyzej (`Armoury/bin/Release/Armoury.dll`).
+
 ## 569 (C): nocny atak na kryjowke bez towaru z niczego - Armoury (HideoutNightLoot569.cs nowy, SubModuleMain.cs, nowy klucz HideoutNightNoFreeLoot w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** audyt kryjowek 15.11, pkt C (Jeff: "ABCDE tak rob"): po nocnym ataku gracza na kryjowke gra doklada do lupu towar, ktorego bandyci nie mieli - 350-4750 zl (stara moneta) na kazda kryjowke, bez platnika. Lamie zamknieta ekonomie. Bez dowodu z logu gry - wynik dekompilacji; dotad slad tylko w linii "Kryjowka nocna (n20): gra dolozyla do lupu N szt. towaru" (Wyceny20.HidePost).
@@ -54,6 +68,15 @@
 **Testy:** linia startu "Kryjowka noca (569 ...): CZYNNE - wpiete"; w grze: nocny atak na kryjowke - w ekranie lupu tylko to, co bandyci mieli (bez dodatkowych towarow handlowych), linia "zablokowano N szt."; atak za dnia i "Send troops" - brak linii 569; klucz NIE - towar gry jak dotad.
 
 **Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane, nie testowane w grze).
+
+### Recenzja 569
+
+Recenzja (aa8c602b) bez uwag blokujacych; trzy drobne uwagi sprawdzone w kodzie:
+1. **Przyjeta (poprawione).** Latka wpinala sie tylko przy kluczu TAK w OnSessionLaunched, a klucz ma `RequireRestart = false` - wlaczenie w MCM w trakcie sesji nie dzialalo do wczytania. Teraz `SessionStart` wpina latke ZAWSZE (raz na proces); Pre sprawdza klucz przy kazdym wywolaniu (NIE = `__state = null`, Post nic nie robi), wiec przelaczenie dziala od razu w obie strony. Linia startu: "CZYNNE - wpiete ..." albo "WYLACZONE (MCM, towar z niczego jak w grze; latka czeka na wlaczenie klucza) - wpiete ...". Opis MCM: "Takes effect at once". Koszt przy NIE: jedno sprawdzenie klucza na zbieranie lupu (raz na bitwe).
+2. **Przyjeta czesciowo.** Opis klucza HistHideoutLootOldCoin (Settings.cs + McmSettings.cs) zaczyna sie teraz od "while Hideout Night No Free Loot is off" - przy 569 TAK tego towaru nie ma. Odrzucone: zmiana linii logu "Kryjowka nocna (n20): gra dolozyla ..." (Wyceny20.HidePost) - to tylko log, zaraz po niej stoi linia 569 z ta sama liczba sztuk (opisane w Ryzyku), jedna zmiana naraz.
+3. **Uwaga dla B (bez zmiany kodu).** Wszystko, co B (skarb band w kryjowce) dolozy do lupu WEWNATRZ `HideoutCampaignBehavior.OnCollectLootItems` (postfiks lub prefiks po prefiksie 569), Post 569 zdejmie jako "towar z niczego" (sztuki bez modyfikatora). B musi oddawac skarb poza ta metoda: wlasny sluchacz `OnCollectLootsItemsEvent`, postfiks dispatchera albo osobny ekran lupu.
+
+Zbudowane, 0 bledow. Status bez zmian: DO SPRAWDZENIA (nie wgrane).
 
 ## 567: kryjowka nigdy nie wraca w ostatnio rozbite miejsce swojej kultury (bez limitu czasu) - Armoury (HideoutSight.cs; nowy klucz HideoutNeverLastCleared w Settings.cs + McmSettings.cs recznie)
 
@@ -127,29 +150,6 @@ Przeglad c6838ca6 (tylko odczyt); poprawki w tym samym wpisie, build Armoury 0 b
 - **PRZYJETE 3 (podpowiedz "Refill"):** `_pBookBack` liczy kazdy zwrot przez `BackToArmory` (takze `ReturnForBattle` -> `BackBattle` i `MoveAll`), a liczba stala w nawiasie przy "back to the armoury (not needed)" - mogl wyjsc napis "... (not needed) 0 (5 back to your list)". Teraz za cala lista: "; of all pieces given back today N went back to your list" (`MarchHud.cs`).
 - **PRZYJETE 4 (tylko opis, kodu nie zmieniam):** waga "yours" (`StashWeight` czyta `QuartermasterLaw.LastSplit`, odswiezany w `PurgeUnusable`) przy egzemplarzu czesciowo gracza, czesciowo ludzi liczy `Own = min(N, stare v[1])` - do najblizszego porzadku "yours" stoi, spada "men's"; suma wagi dobra. Sprawdzenie "waga yours spadnie o tyle, o ile wzrosnie Drill kit" dotyczy tylko egzemplarzy w calosci gracza (albo po porzadku / otwarciu zbrojowni); przy mieszanych to NIE blad.
 - Ryzyko / co sprawdzic: `BookLose` czyta zapas po zdjeciu sztuk (`FindIndexOfElement` - jeden element na egzemplarz id|mod, jak `ClipBook`); niezmiennik "pamiec <= zapas" zachowany na kazdej sciezce. W logu po pojmaniu bez C4: "zuzyte/stracone sztuki gracza Y" mniejsze niz przed poprawka przy mieszanym zapasie; linia "rozliczenia 562" - suma czesci = N kazdej doby.
-
-### Recenzja 569
-
-Recenzja (aa8c602b) bez uwag blokujacych; trzy drobne uwagi sprawdzone w kodzie:
-1. **Przyjeta (poprawione).** Latka wpinala sie tylko przy kluczu TAK w OnSessionLaunched, a klucz ma `RequireRestart = false` - wlaczenie w MCM w trakcie sesji nie dzialalo do wczytania. Teraz `SessionStart` wpina latke ZAWSZE (raz na proces); Pre sprawdza klucz przy kazdym wywolaniu (NIE = `__state = null`, Post nic nie robi), wiec przelaczenie dziala od razu w obie strony. Linia startu: "CZYNNE - wpiete ..." albo "WYLACZONE (MCM, towar z niczego jak w grze; latka czeka na wlaczenie klucza) - wpiete ...". Opis MCM: "Takes effect at once". Koszt przy NIE: jedno sprawdzenie klucza na zbieranie lupu (raz na bitwe).
-2. **Przyjeta czesciowo.** Opis klucza HistHideoutLootOldCoin (Settings.cs + McmSettings.cs) zaczyna sie teraz od "while Hideout Night No Free Loot is off" - przy 569 TAK tego towaru nie ma. Odrzucone: zmiana linii logu "Kryjowka nocna (n20): gra dolozyla ..." (Wyceny20.HidePost) - to tylko log, zaraz po niej stoi linia 569 z ta sama liczba sztuk (opisane w Ryzyku), jedna zmiana naraz.
-3. **Uwaga dla B (bez zmiany kodu).** Wszystko, co B (skarb band w kryjowce) dolozy do lupu WEWNATRZ `HideoutCampaignBehavior.OnCollectLootItems` (postfiks lub prefiks po prefiksie 569), Post 569 zdejmie jako "towar z niczego" (sztuki bez modyfikatora). B musi oddawac skarb poza ta metoda: wlasny sluchacz `OnCollectLootsItemsEvent`, postfiks dispatchera albo osobny ekran lupu.
-
-Zbudowane, 0 bledow. Status bez zmian: DO SPRAWDZENIA (nie wgrane).
-
-### Recenzja 570
-
-Recenzja kodu (19c76b3d) - 4 usterki potwierdzone w kodzie i poprawione, 2 uwagi informacyjne bez zmian w kodzie:
-- **(1) Odwet liczyl sile, ktora nie idzie w pole** (HideoutPurge.Reprisal, klucz HideoutReprisalKinOnly): `theirs` sumowal tez bandy z bohaterem BK i eskorty bohatera, ktore nie sa scalane i nie dostaja rozkazow - np. bohater 80 + boss 20 vs gracz 250 nie uciekali (250 < 3 x 100), a na gracza szarzowal sam boss z 20 ludzmi z twardym rozkazem na 48 h (wbrew "AI walczy o zycie"). Poprawka: przy kin do decyzji ucieczka/atak liczy sie tylko sila band Mergeable (boss + scalani); sila bohaterow/eskort tylko w logu ("sojusznicy bez rozkazow N poza rachunkiem"). Same bandy z bohaterem w promieniu - linia "nikt ich nie scala ani nie prowadzi" PRZED decyzja ucieczki (bez falszywego komunikatu "melt away"). To samo w poscigu (HideoutVendetta): `sAll` (decyzja "odpuszczaja") liczy juz tylko bandy bez bohatera i nie-eskorty; sila bohaterow w linii fazy jako "bohaterowie / eskorty poza rachunkiem".
-- **(2) Opis MCM nieprawdziwy** ("it follows the warband as an ally" - kod nie daje bohaterom rozkazow): Settings.cs + McmSettings.cs, teraz "is never merged and takes no orders - it goes its own way and does not count in the warband's strength". Komentarz klasy HideoutVendetta poprawiony tak samo.
-- **(3) Migotanie atak/sledzenie co godzine:** histereza - wejscie w atak od HideoutVendettaAttackOdds, wyjscie dopiero ponizej AttackOdds x 0.8 (stala AttackHold); do sily gracza licza sie tylko partie wojskowe jego frakcji (`IsLordParty`), bez karawan i chlopow w promieniu 6.
-- **(4) Gracz na morzu:** `Shadow` przy `me.IsCurrentlyAtSea` daje przewodnikowi `SetMoveModeHold` (dotad mogl dostac punkt gracza na wodzie).
-- **(5) Odrzucone jako usterka (informacyjne):** `_ordered` nie jest zapisywane - po wczytaniu z wylaczonym kluczem HideoutVendetta bandy z rozkazem EngageParty (inicjatywa do 2 h) scigaja gracza do wlasnego przemyslenia AI (najwyzej kilka godzin), przez pierwsza godzine po wczytaniu nie sa chronione przed drzemka band. Nieszkodliwe; wiedziec przy tescie.
-- **(6) Informacyjne:** przy WYLACZONYM kluczu HideoutReprisalKinOnly zostaje stary blad odwetu - towar scalanej bandy kopiowany do bossa i zostawiany w znikajacej bandzie (nasluchy zniszczenia rozdaja go drugi raz). Swiadomie: klucz off = stare zachowanie.
-
-**Ryzyko / co sprawdzic (recenzja):** odwet przy kin czesciej stchorzy (bez sily bohaterow) - to zamierzone; poscig moze szybciej odpuscic przy samych bohaterach w promieniu (zostaja wtedy w swoich sprawach jak dotad). Histereza: atak trwa przy stosunku 1.04-1.3 jesli juz trwal. W tescie: linia "odwet rusza ... (sila N, poza rachunkiem odwetu)", linie fazy poscigu z "bohaterowie / eskorty poza rachunkiem", liczba linii ATAK/sledza bez przeskokow co godzine.
-
-**Status recenzji:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane). Plik do wgrania jak w wpisie wyzej (`Armoury/bin/Release/Armoury.dll`).
 
 ## 568: lup w kryjowce - bandy odnosza czesc zrabowanego towaru do magazynu kryjowki, zabiera go ten, kto ja oczysci (gracz przy przeszukaniu, zwyciezca AI) - Armoury (HideoutGoods.cs nowy, HideoutPurge.cs, OutlawLaw.cs, Settings.cs, McmSettings.cs, ArmouryBehavior.cs)
 
