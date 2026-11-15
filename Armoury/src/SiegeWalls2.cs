@@ -122,7 +122,7 @@ namespace Armoury
         private static double SurShare { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeSurrenderShare) ? 0.1 : Clamp(s.SiegeSurrenderShare, 0.0, 0.5); } }
         private static int SurMen { get { var s = Settings.Current; return s == null ? 20 : (int)Clamp(s.SiegeSurrenderMen, 0, 200); } }
         // 400: tydzien laski i ucieczka przez mur
-        private static int GraceDays { get { var s = Settings.Current; return s == null ? 7 : (int)Clamp(s.SiegeStarveGraceDays, 0, 60); } }
+        internal static int GraceDays { get { var s = Settings.Current; return s == null ? 7 : (int)Clamp(s.SiegeStarveGraceDays, 0, 60); } }
         private static bool FleeOn { get { var s = Settings.Current; return s != null && s.SiegeStarveFleeToBesiegers; } }
         private static double FleePct { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeStarveFleePercent) ? 2.0 : Clamp(s.SiegeStarveFleePercent, 0.0, 20.0); } }
         internal static bool LadderOn { get { var s = Settings.Current; return s != null && s.SiegeLadderOverwhelm; } }

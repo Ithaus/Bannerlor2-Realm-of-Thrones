@@ -579,6 +579,14 @@ namespace Armoury
             catch (Exception e) { Stumble("RepelPauseLeftDays", e); return 0.0; }
         }
 
+        /// <summary>Recenzja 542 (1): jak RepelPauseLeftDays, ale tylko odczyt slownika (bez przenoszenia rekordu z zapisu - PauseOf) - dla rownoleglej mysli AI
+        /// (LocalFront334e.TimeLeft pod zamkiem _lk). Rekord jeszcze nieprzeniesiony po wczytaniu = 0 (jak przed 542). Nie rzuca.</summary>
+        internal static double RepelPauseLeftDaysRO(SiegeEvent ev)
+        {
+            try { Pause pz; return ev != null && _pauses.TryGetValue(ev, out pz) && pz != null && Now < pz.Until ? pz.Until - Now : 0.0; }
+            catch { return 0.0; }
+        }
+
         /// <summary>307c: liczba odparc szturmu w tym oblezeniu (OB2). 0 - brak przerwy w pamieci.</summary>
         internal static int RepelsOf(SiegeEvent ev)
         {

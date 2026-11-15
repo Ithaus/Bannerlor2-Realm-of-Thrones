@@ -304,6 +304,8 @@ namespace Armoury
         /// (reszta / tempo budowy) albo droga murow (tempo burzenia), potem szturm z szansa OB1 na mysl (1 / szansa godzin, co najmniej pol doby). Szturm
         /// niemozliwy (s &lt;= 1) albo brak mierzalnej drogi - HorizonDays: oblezenie sie nie konczy, liczy sie kazda odsiecz w horyzoncie. Bez podlogi 1.0 (334e
         /// przyklejal "pozostalo 1.00" na wiele dob). Wyjatek modelu - stara srednia gry od startu. Wolajacy trzyma _lk.</summary>
+        private static bool SimRepelPause542 { get { var s = Settings.Current; return s != null && s.SiegeSimRepelLongPause && SiegeWalls.BreakOn; } }   // recenzja 542 (1)
+
         private static float TimeLeft(BesiegerCamp camp, SiegeEvent ev, Settlement st, CampRec r)
         {
             double el = ev.SiegeStartTime.ElapsedDaysUntilNow;
@@ -423,6 +425,13 @@ namespace Armoury
                 int th = NowH;
                 if (r.TLeftH == th) tLeft = r.TLeft;
                 else { tLeft = TimeLeft(camp, ev, st, r); r.TLeft = tLeft; r.TLeftH = th; }
+                // recenzja 542 (1): przerwa po odparciu szturmu (OB2/371; z 542 takze 7-14 dob po szturmie symulowanym) - do jej konca szturmu nie bedzie, wiec
+                // oblezenie trwa co najmniej tyle (jak BesiegedRelief). Tylko z kluczem SiegeSimRepelLongPause - klucz NIE = stara ocena co do bitu
+                if (SimRepelPause542)
+                {
+                    double pl = SiegeWalls.RepelPauseLeftDaysRO(ev);
+                    if (pl > tLeft) tLeft = (float)Math.Min(HorizonDays, pl);
+                }
                 var l = ListOf(st);
                 var sc = ScoutOf(party);
                 var rel = new List<KeyValuePair<float, float>>();

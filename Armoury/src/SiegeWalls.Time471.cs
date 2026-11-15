@@ -37,7 +37,8 @@ namespace Armoury
     ///  (d) odstapienie - bez zmian (glod obozu m116, odsiecz OB5/334e);
     ///  (e) limit: wiek >= SiegeTimeLimitFactor x gorna granica - oboz liczniejszy i odsiecz nie stoi: Yield471, inaczej Lift471 (RemoveAllSiegeParties + rozejm 30 dob, droga 384).
     /// 542 (Jeff 15.11, klucz SiegeYieldOnlyStarving): (a) wylaczone - zegar i R tylko do linii i bramki; (e) zawsze Lift471 (rozejm 30 dob), chyba ze obroncy glodza
-    /// i (b) przyjdzie (StarveWait542, najwyzej StarveWaitMax542 = 30 dob po limicie). Klucz NIE = (a)/(e) jak wyzej.
+    /// i (b) przyjdzie (StarveWait542, najwyzej StarveWaitMax542 = 30 dob po limicie albo do dnia (b) = poczatek glodu + laska GL + 2; oblezenie fabuly ROT
+    /// nie czeka - (b) go nie dotyczy). Klucz NIE = (a)/(e) jak wyzej.
     /// Yield471 (D4, kapitulacja z honorami): partie lordow obroncow wychodza, zaloga do swoich (BookHoldings.YieldOut), potem KingdomManager.SiegeCompleted -
     /// droga 374 "slowo dotrzymane" bez relacji gracza. Szturmem zdobyte - niewola jak w grze (bez zmian).
     /// U2: zegar i R licza sie przed LogOn (akcje takze bez logu). U8: zegar i doby z odsiecza w zapisie (dopisek "T|" do arm_siege_walls; brak = zegar od wieku).
@@ -341,11 +342,13 @@ namespace Armoury
                                 // najwyzej StarveWaitMax542 dob po limicie
                                 if (age >= lim)
                                 {
-                                    string sw = StarveWait542(ev, st, ratio);
-                                    if (sw != null && age < lim + StarveWaitMax542)
+                                    double due542;
+                                    string sw = StarveWait542(ev, st, ratio, out due542);
+                                    // recenzja 542 (3): czekanie do dnia (b) takze ponad 30 dob po limicie (glod od wieku limit+25 przy lasce 7, laska w MCM > 30)
+                                    if (sw != null && (age < lim + StarveWaitMax542 || CampaignTime.Now.ToDays < due542))
                                     {
                                         _d542Wait++;
-                                        if (!r.Wait542) { r.Wait542 = true; if (log) Log.Info("Czas oblezenia (542) limit minal, oboz czeka na glod: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + CatName[r.Cat] + ") | wiek " + F(age, "0.0") + " >= limit " + F(lim, "0") + " | " + sw + " | najdalej do wieku " + F(lim + StarveWaitMax542, "0") + " dob, potem odejscie."); }
+                                        if (!r.Wait542) { r.Wait542 = true; if (log) Log.Info("Czas oblezenia (542) limit minal, oboz czeka na glod: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + CatName[r.Cat] + ") | wiek " + F(age, "0.0") + " >= limit " + F(lim, "0") + " | " + sw + " | najdalej do wieku " + F(Math.Max(lim + StarveWaitMax542, age + (due542 - CampaignTime.Now.ToDays)), "0") + " dob, potem odejscie."); }
                                     }
                                     else todo.Add(new KeyValuePair<SiegeEvent, string>(ev, pz ? "e-odejscie-odsiecz" : ratio > 1.0 ? "e-odejscie-542" : "e-odejscie"));
                                 }
@@ -384,15 +387,22 @@ namespace Armoury
         }
 
         /// <summary>542 (e): obroncy glodza i kapitulacja z glodu (b) moze przyjsc - te same warunki co bramka Gate471 i StarveYield471 (glod GL wlaczony, zapas 0,
-        /// odsiecz nie stoi, oboz liczniejszy). Opis do linii albo null (oboz odchodzi). Nie rzuca (wyjatek = null).</summary>
-        private static string StarveWait542(SiegeEvent ev, Settlement st, double ratio)
+        /// odsiecz nie stoi, oboz liczniejszy). Opis do linii albo null (oboz odchodzi). due - dzien kampanii (doby), do ktorego (b) powinna przyjsc: poczatek glodu
+        /// (SiegeMisery.HungerGet) + laska GL + 2 doby zapasu; glod bez rekordu - -1 (tylko limit + 30). Oblezenie fabuly ROT (StoryOf) - null: StarveOne nie wola
+        /// tam (b) (recenzja 542 (2)). Nie rzuca (wyjatek = null).</summary>
+        private static string StarveWait542(SiegeEvent ev, Settlement st, double ratio, out double due)
         {
+            due = -1.0;
             try
             {
                 if (!SiegeWalls2.StarveOn || st.Town == null || st.Town.FoodStocks > 0f || ratio <= 1.0) return null;
+                if (SiegePhantomLift.StoryOf(ev.BesiegerCamp) != null) return null;   // recenzja 542 (2): (b) w oblezeniu fabuly nie przychodzi - nie czekac na nia
                 double bes, rel = ReliefStrength(st, null, out bes);
                 if (rel > 0 && bes > 0 && rel >= 0.5 * bes) return null;
-                return "obroncy glodza (zapas 0), oboz / obroncy " + F(ratio, "0.0") + ":1, odsiecz " + F(rel, "0") + " / " + F(bes, "0") + " - kapitulacja z glodu (b) po tygodniu laski GL";
+                double hf; int sm;
+                if (SiegeMisery.HungerGet(st, out hf, out sm) && hf >= 0.0) due = hf + SiegeWalls2.GraceDays + 2.0;
+                return "obroncy glodza (zapas 0" + (hf >= 0.0 ? " od dnia " + F(hf, "0.0") : "") + "), oboz / obroncy " + F(ratio, "0.0") + ":1, odsiecz " + F(rel, "0") + " / " + F(bes, "0")
+                    + " - kapitulacja z glodu (b) po lasce GL " + SiegeWalls2.GraceDays + " dob" + (due >= 0.0 ? " (do dnia " + F(due, "0.0") + ")" : "");
             }
             catch (Exception e) { Stumble("StarveWait542", e); return null; }
         }

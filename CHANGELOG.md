@@ -22,6 +22,24 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 542 (origin/noc/scal-perki...87cc7234) - poprawki - Armoury (LocalFront334e.Siege.cs, SiegeWalls.cs, SiegeWalls.Time471.cs, SiegeWalls2.cs)
+
+**Problem:** recenzja: (1) 334e nie widzi przerwy po odparciu - z 542 to 7-14 dob po kazdym odpartym szturmie symulowanym AI, a TimeLeft liczy tylko przygotowania / machiny / mury / OB1 (przy wyrwie 0.5 doby); silniejsza odsiecz za 2 doby dawala JudgeRule 3 (KONTYNUUJ - nie zdazy) zamiast 4 (ODSTAP), oboz stal w Veto do konca przerwy i dostawal od odsieczy. (2) Oblezenie fabuly ROT z wodzem nieskryptowym: StarveWait542 kazal czekac do 30 dob na (b), a StarveOne przy `story` (b) w ogole nie wola. (3) StarveWait542 konczyl czekanie po limit + 30 bez wzgledu na tydzien laski GL (glod od limit + 25 przy lasce 7 - oboz odchodzil 2 doby przed (b); laska w MCM > 30 - zawsze przed (b)).
+
+**Przyczyna:** (1) LocalFront334e.Siege.cs TimeLeft nie czyta SiegeWalls.RepelPauseLeftDays (czyta je tylko BesiegedRelief.cs:247). (2) Out471 wyklucza tylko Scripted(lp), nie SiegePhantomLift.StoryOf(camp). (3) stala StarveWaitMax542 = 30 bez SiegeStarveGraceDays.
+
+**Zmiana:**
+- (1) JudgeCore (334e): po TimeLeft (takze z pamieci godzinnej) tLeft = max(tLeft, przerwa po odparciu), najwyzej HorizonDays - tylko z kluczem SiegeSimRepelLongPause (i SiegeAssaultBreak); klucz NIE = stara ocena co do bitu. Przerwe czyta nowe SiegeWalls.RepelPauseLeftDaysRO - sam odczyt slownika _pauses, bez przenoszenia rekordu z zapisu (PauseOf zmienia _pendingPauses, a mysl AI jest rownolegla); rekord nieprzeniesiony po wczytaniu = 0 jak przed 542.
+- (2) StarveWait542: oblezenie fabuly (StoryOf != null) - null, wiec po limicie od razu Lift471 (bez 30 dob czekania na (b), ktora tam nie przychodzi). Decyzja domyslna: oblezenia fabuly NIE sa wylaczone z 542 (zaloga z jedzeniem nie kapituluje takze tam) - do potwierdzenia przez Jeffa; gdyby wydarzenie fabuly mialo konczyc sie kapitulacja, trzeba je wylaczyc z (e) 542.
+- (3) StarveWait542 zwraca tez dzien (b): poczatek glodu (SiegeMisery.HungerGet) + laska GL (SiegeWalls2.GraceDays, teraz internal) + 2 doby zapasu; oboz czeka, dopoki wiek < limit + 30 ALBO dzien < dnia (b). Ograniczone: poczatek glodu stoi (laska najwyzej 60), a gdy wraca jedzenie / odsiecz - czekanie konczy sie od razu. Glod bez rekordu - tylko limit + 30 jak dotad. Linia "(542) limit minal, oboz czeka na glod" pokazuje poczatek glodu i dzien (b).
+
+**Ryzyko / co sprawdzic:**
+- (1) mysl AI rownolegla: odczyt _pauses pod zamkiem _lk 334e, zapisy _pauses tylko na watku glownym (Repel, wczytanie) - jak Measure / WallHpMin w tym samym miejscu. Dluzsze tLeft wpuszcza tez wiecej sojusznikow w drodze (lim = tLeft przy braku przewagi) - spojne: oblezenie i tak potrwa do konca przerwy. Linia 334e "pozostalo" pokazuje wartosc z przerwa.
+- (2)/(3) tylko droga (e) przy kluczu SiegeYieldOnlyStarving; klucz NIE bez zmian.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).
