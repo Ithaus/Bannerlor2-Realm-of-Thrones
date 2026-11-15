@@ -8793,7 +8793,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MarchPairsHud { get; set; } = true;
 
-        [SettingPropertyBool("March Hud Pack Train", HintText = "the Pack item on the map bar counts what really slows the marching column: pack animals and livestock (your army's parties included) / how many ride free (March Pack Allowance per man), in warning colour when over - then the whole party is held to the baggage-train pace (March Train Pace). Its tooltip gives that speed ceiling, how many animals to drop to lift it, and the game's herding limit (men - livestock - free horses) as a second line. Needs March Pace Enabled (off = the Pack item shows pack animals / herding limit, as before)", RequireRestart = false)]
+        [SettingPropertyBool("March Hud Pack Train", HintText = "the Pack item on the map bar counts what really slows the marching column: pack animals and livestock (your army's parties included) / how many ride free (March Pack Allowance per man), in warning colour when over - then the party's speed is capped at the baggage-train pace (March Train Pace). Its tooltip gives that speed ceiling (raised by scouting speed perks, higher on roads), whether it holds you back right now or something slower does, how many animals to drop to lift it, and the game's herding limit (men - livestock - free horses) as a second line. Needs March Pace Enabled (off = the Pack item shows pack animals / herding limit, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MarchHudPackTrain { get; set; } = true;
 

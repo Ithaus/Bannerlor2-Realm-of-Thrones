@@ -17,6 +17,20 @@
 
 **Status:** DO SPRAWDZENIA (galaz noc/565-pasek-tabor, nie wgrane)
 
+### Recenzja 565
+
+Recenzja (tylko odczyt, bac424b8): liczby paska zgodne z logiem (83/43, sufit 3.15 = 4.2 x 0.75 - linia 13050 "kolumna 311d2 3.15 -> 3.15 (rodzaj 3)"), klucz off = jak 548, predkosc gracza i AI bez zmian. Poprawki (galaz noc/565-pasek-tabor-fix, tylko wyswietlanie):
+- **Pkt 1 (PRZYJETY):** podpowiedz twierdzila "the whole party marches at baggage-train pace", a w logu Jeffa tabor nie wiaze (linia 5944: 3.92 z Road +0.94, przed droga 2.98 < 3.15, bez wpisu "Marching column"; linia 6546: LimitMax 4.096 = 3.15 x 1.3 na drodze). Teraz "capped at the baggage-train pace"; nowy wiersz "Now" mowi, czy sufit tnie TERAZ - `MarchHud.TrainBinds`: rozpiska predkosci gry liczona wprost przez `MapRoads.Explained` (bez zapisu do pamieci partii, jak okno Review the army), szuka wpisu "Marching column: baggage train" / "your pack animals" (te same TextObject co ColumnPostfix); nie wiaze - "you already march at X, below it". Gracz w cudzej armii (AttachedTo) - wiersz pominiety. Opis klucza MarchHudPackTrain w Settings.cs + McmSettings.cs poprawiony tak samo. Pasek nadal czerwony ponad przydzial (ostrzezenie o przekroczeniu jest prawdziwe; Jeff chcial progu kolumny).
+- **Pkt 2 (PRZYJETY):** "Speed ceiling" pokazuje teraz takze sufit podniesiony perkami: `ScoutPace515.CapShare` (nowa, tylko odczyt) = ten sam PerkShare co Lift, przy kluczu ScoutPerksLiftMarchCap, bez licznikow pomiaru Lift (Lift ma skutki uboczne w licznikach - dlatego nie wolany z UI). Wiersz: "up to X with your scout's and leader's speed perks (+P%)".
+- **Pkt 3 (PRZYJETY):** Kind 1 (sami jezdzcy, sufit zbity jakoscia koni HorseQualitySpeed ponizej tempa taboru): "your riders' horses hold the column lower (X) - the baggage train does not bind while they do" zamiast "binds once that is gone". Kind 4 nazwany ("N footmen riding double").
+- **Pkt 4a (PRZYJETY):** wiersz "Animals" liczy wlasne juczne i bydlo z ItemRoster gracza na zywo (to samo, co TrainOf), reszta = partie armii; bez rekordu par odswiezanego co 1 s - koniec falszywego "N in your army's parties" po zakupie.
+- **Pkt 4b (PRZYJETY):** sufity w formacie "0.00" (3.15 jak w logu i rozpisce).
+- **Kolizje (bez zmian w kodzie):** 564 - jesli zmieni znaczenie `Column.Scale`, poprawic tez zapasowy wzor przy col == null (MarchHud.TrainTooltip, WorldPacePercent). Scalenie z 566 / nowym koncem noc/scal-perki - konflikt tylko w CHANGELOG.md.
+
+**Ryzyko / co sprawdzic:** TrainBinds liczy model predkosci gry raz na zbudowanie podpowiedzi (tylko przy najechaniu na Pack i tylko gdy tabor ponad przydzial) - jak okno przegladu armii; `_noRecord` chroni pamiec drogi partii. SpeedDepth: wywolanie z UI poza lancuchem predkosci, ColumnPostfix liczy na zewnetrznym poziomie tego wywolania (jak ArmyReview). Predkosc, sufit, Herding i pasek bez zmian. W grze (log 15.11, poza droga 2.98 < 3.15): podpowiedz Pack "Now: it does not hold you back - you already march at ...", "Speed ceiling 3.15 on the map, higher on roads".
+
+**Status:** DO SPRAWDZENIA (galaz noc/565-pasek-tabor, nie wgrane)
+
 ## 562b: musztra - pasek Drill pokazuje postep w sztukach (%), podpowiedz mowi, czego brakuje najbardziej i dlaczego pobor nic nie bierze - Armoury (DrillKit.cs, MarchHud.cs)
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 262: Horses 165/165, Pack 80/139, Drill 0/164 czerwone - "mam rzeczy w armoury, ale wojsko nie pobiera - jak mam cos kliknac?". Log Armoury-2026-11-15_19-36-27.log, linia 953: migracja 562 - zapas 299 -> 255 szt., do zbrojowni 53, wzieto z nadwyzki 9 (wlocznie 14 -> 23/26), kontrola ZGODNE. Pokrycie rodzajow: 1H 88/88, 2H 3/3, wlocznie 23/26, tarcze 0/88, luki 0/73, strzaly 0/73, oszczepy 0/7, korpus 61/164, helmy 38/164, nogi 31/164, oponcze 0/164 = 244/1013 sztuk (24%).

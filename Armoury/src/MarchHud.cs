@@ -465,32 +465,52 @@ namespace Armoury
             return l;
         }
 
-        /// <summary>565: podpowiedz Pack - tabor kolumny marszowej (MarchPace.TrainOf / Allowance, sufit z MarchPace.Explain), potem limit Herding (MarchPairs.Last).</summary>
+        /// <summary>565: podpowiedz Pack - tabor kolumny marszowej (MarchPace.TrainOf / Allowance, sufit z MarchPace.Explain), potem limit Herding (MarchPairs.Last).
+        /// Recenzja 565: tabor to SUFIT, nie tempo - "Now" mowi, czy tnie teraz (wpis w rozpisce predkosci gry, TrainBinds); sufit z podniesieniem perkow
+        /// (ScoutPace515.CapShare, jak Lift w ColumnPostfix); zwierzeta wlasne z ItemRoster na zywo (bez rekordu par, ktory odswieza sie co 1 s).</summary>
         private static void TrainTooltip(List<TooltipProperty> l, MarchPairs.Rec r, int men, int train, int allow)
         {
             var c = Settings.Current;
             var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var mp = MobileParty.MainParty;
             l.Add(new TooltipProperty("Baggage train", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
             int over = train - allow;
             Row(l, "Baggage / free", train + " pack animals and livestock, " + allow + " ride free with " + men + " men"
-                   + (over > 0 ? " - " + over + " too many (red): the whole party marches at baggage-train pace" : " - no baggage-train pace"));
-            if (r != null && r.Ok)
+                   + (over > 0 ? " - " + over + " too many (red): the party's speed is capped at the baggage-train pace" : " - no baggage-train cap"));
+            var ir = mp != null ? mp.ItemRoster : null;
+            if (ir != null)
             {
-                int others = Math.Max(0, train - r.CPack - r.CLive);
-                Row(l, "Animals", r.CPack + " pack animals, " + r.CLive + " livestock" + (others > 0 ? ", " + others + " in your army's parties" : ""));
+                int ownPack = ir.NumberOfPackAnimals, ownLive = ir.NumberOfLivestockAnimals;
+                int others = Math.Max(0, train - ownPack - ownLive);   // TrainOf: reszta to doczepione partie armii
+                Row(l, "Animals", ownPack + " pack animals, " + ownLive + " livestock" + (others > 0 ? ", " + others + " in your army's parties" : ""));
             }
             MarchPace.Column col = null;
-            try { col = MarchPace.Explain(MobileParty.MainParty); } catch (Exception e) { Stumble("TrainTooltip.Explain", e); }
+            try { col = MarchPace.Explain(mp); } catch (Exception e) { Stumble("TrainTooltip.Explain", e); }
             float scale = col != null ? col.Scale : Math.Max(5, Math.Min(100, c.WorldPacePercent)) / 100f;
-            string ceil = (c.MarchTrainPace * scale).ToString("0.0", inv);
+            float ceilF = c.MarchTrainPace * scale;
+            string ceil = ceilF.ToString("0.00", inv);
             if (over > 0)
             {
-                Row(l, "Speed ceiling", ceil + " on the map ('Marching column: baggage train' in the speed tooltip)" + (c.MapRoadSpeedBonus ? ", higher on roads" : ""));
+                float share = ScoutPace515.CapShare(mp);
+                Row(l, "Speed ceiling", ceil + " on the map" + (share > 0.0001f ? ", up to " + (ceilF * (1f + share)).ToString("0.00", inv) + " with your scout's and leader's speed perks (+"
+                       + (share * 100f).ToString("0", inv) + "%)" : "") + (c.MapRoadSpeedBonus ? ", higher on roads" : ""));
                 Row(l, "To lift it", "drop or sell " + over + " pack " + (over == 1 ? "animal or head" : "animals or livestock") + ", or take on more men (one free per "
                        + (c.MarchPackAllowance > 0.0001f ? (1f / c.MarchPackAllowance).ToString("0.#", inv) : "-") + " men)");
-                if (col != null && col.Kind != 3 && col.CapRaw * col.Scale < c.MarchTrainPace * scale - 0.001f)
-                    Row(l, "Now", "something slower holds you first (" + (col.Kind == 0 ? col.N + " on foot" : col.Kind == 2 ? col.N + " footmen on spare horses" : "the column") + ", "
-                           + (col.CapRaw * col.Scale).ToString("0.0", inv) + ") - the baggage train binds once that is gone");
+                float now;
+                bool? binds = TrainBinds(mp, out now);
+                if (binds == true)
+                    Row(l, "Now", "it holds you back - you march at " + now.ToString("0.00", inv) + " ('Marching column: baggage train' in the speed tooltip)");
+                else if (col != null && col.Kind != 3 && col.CapRaw * col.Scale < ceilF - 0.001f)
+                {
+                    string slow = (col.CapRaw * col.Scale).ToString("0.00", inv);
+                    if (col.Kind == 1)   // recenzja 565 pkt 3: jakosc koni (HorseQualitySpeed) zbija sufit jazdy - to nie zniknie samo, tabor nie wiaze, poki tak jest
+                        Row(l, "Now", "your riders' horses hold the column lower (" + slow + ") - the baggage train does not bind while they do");
+                    else
+                        Row(l, "Now", "something slower holds you first (" + (col.Kind == 0 ? col.N + " on foot" : col.Kind == 2 ? col.N + " footmen on spare horses"
+                               : col.Kind == 4 ? col.N + " footmen riding double" : "the column") + ", " + slow + ") - the baggage train binds once that is gone");
+                }
+                else if (binds == false)
+                    Row(l, "Now", "it does not hold you back - you already march at " + now.ToString("0.00", inv) + ", below it");
             }
             else Row(l, "Speed ceiling", "none from the baggage - over " + allow + " it would be " + ceil);
             if (r != null && r.Ok)
@@ -499,6 +519,27 @@ namespace Armoury
                 Row(l, "Herding limit", r.CPack + " of " + r.PackLimit + " pack animals before the herding speed penalty (" + r.Men + " men - " + r.CLive + " livestock - " + r.FreeHerd + " free horses)"
                        + (hOver > 0 ? " - " + hOver + " over (red)" : ""));
             }
+        }
+
+        /// <summary>Recenzja 565 (pkt 1): czy sufit taboru tnie TERAZ - wpis "Marching column: baggage train" (sam bohater: "your pack animals") w rozpisce
+        /// predkosci gry, liczonej wprost bez zapisu do pamieci partii (MapRoads.Explained, jak okno przegladu armii). now - wynik gry.
+        /// null = nie wiadomo (gracz w cudzej armii - tempo daje wodz, albo gra nie dala liczby).</summary>
+        private static bool? TrainBinds(MobileParty mp, out float now)
+        {
+            now = 0f;
+            try
+            {
+                if (mp == null || (mp.AttachedTo != null && mp.AttachedTo != mp)) return null;
+                TaleWorlds.CampaignSystem.ExplainedNumber en;
+                if (!MapRoads.Explained(mp, out en)) return null;
+                now = en.ResultNumber;
+                string a = new TaleWorlds.Localization.TextObject("{=!}Marching column: baggage train").ToString();
+                string b = new TaleWorlds.Localization.TextObject("{=!}Marching column: your pack animals").ToString();
+                foreach (var ln in en.GetLines())
+                    if (ln.Item1 == a || ln.Item1 == b) return true;
+                return false;
+            }
+            catch (Exception e) { Stumble("TrainBinds", e); return null; }
         }
 
         private static void Row(List<TooltipProperty> l, string k, string v) { l.Add(new TooltipProperty(k, v, 0, false, TooltipProperty.TooltipPropertyFlags.None)); }
