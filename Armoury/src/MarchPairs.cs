@@ -44,7 +44,16 @@ namespace Armoury
         // E2: Md i Q (szybkosc konia z modyfikatorem, HorsePace.Q) - jakosc koni w parach piechoty ("Horse quality: spare horses")
         private sealed class Lot { public ItemObject It; public ItemModifier Md; public float Q; public int Req; public int N; public byte Src; }
         // Q - suma szybkosci koni pary (E2); E3: UIt/UMd - uprzaz z LADUNKU w tej grupie par (zwolnienie wagi), UW - waga sztuki do kolejnosci (ciezsza najpierw)
-        private sealed class PairLot { public int Req; public int N; public byte HSrc, USrc; public double Q; public ItemObject UIt; public ItemModifier UMd; public float UW; }
+        private sealed class PairLot { public int Req; public int N; public byte HSrc, USrc; public double Q; public ItemObject UIt; public ItemModifier UMd; public float UW;
+            public readonly List<PairSub> Subs = new List<PairSub>(); }
+        // E5: sztuki w grupie par (kon i uprzaz z modyfikatorem) - tylko do widoku "Ridden by"; liczby jadacych, Q i waga dalej z PairLot (bez zmian)
+        private sealed class PairSub { public ItemObject HIt, UIt; public ItemModifier HMd, UMd; public int N, Left; }
+        /// <summary>E5: kto jedzie na jakiej parze (kon + uprzaz, zrodlo) - widok "Ridden by" w ladunku i w Review the army. Tylko watek glowny czyta.</summary>
+        internal sealed class RideLot { public CharacterObject Ch; public byte Kind; public ItemObject HIt, UIt; public ItemModifier HMd, UMd; public byte HSrc, USrc; public int Req, N; }
+        /// <summary>E5: jazda z podgladu DTE (albo z wlasnego doboru) wedlug typu - z para, na koniu bez uprzezy, bez konia / kon zdjety.</summary>
+        internal sealed class CavLot { public CharacterObject Ch; public int Pairs, NoHarness, NoHorse; }
+        internal const byte SrcCargo = SCargo, SrcArmoury = SArm;
+        internal const byte KindFoot = KFoot, KindWoundedRider = KWoundedRider, KindCavWalk = KCavWalk, KindHero = KHero, KindCav = 4;
         /// <summary>E3: uprzaz z ladunku na koniu pod piechurem (para przydzielona w Assign) - sztuka i liczba; waga liczona przez model przy wpisie wagi.</summary>
         internal struct HLot { public EquipmentElement E; public int N; }
         /// <summary>E2: konie pod piechota z par (szybkosc z modyfikatorem, liczba) - HorsePace liczy z nich "Horse quality: spare horses" i sufit kolumny.</summary>
@@ -72,6 +81,9 @@ namespace Armoury
             // E1: braki Jazdy wedlug typu po angielsku (podpowiedz HUD), dzien i czas liczenia rekordu
             public readonly List<string> SkillLowEn = new List<string>();
             public int Day; public double Ms;
+            /// <summary>E5: pary jadace (kto, kon, uprzaz) i pary niewykorzystane (Ch null) - widok "Ridden by"; jazda wedlug typu.</summary>
+            public readonly List<RideLot> RiddenBy = new List<RideLot>(), UnusedBy = new List<RideLot>();
+            public readonly List<CavLot> CavBy = new List<CavLot>();
             /// <summary>E2: konie pod piechota z puli (pary przydzielone w Assign) - szybkosc i liczba; rekord po opublikowaniu tylko czytany (watki tiku).</summary>
             public readonly List<QLot> RideQ = new List<QLot>();
             internal void AddRideQ(float q, int n)
@@ -187,7 +199,7 @@ namespace Armoury
                         if (u.N <= 0 || !SaddleLaw.Fits(u.It, ho.It)) continue;
                         int t = Math.Min(left[i], u.N);
                         left[i] -= t; u.N -= t;
-                        AddPair(res, Math.Max(ho.Req, u.Req), t, ho.Src, u.Src, t * (double)ho.Q, u);
+                        AddPair(res, Math.Max(ho.Req, u.Req), t, ho.Src, u.Src, t * (double)ho.Q, u, ho);
                     }
                 }
             }
@@ -198,14 +210,41 @@ namespace Armoury
         }
 
         /// <summary>E3: uprzaz z ladunku trzymana osobno wedlug sztuki i modyfikatora (wpis wagi); uprzaz ze zbrojowni DTE - bez sztuki (nie lezy w ladunku).</summary>
-        private static void AddPair(List<PairLot> l, int req, int n, byte hs, byte us, double q, Lot u)
+        private static void AddPair(List<PairLot> l, int req, int n, byte hs, byte us, double q, Lot u, Lot ho)
         {
             ItemObject uit = us == SCargo && u != null ? u.It : null;
             ItemModifier umd = uit != null ? u.Md : null;
             float uw = 0f;
             if (uit != null) { try { uw = uit.Weight; } catch { uw = 0f; } }
-            foreach (var x in l) if (x.Req == req && x.HSrc == hs && x.USrc == us && x.UIt == uit && x.UMd == umd) { x.N += n; x.Q += q; return; }
-            l.Add(new PairLot { Req = req, N = n, HSrc = hs, USrc = us, Q = q, UIt = uit, UMd = umd, UW = uw });
+            PairLot pl = null;
+            foreach (var x in l) if (x.Req == req && x.HSrc == hs && x.USrc == us && x.UIt == uit && x.UMd == umd) { x.N += n; x.Q += q; pl = x; break; }
+            if (pl == null) { pl = new PairLot { Req = req, N = n, HSrc = hs, USrc = us, Q = q, UIt = uit, UMd = umd, UW = uw }; l.Add(pl); }
+            // E5: sztuki tej grupy (kon i uprzaz z modyfikatorem, takze uprzaz ze zbrojowni) - tylko widok
+            var hit = ho != null ? ho.It : null; var hmd = ho != null ? ho.Md : null; var sit = u != null ? u.It : null; var smd = u != null ? u.Md : null;
+            foreach (var s in pl.Subs) if (s.HIt == hit && s.HMd == hmd && s.UIt == sit && s.UMd == smd) { s.N += n; return; }
+            pl.Subs.Add(new PairSub { HIt = hit, HMd = hmd, UIt = sit, UMd = smd, N = n });
+        }
+
+        /// <summary>E5: dopisanie n par (sztuki u, grupa p) do listy widoku - te same pola sumowane.</summary>
+        private static void AddRide(List<RideLot> l, CharacterObject ch, byte kind, PairLot p, PairSub u, int n)
+        {
+            if (n <= 0 || u == null) return;
+            foreach (var x in l)
+                if (x.Ch == ch && x.Kind == kind && x.HIt == u.HIt && x.HMd == u.HMd && x.UIt == u.UIt && x.UMd == u.UMd && x.HSrc == p.HSrc && x.USrc == p.USrc) { x.N += n; return; }
+            l.Add(new RideLot { Ch = ch, Kind = kind, HIt = u.HIt, HMd = u.HMd, UIt = u.UIt, UMd = u.UMd, HSrc = p.HSrc, USrc = p.USrc, Req = p.Req, N = n });
+        }
+
+        /// <summary>E5: t par z grupy p dla czlowieka m - po sztukach grupy (kolejnosc doboru); liczby predkosci i wagi bez zmian (PairLot).</summary>
+        private static void TakeSubs(PairLot p, int t, CharacterObject ch, byte kind, Rec r)
+        {
+            foreach (var s in p.Subs)
+            {
+                if (t <= 0) break;
+                if (s.Left <= 0) continue;
+                int k = Math.Min(t, s.Left);
+                s.Left -= k; t -= k;
+                AddRide(r.RiddenBy, ch, kind, p, s, k);
+            }
         }
 
         private static void AddMan(List<ManLot> l, CharacterObject ch, int n, byte kind)
@@ -220,7 +259,7 @@ namespace Armoury
         {
             men.Sort((a, b) => a.Riding.CompareTo(b.Riding));
             var pl = new int[pairs.Count];
-            for (int i = 0; i < pairs.Count; i++) pl[i] = pairs[i].N;
+            for (int i = 0; i < pairs.Count; i++) { pl[i] = pairs[i].N; foreach (var s in pairs[i].Subs) s.Left = s.N; }   // E5: sztuki grupy od nowa
             int p = 0;
             foreach (var m in men)
             {
@@ -235,8 +274,12 @@ namespace Armoury
                     if (pairs[p].N > 0) r.AddRideQ((float)(pairs[p].Q / pairs[p].N), t);   // E2: srednia szybkosc koni tej grupy par
                     if (pairs[p].HSrc == SCargo) r.RideCargoHorse += t;
                     if (pairs[p].UIt != null) r.AddRideHarness(pairs[p].UIt, pairs[p].UMd, t);   // E3: uprzaz z ladunku na koniu pod czlowiekiem
+                    try { TakeSubs(pairs[p], t, m.Ch, m.Kind, r); } catch (Exception e) { Stumble("Assign.RiddenBy", e); }   // E5: tylko widok
                 }
             }
+            // E5: pary niewykorzystane po sztukach (pod jencow albo za trudne) - widok "Ridden by"
+            try { for (int i = 0; i < pairs.Count; i++) if (pl[i] > 0) foreach (var s in pairs[i].Subs) if (s.Left > 0) AddRide(r.UnusedBy, null, 0, pairs[i], s, s.Left); }
+            catch (Exception e) { Stumble("Assign.UnusedBy", e); }
             int unused = 0, umin = -1, ucargo = 0;
             for (int i = 0; i < pairs.Count; i++) if (pl[i] > 0) { unused += pl[i]; if (pairs[i].HSrc == SCargo) ucargo += pl[i]; if (umin < 0 || pairs[i].Req < umin) umin = pairs[i].Req; }
             r.UnusedPairs = unused; r.UnusedReqMin = umin; r.UnusedCargoHorse = ucargo;
@@ -378,6 +421,7 @@ namespace Armoury
                         int noHar = Math.Max(0, t.Rode - t.Harnessed);
                         r.CavNoHarness += noHar; r.CavNoHorse += t.NoHorse; r.CavNoSaddle += t.NoSaddle;
                         int walkers = noHar + t.NoHorse + t.NoSaddle;
+                        if (t.Harnessed > 0 || walkers > 0) r.CavBy.Add(new CavLot { Ch = t.Troop, Pairs = t.Harnessed, NoHarness = noHar, NoHorse = t.NoHorse + t.NoSaddle });   // E5
                         int healthy; cavHealthy.TryGetValue(t.Troop, out healthy);
                         walkers = Math.Min(walkers, healthy);   // tylko jezdzcy wzorca (piechur z podgladu nie jest jezdzcem bez pary)
                         AddMan(men, t.Troop, walkers, KCavWalk);
@@ -400,6 +444,9 @@ namespace Armoury
                     Assign(cm, cp, tmp);
                     r.CavPairs = tmp.Ride;
                     foreach (var m in cm) AddMan(men, m.Ch, m.N - m.Got, KCavWalk);
+                    // E5: jazda z wlasnego doboru - pary po sztukach (kon i uprzaz ze zbrojowni) i typy
+                    foreach (var x in tmp.RiddenBy) { x.Kind = KindCav; r.RiddenBy.Add(x); }
+                    foreach (var m in cm) if (m.N > 0) r.CavBy.Add(new CavLot { Ch = m.Ch, Pairs = m.Got, NoHarness = 0, NoHorse = m.N - m.Got });
                     // zuzyte pary jazdy zdejmujemy z puli zbrojowni: najlatwiejsze pary poszly do jazdy, wiec do piechoty idzie reszta wedlug liczby
                     int usedH = tmp.Ride, usedU = tmp.Ride;
                     foreach (var x in ah) { int t = Math.Min(usedH, x.N); usedH -= t; int f = x.N - t; if (f > 0) { r.AFreeHorses += f; AddLot(horses, x.It, f, SArm); } }
@@ -983,6 +1030,7 @@ namespace Armoury
                       .Append(" (ludzie - bydlo - wolne konie)").Append(r.AtSea ? " - na morzu nikt nie jedzie" : "")
                       .Append(" | pamiec rekordu: liczen od startu sesji ").Append(_mainCount).Append(", ostatnie ").Append(r.Ms.ToString("0.0", Inv)).Append(" ms")
                       .Append(" | ").Append(MarchHud.State());
+                    try { sb.Append(" | ").Append(RiddenBy.State(r)); } catch (Exception e) { Stumble("RiddenBy.State", e); }   // E5
                     try { SpeedLine(sb, mp, r); } catch (Exception e) { Stumble("SpeedLine", e); }   // E2
                     try { WeightLine(sb, mp, r); } catch (Exception e) { Stumble("WeightLine", e); }   // E3
                     // HorsePace dla porownania (krok 1 i 3 - E2 zastapi wpis "riders without horses")

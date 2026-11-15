@@ -8740,6 +8740,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ArmouryHasWeight { get; set; } = true;
 
+        [SettingPropertyBool("Ridden By View", HintText = "the hover panel of a riding horse or a horse harness in your inventory shows who rides it on the march ('Ridden by', the other half of the pair, pieces paired but not ridden, pieces with no fitting partner) - in the stash also for the footmen's pairs from the troops' armoury; Review the army - Horses and harness ends with a 'Who rides what' page. The same pairs as Horses on the map bar. Display only: nothing is moved (off = no such lines)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool RiddenByView { get; set; } = true;
+
         [SettingPropertyBool("Harness On Spare Horses", HintText = "the old rule, used only while Ridden Harness Weightless is off: every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside) and that harness adds its weight to your carry capacity, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HarnessOnSpareHorses { get; set; } = true;
@@ -15974,6 +15978,7 @@ namespace Armoury
             s.MarchPairsSpeed = MarchPairsSpeed;
             s.RiddenHarnessWeightless = RiddenHarnessWeightless;
             s.ArmouryHasWeight = ArmouryHasWeight;
+            s.RiddenByView = RiddenByView;
             s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;

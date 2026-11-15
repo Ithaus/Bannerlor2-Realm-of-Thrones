@@ -463,8 +463,13 @@ namespace Armoury
         {
             hv = null;
             try { hv = HorsesOf(mp, next, fit); } catch (Exception e) { Stumble("HorsesOf", e); }
-            try { return Paginate(HorsePageText(mp, pairs, hv, col)); }
-            catch (Exception e) { Stumble("HorsePageText", e); hv = null; return Paginate(HorseText(mp, pairs)); }
+            List<string> pages;
+            try { pages = Paginate(HorsePageText(mp, pairs, hv, col)); }
+            catch (Exception e) { Stumble("HorsePageText", e); hv = null; pages = Paginate(HorseText(mp, pairs)); }
+            // 537 E5: strona "Who rides what" na koncu (rekord MarchPairs - te same pary co HUD; klucz RiddenByView)
+            try { var t = RiddenBy.PageText(MarchPairs.Main(false)); if (t != null) pages.AddRange(Paginate(t)); }
+            catch (Exception e) { Stumble("RiddenBy.PageText", e); }
+            return pages;
         }
 
         /// <summary>Strony tekstu z powrotem do przegladu ("More" / "Back", na ostatniej "Back" / "Close"). back (133c) - dokad wraca "Back" (null - przeglad).</summary>
