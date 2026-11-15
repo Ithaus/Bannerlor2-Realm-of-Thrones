@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 266 (573 kapitulanci bez walki obszukani - 33% gracz / reszta ludzie, po recenzji), bez autotestu
+
+- Armoury.dll 99da3733 = noc/scal-perki 94353c5b (265 + 573; zbudowane w osobnym worktree w573, bo 574/575 trwaja w nscal). Kopie: .bak-2026-11-15-przed-wgranie266, Backup C: i D: (2026-11-15-wgranie266 i -przed). Nowy klucz SurrenderCaptivesStripped (domyslnie true).
+- Do sprawdzenia: po poddaniu bandy linia 'Jency obszukani (573 kapitulacja): N ludzi, M szt.; dzialka gracza X szt. (33%)' i sztuki na liscie gracza w zbrojowni; po bitwie w polu z jencami tej linii byc nie ma; przy 'Capture the enemy' (sami ranni) - pominiete.
+
 ## STAN 15.11 - WGRANIE 265 (567 kryjowka nie wraca w ostatnio rozbite miejsce, 568 lup band w kryjowce, 569 noc bez lupu z niczego, 570 poscig za skarbem + laczenie band jednego klanu, 571 musztra z listy gracza w zbrojowni, 572 szybkie drabiny 8:1), bez autotestu
 
 - Armoury.dll 19effb0e = noc/scal-perki 9ad416e6 (264 + 567-572; scalenie sprawdzone recenzja). Kopie: .bak-2026-11-15-przed-wgranie265, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie265 i -przed). Nowe klucze: HideoutNeverLastCleared, HideoutGoodsStash/Share/Cap, HideoutNightNoFreeLoot, HideoutReprisalKinOnly, HideoutVendetta*, DrillTakesPlayerStash, SiegeLadderStormRatio 8 / StormDays 1; zapis arm_570_vendetta, segment B= musztry.
