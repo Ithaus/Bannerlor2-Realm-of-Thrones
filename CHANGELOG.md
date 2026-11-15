@@ -1,5 +1,53 @@
 # DZIENNIK ZMIAN
 
+## 541: pasek mapy - szerokosc jak przed 537 (nie zaslania Done), pelne ulamki, Weapons i Armour (zapas musztry), ikony konia, jucznego, miecza i zbroi - Armoury (MarchHud, MarchHudUi NOWY, Drill.HudKit, MenPurse.KeptGiven)
+
+**Problem:** Jeff, czat 15.11 (zrzut paska: gora gold 225k, 1.5, -, morale 90%, 133+1w, 519, 72.5, Horses 132, 120; dol 2, 9.8, 1089, Harness 132, Pack 53 z ikona zboza): "zobacz dolny prawy pasek tam gdzie dodales konie rozszerzyles go i nachodzi na przycisk done, zmiany: rozmiar ma byc taki jak przedtem; dodaj ikony miecza i zbroi, aby bylo wiadomo ile broni i zbroi ofiarowac ludziom do szybszego szkolenia, bo teraz nikt nie wie ile i gdzie i jak ubywa - to mamy np. bronie 45/45 a za kilka dni 43/45, to samo zbroje; mamy 132/ na 132 ma byc ile mamy zapelnionych czemu jest tylko 132?; czy mozesz dobrac bardziej pasujace ikony - ikona zboza srednio pasuje".
+
+**Przyczyna:**
+- Szerokosc: MapBar.xml (SandBox) - InfoBarWidget i oba rzedy maja CoverChildren, pasek = szerszy z dwoch rzedow. 537 E1 dodal Horses do GORNEGO rzedu (PrimaryInfoItems) - ok. +73 px, a gorny rzad wyznacza szerokosc (dol z 5 pozycjami ok. 445 px niczego nie poszerzal).
+- Sama liczba: MarchHud.Frac mial MaxChars 5 (pole tekstu MaxWidth 52 przy FontSize 20; dluzszy tekst lamie sie do drugiej linii) - "132/150" (7 znakow, ok. 57 px) obciete do licznika. Harness i Horses to ta sama funkcja Frac(Ridden, AllHorses) - dlatego oba "132".
+- Ikony: SetOverriddenVisualId na warstwy gry speed / troops / food (stad zboze na Pack).
+- 45/45 -> 43/45 (dowod z logu Armoury-2026-11-15_05-07-27, linie "Musztra (gracz)"): zuzycie musztry min(stan, komplet) x D / 200 na dobe (pelny dzien 8 h: D 2.25 - ok. 0.5 sztuki na grupe), sprzedaz nadwyzki ludzi w miescie (05:15:04 "Your men sold 328 spare pieces"), komplet rosnie z rekrutami (ceil(ludzie/3)). Na pasku nic tego nie pokazywalo.
+
+**Zmiana:**
+- Gorny rzad wraca do pozycji gry (MarchHud.PurgeOurs zdejmuje z niego kazda pozycje "armoury_") - szerokosc paska sprzed 537.
+- Dolny rzad: Horses, Pack, Weapons, Armour. **Harness polaczone z Horses** (liczby byly identyczne; z piecioma naszymi pozycjami z ulamkami dol bylby o ok. 100 px szerszy - decyzja do potwierdzenia przez Jeffa). Horses w kolorze ostrzezenia, gdy uprzezy mniej niz koni (AllHarness < AllHorses) albo pary stoja przez Riding (UnusedPairs); szczegoly uprzezy jak dotad w podpowiedzi. Stara pozycja armoury_harness zdejmowana z listy.
+- Weapons / Armour (tylko przy czynnym zapasie musztry, Drill.StockOn): have/komplet, have = od gracza + nadwyzka ludzi (ta sama liczba co wiadomosc "Your men took ... drill stock" i wzor S w CtxOf), komplet = ceil(ludzie/3); kolor ostrzezenia ponizej kompletu; bez zolnierzy "-". Podpowiedz po angielsku: stan i komplet, w uzyciu, od gracza / nadwyzka ludzi, ile jeszcze przyjma (2 komplety), premia XP (+10% przy pelnym, perk Giving Hands / Paid in Promise x1.5), zuzycie na pelny dzien musztry, za ile dni nastepna sztuka, zuzyte dzis, skad dodac (Discard / trofea) i gdzie znika (sprzedaz w miescie, zlom do kowali).
+- Drill.HudKit (NOWE, internal): ludzie i "od gracza" zywe (dwa pola i mala petla po _stock); nadwyzka ludzi (11 planow K1 MenPurse.PlayerSurplusPlan) liczona od nowa tylko po zmianie zbrojowni DTE albo skladu (VersionNo, referencja zbrojowni) i najwyzej raz na 1 s, inaczej z pamieci. MenPurse.KeptGiven (NOWE) - licznik 535 zapamietany i przywracany wokol liczenia paska (linia sprzedazy bez zmian). Reset w Drill.Reset.
+- Pelne ulamki: MarchHudUi (NOWY plik, osobny UIExtender "Armoury.MarchHud", rejestracja w OnSubModuleLoad przez metode NoInlining jak HorseWindBarUi) - PrefabExtensionSetAttributePatch MaxWidth=70 TYLKO na polu tekstu szablonu dolnego rzedu (xpath ListPanel[@Id='BottomInfoBar']/ItemTemplate/...). Frac bez MaxChars (pelny ulamek takze w RiddenBy i linii doby).
+- Bezpiecznik szerokosci w MarchHud.Sync: szacunek obu rzedow z XAdvance czcionki Galahad ((adv + 0.5) x 20/32, przyciete do [20, MaxWidth], +50 na pozycje, +75 na rzad). Gdy dol bylby szerszy niz gora, pozycje PELNE (bez ostrzezenia) od konca (Armour, Weapons, Pack, Horses) pokazuja sam licznik; pozycje z brakiem zawsze pelny ulamek. Bez nalozonej wstawki (BottomApplied 0) liczy z MaxWidth 52 - ulamek dluzszy niz pole pokazuje sam licznik (bez lamania linii).
+- Ikony: wlasne warstwy armoury_horses / _pack / _weapons / _armour dopisane do pedzla MapBar.Right.Icons, ktory wygral (BK z piety zostaje - wlasnego pedzla nie robimy), FillFrom warstwy "food", ImageFitType Contain, sprajty gry z Native (ui_group1, AlwaysLoad): General\EquipmentIcons\equipment_type_mount (kon), SPGeneral\MountFlagIcons\weight_carrying_mount (juczny), General\EquipmentIcons\equipment_type_one_handed (miecz), General\EquipmentIcons\equipment_type_body_armor (zbroja); zapasowe sprajty i na koncu dawna warstwa gry (speed / food / troops / hit_points). Warstwy sprawdzane w kazdym Sync porownaniem referencji pedzla (przeladowanie BrushFactory = dopisanie od nowa). Kazda ikona we wlasnym try z licznikiem potkniec; bez wylacznika.
+- Podpowiedz MCM "March Pairs Hud" (Settings.cs i McmSettings.cs, recznie) opisuje nowy uklad. Bez nowych kluczy.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: HorsesText / HarnessText / PackText czytaja tez MarchPairs (linia doby "Pary marszowe (gracz)") i RiddenBy - teraz zawsze pelny ulamek (tam to tylko tekst). Predkosc, waga, FootStable.Pump i StashWeight.Refresh w Sync bez zmian (te same wolania, ta sama kolejnosc, takze przy kluczu NIE).
+- Kolizje: UIExtenderEx wylacza gotowy (AutoGenerated) kod prefabu MapBar, gdy film ma wstawke - jak dawniej MapSpeedUi przed Better Time; prefab czytany z XML. Better Time / BK nie dotykaja szablonu dolnego rzedu (BK dodaje warstwe piety i pozycje do gornego rzedu - nasze warstwy dopisane do tego samego pedzla, nic nie podmieniamy). Drill.HudKit nie zmienia stanu musztry (tylko odczyt; PlayerSurplusPlan ma jedyny efekt uboczny _keptGiven - przywracany).
+- Koszt: co 0.2 s - dwa odczyty VersionNo, petla po _stock, HasPerk x2, szacunek szerokosci ok. 15 krotkich napisow; plan K1 najwyzej raz na 1 s i tylko po zmianie zbrojowni lub skladu.
+- Szacunek szerokosci liczony z kodu i Galahad.fnt, w grze NIE sprawdzony; przy wartosciach Jeffa (gora ok. 713 px) dol z 7 pozycjami i ulamkami ok. 700 px - na styk. Jesli pasek dalej siega Done - sprawdzic linie "pasek (N) -> ... szerokosc (szacunek): gora X px, dol Y px".
+- W logu: linia startu "Pasek mapy - pary marszowe (537 E1 / 541): ... pole tekstu dolnego rzedu: MaxWidth 70 ... zarejestrowane, nalozone Nx | ikony: horses sprajt General\EquipmentIcons\equipment_type_mount, pack sprajt ..., weapons ..., armour ..." (N moze byc 0 przy starcie sesji - prefab laduje sie z mapa; linia doby "pasek mapy: ... MaxWidth dolnego rzedu 70 (nalozone Nx)" musi miec N > 0); "Pasek mapy (541): UIExtenderEx - MaxWidth 70 ... zarejestrowane" przy starcie gry; linie "pasek (N) -> Horses a/b, Pack c/d, Weapons e/f, Armour g/h | pelne: ... | musztra: bron X (od Ciebie G, nadwyzka ludzi S) ...". Liczby Weapons/Armour musza sie zgadzac z linia "Musztra (gracz)" (bron X/komplet) i z wiadomoscia po Discard.
+- W grze: pasek nie siega przycisku Done ekranu ekwipunku; ikony kon / juczny / miecz / zbroja widoczne (nie puste); podpowiedzi po najechaniu.
+
+### Recenzja 541 (galaz noc/541-pasek-fix -> noc/541-pasek)
+
+Przyjete (sprawdzone w kodzie):
+- **1. Horses - falszywe ostrzezenie.** Warunek `AllHarness < AllHorses || UnusedPairs > 0` zapalal kolor przy nadmiarze koni lub par w zbrojowni DTE, choc nikt nie szedl pieszo (MarchPairs.Assign: UnusedPairs = wszystkie pary bez jezdzca). Teraz `WalkNoHarness > 0 || WalkSkill > 0` (ktos naprawde idzie pieszo bez uprzezy albo przez za niska Jazde) - MarchHud.Sync.
+- **2. Szerokosc nie gwarantowana.** Bezpiecznik skracal tylko pozycje bez ostrzezenia. Teraz druga runda skraca takze pozycje z ostrzezeniem (kolor zostaje, pelny ulamek w podpowiedzi). Gdy nawet same liczniki sa szersze niz gorny rzad - wiecej zrobic sie nie da (4 pozycje); linia "pasek (N)" pokazuje oba szacunki.
+- **3. Pelne liczenie podgladu bitwy co sekunde.** HudKit -> PlayerSurplus -> PlayerSurplusPlan -> KitPreview.ForArmoury -> Get(false): przy zmianie skladu chybia pamiec i robi Compute (ok. 35 ms). Teraz: nowe `KitPreview.Fresh(r)` (ten sam klucz co Get - Get(false) zwroci wynik bez liczenia); HudKit przelicza nadwyzke od razu (najwyzej 1/s), gdy pamiec podgladu aktualna, a gdy nie - najwyzej raz na 5 s (jak DteMapBar533), do tego czasu stare liczby. Linia doby: "przeliczen zapasu musztry N (w tym z pelnym liczeniem podgladu bitwy M)".
+- **4. Spozniona liczba po Discard / zmianie dnia.** Klucz paska ma teraz takze wersje sakw, dzien i referencje KitPreview.Last (Accept po Discard liczy podglad - pasek przelicza sie z tym samym wynikiem, ta sama liczba co wiadomosc).
+- **5. Linia startu "nalozone 0x".** Przy 0 pisze, ze wstawka naklada sie przy pierwszym wczytaniu paska i liczbe pokazuje linia doby.
+- **6. Podpowiedz MCM.** "shown when Drill Stock, Drill Law and Donation Xp Off are on" (warunek Drill.StockOn); opis ostrzezenia Horses zgodny z p. 1; skrot dotyczy kazdej pozycji. Settings.cs i McmSettings.cs recznie (gen_mcm.py nadpisuje reczne zmiany innych wpisow w McmSettings - nie uzywac do tej poprawki).
+
+Odrzucone / bez zmian w kodzie:
+- **7. Usuniecie pozycji Harness** - decyzja dla Jeffa (liczby byly identyczne z Horses; uprzeze sa w podpowiedzi Horses i w kolorze ostrzezenia).
+
+**Ryzyko / co sprawdzic (recenzja):**
+- Regresje: KitPreview.Fresh tylko czyta (Key jak Get); PlayerSurplus / Accept / CountPlayerStock / DteMapBar533 bez zmian. Pasek moze pokazac stara nadwyzke do 5 s po zmianie skladu, gdy nikt inny nie liczyl podgladu.
+- W logu: linia doby "pasek mapy: ... przeliczen zapasu musztry N (w tym z pelnym liczeniem podgladu bitwy M)" - M nie wiecej niz ok. 1 na 5 s gry przy ciaglych zmianach; Horses bez koloru ostrzezenia, gdy wszyscy jada.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 540: opisy perkow wedlug dzialania - 60 polowek perkow z nowym angielskim opisem (podpowiedz i okno wyboru perku) - Armoury (PerkTexts.cs, klucz Perk Texts Rewrite)
 
 **Problem:** Jeff, czat 15.11, ze zrzutem ekranu perku Bow Deep Quivers z tekstem gry "+3 extra arrows per quiver / +1 extra arrow per quiver to troops in your party": "ale kurwa czemu opisy perkow nie sa poprawione i perki przeciez miales to zrobic". Audyt perkow 14.11 (docs/audyty-2026-11-14/PERKI.md, PERKI-DECYZJE.md) i wpisy 500-519 (oraz 526, 289, 362, m109, 181, A17/KS) zmienily dzialanie perkow, ale w grze zostaly opisy gry - np. Deep Quivers nie daje strzal (ROT nie wola InitializeMissionEquipment, licznik 512: "wywolan metody gry 0"), tylko +10% odzysku strzal partii.
@@ -183,9 +231,6 @@ Ryzyko: brak (tylko napis w linii doby; nowa wlasciwosc tylko do odczytu). Statu
 - Stan z pamieci nie widzi nocnej zmiany odsieczy - trwa najwyzej do pierwszej mysli po migawce (Hourly od 1. godziny doby), potem normalny sad (moze ODSTAP po 2 myslach jak dotad). Odwrot pod przewazajaca odsiecza moze sie opoznic o te godzine.
 - Licznik _dJudge i _dStates tylko z prawdziwych sadow; StaleState tylko pod _lk; liczniki zerowane w ZeroSiegeDay.
 - W logu: wiecej "trzymane", mniej KO "odejscie z obozu" na poczatku doby przy duzej przewadze; licznik 543 w linii koszt > 0.
-- Build Armoury 0 bledow. W grze nie sprawdzone.
-
-**Status:** DO SPRAWDZENIA
 
 ### Recenzja 543
 
@@ -196,6 +241,7 @@ Uwagi drobne - potwierdzone, bez zmian w kodzie (zgodnie z recenzja):
 2. Kosmetyka linii "koszt" (`LocalFront334e.Log.cs:202`): fragment 543 wypisywany takze przy zerze; uzycia sprzed Daily wchodza do linii, ktora Daily wypisuje za poprzednia dobe. Tylko log.
 
 Co sprawdzic w logu po wgraniu: w linii "koszt" 334e `bez migawki z dzis ... N razy` > 0; przy Acorn Hall i podobnych brak mysli KO bez opcji oblezenia miedzy pierwsza linia doby a linia migawki.
+
 
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 

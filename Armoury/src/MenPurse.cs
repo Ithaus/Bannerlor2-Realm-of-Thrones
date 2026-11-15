@@ -619,6 +619,8 @@ namespace Armoury
         }
 
         private static int _keptGiven;   // 535: sztuki zdjete ze sprzedazy, bo podglad bitwy je wydaje (licznik do linii sprzedazy)
+        /// <summary>541: pasek mapy (Drill.HudKit) liczy nadwyzke tym samym planem - zapamietuje i przywraca licznik, zeby nie dopisywal sie do linii sprzedazy.</summary>
+        internal static int KeptGiven { get { return _keptGiven; } set { _keptGiven = value; } }
 
         /// <summary>535: na kazdy przedmiot w zbrojowni zostaje co najmniej tyle sztuk, ile podglad bitwy wydaje ludziom (Given); nadmiar sprzedazy zdejmowany
         /// od najlepszych egzemplarzy (lista WorseFirst - od konca). Zwraca liczbe sztuk zdjetych ze sprzedazy.</summary>
