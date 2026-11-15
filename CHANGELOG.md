@@ -17,6 +17,16 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 543
+
+Recenzja galezi `noc/543-polnoc` (37064220): brak uwag blokujacych; kod czytany z galezi, w grze nie sprawdzany. Proby zlamania (odsiecz w nocy, zly oboz, tryby 2/4/5, zapis i wczytanie, watki, kompilacja) - wynik negatywny, sprawdzone w kodzie: luka bez migawki trwa najwyzej do 1. godziny doby (`LocalFront334e.cs` Hourly: BuildSnap gdy `d != Today && (d < 0 || godzina >= 1)`), bitwa przy obozie przerywa Judge (`party.MapEvent != null`), StaleState odrzuca ODSTAP (4), inna strone (`ReferenceEquals(r.K, k)`) i stan starszy niz 24 h, nie rusza `r.Hour` ani licznika Bad.
+
+Uwagi drobne - potwierdzone, bez zmian w kodzie (zgodnie z recenzja):
+1. Luka po wczytaniu (stara, nie z 543): po wczytaniu `_snap.Day = -1`, `_camps` puste - mysli przed pierwszym Hourly nadal bez sadu i bez opcji oblezenia (pierwszy Hourly buduje migawke o kazdej godzinie, bo `d < 0`). Raz na wczytanie; jesli Jeff zobaczy zwiniety oboz zaraz po wczytaniu - to ten mechanizm.
+2. Kosmetyka linii "koszt" (`LocalFront334e.Log.cs:202`): fragment 543 wypisywany takze przy zerze; uzycia sprzed Daily wchodza do linii, ktora Daily wypisuje za poprzednia dobe. Tylko log.
+
+Co sprawdzic w logu po wgraniu: w linii "koszt" 334e `bez migawki z dzis ... N razy` > 0; przy Acorn Hall i podobnych brak mysli KO bez opcji oblezenia miedzy pierwsza linia doby a linia migawki.
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).
