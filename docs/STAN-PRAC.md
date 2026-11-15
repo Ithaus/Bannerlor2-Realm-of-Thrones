@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 257 (558 towarzysze cwicza jak oddzial), bez autotestu
+
+- Armoury.dll 4da0d0ab = noc/scal-perki 94a12643 (256 + 558). Kopie: .bak-2026-11-15-przed-wgranie257, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie257 i -przed). Klucze NOWE DrillHeroes (TAK), DrillHeroXpMult 1.0.
+- Do sprawdzenia: linia 558 (XP bohaterow, umiejetnosci), napis 'X XP each learned', pasek Drill 82/132. Decyzje Jeffa: 555 a/b/c, kusze, druzyna z samymi towarzyszami przy Drill Camp Only, dowodcy partii AI cwicza?
+
 ## STAN 15.11 - WGRANIE 256 (556 log zbiorki armii wladcy i pierwszej mysli po zbiorce), bez autotestu
 
 - Armoury.dll 73ca1d37 = noc/scal-perki bd3b436c (255 + 556, tylko log). Kopie: .bak-2026-11-15-przed-wgranie256, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie256 i -przed).
