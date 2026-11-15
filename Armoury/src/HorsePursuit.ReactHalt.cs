@@ -71,6 +71,12 @@ namespace Armoury
         internal static int HaltFireRel { get { return LRel[LFire]; } }
         internal static int HaltRoleRel441 { get { return LRel[LRole]; } }   // 441-p: postoje 283 zwolnione przez role jazdy Armoury
 
+        /// <summary>552 (CloseRanks B1, glowny watek): szyk stoi teraz na postoju R4 283 - ReactHalt sam ustawia mu FacingOrder (Face), 552 go nie obraca.</summary>
+        internal static bool HaltHolds(Formation f)
+        {
+            return f != null && Halts.ContainsKey(f);
+        }
+
         /// <summary>441-p (recenzja 441, jeden wlasciciel): Doctrine.C441SetRole PRZED Take - trwajacy postoj 283 szyku zwolniony, poki wagi sa jeszcze nasze
         /// (Release oddaje zapisane wagi zachowan gry i RBM). Glowny watek. false = szyk nie stal.</summary>
         internal static bool ReleaseHaltForRole441(Formation f)

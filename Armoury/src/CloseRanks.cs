@@ -43,7 +43,7 @@ namespace Armoury
     /// bitwe (BattleSense.Clean, po linii 140). Klucz NIE: ta sama ocena na sucho (szyko-sekundy, co bysmy wybrali) - szyk zostaje RBM.
     /// Nazwa klasy nie moze byc "Log", "Settings" ani "McmSettings".
     /// </summary>
-    internal static class CloseRanks
+    internal static partial class CloseRanks   // 552: czesc w CloseRanks.Front552.cs
     {
         // ------------------------------------------------------------ stale
         internal const float PassEvery = 0.5f;      // pass szykow (glowny watek) - tyle co tick FormationAI (FormationAI:116)
@@ -68,6 +68,7 @@ namespace Armoury
             public bool Any, Guard;   // poprawka recenzji 310: Any = nasz szyk z decyzji 310 (poza RBM); Guard = szyk w zakresie 310 i RBM nie pyta (straz tylko wtedy)
             public ArrangementOrder.ArrangementOrderEnum Seen, Applied, Before;
             public float LastChange = -100f, LastCall = -100f, FireStart = -1f, Ratio;
+            public S552 S;   // 552: czolo do strzelca / tarcze na czolo / marsz (CloseRanks.Front552.cs)
         }
 
         private static readonly object Gate = new object();
@@ -405,6 +406,7 @@ namespace Armoury
             _live = _s4 && _field;
             _on = _live && _key && Patched;
             _guard = _on && _any && GuardPatched;
+            Begin552(c);   // 552: klucze i latki (po _on)
         }
 
         /// <summary>BattleSense.OnMissionTick (po ShieldsUp.Tick - S4 z tej klatki): pass szykow co 0.5 s.</summary>
@@ -455,6 +457,7 @@ namespace Armoury
                     if (!Forms.TryGetValue(f, out st) || !st.Fire || st.Contact) return;
                     int cat = st.Ours ? (st.Applied == ArrangementOrder.ArrangementOrderEnum.ShieldWall ? 0 : 1) : 2;
                     Hit[cat * 3 + kind]++;
+                    HitRank552(st, v, kind);   // 552 B3: szereg 0 / dalej w szykach z tarczami na czolo
                 }
             }
             catch (Exception e) { Stumble("CloseRanks.OnHit", e); }
@@ -496,6 +499,7 @@ namespace Armoury
                 _anyReact = 0;
                 for (int i = 0; i < Sec.Length; i++) Sec[i] = 0f;
             }
+            Clear552();   // 552: sloty i liczniki (latki przestaja dzialac)
             Interlocked.Exchange(ref _gCalls, 0);
             Interlocked.Exchange(ref _gSwaps, 0);
             Units.Clear();
@@ -593,8 +597,13 @@ namespace Armoury
 
         private static void One(Mission m, Team t, Formation f, Team pt)
         {
-            if (Doctrine.Q446Holds(f)) return;   // 446: szyk w czworoboku przed jazda - jeden wlasciciel ustawienia (stan 146 / 310 bez zmian do wyjscia)
             St st;
+            if (Doctrine.Q446Holds(f))   // 446: szyk w czworoboku przed jazda - jeden wlasciciel ustawienia (stan 146 / 310 bez zmian do wyjscia)
+            {
+                lock (Gate) Forms.TryGetValue(f, out st);
+                Drop552(f, st);   // 552: czworobok - sloty zwolnione (jeden wlasciciel FacingOrder)
+                return;
+            }
             lock (Gate) Forms.TryGetValue(f, out st);
             var q = f.QuerySystem;
             bool inf = q != null && q.IsInfantryFormation;
@@ -773,6 +782,8 @@ namespace Armoury
             }
             if (restore) f.SetArrangementOrder(Of(back));
             else if (apply) f.SetArrangementOrder(Of(target));
+            // 552: czolo do strzelca (B2), tarcze na czolo (B3), tarcze w marszu (C2) - po decyzji o szyku; wlasny try i licznik potkniec na szyk
+            Front552(m, t, f, st, inf, fire, contact, gap, beh, horse, men, hand);
         }
 
         // ------------------------------------------------------------ linia bitwy
@@ -862,6 +873,7 @@ namespace Armoury
                 sb.Append(" | potkniecia szyk ").Append(stum).Append(" (w latce ").Append(perr).Append(").");
             }
             Log.Info(sb.ToString());
+            Write552();   // 552: linia "Front do strzelca (552)" zaraz po linii 146
         }
     }
 }

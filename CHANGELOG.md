@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 552: szyk AI pod ostrzalem - sygnal widzi samotnego strzelca (552a) - Armoury (ShieldsUp.cs; klucz NOWY ShieldsUpHarassShots = 2, MCM "Shields Up Harass Shots")
+## 552: szyk AI pod ostrzalem - sygnal widzi samotnego strzelca (552a), czolo do strzelca i tarcze na czolo (552b) - Armoury (ShieldsUp.cs, CloseRanks.cs + CloseRanks.Front552.cs; klucze NOWE ShieldsUpHarassShots = 2, FormationsFaceTheShooter, ShieldsToTheFrontRank)
 
 **Problem:** Jeff, czat 15.11, w bitwie: "potem strzelam do szyku - ludzie z tarczami stoja z tylu, bez tarcz z przodu; widza ze do nich strzelam, to zamiast ustawic ludzi z tarczami z przodu i zrobic shield wall, to stoja jak kretyni i sie nie chronia; potem strzelam do wojska jak idzie, porusza sie, to musi sie odwrocic do mnie tarczami bo chca zachowac zycie, skierowac tarczownikow na kierunek mojego ostrzalu, a ida jak zombie i olewaja to, nawet nie biegna, po prostu ida". Specyfikacja 552 (raport z logu): Jeff trafial co 3-5 s, S4 (140) wymaga 3 zdarzen w 5 s, a miara gry UnderRangedAttackRatio dawala ok. 0.03 przy progu 0.33 - CloseRanks mial fire=false, decyzja konczyla sie na YQuiet; 146/310, 291 C i 140 dla calego szyku nie ruszyly.
 
@@ -21,7 +21,26 @@
 - Nic nie czyta MovementOrder (pulapka 12.11). Pierscien czyszczony z FState (ShieldsUp.Clear -> Forms.Clear).
 - Build 0 bledow; w grze nie sprawdzone. Weryfikacja: linia 140 "przez nekanie" > 0; linia 146 wzrost ShieldWall/Loose i 310 przy nekaniu; linia 291 C "bez tarcz pod ostrzalem biegnie".
 
-**Status:** DO SPRAWDZENIA (552a osobno do wgrania - CLAUDE.md p. 2; nie wgrane)
+**Zmiana (552b, osobny commit - szyk stojacy: czolo do strzelca i tarcze w pierwszym szeregu; nowy plik CloseRanks.Front552.cs, CloseRanks partial; klucze NOWE FormationsFaceTheShooter = TAK, ShieldsToTheFrontRank = TAK, MCM "Formations Face The Shooter" / "Shields To The Front Rank"):**
+- Zakres: szyk AI piechoty kazdej strony (IsAIControlled i bez gracza w szyku = !HorsePursuit.PlayerFormDirect), tylko bitwa polowa i tylko przy czynnym 146 (_on: AiFormationsUnderFire + latka RBM). Szyk z rozkazem gracza nigdy. Strzelcy bez zmian.
+- Wolane z CloseRanks.One na koncu (po decyzji o szyku), wlasny try; potkniecie liczy sie na szyk (od 5 szyk pominiety do konca bitwy, sloty zwolnione), RoutHold.Stumble miejsce "szyk" - funkcji nie gasimy.
+- B1/B2 czolo do strzelca: S4 (z 552a), przed zwarciem, bez konnicy w 90 m i bez szarzy od czola, nie BehaviorCharge, szyk stoi (srodek < 1 m przez 2 s, pierscien 5 pozycji bez MovementOrder), ShooterDir z rozrzutem >= 0.6, kat do czola >= 50 st., brak nierozbitego szyku piechoty/konnicy wroga w 120 m pod katem > 60 st. od strzelca; wykluczone: czworobok 446, postoj R4 283 (nowy odczyt HorsePursuit.HaltHolds), odwod 457 (HeldReserve; szyk 8 z 459 jest nie-AI - SetControlledByAI(false) - wiec i tak poza zakresem). Slot na szyk (FForm/FAng/FOn, Volatile) + postfiks FormationAI.TickOccasionally(float) (DeclaredMethod, Priority.Last po com.rbmai, kontrola GetPatchInfo) nadpisuje FacingOrder po zachowaniu gry/RBM w tym samym wywolaniu; wejscie od razu SetFacingOrder na glownym watku. Nowy kierunek przy zmianie > 30 st. najwczesniej 6 s po poprzednim. Koniec: 3 s bez ostrzalu / zwarcie / konnica / ruch (po 4 s od zwrotu - obrot sam przesuwa srodek) albo szarza / gracz / zagrozenie z innej strony / 446-R4-rezerwa; facing wraca sam przy nastepnym ticku zachowania.
+- B3 tarcze na czolo: S4, wrog pieszy dalej niz 40 m, bez konnicy, nie Charge, LineFormation (nie kolumna). Zamiany tylko przy Interval <= 0 (ShieldWall/Square - gra nie sortuje, LineFormation.SwitchFrontUnitTypesToFrontRows); w Line/Loose tylko pomiar. Kolejnosc: ten sam rzad (bez tarczy w r-1, tarcza w r), potem szereg 0 z rzedami +-1/+-2 (tarcza w szeregu 1-2). 8 zamian na pass (4, gdy odchylenie szyku po 3 s wzroslo ponad 2x). Kontrola po zamianie: szereg bez zmiany = odmowa (RBM OverrideLineFormation / gra). Nie ruszamy: bohaterow, kapitana, gracza, chorazych (HorsePursuit.Banner), paniki, odwrotu (IsRunningAway, 143), nieustawionych. Straz sztandaru 550 - znacznik do uzgodnienia przy scaleniu (w tej galezi go nie ma).
+- Pomiar: OnHit - trafienia w szykach z B3 wedlug szeregu 0 / dalej; czolo z tarcza przy wejsciu i po 3 s; odchylenie (DeviationOfPositionsExcludeFarAgents).
+- Linia "Front do strzelca (552)" raz na bitwe zaraz po linii 146 (nekanie z 552a, B2 wejscia/kat/konce/pominiete/postfiks, B3 passy/zamiany/odmowy/czolo/odchylenie/trafienia wedlug szeregu, C2, potkniecia) + do 20 linii biezacych "552 zwrot | T/F zachowanie szyk | kat | strzelec | tarcze w rece" i "552 koniec | ... | powod".
+- Klucz marszu (552c) w tym commicie na sztywno NIE (latka marszu nie wchodzi).
+
+**Ryzyko / co sprawdzic (552b):**
+- Jeden wlasciciel FacingOrder: R4 283 (ReactHalt Face/Release) i 457 - wykluczone przez HaltHolds/HeldReserve; 459 i oblezenia poza zakresem (nie-AI / nie bitwa polowa); 446 wykluczony (Drop552 przy czworoboku zwalnia slot).
+- RBM po drugiej stronie ustawia facing = -Direction naszego szyku (OverrideBehaviorAdvance:319/343) - odwrocony szyk zmieni facing wroga; tylko przy szyku stojacym. Obserwowac.
+- IsUnderCavalryChargeFromFront liczy "front" od nowej strony - dlatego przy konnicy w 90 m nie obracamy wcale.
+- TurnBackwards (> 135 st.) zamienia szeregi - w ShieldWall musi zadzialac B3 (test: "czolo z tarcza po 3 s" w linii 552, licznik ">135 st.").
+- HeroCaution przesuwa bohaterow do tylu, B3 ich nie rusza - sprawdzic, czy licznik "ponowna" w linii HeroCaution nie rosnie.
+- Postfiks biegnie w ticku druzyn (takze watek roboczy): tylko odczyt slotow (Volatile), bez alokacji/logu/Settings, liczniki i wyjatki przez Interlocked. Sloty czyszczone w CloseRanks.Clear (Begin/End). Bez odczytu MovementOrder (pulapka 12.11).
+- Koszt: B3 do 8 zamian i dwa przejscia siatki na szyk co 0.5 s; OtherThreat po szykach wroga tylko przy wejsciu/trwaniu.
+- 140 EnforceShieldUsage liczy kierunek tarczy od szeregu - po zwrocie i zamianach gra poprawia go sama (UpdateFormationOrders).
+
+**Status:** DO SPRAWDZENIA (wgrania osobno - CLAUDE.md p. 2: najpierw 552a, test, potem 552b; nic nie wgrane; build 0 bledow, w grze nie sprawdzone)
 
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 

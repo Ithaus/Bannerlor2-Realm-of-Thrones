@@ -814,6 +814,12 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>552 (linia CloseRanks "Front do strzelca"): szyki pod ostrzalem przez nekanie, w tym bez warunku N w 5 s; zdarzenia z pozycja strzelca / bez.</summary>
+        internal static void HarassCounts(out int forms, out int only, out int dir, out int noDir)
+        {
+            forms = HarassForms.Count; only = HarassOnly(); dir = _evDir; noDir = _evNoDir;
+        }
+
         private static int HarassOnly()
         {
             int n = 0;
