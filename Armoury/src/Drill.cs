@@ -62,9 +62,9 @@ namespace Armoury
         private const float StockBonus = 0.10f, PerkMult = 1.5f, WearDays = 200f;
         internal const float RestStep = 0.35f;            // jedna stala dla musztry, ksiegi snu gracza (NightRest.OnHourly) i ksiegi AI T10 R2 (RestMoveLimit)
         private const int RestBelowHours = 4, AllHours = 0xFFFFFF;
-        // 548 (Jeff 15.11: "1 miecz i jeden pancerz na osobe a nie na 3 ludzi"): pelny zapas = 1 sztuka na tylu ludzi (klucz Drill Men Per Piece, domyslnie 1;
+        // 548 (Jeff 15.11: "1 miecz i jeden pancerz na osobe a nie na 3 ludzi"): pelny zapas = 1 sztuka na tylu ludzi (klucz Drill Men Per Piece, domyslnie 1, bez ustawien tez 1 - recenzja 548;
         // 3 = dawna zasada). Wzor S bez zmian (u uciete do 1) - zmienia sie tylko liczba sztuk do maksimum, ta sama dla gracza i AI (jeden wzor).
-        private static int MenPerPiece { get { var s = Settings.Current; return s == null ? 3 : Math.Max(1, Math.Min(3, s.DrillMenPerPiece)); } }
+        private static int MenPerPiece { get { var s = Settings.Current; return s == null ? 1 : Math.Max(1, Math.Min(3, s.DrillMenPerPiece)); } }
         // 548: limit przyjecia od gracza w pelnych zapasach - przy 1 na czlowieka jeden zapas (tyle, ile potrzebuja; zapas nic nie wazy - osobny ItemRoster),
         // przy dawnej zasadzie jak dotad dwa (zapas na wymiane daje nadwyzka ludzi w zbrojowni)
         private static int IntakeSets { get { return MenPerPiece == 1 ? 1 : 2; } }

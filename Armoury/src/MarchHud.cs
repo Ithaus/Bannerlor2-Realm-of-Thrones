@@ -386,15 +386,16 @@ namespace Armoury
                 if (r == null || !r.Ok) { l.Add(new TooltipProperty("Not counted yet", "", 0, false, TooltipProperty.TooltipPropertyFlags.None)); return l; }
                 if (r.AtSea) { Row(l, "At sea", "nobody rides on board"); return l; }
                 int mounted = Mounted(r), walk = Math.Max(0, r.Men - mounted);
-                Row(l, "Men riding / men", mounted + " of " + r.Men + " men ride" + (walk > 0 ? " - " + walk + " walk (red)" : " - nobody walks"));
+                Row(l, "Men riding / men", mounted + " of " + r.Men + " men ride (heroes included, as Troops on the top bar)" + (walk > 0 ? " - " + walk + " walk (red)" : " - nobody walks"));
                 if (walk > 0)
                 {
-                    int known = r.WalkNoHorse + r.WalkNoHarness + r.WalkSkill + r.HeroFoot;
+                    // recenzja 548: bohater bez wlasnego konia jest w puli piechoty (MarchPairs AddMan KHero) - jesli idzie, juz siedzi w WalkNoHorse / NoHarness / Skill;
+                    // HeroFoot liczy tez bohaterow jadacych na parach z puli, wiec nie dokladamy go drugi raz
+                    int known = r.WalkNoHorse + r.WalkNoHarness + r.WalkSkill;
                     var why = new List<string>();
                     if (r.WalkNoHorse > 0) why.Add(r.WalkNoHorse + " no horse");
                     if (r.WalkNoHarness > 0) why.Add(r.WalkNoHarness + " no harness that fits a horse");
                     if (r.WalkSkill > 0) why.Add(r.WalkSkill + " Riding too low" + (r.SkillLowEn.Count > 0 ? " (" + string.Join(", ", r.SkillLowEn) + ")" : ""));
-                    if (r.HeroFoot > 0) why.Add(r.HeroFoot + " heroes without a horse");
                     if (walk > known) why.Add((walk - known) + " other");
                     Row(l, "On foot", walk + ": " + string.Join(", ", why));
                 }
@@ -457,8 +458,9 @@ namespace Armoury
                 if (k.Men <= 0) { Row(l, "No soldiers", "nobody drills, the stock takes nothing"); return l; }
                 int per = Drill.OnePer, ready = k.Ready;
                 string unit = per == 1 ? "one weapon and one piece of armour per man" : "one weapon and one piece of armour per " + per + " men";
-                if (per == 1) Row(l, "Ready to drill / men", ready + " of " + k.Men + " men have a weapon and a piece of armour to drill with" + (ready < k.Full ? " (red)" : ""));
-                else Row(l, "Ready / full set", ready + " of " + k.Full + " sets (" + unit + ", " + k.Men + " men)" + (ready < k.Full ? " (red)" : ""));
+                // recenzja 548: mianownik bez bohaterow (Drill.Men) - inny niz Troops i Horses, wiec mowimy to wprost
+                if (per == 1) Row(l, "Ready to drill / soldiers", ready + " of " + k.Men + " soldiers have a weapon and a piece of armour to drill with" + (ready < k.Full ? " (red)" : "") + " - heroes do not drill and are not counted");
+                else Row(l, "Ready / full set", ready + " of " + k.Full + " sets (" + unit + ", " + k.Men + " soldiers, heroes not counted)" + (ready < k.Full ? " (red)" : ""));
                 Row(l, "Weapons", KitLine(k, true));
                 Row(l, "Armour", KitLine(k, false));
                 Row(l, "Full set", unit + ", beside his battle kit");
