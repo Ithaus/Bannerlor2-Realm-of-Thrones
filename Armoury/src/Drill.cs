@@ -228,7 +228,7 @@ namespace Armoury
             _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
             _pTakenBook = _pBookBack = _pBookGone = 0;   // 571
             _pBackHard = _pHardSkip = _aHardSkip = 0;    // 574
-            _pSwapN = _pSwapCovDrop = _pUpgBack = _pUpgNo = _pUpgTrial = 0; _pSwapOutV = _pSwapInV = 0; Array.Clear(_pSwapOutT, 0, _pSwapOutT.Length); Array.Clear(_pSwapInT, 0, _pSwapInT.Length);   // 575
+            _pSwapN = _pSwapCovDrop = _pUpgBack = _pUpgNo = _pUpgTrial = _pSwapBookIn = 0; _pSwapOutV = _pSwapInV = 0; Array.Clear(_pSwapOutT, 0, _pSwapOutT.Length); Array.Clear(_pSwapInT, 0, _pSwapInT.Length);   // 575
             Array.Clear(_pWorn, 0, NK); Array.Clear(_aWorn, 0, NK); _aKitParties = _aKitPieces = _aiKept = _aiNoKitSale = 0;
             _cParties = _cMen = _cRest = _cOff = 0; _cXp = _cL = 0;
             _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;

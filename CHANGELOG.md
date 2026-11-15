@@ -35,6 +35,26 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 575
+
+Trzy niezalezne recenzje: BRAK BLEDOW blokujacych (bilans 1:1, ZGODNE, bez ping-ponga potwierdzone). Zgloszenia sprawdzone w kodzie:
+
+**Poprawione:**
+- Liczniki listy gracza przy wymianie (recenzje 1-3): tansza sztuka gracza wzieta w `SwapCheaper` nie liczyla sie nigdzie, a oddana drozsza gracza podbijala `_pBookBack` ("na liste gracza wrocilo") - z linii doby nie dalo sie uzgodnic ruchu sztuk gracza, a na pasku "N went back to your list" bylo wieksze niz suma zwrotow. Nowy licznik `_pSwapBookIn` (osobno od `_pTakenBook`, ktory zostaje czystym poborem, wiec "Taken today ... (X of them yours)" nie przekracza "Taken"); log: "wymieniono na tansze N (... z listy gracza X; bilans 1:1)"; pasek: "swapped for cheaper pieces N (X of the cheaper ones yours)" przed zdaniem o zwrotach na liste gracza. Zerowany w `ClearDay`.
+- Bron boczna a zasada 535 (recenzja 1): `GivenBy` liczyl sloty 0-3 razem z bronia boczna, wiec przy SideArmsAreOptional miecz z musztry mogl wrocic do zbrojowni tylko dlatego, ze poprawi komus bron boczna (a `ReturnForBattle` bron boczna pomija - dwie zasady na jedno zjawisko). Teraz w `KitPreview` (podglad mapy) slot 0-3 klasyfikowany `KitGaps.WeaponCat` (teraz internal; biala po broni glownej = bron boczna, kolejnosc slotow wydanego zestawu - przyblizenie wzorca z `Compare`) i przy SideOptional bron boczna nie trafia do `GivenBy`. Proba (`Trial`) dalej porownuje cale `Given`, ale kandydat musi najpierw byc lepszy od wydanej broni glownej/zbroi.
+- Blokada 7 dni po egzemplarzu (recenzja 1): `_upgBlock` i `_upgNo` kluczowane `QuartermasterLaw.KeyOf` (przedmiot + modyfikator) zamiast `ItemObject` - zwrot jednego "Fine X" nie blokuje juz zwyklego, tanszego X przy poborze i wymianie. Oba slowniki tylko w sesji (po wczytaniu gry puste - dopuszczalne: najwyzej jedna dodatkowa proba podgladu), czyszczone przy nowej kampanii.
+- Napis paska "Refill" (recenzja 2): mowil "your own pieces ... (worst first)", a przy 575 pobor idzie po cenie z obu pul i jest wymiana. Przy kluczu Drill Kit Cheapest Swap: "... cheapest usable pieces first; each day a dearer piece in the kit is swapped for a cheaper one anyone in its role can use, and a piece that would give a man better gear in battle goes back to the armoury"; klucz wylaczony - napis jak dotad.
+- Log migracji 562 (recenzja 2): `bb += ub` wliczal zwroty "lepsze niz wydane" do "pod braki bitwy" w jednorazowej linii migracji; `ub` osobno (warunek odswiezenia paska `back + bb + ub + took + sw`).
+
+**Odrzucone / bez zmiany:**
+- Koszt `ArmCount` w `Avail` przy `KeepMen` (recenzja 3) - rzad wielkosci maly; obserwowac ms w "rozliczenia 562".
+- `ReturnForUpgrade` przy rozliczeniu "miasto" przed `SellPlayerSurplus` (recenzje 1, 3) - K1 (`FitBest`) przydziela lepsza sztuke, sprzedana zostaje raczej wypchnieta gorsza; zgodne z zamiarem, obserwowac.
+- Szum losowego pancerza w podgladzie (K7) - nieszkodliwy (oddana drozsza, pobor bierze tansza); obserwowac "oddane pod bitwe" / "odrzucone proba".
+
+**Nierozstrzygniete (decyzja Jeffa):** wymiana i pobor po cenie z obu pul moga zamienic tansza sztuke z LISTY GRACZA na drozsza sztuke LUDZI - drozsza wraca na stan ludzi i jesli K1 uzna ja za nadwyzke, `SellPlayerSurplus` sprzeda ja w miescie (do sakiewki ludzi), a sztuka gracza zuzywa sie na musztrze. Ekonomia zamknieta i zgodne ze specyfikacja "z obu pul razem", ale to przesuniecie wartosci od gracza do ludzi (Jeff zgodzil sie na sprzedaz oddanego sprzetu, ktorego NIKT nie udzwignie). Jesli ma tak nie byc: w `SwapCheaper` pomijac `pick.Book`, gdy oddawana sztuka nie ma czesci gracza (`_fromBook[KeyOf(dear)] == 0`). Pilnowac "sztuk gracza w zapasie" i "z listy gracza" w wymianie.
+
+Build Armoury 0 bledow (Release). NIE wgrane.
+
 ## 574: umiejetnosci w zestawie musztry - do zapasu trafia tylko sprzet, ktory typ z brakiem udzwignie; pokrycie per typ; za trudne wraca do zbrojowni - Armoury (DrillKit.cs, Drill.cs; nowy klucz DrillKitSkillCheck w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "sprawdz czy w sprzecie do treningu zabieramy jest sprzet ... tylko taki ktory dany czlowiek ma umiejetnosci aby cwiczyc np jesli ma lucznictwo 30 a luk lezy 40 to mimo ze lezy to nie moze uzyc ... aby respektowane byly umiejetnosci". Audyt (3 raporty, sceptyk): NIE - `Eligible` sprawdza tylko rodzaj, wyrob gracza i unikat ("umiejetnosc dowolna (musztra to nie bitwa)"); zadna droga brania (TakePlayer, TakeBook, AiKit, Accept) nie wola ItemReq/GearFit, a `AddHave`/`Allocate` licza pokrycie z kazdej sztuki rodzaju (luk 40 "pokrywa" lucznika 30, zawyza premie S i pasek). Dowod mozliwosci w logu `Armoury-2026-11-15_21-30-26.log` l. 874 (kwatermistrz): "nikt nie udzwignie - zostaje gracza: crossbow_f x6 (Crossbow 100, najlepszy 60) ... crossbow_g x29 (Crossbow 80, najlepszy 60)" - nienoszone sztuki gracza, `PlayerBookPlan` daje im Sell = Own, `TakeBook` mogl je brac do musztry. Log nie wypisuje zapasu per przedmiot, wiec obecnosci tych sztuk w zapasie nie da sie dowiesc.

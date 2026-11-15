@@ -177,7 +177,7 @@ namespace Armoury
 
         /// <summary>Rodzaj sztuki wzorca w slocie 0-3. primary - czy byla juz bron glowna (biala, luk, kusza, rzucana, proca, pistolet, muszkiet): biala po niej
         /// to bron boczna (K2). Amunicja i tarcza nie sa bronia glowna.</summary>
-        private static int WeaponCat(ItemObject it, ref bool primary)
+        internal static int WeaponCat(ItemObject it, ref bool primary)   // recenzja 575: takze KitPreview.GivenBy (bron boczna)
         {
             switch (it.ItemType)
             {

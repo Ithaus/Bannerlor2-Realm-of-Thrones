@@ -558,13 +558,15 @@ namespace Armoury
                 var eq = _fEq.GetValue(a) as Equipment;
                 if (eq == null) continue;
                 CharacterObject gch = res.GivenBy != null ? _getChar.Invoke(a, null) as CharacterObject : null;   // 575
+                bool prim = false;   // recenzja 575: rodzaj slotu 0-3 jak KitGaps.Compare (biala po broni glownej = bron boczna)
                 for (int s = 0; s < 12; s++)
                 {
                     if (s == 4) continue;
                     var it = eq[(EquipmentIndex)s].Item;
                     if (it == null || Temp(a, s, it)) continue;
                     Add(res.Given, it, 1);
-                    if (gch != null && !gch.IsHero && s < 10) AddBy(res.GivenBy, KitGaps.Group(it), gch, it);   // 575: bez konia (10) i uprzezy (11)
+                    bool side = s < 4 && KitGaps.WeaponCat(it, ref prim) == KitGaps.SideArm && SideOptional;   // recenzja 575 (zasada 535): bron boczna nie jest powodem zwrotu z musztry - jak ReturnForBattle (w.Side)
+                    if (gch != null && !gch.IsHero && s < 10 && !side) AddBy(res.GivenBy, KitGaps.Group(it), gch, it);   // 575: bez konia (10) i uprzezy (11)
                 }
             }
             // resztka zbrojowni po rozdaniu

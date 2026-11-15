@@ -568,7 +568,7 @@ namespace Armoury
                 int bb = ReturnForBattle(pv, arm);
                 if (bb > 0) { pv = KitPreview.ForArmoury(); _settlePv++; }
                 int ub = ReturnForUpgrade(pv, arm);   // 575: sztuki, ktore w bitwie dalyby komus lepsza bron/zbroje niz wydana (sprawdzone proba podgladu)
-                if (ub > 0) { pv = KitPreview.ForArmoury(); _settlePv++; bb += ub; }
+                if (ub > 0) { pv = KitPreview.ForArmoury(); _settlePv++; }   // recenzja 575: ub osobno (log migracji 562 'pod braki bitwy' bez ulepszen)
                 int took = 0, sw = 0;
                 if (why == WhyDaily || why == WhyRoster)
                 {
@@ -581,7 +581,7 @@ namespace Armoury
                 _settleN++; _settleBy[Math.Max(0, Math.Min(3, why))]++;
                 int after = Pieces(arm) + Pieces(_stock);
                 if (after != before) _settleBad++;
-                if (back + bb + took + sw > 0) { _hudDirty = true; try { MarchPairs.InvalidateWeight(main); } catch { } }
+                if (back + bb + ub + took + sw > 0) { _hudDirty = true; try { MarchPairs.InvalidateWeight(main); } catch { } }
                 if (migr)
                 {
                     _migrPending = false;
@@ -863,7 +863,7 @@ namespace Armoury
                         var it = el.Item;
                         if (it == null || !Eligible(it) || (k == K2H && t == ItemObject.ItemTypeEnum.Polearm && (KindInfo(it) & F2H) == 0)) continue;
                         if (pool == 1 && MusterBook.IsPinnedItem(it.StringId)) continue;
-                        if (c.Cheap && UpgBlocked(it)) continue;
+                        if (c.Cheap && UpgBlocked(el)) continue;
                         l.Add(new TakeC { P = p, El = el, Book = pool == 1, T = ti, Ix = ix, Price = el.ItemValue });
                     }
                 }
@@ -943,14 +943,14 @@ namespace Armoury
         // tylko pod PUSTE sloty, nie pod ulepszenie).
         private const int SwapPerDay = 100;     // limit wymian na dobe (gracz)
         private const int UpgBlockDays = 7;     // sztuka oddana pod bitwe nie wraca do zapasu przez tyle dni (bez ping-ponga przy losowym pancerzu podgladu - K7)
-        private static readonly Dictionary<ItemObject, int> _upgBlock = new Dictionary<ItemObject, int>(), _upgNo = new Dictionary<ItemObject, int>();   // przedmiot -> dzien
-        private static int _pSwapN, _pSwapCovDrop, _pUpgBack, _pUpgNo, _pUpgTrial;
+        private static readonly Dictionary<string, int> _upgBlock = new Dictionary<string, int>(StringComparer.Ordinal), _upgNo = new Dictionary<string, int>(StringComparer.Ordinal);   // recenzja 575: egzemplarz (KeyOf - przedmiot + modyfikator) -> dzien
+        private static int _pSwapN, _pSwapCovDrop, _pUpgBack, _pUpgNo, _pUpgTrial, _pSwapBookIn;   // recenzja 575: _pSwapBookIn - tansze wziete z listy gracza w wymianie
         private static long _pSwapOutV, _pSwapInV;
         private static readonly int[] _pSwapOutT = new int[7], _pSwapInT = new int[7];
 
         private static int TierIx(ItemObject it) { int t = 1; try { t = AiGear.TierOf(it); } catch (Exception e) { Stumble("TierOf", e); } return Math.Max(1, Math.Min(6, t)); }
 
-        private static bool UpgBlocked(ItemObject it) { int d; return it != null && _upgBlock.TryGetValue(it, out d) && (int)CampaignTime.Now.ToDays - d < UpgBlockDays; }
+        private static bool UpgBlocked(EquipmentElement el) { int d; return el.Item != null && _upgBlock.TryGetValue(QuartermasterLaw.KeyOf(el), out d) && (int)CampaignTime.Now.ToDays - d < UpgBlockDays; }
 
         /// <summary>575: tansza sztuka moze zastapic drozsza - kazdy typ z rola, ktorej drozsza sluzy (KindsMask), i ktory drozsza udzwignie, udzwignie tez tansza
         /// (pokrycie per typ - 574 - nie spada). Bez 574 - zawsze.</summary>
@@ -1009,6 +1009,7 @@ namespace Armoury
                             }
                             if (pick == null) break;
                             Move(pick, 1, c);
+                            if (pick.Book) _pSwapBookIn++;   // recenzja 575: osobno od _pTakenBook (pobor), para do _pBookBack z BackToArmory
                             BackToArmory(c.Arm, del.EquipmentElement, 1);   // 571: czesc gracza na liste gracza, reszta na stan wojska
                             left--; n++;
                             _pSwapOutT[TierIx(dIt)]++; _pSwapInT[TierIx(pick.El.Item)]++; _pSwapOutV += dv; _pSwapInV += pick.Price;
@@ -1056,7 +1057,7 @@ namespace Armoury
                     var el = _stock.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
                     if (el.Amount <= 0 || it == null || KindInfo(it) < 0) continue;
-                    int nd; if (_upgNo.TryGetValue(it, out nd) && nd == day) continue;   // proba dzis juz odrzucila
+                    int nd; if (_upgNo.TryGetValue(QuartermasterLaw.KeyOf(el.EquipmentElement), out nd) && nd == day) continue;   // proba dzis juz odrzucila ten egzemplarz
                     if (!pv.GivenBy.ContainsKey(KitGaps.Group(it))) continue;
                     cand.Add(el);
                 }
@@ -1097,8 +1098,8 @@ namespace Armoury
                     var it = t.Item1.Item;
                     int a; acc.TryGetValue(it, out a);
                     int x = Math.Min(t.Item2, a);
-                    if (x > 0) { BackToArmory(arm, t.Item1, x); acc[it] = a - x; n += x; _upgBlock[it] = day; }   // 571: czesc gracza na liste gracza
-                    if (x < t.Item2) { _upgNo[it] = day; _pUpgNo += t.Item2 - x; }
+                    if (x > 0) { BackToArmory(arm, t.Item1, x); acc[it] = a - x; n += x; _upgBlock[QuartermasterLaw.KeyOf(t.Item1)] = day; }   // 571: czesc gracza na liste gracza
+                    if (x < t.Item2) { _upgNo[QuartermasterLaw.KeyOf(t.Item1)] = day; _pUpgNo += t.Item2 - x; }
                 }
             }
             catch (Exception e) { Stumble("ReturnForUpgrade", e); }
@@ -1131,7 +1132,7 @@ namespace Armoury
             var sb = new StringBuilder(", 575: wymieniono na tansze ").Append(_pSwapN);
             if (_pSwapN > 0)
                 sb.Append(" (oddane: ").Append(TierList(_pSwapOutT)).Append(" / sr. cena ").Append(_pSwapOutV / _pSwapN).Append(" d, wziete: ").Append(TierList(_pSwapInT))
-                  .Append(" / sr. cena ").Append(_pSwapInV / _pSwapN).Append(" d; bilans 1:1)");
+                  .Append(" / sr. cena ").Append(_pSwapInV / _pSwapN).Append(" d; z listy gracza ").Append(_pSwapBookIn).Append("; bilans 1:1)");
             if (_pSwapCovDrop > 0) sb.Append(", SPADEK pokrycia po wymianie ").Append(_pSwapCovDrop);
             sb.Append(", oddane pod bitwe (lepsze niz wydane) ").Append(_pUpgBack).Append(" (prob podgladu ").Append(_pUpgTrial).Append(", odrzucone proba ").Append(_pUpgNo).Append(')');
             sb.Append(", zapas wedlug tierow T1..T6 ").Append(StockTiers());
@@ -1637,7 +1638,7 @@ namespace Armoury
             internal readonly int[] Need = new int[NK], Cov = new int[NK], WornToday = new int[NK], RoleMen = new int[NR];
             internal readonly float[] Acc = new float[NK];     // ulamek zuzycia do nastepnej sztuki rodzaju (0..1)
             internal int Taken, Back, BackBattle, LastTook;
-            internal int TakenBook, BookBack;                  // 571: z tego z listy gracza / wrocone na liste gracza
+            internal int TakenBook, BookBack, Swapped, SwapBook;                  // 571: z tego z listy gracza / wrocone na liste gracza
             internal int CapeUse;                              // 562c: oponcze-dodatek z zapasu w uzyciu (KitM.Used[KCape])
             internal int CovSum(int lo, int hi) { int n = 0; for (int i = lo; i <= hi; i++) n += Math.Min(Cov[i], Need[i]); return n; }   // 562b: pokryte sztuki rodzajow lo..hi
             internal int NeedSum(int lo, int hi) { int n = 0; for (int i = lo; i <= hi; i++) n += Need[i]; return n; }
@@ -1663,6 +1664,7 @@ namespace Armoury
         internal static float BonusPerSet { get { return StockBonus; } }
         internal static float BonusPerkMult { get { return PerkMult; } }
         internal static int OnePer { get { return MenPerPiece; } }
+        internal static bool HudCheapOn { get { return CheapOn; } }   // recenzja 575: klucz Drill Kit Cheapest Swap (podpowiedz paska)
         internal static bool HudBookOn { get { return BookOn; } }   // 571: klucz Drill Takes Player Stash (podpowiedz paska)
         internal static string KindName(int k) { return KindEn[k]; }
         internal static float LifeDays(int k) { return WearDays * LifeX[k]; }
@@ -1700,6 +1702,7 @@ namespace Armoury
                 k.LastTook = _lastTook;
                 k.Taken = _pTaken; k.Back = _pBack + _pBackOther + _pBackOff; k.BackBattle = _pBackBattle + _pUpgBack;   // 575: takze oddane pod bitwe jako lepsze
                 k.TakenBook = _pTakenBook; k.BookBack = _pBookBack;   // 571
+                k.Swapped = _pSwapN; k.SwapBook = _pSwapBookIn;   // recenzja 575
                 k.PerkW = main.HasPerk(DefaultPerks.Steward.GivingHands);
                 k.PerkA = main.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
                 k.Ok = _hudHave;

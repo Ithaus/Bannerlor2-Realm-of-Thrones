@@ -591,11 +591,13 @@ namespace Armoury
                             + "crossbowmen: a crossbow and bolts; javelin men also a stack of javelins. Everyone: body armour, a helmet and leg armour (boots). Gloves and capes are not part of the drill kit."
                             + (per == 1 ? "" : " One piece of each kind serves " + per + " men."));
                 // 571 (Jeff 15.11): po nadwyzce ludzi takze nienoszone sztuki gracza z listy zbrojowni (klucz Drill Takes Player Stash)
-                bool bookOn = Drill.HudBookOn;
-                Row(l, "Refill", "Your men take what their drill kit lacks from their spare kit in the troops' armoury" + (bookOn ? ", then from your own pieces there that nobody wears (worst first)" : "")
+                bool bookOn = Drill.HudBookOn, cheapOn = Drill.HudCheapOn;   // recenzja 575: opis poboru po cenie i wymiany
+                Row(l, "Refill", "Your men take what their drill kit lacks from their spare kit in the troops' armoury" + (bookOn ? (cheapOn ? " and from your own pieces there that nobody wears" : ", then from your own pieces there that nobody wears (worst first)") : "")
+                            + (cheapOn ? " - cheapest usable pieces first; each day a dearer piece in the kit is swapped for a cheaper one anyone in its role can use, and a piece that would give a man better gear in battle goes back to the armoury" : "")
                             + " - once a day and when the troops change - only pieces the next battle's hand-out leaves unused; "
                             + "those pieces leave the armoury" + (bookOn ? " (yours leave your list, and come back to it when the kit no longer needs them)" : "") + ". Nothing to click. Taken today " + k.Taken
                             + (bookOn && k.TakenBook > 0 ? " (" + k.TakenBook + " of them yours)" : "") + ", given back for battle " + k.BackBattle + ", back to the armoury (not needed) " + k.Back
+                            + (k.Swapped > 0 ? "; swapped for cheaper pieces " + k.Swapped + (bookOn && k.SwapBook > 0 ? " (" + k.SwapBook + " of the cheaper ones yours)" : "") : "")
                             + (k.BookBack > 0 ? "; of all pieces given back today " + k.BookBack + " went back to your list" : "") + "."   // 571 (recenzja): _pBookBack liczy kazdy zwrot (takze na bitwe), nie tylko "not needed"
                             + (k.LastTook == 0 && most.Length > 0 ? (bookOn ? " Last check found nothing to take: what lies in the troops' armoury is their battle kit and its reserve, and your pieces the next battle hands out - the drill touches none of them."
                                                                             : " Last check found nothing to take: what lies in the troops' armoury is their battle kit and its reserve, which the drill does not touch.") : ""));
