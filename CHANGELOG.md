@@ -24,6 +24,16 @@
 
 **Status:** DO SPRAWDZENIA (zbudowane 0 bledow, niewgrane).
 
+### Recenzja 560 (galaz noc/560-musztra-fix -> noc/560-musztra)
+
+Przyjete (sprawdzone w kodzie):
+- **(1) Napisy "The men" przy samych towarzyszach** (CampDrill.cs). Nowa `Men(mp)` = "Your companions" w druzynie bez zolnierzy (`NoSoldiers`), inaczej "The men"; uzyta w `WhyNot` (sen, glod, dlug snu, pelny dzien), w `DrillTick` (zmierzch, glod, dlug snu, pelny dzien) i w tekscie treningu przed snem (`SetText`, "... bed down"). Przy zolnierzach napisy bez zmian.
+- **(2) Komentarz nad DrillHeroes** (Settings.cs) - "gracz i dowodcy partii - nie" zamienione na stan po 560 (gracz nie; dowodcy cwicza; sami towarzysze w obozie). Tylko komentarz.
+- **(3) DrillTick przy utracie ostatniego zdrowego towarzysza** (CampDrill.cs). W druzynie bez zolnierzy, gdy `Drill.PlayerDrillHeroes(mp) <= 0` (np. towarzysz odszedl albo zostal ranny), cwiczenia koncza sie przez `Leave("nikt", "No one is left fit to drill.")` - ta sama droga co glod/zmierzch (SwitchToMenu z ticku menu jak dotad). Koszt: petla po rosterze gracza na tick menu, tylko przy braku zolnierzy.
+- (4) Konflikt CHANGELOG przy scaleniu z noc/scal-perki (wpis 555) - nie dotyczy kodu galezi; do ulozenia recznie przy scaleniu (wpisy 560 i 555 bez ucinania historii).
+
+**Ryzyko / co sprawdzic:** przy zolnierzach napisy i zachowanie identyczne jak w 560; przy samych towarzyszach napisy "Your companions ...". Zbudowane 0 bledow, niewgrane.
+
 ## 558: towarzysze cwicza - bohaterowie partii lorda (towarzysze, rodzina) dostaja w dniu musztry XP umiejetnosci noszonej broni wedlug wzoru oddzialu i licza sie do kompletu zapasu - Armoury (Drill.cs, MarchHud.cs; klucze NOWE DrillHeroes = TAK, DrillHeroXpMult = 1.0 w Settings.cs + McmSettings.cs recznie, MCM "Drill Heroes", "Drill Hero Xp Multiplier")
 
 **Problem:** Jeff, czat 15.11: "towarzysze maja cwiczyc" (wczesniej: "bohaterowie tez cwicza i dostaja xp, tylko gracz nie dostaje"). Musztra dawala XP tylko zolnierzom; pasek Drill liczyl komplet na samych zolnierzy ("heroes do not drill and are not counted").

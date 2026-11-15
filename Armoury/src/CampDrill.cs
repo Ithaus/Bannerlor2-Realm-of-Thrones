@@ -482,10 +482,10 @@ namespace Armoury
                     return Drill.HudHeroesOn ? "You have no men to drill, and no companion fit to drill." : "You have no men to drill.";
                 Roll();
                 if (!DayHour(CampaignTime.Now.GetHourOfDay))
-                    return "The men are asleep. The drill runs by day, from " + NightRest.PlayerDawn + ":00 to " + NightRest.BedNightStart + ":00.";
-                if (mp.Party != null && mp.Party.IsStarving) return "The men are too hungry to drill.";
-                if (NightRest.DawnDebtOf(mp) >= 1) return "The men met the dawn short of sleep - no drill until the next dawn.";
-                if (_dayHours >= FullHours - 0.01f) return "The men have drilled a full day (8 hours) - they can learn no more today.";
+                    return Men(mp) + " are asleep. The drill runs by day, from " + NightRest.PlayerDawn + ":00 to " + NightRest.BedNightStart + ":00.";
+                if (mp.Party != null && mp.Party.IsStarving) return Men(mp) + " are too hungry to drill.";
+                if (NightRest.DawnDebtOf(mp) >= 1) return Men(mp) + " met the dawn short of sleep - no drill until the next dawn.";
+                if (_dayHours >= FullHours - 0.01f) return Men(mp) + " have drilled a full day (8 hours) - they can learn no more today.";
             }
             catch (Exception e) { Stumble("WhyNot", e); return "Not now."; }
             return null;
@@ -516,13 +516,19 @@ namespace Armoury
             return r == null || r.TotalRegulars <= 0;
         }
 
+        /// <summary>Recenzja 560 (1): podmiot napisow cwiczen - "The men" albo, w druzynie bez zolnierzy, "Your companions".</summary>
+        private static string Men(MobileParty mp)
+        {
+            return NoSoldiers(mp) ? "Your companions" : "The men";
+        }
+
         private static void SetText()
         {
             MBTextManager.SetTextVariable("ARM_DRILL_TEXT", (NoSoldiers(MobileParty.MainParty)   // 560: sami towarzysze
                     ? "Your companions drill in camp - sword and shield, sparring with the spear, the bow at the butts. Today: "
                     : "The men drill in camp - sword and shield, the spear wall, volleys at the butts, marching in step. Today: ")
                 + F1(_dayHours) + " of " + (int)FullHours + " hours. What they learn is counted with their daily drill."
-                + (_pre ? " The column halted to drill before sleep; at nightfall (" + NightRest.BedNightStart + ":00) the men bed down" + NightRest.TbsUntilDawn() + "." : ""));   // 311e; 315a: do switu (klucz SleepUntilDawn)
+                + (_pre ? " The column halted to drill before sleep; at nightfall (" + NightRest.BedNightStart + ":00) " + Men(MobileParty.MainParty).ToLowerInvariant() + " bed down" + NightRest.TbsUntilDawn() + "." : ""));   // 311e; 315a: do switu (klucz SleepUntilDawn)
         }
 
         /// <summary>311e: postoj na trening przed snem - wejscie w menu cwiczen z czystej mapy (NightRest.TbsHour z ticku godzinowego, po wszystkich warunkach).
@@ -576,10 +582,12 @@ namespace Armoury
                 if (mp == null || mp.MapEvent != null || PlayerEncounter.Current != null) return;
                 if (_leave) { _leave = false; Leave("gracz", null); return; }
                 Roll();
-                if (!DayHour(CampaignTime.Now.GetHourOfDay)) { Leave("noc", "Dusk - the drill is over for today; the men eat and bed down."); return; }
-                if (mp.Party != null && mp.Party.IsStarving) { Leave("glod", "The men are too hungry to drill."); return; }
+                if (!DayHour(CampaignTime.Now.GetHourOfDay)) { Leave("noc", "Dusk - the drill is over for today; " + Men(mp).ToLowerInvariant() + " eat and bed down."); return; }
+                if (mp.Party != null && mp.Party.IsStarving) { Leave("glod", Men(mp) + " are too hungry to drill."); return; }
+                // recenzja 560 (3): druzyna bez zolnierzy stracila ostatniego zdrowego towarzysza w trakcie cwiczen - koniec, nikt juz nie cwiczy
+                if (NoSoldiers(mp) && Drill.PlayerDrillHeroes(mp) <= 0) { Leave("nikt", "No one is left fit to drill."); return; }
                 // recenzja 1: kare pilnuje menu w chwili cwiczen (tick treningu juz jej nie stosuje do godzin zrobionych) - dlug o swicie takze tu, nie tylko przy wejsciu
-                if (NightRest.DawnDebtOf(mp) >= 1) { Leave("dlug snu", "The men met the dawn short of sleep - no drill until the next dawn."); return; }
+                if (NightRest.DawnDebtOf(mp) >= 1) { Leave("dlug snu", Men(mp) + " met the dawn short of sleep - no drill until the next dawn."); return; }
                 if (mp.CurrentSettlement != null || mp.AttachedTo != null || mp.BesiegerCamp != null || mp.SiegeEvent != null || Moving(mp)) { Leave("ruch", null); return; }
                 float add = (float)dt.ToHours;
                 float take = Math.Max(0f, Math.Min(add, FullHours - _dayHours));
@@ -588,7 +596,7 @@ namespace Armoury
                 if (take > 0f) _lastDrillAt = CampaignTime.Now.ToHours;   // ksiega snu: ta godzina to praca, nie odpoczynek (recenzja 4)
                 if (_dayHours >= FullHours - 0.001f)
                 {
-                    Leave("pelny dzien", "A full day of drill (8 hours) - the men can learn no more today.");
+                    Leave("pelny dzien", "A full day of drill (8 hours) - " + Men(mp).ToLowerInvariant() + " can learn no more today.");
                     return;
                 }
                 SetText();
