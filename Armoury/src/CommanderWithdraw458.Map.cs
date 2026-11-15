@@ -125,6 +125,7 @@ namespace Armoury
         /// gry partii strony wodza, raz na oczekiwanie (DoWait moze wolac metode wiecej razy - RBM dopisuje przy kazdym). Tylko odczyt.</summary>
         public static void ContPre()
         {
+            BattleLosses312.PreRbm();   // 557: migawka licznikow dla linii strat 312f (przed RBM SetRoutedPatch) - sam odczyt, wlasny klucz, nie rzuca
             var p = _p;
             if (p == null || p.Pre != null) return;
             try
