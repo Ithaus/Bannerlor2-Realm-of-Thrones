@@ -35,6 +35,27 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 574
+
+Trzy niezalezne recenzje (bledy, bilans/ekonomia, regresje/wydajnosc). Kazde zgloszenie sprawdzone w kodzie.
+
+**Poprawione:**
+- **BLAD 1 (rec. 1 i 3, potwierdzony): podwojne liczenie sztuk dwurodzajowych w `FitMatch` blokowalo pobor broni 1H/2H.** FitMatch przechodzil kazdy rodzaj osobno z pelna liczba sztuk, wiec kopia/wlocznia z F1H zajmowala miejsca typow i w `Resid[KPole]`, i w `Resid[K1H]` (dwureczna z F1H - w K2H i K1H, drzewce z F2H - w KPole i K2H). Allocate dawal ja jednemu rodzajowi, drugi mial brak, ale `Claim` zwracal 0 - np. 10 jezdzcow z 10 kopiami F1H nigdy nie dostawalo mieczy (`TakePlayer`, `TakeBook`, `Accept`). Poprawka: JEDNA pula sztuk (`rem`) dla wszystkich rodzajow; nowa `FitKind(m, k, rem, sub, f1)` zmniejsza pule po kazdym dopasowaniu. Kolejnosc jak Allocate: rodzaje bez zastepstw, wlocznie, 1H, dwureczne bez 1H do 2H, zastepstwa 1H (dwureczne z 1H przed drzewcami), dwureczne z 1H do 2H, drzewce z 2H. W rodzaju: najpierw sztuki, ktore udzwignie najmniej typow, potem mniej wszechstronne (drzewce bez uzycia bialego przed drzewcami z F1H - jak Allocate), potem drozsze.
+- **Drobny 2 (rec. 1): per typ dla broni bialej slabszy niz opisano.** Skutek tego samego podwojnego liczenia - naprawiony ta sama poprawka: `Fit[K1H]` liczy juz tylko sztuki dopasowane do typow 1H (kazda sztuka raz), wiec `ClampFit` obniza pokrycie 1H, gdy miecz 40 lezy przy typie z 1H 30.
+- **Uwaga 1 (rec. 2): `FitItems` tylko dla rodzaju podstawowego.** Teraz `FitItems[it]` dostaje kazde dopasowanie (takze jako zastepstwo); przy wspolnej puli suma <= liczby sztuk, wiec przebieg 1 `ReturnExcess` oddaje najpierw tylko sztuki niedopasowane w zadnym rodzaju.
+- **Drobny 3 (rec. 1): klucz pamieci `Fits` nie obejmowal wszystkich bramek.** `cfg` = GearFit.On, CultureOn, KinItemOn (GearFitKinItemLevel), GiantGear.On, HeroBardingNeedsRiding - zmiana w MCM czysci pamiec od razu.
+- **Drobny 1 (rec. 3): `catch { sv = 0; }` w `Claim` bez sladu.** Teraz `Stumble("Claim", e)` (licznik potkniec, bez wylacznika).
+
+**Odrzucone / bez zmiany kodu:**
+- Uwaga 2 (rec. 2) "pominiete przy braniu" nie jest liczba roznych sztuk - prawda, ale to diagnostyka, opisane w wpisie; bez zmiany.
+- Drobny 2 (rec. 3) `GiantGear.SieveRefused` liczy tez odmowy z musztry - opisane w "Ryzyko" wyzej; bez zmiany.
+- Drobny 3 (rec. 3) przy `MenPerPiece > 1` suma `Cap` typow (Units(n) kazdego) moze byc wieksza od `Need` grupy (Units(sumy)) - sprawdzenie per typ jest wtedy o najwyzej 1 sztuke na typ luzniejsze; `ClampFit` tylko obniza, a `Cov` i tak ograniczone popytem. Nie blad - odnotowane tutaj.
+
+**Pozostaje (nierozstrzygniete):**
+- Allocate i FitMatch to dwa osobne przydzialy. Kolejnosc FitMatch odwzorowuje Allocate, ale przy kulturze/umiejetnosciach moga sie roznic o kilka sztuk - wtedy `ClampFit` obniza pokrycie rodzaju (ostroznie, nigdy w gore), a pobor dobiera brakujace nazajutrz. Moze to dac dzien opoznienia albo drobna wymiane; obserwowac "wzieto" i "zwrocono ponad komplet" doba po dobie.
+- Test w autotescie: jazda z samymi kopiami/wloczniami F1H w zapasie - dla rodzaju 1H w linii Musztra "wzieto" > 0.
+- Build Armoury 0 bledow (Release). NIE wgrane.
+
 ## 573: kapitulanci bez walki obszukani - sprzet jak lup z pola (dzialka dowodcy na liste gracza w zbrojowni, reszta ludziom) - Armoury (ArmouryBehavior.cs OnPrisonerTaken + nowe StripSurrendered; BattlefieldLaw.SimSharePercent internal; nowy klucz SurrenderCaptivesStripped w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "Pojmalem bandytow poddali sie ale wchodze do ekwipunku a tam nic zero ich sprzetu gdzie podzial sie ich sprzet gdzie moje 30%". Dowod: `Armoury-2026-11-15_21-30-26.log` 22:01:26-22:01:41, Tumblestone Farms - banda looters_2145787377 (25 ludzi) poddala sie: "Lup bitwy (m109): ... misja NIE ... powaleni przez druzyne 0", "Straty bitwy (312f): ... wystawieni 0, ranni sprzed bitwy 25 ... pojmanie TAK: u gracza 25", "Okno lupu (117): ... sprzet 7 szt. za 124 ... (Spoils razem 13/2387 - sztuki zgodne NIE)". Brak linii "Jency obszukani" - 25 jencow weszlo do lochu, ich rynsztunek przepadl.

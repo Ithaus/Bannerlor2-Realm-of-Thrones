@@ -161,7 +161,7 @@ namespace Armoury
             internal int Unfit;                  // 574: sztuki zapasu, ktorych nikt w potrzebujacej roli nie udzwignie - poza Have, zawsze nadmiar (ReturnExcess)
             internal readonly int[] Fit = new int[NK];   // 574: sztuki rodzaju dopasowane do typow (typ z n ludzmi - najwyzej Units(n) sztuk, ktore sam udzwignie)
             internal int[][] Resid;              // 574: [rodzaj][typ] wolne miejsca typu po dopasowaniu (Claim je zajmuje)
-            internal Dictionary<ItemObject, int> FitItems;   // 574: dopasowane sztuki wedlug przedmiotu (rodzaj podstawowy) - ReturnExcess oddaje najpierw reszte
+            internal Dictionary<ItemObject, int> FitItems;   // 574: dopasowane sztuki wedlug przedmiotu (kazdy rodzaj, wspolna pula - recenzja 574) - ReturnExcess oddaje najpierw reszte
             internal int Kit { get { return Men + Heroes; } }
             /// <summary>562c: pokrycie sztuk rodzajow lo..hi (suma min(Cov, Need) / suma Need), 0..1; bez popytu - 0.</summary>
             internal float Cover(int lo, int hi)
@@ -188,7 +188,9 @@ namespace Armoury
         private static bool Fits(KitT t, ItemObject it)
         {
             if (t == null || t.Ch == null || it == null) return true;
-            int day = (int)CampaignTime.Now.ToDays, cfg = (GearFit.On ? 1 : 0) + (GearFit.CultureOn ? 2 : 0);
+            var st = Settings.Current;
+            int day = (int)CampaignTime.Now.ToDays, cfg = (GearFit.On ? 1 : 0) + (GearFit.CultureOn ? 2 : 0)
+                + (GearFit.KinItemOn ? 4 : 0) + (GiantGear.On ? 8 : 0) + (st == null || st.HeroBardingNeedsRiding ? 16 : 0);   // recenzja 574 (3): wszystkie bramki predykatu
             if (day != _fitMemoDay || cfg != _fitMemoCfg || _fitMemoN > 200000) { _fitMemo.Clear(); _fitMemoN = 0; _fitMemoDay = day; _fitMemoCfg = cfg; }
             Dictionary<ItemObject, bool> d;
             if (!_fitMemo.TryGetValue(t.Ch, out d)) _fitMemo[t.Ch] = d = new Dictionary<ItemObject, bool>();
@@ -240,7 +242,7 @@ namespace Armoury
                 {
                     if (r[t] <= 0 || !Fits(m.Types[t], it)) continue;
                     int sv = 0;
-                    if (sk != null) { try { sv = m.Types[t].Ch.GetSkillValue(sk); } catch { sv = 0; } }
+                    if (sk != null) { try { sv = m.Types[t].Ch.GetSkillValue(sk); } catch (Exception e) { Stumble("Claim", e); sv = 0; } }
                     if (sv < bs) { bs = sv; best = t; }
                 }
                 if (best < 0) break;
@@ -250,8 +252,11 @@ namespace Armoury
             return got;
         }
 
-        /// <summary>574: dopasowanie sztuk do typow wedlug rodzajow (Fit, Resid, FitItems). Rodzaj k bierze sztuki, ktore mu sluza (podstawowe i zastepstwa,
-        /// jak Allocate); najpierw sztuki, ktore udzwignie najmniej typow (przy progach umiejetnosci dopasowanie pelne). pcs == null - same wolne miejsca.</summary>
+        /// <summary>574: dopasowanie sztuk do typow (Fit, Resid, FitItems). Recenzja 574 (blad 1): JEDNA pula sztuk dla wszystkich rodzajow - sztuka zajmuje
+        /// miejsce typu tylko w jednym rodzaju (wczesniej kopia z 1H zajmowala miejsca i wloczni, i 1H - Allocate dawal ja wloczni, a pobor mieczy stal na 0).
+        /// Kolejnosc jak Allocate: rodzaje bez zastepstw, wlocznie, 1H, dwureczne bez 1H do 2H, zastepstwa 1H (dwureczne z 1H przed drzewcami), dwureczne z 1H do 2H, drzewce z 2H.
+        /// W rodzaju najpierw sztuki, ktore udzwignie najmniej typow (przy progach umiejetnosci dopasowanie pelne), potem mniej wszechstronne (drzewce bez
+        /// uzycia bialego, dwureczne bez 1H - zostaja dla zastepstw jak w Allocate), potem drozsze. pcs == null - same wolne miejsca.</summary>
         private static void FitMatch(KitM m, Dictionary<ItemObject, int> pcs)
         {
             int nt = m.Types.Count;
@@ -265,34 +270,55 @@ namespace Armoury
                 m.Resid[k] = r;
             }
             if (!m.Skill || pcs == null || pcs.Count == 0) return;
-            for (int k = 0; k < NK; k++)
+            var rem = new Dictionary<ItemObject, int>();   // recenzja 574: wspolna pula - kazda dopasowana sztuka ja zmniejsza
+            foreach (var kv in pcs) if (kv.Key != null && kv.Value > 0 && UsableAny(m, kv.Key)) rem[kv.Key] = kv.Value;
+            if (rem.Count == 0) return;
+            for (int k = 0; k < NK; k++) if (k != K1H && k != K2H && k != KPole) FitKind(m, k, rem, false, 0);
+            // jak Allocate: wlocznie, 1H, dwureczne bez 1H do 2H, brak 1H - dwureczne z 1H i drzewce z 1H, brak 2H - reszta dwurecznych i drzewce z 2H
+            FitKind(m, KPole, rem, false, 0); FitKind(m, K1H, rem, false, 0); FitKind(m, K2H, rem, false, 1);
+            FitKind(m, K1H, rem, true, 0); FitKind(m, K2H, rem, false, 2); FitKind(m, K2H, rem, true, 0);
+        }
+
+        /// <summary>Recenzja 574: jeden przebieg FitMatch - rodzaj k ze sztukami podstawowymi (sub = false) albo zastepczymi (sub = true) z pozostalej puli; f1: 0 - wszystkie, 1 - tylko bez uzycia 1H, 2 - tylko z uzyciem 1H.</summary>
+        private static void FitKind(KitM m, int k, Dictionary<ItemObject, int> rem, bool sub, int f1)
+        {
+            if (k == KCape || m.Need[k] <= 0) return;
+            int nt = m.Types.Count;
+            var l = new List<ItemObject>();
+            var cnt = new Dictionary<ItemObject, int>();
+            var ver = new Dictionary<ItemObject, int>();
+            foreach (var kv in rem)
             {
-                if (k == KCape || m.Need[k] <= 0) continue;
-                var l = new List<KeyValuePair<ItemObject, int>>();
-                var cnt = new Dictionary<ItemObject, int>();
-                foreach (var kv in pcs)
-                {
-                    var it = kv.Key; int v = KindInfo(it);
-                    if (kv.Value <= 0 || !(Serves(v, k, false) || Serves(v, k, true)) || !UsableAny(m, it)) continue;
-                    int c = 0;
-                    for (int t = 0; t < nt; t++) if ((m.Types[t].Mask & (1 << k)) != 0 && Fits(m.Types[t], it)) c++;
-                    if (c == 0) continue;
-                    l.Add(kv); cnt[it] = c;
-                }
-                l.Sort((a, b) =>
-                {
-                    int c = cnt[a.Key].CompareTo(cnt[b.Key]);
-                    if (c != 0) return c;
-                    c = b.Key.Value.CompareTo(a.Key.Value);
-                    return c != 0 ? c : string.CompareOrdinal(a.Key.StringId, b.Key.StringId);
-                });
-                foreach (var kv in l)
-                {
-                    int x = Claim(m, k, kv.Key, kv.Value);
-                    if (x <= 0) continue;
-                    m.Fit[k] += x;
-                    if ((KindInfo(kv.Key) & 0xFF) == k) { int f; m.FitItems.TryGetValue(kv.Key, out f); m.FitItems[kv.Key] = f + x; }
-                }
+                var it = kv.Key; int v = KindInfo(it);
+                if (kv.Value <= 0 || !Serves(v, k, sub)) continue;
+                if (f1 != 0 && ((v & F1H) != 0) != (f1 == 2)) continue;
+                int c = 0;
+                for (int t = 0; t < nt; t++) if ((m.Types[t].Mask & (1 << k)) != 0 && Fits(m.Types[t], it)) c++;
+                if (c == 0) continue;
+                l.Add(it); cnt[it] = c;
+                int mk = KindsMask(it), p = 0; while (mk != 0) { p += mk & 1; mk >>= 1; }
+                ver[it] = p;
+            }
+            if (l.Count == 0) return;
+            l.Sort((a, b) =>
+            {
+                int c = 0;
+                if (sub) c = (KindInfo(a) & 0xFF) == K2H ? ((KindInfo(b) & 0xFF) == K2H ? 0 : -1) : ((KindInfo(b) & 0xFF) == K2H ? 1 : 0);   // 1H: dwureczne przed drzewcami (Allocate)
+                if (c != 0) return c;
+                c = cnt[a].CompareTo(cnt[b]);
+                if (c != 0) return c;
+                c = ver[a].CompareTo(ver[b]);
+                if (c != 0) return c;
+                c = b.Value.CompareTo(a.Value);
+                return c != 0 ? c : string.CompareOrdinal(a.StringId, b.StringId);
+            });
+            foreach (var it in l)
+            {
+                int x = Claim(m, k, it, rem[it]);
+                if (x <= 0) continue;
+                rem[it] -= x;
+                m.Fit[k] += x;
+                int f; m.FitItems.TryGetValue(it, out f); m.FitItems[it] = f + x;   // recenzja 574 (uwaga 1): kazde dopasowanie, takze jako zastepstwo
             }
         }
 
