@@ -2338,6 +2338,10 @@ namespace Armoury
         [SettingPropertyGroup("Shields under fire")]
         public int ShieldsUpFormationShots { get; set; } = 3;
 
+        [SettingPropertyInteger("Shields Up Harass Shots", 0, 10, "0", HintText = "with AI Shields Up Under Fire: a formation also counts as under fire when this many arrows, bolts or javelins hit its men or land close to them within 12 seconds - so a lone archer or horse archer picking at it is noticed, not only massed volleys. 0 = only the count above, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public int ShieldsUpHarassShots { get; set; } = 2;
+
         [SettingPropertyBool("Shields Up Your Men Too", HintText = "with AI Shields Up Under Fire: your own soldiers follow the same rule (your orders to formations are never changed)", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool ShieldsUpYourMenToo { get; set; } = true;
@@ -14432,6 +14436,7 @@ namespace Armoury
             s.AiShieldsUpUnderFire = AiShieldsUpUnderFire;
             s.ShieldsUpHoldSeconds = ShieldsUpHoldSeconds;
             s.ShieldsUpFormationShots = ShieldsUpFormationShots;
+            s.ShieldsUpHarassShots = ShieldsUpHarassShots;
             s.ShieldsUpYourMenToo = ShieldsUpYourMenToo;
             s.PikesKeptAgainstHorse = PikesKeptAgainstHorse;
             s.AiFormationsUnderFire = AiFormationsUnderFire;

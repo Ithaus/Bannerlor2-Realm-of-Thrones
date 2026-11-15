@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 552: szyk AI pod ostrzalem - sygnal widzi samotnego strzelca (552a) - Armoury (ShieldsUp.cs; klucz NOWY ShieldsUpHarassShots = 2, MCM "Shields Up Harass Shots")
+
+**Problem:** Jeff, czat 15.11, w bitwie: "potem strzelam do szyku - ludzie z tarczami stoja z tylu, bez tarcz z przodu; widza ze do nich strzelam, to zamiast ustawic ludzi z tarczami z przodu i zrobic shield wall, to stoja jak kretyni i sie nie chronia; potem strzelam do wojska jak idzie, porusza sie, to musi sie odwrocic do mnie tarczami bo chca zachowac zycie, skierowac tarczownikow na kierunek mojego ostrzalu, a ida jak zombie i olewaja to, nawet nie biegna, po prostu ida". Specyfikacja 552 (raport z logu): Jeff trafial co 3-5 s, S4 (140) wymaga 3 zdarzen w 5 s, a miara gry UnderRangedAttackRatio dawala ok. 0.03 przy progu 0.33 - CloseRanks mial fire=false, decyzja konczyla sie na YQuiet; 146/310, 291 C i 140 dla calego szyku nie ruszyly.
+
+**Przyczyna:** ShieldsUp.FEvent uznawal szyk za "pod ostrzalem" tylko przy ShieldsUpFormationShots (3) zdarzeniach w 5 s - salwa, nie samotny strzelec. Kierunek strzalu nigdzie nie byl zapisywany.
+
+**Zmiana (552a):**
+- FState: staly pierscien 16 zdarzen S4 (czas, pozycja strzelca; strzelec nieczynny/nieznany = NaN - liczy sie do czestosci, nie do kierunku), bez alokacji po utworzeniu.
+- FEvent(f, missile, shooter): wolajacy podaja strzelca (Hit: ev.A, HorseHit: at, MarkNear pudla: at; S3 bez zdarzenia jak dotad). Nowy warunek obok "N w 5 s": co najmniej ShieldsUpHarassShots zdarzen w 12 s -> ten sam skutek (FormUnder, Until = teraz + ShieldsUpHoldSeconds). 0 = jak dotad.
+- ShieldsUp.ShooterDir(f, srodek, teraz, out kierunek, out rozrzut, out n, out odleglosc): wpisy z 8 s z pozycja, suma wektorow jednostkowych, rozrzut = |suma|/n. Na razie bez czytelnika (552b/c).
+- Linia "Bitwa (140 tarcze)": "552a: przez nekanie (od N w 12 s) X, w tym bez warunku 3 w 5 s Y; zdarzen z pozycja strzelca A / bez B".
+- Klucz ShieldsUpHarassShots (Settings.cs + McmSettings.cs recznie, grupa "Shields under fire", 0-10; RANGES w tools/gen_mcm.py).
+
+**Ryzyko / co sprawdzic:**
+- Szerszy sygnal dla wszystkich czytelnikow FormFire: CloseRanks.cs:608 (146/310 - wiecej ShieldWall/Loose, nadal najwyzej raz na 10 s), MarchToContact.cs:616/784 (291 C - czesciej bieg szyku bez tarcz; 313y szarza), Doctrine.Outshot438 tylko liczy. Sprawdzone w kodzie: zaden nie zaklada "3 w 5 s = masowy ostrzal" poza nazwa; 313b czyta fire (MarchToContact:784), ale wchodzi tylko przy OutshotRush.Live (straty od pociskow) - bramka bez zmian.
+- 140: PassForms znakuje caly szyk -> wiecej przelozen broni (pika -> tarcza) przy jednym strzelcu; budzet CmdPerBattle 3000 i PikesKeptAgainstHorse bez zmian - pilnowac "limit" w linii 140.
+- 333/344 (Pendulum333) przyjmuje Loose "pod ostrzalem" tylko przy mierze gry - nasze Loose z 310 moze byc czesciej odrzucane: linia 146 "nasz szyk zmieniony inna sciezka".
+- 291 C: wiecej biegu; linia 144 (bieg / sr. budzet) pokaze wyczerpanie przed zwarciem.
+- Nic nie czyta MovementOrder (pulapka 12.11). Pierscien czyszczony z FState (ShieldsUp.Clear -> Forms.Clear).
+- Build 0 bledow; w grze nie sprawdzone. Weryfikacja: linia 140 "przez nekanie" > 0; linia 146 wzrost ShieldWall/Loose i 310 przy nekaniu; linia 291 C "bez tarcz pod ostrzalem biegnie".
+
+**Status:** DO SPRAWDZENIA (552a osobno do wgrania - CLAUDE.md p. 2; nie wgrane)
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".

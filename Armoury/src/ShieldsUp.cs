@@ -70,6 +70,10 @@ namespace Armoury
         internal const float PassEvery = 0.25f;     // pass ludzi
         internal const float FormEvery = 1f;        // pass szykow (S4, konnica, zmiany szyku)
         internal const float Window = 5f;           // okno strzalow na szyk
+        // 552a: nekanie - pierscien zdarzen S4 na szyk (czas i pozycja strzelca): szyk pod ostrzalem takze od ShieldsUpHarassShots zdarzen w 12 s (samotny
+        // strzelec), kierunek strzalu z ostatnich 8 s (ShooterDir, CloseRanks 552b/c)
+        internal const float HarassWindow = 12f, DirWindow = 8f;
+        private const int RingN = 16;
         private const int CmdPerPass = 16, CmdPerBattle = 3000, UapPerPass = 32;
         internal const int QueriesPerPass = 64, QueriesPerFrame = 12;   // 204: te same limity zapytan (HorsePursuit.Hunt)
         private const int MaxTries = 3, StubbornAfter = 3, MaxFails = 5, QueueCap = 1024, DedupeN = 128;
@@ -89,6 +93,7 @@ namespace Armoury
         private static bool _riders;                // 157 P2: regula konnych (RidersShieldsUpUnderFire)
         private static float _hold = 8f;
         private static int _shots = 3;
+        private static int _harass = 2;             // 552a: ShieldsUpHarassShots (0 = wylaczone)
         private static float _now, _accMen, _accForm;
         private static int _rot;
         private static string _kind = "?";
@@ -118,6 +123,10 @@ namespace Armoury
             public float Until = -1f, LastMark = -100f;
             public bool Cav, ArrSeen;
             public ArrangementOrder.ArrangementOrderEnum Arr;
+            // 552a: pierscien zdarzen S4 (czas, pozycja strzelca; RX = NaN - strzelec nieznany: liczy sie do czestosci, nie do kierunku) - bez alokacji po utworzeniu
+            public readonly float[] RT = new float[RingN], RX = new float[RingN], RY = new float[RingN];
+            public int RPos, RCount;
+            public bool ByHarass;   // szyk wszedl pod ostrzal przez nekanie (bez warunku ShieldsUpFormationShots w 5 s)
         }
 
         private static readonly Dictionary<int, Entry> By = new Dictionary<int, Entry>();
@@ -166,6 +175,8 @@ namespace Armoury
         private static readonly HashSet<int> MarkedMen = new HashSet<int>(), AlreadyMen = new HashSet<int>(), CmdMen = new HashSet<int>(),
                                              NoOneMen = new HashSet<int>(), OkMen = new HashSet<int>(), FavorMen = new HashSet<int>();
         private static readonly HashSet<Formation> FormUnder = new HashSet<Formation>();
+        private static readonly HashSet<Formation> HarassForms = new HashSet<Formation>(), BulkForms = new HashSet<Formation>();   // 552a: pod ostrzalem przez nekanie / przez N w 5 s
+        private static int _evDir, _evNoDir;   // 552a: zdarzenia S4 z pozycja strzelca / bez
         // 157: WDragon (jezdziec na smoku ROT), WChase (jezdziec w poscigu 148) - tylko przy RidersShieldsUpUnderFire (bez klucza konny = WMounted jak dotad)
         private const int WRanged = 0, WMounted = 1, WBanner = 2, WObject = 3, WDetached = 4, WUndead = 5, WPanic = 6, WPlayer = 7, WHorse = 8, WNear = 9,
                           WDragon = 10, WChase = 11, WReasons = 12;
@@ -433,6 +444,7 @@ namespace Armoury
             _key = c != null && c.AiShieldsUpUnderFire;
             _hold = c != null ? Clamp(c.ShieldsUpHoldSeconds, 2f, 30f) : 8f;
             _shots = c != null ? Math.Max(1, Math.Min(20, c.ShieldsUpFormationShots)) : 3;
+            _harass = c != null ? Math.Max(0, Math.Min(10, c.ShieldsUpHarassShots)) : 2;   // 552a (zakres = RANGES w tools/gen_mcm.py)
             _yourMen = c == null || c.ShieldsUpYourMenToo;
             _pikes = c == null || c.PikesKeptAgainstHorse;
             _riders = c == null || c.RidersShieldsUpUnderFire;   // 157 P2
@@ -572,6 +584,7 @@ namespace Armoury
             _vOffShield = _vOffElse = _vNoShield = _vMainTwo = _vMainOne = _vMainEmpty = _aiN = 0;
             _aiDelay = _aiRadius = _aiProb = 0;
             MarkedMen.Clear(); AlreadyMen.Clear(); CmdMen.Clear(); NoOneMen.Clear(); OkMen.Clear(); FavorMen.Clear(); FormUnder.Clear();
+            HarassForms.Clear(); BulkForms.Clear(); _evDir = _evNoDir = 0;   // 552a (pierscienie siedza w FState - Forms.Clear wyzej)
             for (int i = 0; i < SkipMen.Length; i++) SkipMen[i].Clear();
             Types.Clear();
             RiderClear();   // 157: liczniki konnych (P2) i pomiar konnicy (P1)
@@ -645,7 +658,7 @@ namespace Armoury
             // S3 (K6): punkt upadku z balistyki - opad LandDrop ponizej punktu wylotu, bez oporu powietrza
             Vec2 land;
             if (!Land(ev.P, ev.Vel, out land)) return;
-            MarkNear(m, land, LandRadius, s.Team, -1);
+            MarkNear(m, land, LandRadius, s.Team, -1, s);
         }
 
         /// <summary>S3 (K6) i 204: punkt upadku pocisku z balistyki - opad LandDrop ponizej punktu wylotu p, predkosc v, bez oporu powietrza, lot najwyzej
@@ -689,12 +702,12 @@ namespace Armoury
                 }
                 if (!act || !v.IsActive()) return;
                 TryMark(v, _now + _hold);   // S1
-                FEvent(v.Formation, ev.I);
+                FEvent(v.Formation, ev.I, at);   // 552a: strzelec do kierunku ostrzalu
                 return;
             }
             if (!act || at == null || at.Team == null) return;
             _misses++;
-            MarkNear(m, ev.P.AsVec2, MissRadius, at.Team, ev.I);   // S3 (K6): pudlo - punkt zderzenia
+            MarkNear(m, ev.P.AsVec2, MissRadius, at.Team, ev.I, at);   // S3 (K6): pudlo - punkt zderzenia
         }
 
         /// <summary>Recenzja 157: kon trafiony pociskiem - jego jezdziec jak trafiony (S1, S4); swoj w swojego - nic (jak u ludzi).</summary>
@@ -704,11 +717,11 @@ namespace Armoury
             if (r == null || !r.IsHuman || !r.IsActive()) return;
             if (at != null && at.Team != null && r.Team != null && !r.Team.IsEnemyOf(at.Team)) return;
             TryMark(r, _now + _hold);   // S1
-            FEvent(r.Formation, missile);
+            FEvent(r.Formation, missile, at);
         }
 
         /// <summary>Wrogowie druzyny strzelca w promieniu od punktu: znacznik (S3), przy indeksie pocisku jedno zdarzenie S4 na szyk.</summary>
-        private static void MarkNear(Mission m, Vec2 p, float r, Team shooterTeam, int missile)
+        private static void MarkNear(Mission m, Vec2 p, float r, Team shooterTeam, int missile, Agent shooter)
         {
             if (_qFrame >= QueriesPerFrame) { _queriesOver++; return; }
             _qFrame++;
@@ -723,13 +736,14 @@ namespace Armoury
                 var f = a.Formation;
                 if (missile >= 0 && f != null && !TmpF.Contains(f)) TmpF.Add(f);
             }
-            for (int i = 0; i < TmpF.Count; i++) FEvent(TmpF[i], missile);
+            for (int i = 0; i < TmpF.Count; i++) FEvent(TmpF[i], missile, shooter);
             TmpF.Clear();
             Buf.Clear();
         }
 
-        /// <summary>S4: jedno zdarzenie na pocisk na szyk (pamiec indeksu pocisku 3 s), okno 5 s.</summary>
-        private static void FEvent(Formation f, int missile)
+        /// <summary>S4: jedno zdarzenie na pocisk na szyk (pamiec indeksu pocisku 3 s), okno 5 s. 552a: kazde zdarzenie do pierscienia (czas, pozycja
+        /// strzelca); szyk pod ostrzalem takze od ShieldsUpHarassShots zdarzen w 12 s (nekanie samotnego strzelca) - ten sam skutek (FormUnder, trzymanie).</summary>
+        private static void FEvent(Formation f, int missile, Agent shooter)
         {
             if (f == null) return;
             if (missile >= 0)
@@ -740,14 +754,71 @@ namespace Armoury
                 _dedupePos = (_dedupePos + 1) % DedupeN;
             }
             var st = GetF(f);
+            // 552a: pierscien - pozycja strzelca w chwili zdarzenia (gdy czynny), inaczej NaN (tylko czestosc)
+            float sx = float.NaN, sy = float.NaN;
+            if (shooter != null)
+            {
+                try { if (shooter.IsActive()) { var sp = shooter.Position; sx = sp.x; sy = sp.y; } }
+                catch { sx = sy = float.NaN; }
+            }
+            if (float.IsNaN(sx)) _evNoDir++; else _evDir++;
+            int k = st.RPos;
+            st.RT[k] = _now; st.RX[k] = sx; st.RY[k] = sy;
+            st.RPos = (k + 1) % RingN;
+            if (st.RCount < RingN) st.RCount++;
             st.Shots.Enqueue(_now);
             while (st.Shots.Count > 0 && _now - st.Shots.Peek() > Window) st.Shots.Dequeue();
             while (st.Shots.Count > 64) st.Shots.Dequeue();
-            if (st.Shots.Count >= _shots)
+            bool bulk = st.Shots.Count >= _shots;
+            bool harass = false;
+            if (!bulk && _harass > 0)
+            {
+                int c = 0;
+                for (int i = 0; i < st.RCount; i++) if (_now - st.RT[i] <= HarassWindow) c++;
+                harass = c >= _harass;
+            }
+            if (bulk || harass)
             {
                 FormUnder.Add(f);
                 st.Until = _now + _hold;
+                if (bulk) BulkForms.Add(f);
+                else { st.ByHarass = true; HarassForms.Add(f); }
             }
+        }
+
+        /// <summary>552a (CloseRanks 552b/c, glowny watek - pass szykow; pierscien pisze Drain tez na glownym watku): kierunek od srodka szyku c do strzelcow
+        /// z ostatnich DirWindow s - suma wektorow jednostkowych; spread = |suma| / n (1 = jeden kierunek); dist = srednia odleglosc. false = brak wpisu z pozycja.</summary>
+        internal static bool ShooterDir(Formation f, Vec2 c, float now, out Vec2 dir, out float spread, out int n, out float dist)
+        {
+            dir = Vec2.Zero; spread = 0f; n = 0; dist = 0f;
+            FState st;
+            if (f == null || !c.IsValid || !Forms.TryGetValue(f, out st)) return false;
+            float sx = 0f, sy = 0f, sd = 0f;
+            for (int i = 0; i < st.RCount; i++)
+            {
+                if (now - st.RT[i] > DirWindow) continue;
+                float x = st.RX[i];
+                if (float.IsNaN(x)) continue;
+                float dx = x - c.x, dy = st.RY[i] - c.y;
+                float l = (float)Math.Sqrt(dx * dx + dy * dy);
+                if (l < 1f) continue;
+                sx += dx / l; sy += dy / l; sd += l;
+                n++;
+            }
+            if (n < 1) return false;
+            float len = (float)Math.Sqrt(sx * sx + sy * sy);
+            spread = len / n;
+            dist = sd / n;
+            if (len < 1E-04f) return false;
+            dir = new Vec2(sx / len, sy / len);
+            return true;
+        }
+
+        private static int HarassOnly()
+        {
+            int n = 0;
+            foreach (var f in HarassForms) if (!BulkForms.Contains(f)) n++;
+            return n;
         }
 
         private static FState GetF(Formation f)
@@ -1298,7 +1369,10 @@ namespace Armoury
               .Append(", bohatera gracza pod SI ").Append(_sHeroAi)
               .Append(" (bez celu: punkt upadku z balistyki), pudel z punktem upadku ").Append(_misses)
               .Append(", trafien ").Append(_hits).Append(" (tarcza w rece ").Append(_hitShield).Append(", tarcza na plecach ").Append(_hitBack).Append(", cialo ").Append(_hitBody)
-              .Append("), szykow pod ostrzalem ").Append(FormUnder.Count).Append(" (").Append(_formUnderSec).Append(" s), zapytan ").Append(_queries)
+              .Append("), szykow pod ostrzalem ").Append(FormUnder.Count).Append(" (").Append(_formUnderSec).Append(" s; 552a: przez nekanie (od ").Append(_harass)
+              .Append(" w ").Append(HarassWindow.ToString("0", Inv)).Append(" s) ").Append(HarassForms.Count).Append(", w tym bez warunku ").Append(_shots).Append(" w ")
+              .Append(Window.ToString("0", Inv)).Append(" s ").Append(HarassOnly()).Append("; zdarzen z pozycja strzelca ").Append(_evDir).Append(" / bez ").Append(_evNoDir)
+              .Append("), zapytan ").Append(_queries)
               .Append(" (ponad limit klatki ").Append(_queriesOver).Append("), nadmiar kolejki ").Append(_qOverTotal)
               .Append(" | ludzie: oznaczonych ").Append(MarkedMen.Count).Append(" (juz z tarcza w rece ").Append(AlreadyMen.Count).Append(')')
               .Append(" | przelozenia ").Append(_cmdBoth + _cmdShield).Append(", ludzi ").Append(CmdMen.Count).Append(" (jednoreczna+tarcza ").Append(_cmdBoth)
