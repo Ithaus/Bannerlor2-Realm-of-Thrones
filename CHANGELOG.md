@@ -11,11 +11,15 @@ Zasieg: gracz i partie jego rodu (zasieg rekordu par MarchPairs; potrzebny klucz
 
 **Ryzyko / co sprawdzic:**
 - Regresje/kolizje: Strong dodaje tylko gra (grep: nikt w repo nie dotyka Athletics.Strong); wpis idzie w tym samym ExplainedNumber co "Footmen on horses: ..." i sumuje sie przed sufitem kolumny MarchPace, ScoutPace515 i drogami (MapRoads dzieli przez 1+F - mniejsze F po naszym wpisie, jak przy kazdym wpisie). Liczby jazdy te same co wpisy MarchPairs/HorsePace (RideO, AttRide, Extra, Walk) - jeden czlowiek albo jedzie, albo ma Strong. Bez perka wpisu nie ma (liczenie konczy sie na HasPerk).
-- WorldPace / 565 (tempo swiata jako mnoznik) - inna galaz; tu nie ruszane.
-- W logu: linia "Pary marszowe (gracz)" -> "566 Strong (klucz StrongWalkersOnly TAK): idacy X/piesi gry Y, wpis -0.xxx"; audyt predkosci: przy linii 4084 oczekiwane "Strong: only men on foot" okolo -0.15 (prawie cala piechota na parach), Strong netto bliski zera.
+- WorldPace / 564 (tempo swiata jako mnoznik) - inna galaz; tu nie ruszane.
+- W logu: linia "Pary marszowe (gracz)" -> "566 Strong (klucz StrongWalkersOnly TAK): idacy X/piesi gry Y, wpis -0.xxx"; audyt predkosci: przy linii 4084 oczekiwane "Strong: only men on foot" -0.17 (wspolczynnik -138/168 x 0.05 = -0.041; idacy 0, cala piechota na parach), Strong netto dokladnie 0.
 - Koszt: HasPerk + kilka dodawan na wywolanie modelu predkosci gracza/rodu (bez nowych pamieci).
 
 **Status:** DO SPRAWDZENIA (galaz noc/566-strong-pieszo, nie wgrane)
+
+### Recenzja 566 (galaz noc/566-strong-pieszo-fix -> noc/566-strong-pieszo)
+Przeglad fdba6fbf: brak uwag w kodzie (sprawdzone na kodzie i logu, nie w grze). Liczby: SecondaryBonus Strong 0.05 (DefaultPerks.cs:2109), gra GetFootmenPerkBonus (:429-436) piesi / N x 0.05; DStrong = (WalkO - FootG) / N x B w tym samym ExplainedNumber -> suma WalkO / N x B. Podwojnego liczenia brak (gracz: HorsePace zeruje Extra/Walk przy rekordzie par; rod: jadacy RideO + AttRide + Extra, idacy reszta - te same liczby co wpisy +0.15/-0.3; rozjazd uprzezy Extra HorsePace vs MarchPairs sprzed 566). Bezpiecznik zagniezdzen bez zmian (StrongOf tylko z Compute, FootOf z pamieci GetFast). Klucz NIE = identycznie (SpeedSig +0). 564 mnozy wpis Strong raz (WorldPace.FinalPostfix po MarchPace); 565 nie dotyka Compute/ApplySpeed/ColumnOf; git merge-tree z 564, 565 i noc/scal-perki - konflikt tylko w CHANGELOG.
+Poprawione (tylko tekst wpisu, kod bez zmian): "Ryzyko" - tempo swiata to wpis 564, nie 565; oczekiwany wpis w audycie przy linii 4084 to -0.17 (audyt pokazuje Strong +0.17 = cala premia gry, 138/168 piesi gry, idacy 0), nie "okolo -0.15" - Strong netto dokladnie 0.
 
 ## 562b: musztra - pasek Drill pokazuje postep w sztukach (%), podpowiedz mowi, czego brakuje najbardziej i dlaczego pobor nic nie bierze - Armoury (DrillKit.cs, MarchHud.cs)
 
