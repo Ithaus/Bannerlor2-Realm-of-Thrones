@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 261 (561 jednorozce nigdzie, konie wight tylko u Innych; Skagos na koniach gorskich), bez autotestu
+
+- Armoury.dll 2891ca06 = noc/scal-perki d628b6ca (260 + 561). Kopie: .bak-2026-11-15-przed-wgranie261, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie261 i -przed).
+- Do sprawdzenia: linia 'Zakazane wierzchowce (561)' - podmiana szablonow 3 jednostek Skagosu, ile usunieto i skad; brak tych koni na polkach. W toku: 562 komplet cwiczebny wedlug roli, 563 stal valyrianska.
+
 ## STAN 15.11 - WGRANIE 260 (559 kusze: pulap energii beltu 190 J, 469 z prawdziwa waga beltu), bez autotestu
 
 - Armoury.dll 0bbad706 = noc/scal-perki d90f8613 (259 + 559). Kopie: .bak-2026-11-15-przed-wgranie260, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie260 i -przed). Klucz NOWY CrossbowBoltEnergyCap = 190.
