@@ -22,6 +22,14 @@
 
 **Status:** DO SPRAWDZENIA (galaz noc/546-bez-limitu, nie wgrane).
 
+### Recenzja 546 (galaz noc/546-bez-limitu-fix -> noc/546-bez-limitu)
+
+- **(1) [GLOWNE] oboz slabszy od zalogi siedzi 1.5-2.3 roku, trzyma go tylko 545 - POTWIERDZONE, NIE WDROZONE (decyzja Jeffa).** Sprawdzone w kodzie: HoldsToEnd545 (Hold.cs) nie patrzy na stosunek sil; (b) StarveYield471 i bramka glodu Gate471 wymagaja Ratio471 > 1; (a) przy 546 tylko przy 542 NIE i tez ratio > 1; furaz 471b-3 (KeepDays 5, MaxDays 2) trzyma zapas druzyny powyzej progu m116 (1.5 doby); straty obozu (SiegeCamp471, RoundRandomized od zdrowych) maleja wykladniczo. Istniejace realistyczne mechanizmy (glod obroncow, straty i zaraza obozu, wyczerpanie spichlerzy okregu) koncza takie oblezenie, ale dopiero po latach - zaden nie skroci go bez nowej reguly, wiec to wybor projektowy: (A) trzymanie 545 tylko przy Ratio471 > 1 (przy ratio <= 1 zadna droga konca 471b nie istnieje; o odejsciu decyduje mysl gry, bez rozejmu) albo (B) "oboz bez szans": OB1 s <= 1 / 307c, obroncy maja > 30 dob jedzenia, przez ok. 14 dob z rzedu - trzymanie wygasa. Zaden wariant nie jest limitem czasu oblezenia.
+- **(2) podpowiedz "Siege Time By Factors" - POPRAWIONE.** Zdanie o limicie w McmSettings.cs (HintText) i Settings.cs (komentarz) dostalo "With Siege No Time Limit off," jak trzy inne podpowiedzi.
+- **(3) komentarze SiegeWalls2.Hold.cs - POPRAWIONE.** "oboz nie siedzi wiecznie" / "(limit 471b/542 konczy oboz)" -> trzymanie tam, gdzie dziala regula 471b; konczy prawdziwe wyjscie, przy 546 NIE tez limit. Tylko komentarze.
+- **(4) linia doby przy kluczu NIE - POPRAWIONE.** Licznik "oblezen ponad dawny limit" tylko przy 546 TAK; przy NIE czlon odsyla do "ponad limitem" (bez sprzecznego 0). Tylko tekst logu.
+- Regresje: zmiany (2)-(4) to tekst MCM, komentarze i jedna linia logu - zadnej logiki. Build Armoury 0 bledow (commit 9f72b602 - kod; ten commit - wpis).
+
 ## 541: pasek mapy - szerokosc jak przed 537 (nie zaslania Done), pelne ulamki, Weapons i Armour (zapas musztry), ikony konia, jucznego, miecza i zbroi - Armoury (MarchHud, MarchHudUi NOWY, Drill.HudKit, MenPurse.KeptGiven)
 
 **Problem:** Jeff, czat 15.11 (zrzut paska: gora gold 225k, 1.5, -, morale 90%, 133+1w, 519, 72.5, Horses 132, 120; dol 2, 9.8, 1089, Harness 132, Pack 53 z ikona zboza): "zobacz dolny prawy pasek tam gdzie dodales konie rozszerzyles go i nachodzi na przycisk done, zmiany: rozmiar ma byc taki jak przedtem; dodaj ikony miecza i zbroi, aby bylo wiadomo ile broni i zbroi ofiarowac ludziom do szybszego szkolenia, bo teraz nikt nie wie ile i gdzie i jak ubywa - to mamy np. bronie 45/45 a za kilka dni 43/45, to samo zbroje; mamy 132/ na 132 ma byc ile mamy zapelnionych czemu jest tylko 132?; czy mozesz dobrac bardziej pasujace ikony - ikona zboza srednio pasuje".
