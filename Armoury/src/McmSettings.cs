@@ -13812,6 +13812,14 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeYieldOnlyStarving { get; set; } = true;
 
+        [SettingPropertyBool("Siege No Minimum Days Gate", HintText = "With Siege Time By Factors: the lords of the world assault a besieged town or castle whenever they have a real chance (the breach, the siege engines and the odds of the storm decide, with the usual pause after a repulse), not only after the lower bound of the term (small castle 20, castle 40, town 60 days) and not only through a breach. Waiting for a starving garrison to yield stays. Off = no assault before the lower bound and bigger places only through a breach, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeNoMinDaysGate { get; set; } = true;
+
+        [SettingPropertyBool("Siege Camp Holds To The End", HintText = "With Siege AI Holds Fresh Siege and Siege Time By Factors: an AI host keeps its siege until the place falls instead of only for the first ten days - it leaves only when its food runs out, a stronger relief army comes, its own stronghold needs defending, peace or a truce ends the war, or the siege drags past Siege Time Limit Factor times the upper bound of its term. Sieges with you, the Others or the story keep the old hold. Off = the hold ends after ten days (two without Siege Hold Ten Days), as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeCampHoldsToEnd { get; set; } = true;
+
         [SettingPropertyBool("Siege Abandon Grace", HintText = "with Siege Near Relief Only: for the first 2 days of a siege the besieging AI army leaves for a relief only if the enemy is stronger by the same measure the army used when it chose to start the siege (enemies in the field within reach) - the start and the first judgement no longer disagree and the army does not walk away a few hours after arriving. Off = the judgement of a running siege applies from the first hour, as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeAbandonGrace { get; set; } = true;
@@ -17270,6 +17278,8 @@ namespace Armoury
             s.SiegeTimeLimitFactor = SiegeTimeLimitFactor;
             s.SiegeNearReliefOnly = SiegeNearReliefOnly;
             s.SiegeYieldOnlyStarving = SiegeYieldOnlyStarving;
+            s.SiegeNoMinDaysGate = SiegeNoMinDaysGate;
+            s.SiegeCampHoldsToEnd = SiegeCampHoldsToEnd;
             s.SiegeAbandonGrace = SiegeAbandonGrace;
             s.SiegeAbandonStartMeasure = SiegeAbandonStartMeasure;
             s.SiegeTimeRulesPlayerHoldings = SiegeTimeRulesPlayerHoldings;
