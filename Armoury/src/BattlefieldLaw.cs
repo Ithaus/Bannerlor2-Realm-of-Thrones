@@ -1421,7 +1421,7 @@ namespace Armoury
         }
 
         /// <summary>Dzialka kapitana w bitwie bez misji: stala trzecia (PlayerLootSharePercent - nie wiadomo, kto kogo powalil); sam w druzynie - wszystko.</summary>
-        private static int SimSharePercent()
+        internal static int SimSharePercent()   // 573: takze dzialka z kapitulantow (ArmouryBehavior.StripSurrendered)
         {
             int third = Math.Max(0, Math.Min(100, Settings.Current.PlayerLootSharePercent));
             int troops = 0;

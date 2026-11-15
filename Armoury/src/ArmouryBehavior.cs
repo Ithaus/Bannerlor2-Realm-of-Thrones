@@ -4122,6 +4122,11 @@ namespace Armoury
             catch { }
             if (fromBattle)   // audyt pelny W3: jeniec z walki oddal sprzet w lupie z pola (DTE liczy nieprzytomnych jak poleglych)
             {
+                // 573 (Jeff 15.11 "tak rob"): bitwa gracza BEZ misji i bez symulacji = kapitulacja (banda/karawana sie poddala, wygrana bez walki) -
+                // nikt nikogo nie powalil, DTE nic nie zebral z pola, a szablonowa loteria gry placi tylko za WoundedInBattle (przy kapitulacji pusta,
+                // SurrenderParty rani ludzi PRZED bitwa). Taki jeniec zostaje obszukany do naga, sprzet dzielony jak lup z pola.
+                try { if (StripSurrendered(roster)) return; }
+                catch (Exception e) { Log.Error("StripSurrendered (573)", e); }
                 // stary lad (bez prawa zachowania lupu): vanilla loteria juz
                 // zaplacila za rannych - obszukanie byloby DRUGA nagroda
                 try { _prisonerBaseline = SnapshotPrisoners(); } catch { }
@@ -4137,6 +4142,131 @@ namespace Armoury
             }
             catch { }
             TryStripNewCaptives(fromBattle ? "bitwa" : "OnPrisonerTaken");
+        }
+
+        /// <summary>
+        /// 573: kapitulanci bez walki. Warunek: bitwa gracza (MapEvent.PlayerMapEvent / PlayerEncounter.Battle) bez misji w polu (LosersFlee.FieldFought -
+        /// kazda misja w czasie bitwy gracza) i bez symulacji (IsPlayerSimulation - autobitwe placi DTE/loteria za WoundedInBattle, tam bylby dubel),
+        /// nie okno jencow 380 (PrisonersFromField). Obszukani tylko szeregowi wzieci tym ekranem (roster), przycieci do przyrostu lochu od poczatku
+        /// bitwy (_prisonerBaseline). Sprzet: dzialka dowodcy (BattlefieldLaw.SimSharePercent - PlayerLootSharePercent, sam w druzynie 100%) do
+        /// zbrojowni DTE na liste gracza (StockDepositKey), reszta do zbrojowni DTE jako stan wojska. Bez zbrojowni DTE - wszystko do sakw (jak dotad).
+        /// Zwraca true, gdy sprawa zalatwiona (ksiega jencow juz nowa).
+        /// </summary>
+        private bool StripSurrendered(TaleWorlds.CampaignSystem.Roster.FlattenedTroopRoster roster)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.CaptiveSpoilsEnabled || !s.SurrenderCaptivesStripped || !s.BattlefieldLawEnabled || roster == null) return false;   // bez prawa pola lup Spoils zostaje loteria - bez obszukania (dubel)
+            if (PrisonersFromField > 0) return false;
+            var me = MapEvent.PlayerMapEvent ?? TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Battle;
+            if (me == null || me.IsPlayerSimulation || LosersFlee.FieldFought(me)) return false;
+            if (BattlefieldLaw.RotEnlisted()) return false;   // zaciezny w armii ROT - lup zostaje przy armii (jak AfterGenerateLoot)
+            var prison = MobileParty.MainParty != null ? MobileParty.MainParty.PrisonRoster : null;
+            if (prison == null) return false;
+
+            // ilu wzieto: z ekranu, nie wiecej niz realny przyrost lochu od poczatku bitwy
+            var taken = new Dictionary<CharacterObject, int>();
+            int onScreen = 0, lords = 0;
+            foreach (var e in roster)
+            {
+                var t = e.Troop;
+                onScreen++;
+                if (t == null || t.IsHero) { lords++; continue; }   // lordowie - okup, nie plaszcz
+                int v; taken.TryGetValue(t, out v); taken[t] = v + 1;
+            }
+            var now = SnapshotPrisoners();
+            var loot = new TaleWorlds.CampaignSystem.Roster.ItemRoster();
+            int men = 0, pieces = 0;
+            foreach (var kv in taken)
+            {
+                int had = 0, have = 0;
+                if (_prisonerBaseline != null) _prisonerBaseline.TryGetValue(kv.Key.StringId, out had);
+                now.TryGetValue(kv.Key.StringId, out have);
+                int fresh = Math.Min(kv.Value, Math.Max(0, have - had));
+                for (int m = 0; m < fresh; m++)
+                {
+                    Equipment eq = null; int n = 0;
+                    foreach (var be in kv.Key.BattleEquipments) { n++; if (MBRandom.RandomInt(n) == 0) eq = be; }
+                    if (eq == null) continue;
+                    men++;
+                    for (int slot = 0; slot < 12; slot++)
+                    {
+                        if (slot == 4) continue;                                     // choragiew zostaje przy sztandarze
+                        if (!s.CaptiveSpoilsIncludeMounts && slot >= 10) continue;   // kon i rzad konski
+                        var item = eq[(EquipmentIndex)slot].Item;
+                        if (item == null || item.ItemType == ItemObject.ItemTypeEnum.Banner) continue;
+                        if (item.StringId != null && item.StringId.StartsWith("dragon_")
+                            && item.ItemType == ItemObject.ItemTypeEnum.Horse) continue;   // smokow nie ma w zbrojowni
+                        loot.AddToCounts(new EquipmentElement(item, PickWornModifier(item)), 1);
+                        pieces++;
+                    }
+                }
+            }
+            _prisonerBaseline = now;   // nowy stan = nowa baza (hourly/menu nie obszukaja ich drugi raz)
+            if (pieces <= 0)
+            {
+                if (men > 0 || taken.Count > 0) Log.Info("Jency obszukani (573 kapitulacja): " + men + " ludzi, 0 szt. - nic do podzialu.");
+                return true;
+            }
+
+            var arm = HorseFate.PlayerArmory();
+            if (arm == null)
+            {
+                // bez DTE nie ma zbrojowni wojska - wszystko do sakw, jak dawne obszukanie
+                var bag = MobileParty.MainParty.ItemRoster;
+                for (int i = 0; i < loot.Count; i++) { var el = loot.GetElementCopyAtIndex(i); bag.AddToCounts(el.EquipmentElement, el.Amount); }
+                Log.Info("Jency obszukani (573 kapitulacja): " + men + " ludzi, " + pieces + " szt. do sakw (brak zbrojowni DTE).");
+                Log.Player("The surrendered captives are stripped at the rope: " + pieces + " pieces of gear go into the baggage.", true);
+                return true;
+            }
+
+            // dzialka dowodcy: ten sam procent co lup bitwy bez misji; suma = round(N x pct) (od zera), rozdzial na przedmioty najwiekszymi resztami
+            // (pojedyncze sztuki nie zaokraglaja sie do zera), w przedmiocie najpierw egzemplarze w lepszym stanie
+            int pct = BattlefieldLaw.SimSharePercent();
+            int target = Math.Min(pieces, (int)Math.Round(pieces * pct / 100.0, MidpointRounding.AwayFromZero));
+            var byItem = new Dictionary<ItemObject, int>();
+            for (int i = 0; i < loot.Count; i++)
+            {
+                var el = loot.GetElementCopyAtIndex(i);
+                int v; byItem.TryGetValue(el.EquipmentElement.Item, out v); byItem[el.EquipmentElement.Item] = v + el.Amount;
+            }
+            var shareOf = new Dictionary<ItemObject, int>();
+            var rest = new List<KeyValuePair<ItemObject, double>>();
+            int given = 0;
+            foreach (var kv in byItem)
+            {
+                double exact = kv.Value * pct / 100.0;
+                int fl = Math.Min(kv.Value, (int)Math.Floor(exact));
+                shareOf[kv.Key] = fl; given += fl;
+                if (fl < kv.Value) rest.Add(new KeyValuePair<ItemObject, double>(kv.Key, exact - fl));
+            }
+            rest.Sort((a, b) => { int c = b.Value.CompareTo(a.Value); return c != 0 ? c : b.Key.Value.CompareTo(a.Key.Value); });
+            for (int i = 0; i < rest.Count && given < target; i++) { shareOf[rest[i].Key]++; given++; }
+
+            var els = new List<ItemRosterElement>();
+            for (int i = 0; i < loot.Count; i++) els.Add(loot.GetElementCopyAtIndex(i));
+            els.Sort((a, b) =>
+            {
+                float pa = a.EquipmentElement.ItemModifier != null ? a.EquipmentElement.ItemModifier.PriceMultiplier : 1f;
+                float pb = b.EquipmentElement.ItemModifier != null ? b.EquipmentElement.ItemModifier.PriceMultiplier : 1f;
+                return pb.CompareTo(pa);
+            });
+            int toPlayer = 0, toMen = 0;
+            foreach (var el in els)
+            {
+                var it = el.EquipmentElement.Item;
+                int left; shareOf.TryGetValue(it, out left);
+                int mine = Math.Min(left, el.Amount);
+                shareOf[it] = left - mine;
+                arm.AddToCounts(el.EquipmentElement, el.Amount);
+                if (mine > 0) StockDepositKey(el.EquipmentElement, mine);   // dzialka dowodcy - lista gracza w zbrojowni
+                toPlayer += mine; toMen += el.Amount - mine;
+            }
+            StockVersion++;
+            Log.Info("Jency obszukani (573 kapitulacja): " + men + " ludzi, " + pieces + " szt.; dzialka gracza " + toPlayer + " szt. (" + pct
+                     + "%), ludziom " + toMen + " szt. | bitwa bez misji i bez symulacji, ekran wzial " + onScreen + " (lordow pominietych " + lords + ").");
+            Log.Player("The surrendered captives are stripped at the rope: " + pieces + " pieces of gear. Your captain's share of " + toPlayer
+                       + " goes to your list in the troops' armoury, " + toMen + " to your men.", true);
+            return true;
         }
 
         private Dictionary<string,int> SnapshotPrisoners()

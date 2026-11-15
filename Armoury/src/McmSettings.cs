@@ -1520,6 +1520,10 @@ namespace Armoury
         [SettingPropertyGroup("Loot from the field")]
         public bool CaptiveSpoilsIncludeMounts { get; set; } = true;
 
+        [SettingPropertyBool("Surrender Captives Stripped", HintText = "men who surrender to you without a fight (a band or caravan that gives up, a battle won with no fighting on the field) are stripped at the rope like the fallen: the captain's share (Player Loot Share Percent; all of it if you ride alone) goes to your list in the troops' armoury, the rest to your men's part of it. Captives taken in a battle you fought yourself are not stripped again - their gear was picked off the field. Lords are never stripped (they are ransomed). Off = surrendered men go to your dungeon with their gear lost, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Loot from the field")]
+        public bool SurrenderCaptivesStripped { get; set; } = true;
+
         [SettingPropertyBool("Captive Rags Preview", HintText = "the party screen shows your captives the way you actually keep them: stripped to rags, not in the full armour you already took (icons stay, only the 3D preview changes)", RequireRestart = false)]
         [SettingPropertyGroup("Loot from the field")]
         public bool CaptiveRagsPreview { get; set; } = true;
@@ -14377,6 +14381,7 @@ namespace Armoury
             s.LootWearSpread = LootWearSpread;
             s.CaptiveSpoilsEnabled = CaptiveSpoilsEnabled;
             s.CaptiveSpoilsIncludeMounts = CaptiveSpoilsIncludeMounts;
+            s.SurrenderCaptivesStripped = SurrenderCaptivesStripped;
             s.CaptiveRagsPreview = CaptiveRagsPreview;
             s.PartyScreenRealKit = PartyScreenRealKit;
             s.BeatenPurseToVictor = BeatenPurseToVictor;
