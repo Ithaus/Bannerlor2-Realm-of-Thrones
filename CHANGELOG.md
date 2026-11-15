@@ -24,6 +24,17 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 554
+
+Przyjete (kod, build 0 bledow, w grze nie sprawdzone):
+- **R1 - ksiega zysku karawany widziala strate.** SellItemsAction -> CaravanGoods.TradePostfix -> CaravanTrade284.NoteSale zapisuje utarg - myto - koszt PRZED doplata (dla sztuk z doplata ujemne), a doplata szla tylko do kiesy. Skutek: pierscien 294 (a.Below -> zwijanie karawany), CaravanSizeByTrade (wstrzymany najem strazy), linie 284/287 (droga 'surowce masowe - brak miasta') i 259 (karawany Jeffa) liczyly strate. Poprawka: nowa `CaravanTrade284.NoteBonus(mp, paid)` - po wyplacie doplaty `AddReal` (pierscien karawany), `_pR[PathBulkShort]`, `_plR` dla karawan gracza. Liczniki sztuk/utargu/strat (_pLoss*) bez zmian - to zapis samej sprzedazy. 139b (XP Handlu dowodcy) dalej liczy zysk bez doplaty - XP z takiej sprzedazy 0, nie ujemne; nie ruszane.
+- **R2 - doplata liczona jako wyplata zysku wlascicielowi.** TakeFromSmiths/TakeBack zmienialy kapital warsztatu poza jego tickiem bez znacznika; RunPrefix (WorkshopTrade) liczyl roznice CapEnd - Capital do "gracz"/"notable" w linii "Warsztaty towarowe", a koszt nie wchodzil do wyniku doby zlotnika. Poprawka: `WorkshopTrade.NoteOutsideIncome(w, -x)` po kazdym `ChangeGold(-x)` i `(w, +x)` w TakeBack (konwencja Komis429). W trakcie ticku warsztatu (HasEnd false) - nic, RunPostfix policzy sam.
+
+Odrzucone / bez zmiany kodu:
+- **R3 (PLAUSIBLE) - srebro moze krazyc miedzy zlotnikami.** Prawdziwe ryzyko, ale nie pewne (ogranicza je BuyBlocked 284 i podloga polowy kapitalu). Proponowana poprawka (wycena 0 zakupu srebra przez BK ponizej SmithKeep) zmienia zakupy BK - osobna decyzja Jeffa, nie "przy okazji". Sprawdzic w logu: doplata zlotnikow (554) rosnie z doby na dobe, a 311c silversmithy cykli stoi -> wtedy wprowadzic blokade.
+- **R4 - dowod w Przyczynie.** Racja: przy wjezdzie blokowala glownie kasa miast (34 vs 11 ponizej progu kosztu). 554 dziala dla miast z nadwyzka kasy (Jeff: Gulltown, Seagard - tam blokowal koszt); miasta AI ponizej zapasu kupcow (Qarth, Qarkash, New Ghys) dalej nie kupia - E5/A1 bez zmian. Zdanie o "glownej przyczynie" nalezy czytac tylko dla zlotnikow Jeffa.
+- **R5 - scalenie.** Nie dotyczy tej galezi; przy scalaniu do noc/scal-perki wpis 554 nad 549/550, sprawdzic, ze liczba linii CHANGELOG rosnie.
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".

@@ -158,6 +158,7 @@ namespace Armoury
                     int x = Math.Min(due - got, SpareOf(w));
                     if (x <= 0) continue;
                     w.ChangeGold(-x);
+                    WorkshopTrade.NoteOutsideIncome(w, -x);   // 554 (recenzja 2): koszt zlotnika poza jego tickiem - do wyniku doby Op, nie "wyplata zysku wlascicielowi"
                     got += x;
                 }
                 catch (Exception e) { Stumble("TakeFromSmiths", e); }
@@ -172,7 +173,7 @@ namespace Armoury
             {
                 var ws = t != null ? t.Workshops : null;
                 if (ws == null) return;
-                foreach (var w in ws) if (UsesSilver(w)) { w.ChangeGold(x); return; }
+                foreach (var w in ws) if (UsesSilver(w)) { w.ChangeGold(x); WorkshopTrade.NoteOutsideIncome(w, x); return; }   // 554 (recenzja 2): zwrot tym samym torem
             }
             catch (Exception e) { Stumble("TakeBack", e); }
         }
@@ -448,7 +449,7 @@ namespace Armoury
                             try { mp.PartyTradeGold += paid; }
                             catch (Exception e) { Stumble("Sell(doplata)", e); TakeBack(t, paid); paid = 0; }
                         }
-                        if (paid > 0) { _pSales++; _pPcs += moved; _pGold += paid; }
+                        if (paid > 0) { _pSales++; _pPcs += moved; _pGold += paid; CaravanTrade284.NoteBonus(mp, paid); }   // 554 (recenzja 1): doplata do ksiegi zysku karawany
                         if (paid < dueI) _pShort++;
                     }
                 }
