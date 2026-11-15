@@ -25,6 +25,22 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 555 (galaz noc/555-banefort-zaloga-fix -> noc/555-banefort-zaloga)
+
+Przyjete (sprawdzone w kodzie):
+- **#1 Wyzwalacz bez zwiazku z 544** - prawda: brak klucza w zapisie = "czeka", jedynym warunkiem byl pan; starszy zapis sprzed oblezenia (zaloga 336) albo zapis autotestu dostalby +168 i wiecej z niczego. Zmiana: dar tylko gdy 544 w tej kampanii naprawde oddal zamek - nowe `Banefort544.ReturnedOk` (stan 544 "done:dzien:ok") i `Banefort544.StateText`; 544 czeka - 555 czeka ("czekam na zwrot 544"); kazdy inny wynik 544 (juz-w-koronie, inny-pan, gracz, new, blad) - 555 konczy "bez-zwrotu-544" z linia logu. U Jeffa 544 ma wynik ok (l.864 WGRANIE 250), wiec dar nadal dojdzie.
+- **#3 Zold** - prawda (DefaultPartyWageModel.GetCharacterWage: T1 2, T2 3, T3 5, T4 8, T5 12, T6 17; dawna mieszanka ok. 6.1 na czlowieka, ok. 3070/dobe za 504). Zmiana: mieszanka T1 30% / T2 35% / T3 20% / T4 10% / T5 5% / T6 0% - ok. 4.05 na czlowieka (-34%, ok. 2040/dobe za 504, za dodanych ok. 1740 przy zalodze ok. 74). Linia DAR 555 pisze teraz "zold dodanych ok. N na dobe" (z modelu gry). Zold nadal ponad sily House Banefort (linia 334 dnia 109114: zold 827, dlug 1911) - patrz DECYZJA nizej.
+- **Drobne: gotowosc gracza** - zamiast "gracz nie w Banefort" ten sam warunek co 544 (`BookHoldings.PlayerOnMapFor`: nie w osadzie, menu, spotkaniu, bitwie, oblezeniu, armii, rozmowie, niewoli), z tym samym ograniczeniem linii "czeka ... gracz" do jednej na dobe. Skutek: gdy Jeff jest w armii albo w osadzie, dar czeka do wyjscia na mape.
+- **Drobne: ksiega ludzi** - `GiveNone(..., -1)` nie liczyl naplywu w zadnej przyczynie. Nowa przyczyna `PeopleBook.FGift555 = 67` ("dar zalogi Banefort (555)", FKinds 67 -> 68, nazwa dopisana na koncu FName); linia doby ksiegi pokazuje ja w "wejscia" tylko gdy > 0. Tablice FKinds tylko w pamieci doby (nie w zapisie) - poszerzenie bez skutku dla zapisow.
+
+Potwierdzone, bez zmiany kodu - DECYZJA JEFFA przed wgraniem:
+- **#2 Limit zalogi** - prawda: DefaultPartySizeLimitModel zamek 200 + Przywodztwo pana + perki/budynki; DesertionCampaignBehavior pomija tylko partie w MapEvent (dziala w oblezeniu miedzy szturmami); DefaultPartyDesertionModel zdejmuje 25% nadwyzki na dobe (+5 na dobe przy niezaplaconym zoldzie, do 20 przy limicie zoldu). Nadwyzka odchodzi W4c do ludnosci BK wsi. Przed oblezeniem zamek trzymal 336, wiec limit byl wtedy co najmniej ok. 336 - 504 jest ponad nim o ok. 170, czyli ok. 7 dob do zejscia do limitu. Cel 504 to liczba z rozkazu Jeffa, wiec go nie ciete. Do wyboru: (a) zostaje 504 - dar topnieje do limitu, nadwyzka do wsi; (b) cel = min(504, limit zalogi gry) - nic nie przecieka do wsi, ale bez pelnego +50%; (c) osobna ochrona zalogi Banefortu przed przepelnieniem do konca oblezenia (nowa latka - osobna zmiana).
+- Klucz MCM do wylaczenia 555 - nie dodany (zadanie go nie wymagalo).
+
+Odrzucone: brak.
+
+Ryzyko: 555 zalezy teraz od stanu 544 - zapis, w ktorym 544 zakonczyl sie innym wynikiem niz ok, daru nie dostanie (zamierzone). Rejestracja 544 przed 555 bez zmian (ta sama godzina). Build Armoury 0 bledow. W grze nie sprawdzone.
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".

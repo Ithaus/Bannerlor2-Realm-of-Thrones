@@ -17,6 +17,8 @@ namespace Armoury
     /// ZAMKNIETA EKONOMIA: wyjatek z rozkazu Jeffa - ludzie z niczego (bez zdjecia z ludnosci, bez zlota), linia logu "dar 555"; ksiega ludzi: koszyk bez pochodzenia.
     /// Dalej zaloga zyje wedlug zwyklych regul (zold pana, limit zalogi i przepelnienie W4c, zbrojownia zalogi dokupi sprzet).
     /// KIEDY: raz na kampanie, flaga w zapisie "arm_555_banefort" ("" czeka, "new" nowa kampania - nic, "done:dzien:wynik"). Proba co godzine gry (HourlyTickEvent).
+    /// RECENZJA 555: dar tylko gdy 544 w tej kampanii naprawde oddal zamek (stan 544 "done:dzien:ok"; 544 czeka - czekamy; inny wynik - bez daru), gracz na mapie
+    /// (BookHoldings.PlayerOnMapFor jak 544), tansza mieszanka tierow (bez T6), ksiega ludzi - przyczyna FGift555. Limit zalogi gry i zold - DECYZJA JEFFA (CHANGELOG).
     /// WARUNKI: pan Banefortu = House Banefort (ROTclan_59) albo rod panujacy korony "vlandia" (odbiorca zapasowy 544), nie rod gracza. Pan z Polnocy, gdy 544
     /// jeszcze czeka - czekamy na 544; inny pan - koniec bez zmian. OBLEZENIE: gra sama dopisuje ludzi do zalogi oblezonej twierdzy (GarrisonTroopsCampaignBehavior.
     /// OnSettlementEntered - lord wchodzacy do oblezonej osady zostawia ludzi, bez warunku oblezenia; dekompilacja 1.4.8), a wlasny werbunek zalogi wstrzymuje
@@ -29,8 +31,10 @@ namespace Armoury
         private const string StId = "ROT_castle20", ClanId = "ROTclan_59", CrownId = "vlandia";
         internal const int PreSiegeGarrison = 336;                       // linie OB1 dni 109003-109012 (oblezenie od 108995)
         internal const int Target = PreSiegeGarrison * 3 / 2;            // +50% = 504
-        // mieszanka tierow zalogi (T1..T6) - wiekszosc szeregowcy T2-T4, garstka weteranow; brak tieru w drzewie - udzial dzielony na pozostale
-        private static readonly double[] TierShare = { 0.10, 0.25, 0.30, 0.20, 0.10, 0.05 };
+        // mieszanka tierow zalogi (T1..T6) - wiekszosc szeregowcy T1-T3, garstka weteranow; brak tieru w drzewie - udzial dzielony na pozostale.
+        // Recenzja 555 #3: dawne { 0.10, 0.25, 0.30, 0.20, 0.10, 0.05 } = ok. 6.1 zoldu na czlowieka (GetCharacterWage: T1 2, T2 3, T3 5, T4 8, T5 12, T6 17),
+        // House Banefort nie udzwignie; ta mieszanka ok. 4.05 na czlowieka (-34%), bez T6 (zaloga to nie gwardia)
+        private static readonly double[] TierShare = { 0.30, 0.35, 0.20, 0.10, 0.05, 0.00 };
         private const int MaxErrors = 3;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -80,6 +84,7 @@ namespace Armoury
         {
             _errors = 0;
             if (day == _waitDay && why == _waitText) return;
+            if (day == _waitDay && why != null && _waitText != null && why.StartsWith("gracz", StringComparison.Ordinal) && _waitText.StartsWith("gracz", StringComparison.Ordinal)) return;   // jak 544
             _waitDay = day; _waitText = why;
             Log.Info(Tag + "czeka - dzien " + day + " | " + why + " (proba co godzine, tez po nastepnym wczytaniu).");
         }
@@ -146,6 +151,10 @@ namespace Armoury
                 day = (int)CampaignTime.Now.ToDays;
                 var st = Settlement.Find(StId);
                 if (st == null || !st.IsFortification || st.Town == null) { Done(day, "brak-osady", "osady " + StId + " nie ma w swiecie - bez daru"); return; }
+                // recenzja 555 #1: dar tylko po rzeczywistym zwrocie 544 (zamek oddany bez obsady). 544 czeka - czekamy; inny wynik 544 (juz w koronie,
+                // inny pan, gracz, nowa kampania, blad) - zaloga nie byla oprozniona przez 544 (np. starszy zapis sprzed oblezenia, zapis autotestu) - bez daru.
+                if (Banefort544.Pending) { Wait(day, "czekam na zwrot 544"); return; }
+                if (!Banefort544.ReturnedOk) { Done(day, "bez-zwrotu-544", "544 nie oddal Banefortu w tej kampanii (stan 544: " + Banefort544.StateText + ") - zaloga nie oprozniona przez 544, bez daru"); return; }
                 var owner = st.OwnerClan;
                 if (owner == null) { Wait(day, "Banefort bez pana"); return; }
                 if (owner == Clan.PlayerClan) { Done(day, "gracz", "Banefort nalezy do rodu gracza - bez daru (zaloga gracza to jego decyzja)"); return; }
@@ -154,11 +163,11 @@ namespace Armoury
                 bool crownRuler = crown != null && !crown.IsEliminated && crown.RulingClan == owner;
                 if (!rightful && !crownRuler)
                 {
-                    if (Banefort544.Pending) { Wait(day, "Banefort u " + Nm(owner) + " - czekam na zwrot 544"); return; }
                     Done(day, "inny-pan", "Banefort u " + Nm(owner) + " (" + (owner.Kingdom != null ? Nm(owner.Kingdom) : "-") + "), nie u House Banefort ani rodu panujacego korony - bez daru");
                     return;
                 }
-                if (Settlement.CurrentSettlement == st) { Wait(day, "gracz w Banefort (ekran zalogi moze byc otwarty)"); return; }
+                string pwhy;   // recenzja 555 (drobne): ten sam warunek gotowosci co 544 (nie w osadzie, menu, spotkaniu, bitwie, oblezeniu, armii, rozmowie, niewoli)
+                if (!BookHoldings.PlayerOnMapFor(out pwhy)) { Wait(day, pwhy ?? "gracz nie na mapie"); return; }
                 if (st.Party != null && st.Party.MapEvent != null) { Wait(day, "bitwa w osadzie (MapEvent) - dar po bitwie"); return; }
                 var g = st.Town.GarrisonParty;
                 if (g != null && g.Party != null && g.Party.MapEvent != null) { Wait(day, "zaloga w bitwie (MapEvent) - dar po bitwie"); return; }
@@ -187,15 +196,16 @@ namespace Armoury
                 var plan = Plan(tree, add);
                 var byTier = new int[6];
                 var sb = new StringBuilder(600);
-                int added = 0;
+                int added = 0, wageAdd = 0;
                 foreach (var kv in plan)
                 {
                     g.MemberRoster.AddToCounts(kv.Key, kv.Value);
                     added += kv.Value;
+                    try { wageAdd += Campaign.Current.Models.PartyWageModel.GetCharacterWage(kv.Key) * kv.Value; } catch { }
                     byTier[Math.Max(1, Math.Min(6, kv.Key.Tier)) - 1] += kv.Value;
                     sb.Append(sb.Length > 0 ? ", " : "").Append(Nm(kv.Key)).Append(" T").Append(kv.Key.Tier).Append(' ').Append(kv.Value);
                 }
-                try { PeopleBook.GiveNone(g.MemberRoster, added, -1); }   // ksiega ludzi: koszyk bez pochodzenia (dar z niczego, jak CartEscort297)
+                try { PeopleBook.GiveNone(g.MemberRoster, added, PeopleBook.FGift555); }   // ksiega ludzi: koszyk bez pochodzenia, nazwana przyczyna "dar zalogi Banefort (555)" (recenzja 555)
                 catch (Exception e) { try { Log.Error("Banefort555.PeopleBook", e); } catch { } }
                 int g1 = g.MemberRoster.TotalRegulars;
 
@@ -210,7 +220,8 @@ namespace Armoury
                 Done(day, "ok", "DAR 555 zalogi Banefort [" + StId + "] | pan " + Nm(owner) + (rightful ? "" : " (rod panujacy korony)") + " | cel " + Target + " = zaloga sprzed oblezenia "
                      + PreSiegeGarrison + " (OB1 dni 109003-109012) x 1.5 | zaloga " + g0 + " -> " + g1 + " (dodano " + added + ", kultura " + (cult.StringId ?? "?") + ": " + tiers + ") [" + sb
                      + "] | oblezenie " + siege + ", milicja " + (int)st.Town.Militia + " | limit zalogi gry " + limit + ", budzet zoldu zalogi " + wage
-                     + " (ponad limit: przepelnienie W4c - 25% nadwyzki na dobe do domu) | dar 555 - jednorazowy wyjatek od zamknietej ekonomii z rozkazu Jeffa 15.11: ludzie z niczego, bez zlota, "
+                     + ", zold dodanych ok. " + wageAdd + " na dobe (przed perkami; brak zoldu - gra: +5 dezercji zalogi na dobe)"
+                     + " (ponad limit: przepelnienie W4c - 25% nadwyzki na dobe do domu, ludnosc BK wsi) | dar 555 - jednorazowy wyjatek od zamknietej ekonomii z rozkazu Jeffa 15.11: ludzie z niczego, bez zlota, "
                      + "bez zdjecia z ludnosci; ksiega ludzi - bez pochodzenia; sprzet - zbrojownia zalogi dokupi braki");
                 try { Log.Player("Banefort's garrison is restored: " + added + " fresh troops join the defenders (" + g1 + " men in the castle)."); } catch { }
             }

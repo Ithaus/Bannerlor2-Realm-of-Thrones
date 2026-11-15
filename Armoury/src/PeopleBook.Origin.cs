@@ -58,7 +58,9 @@ namespace Armoury
             FDieWork = 65,
             // D3 (Jeff 14.11, grupa B): wyjscie (Take) - jency lochu zmarli z glodu (twierdza bez jedzenia po tygodniu laski; PrisonLabor509.Daily)
             FDieHunger = 66,
-            FKinds = 67;
+            // 555 recenzja: wejscie (Give) - jednorazowy dar zalogi Banefortu z rozkazu Jeffa 15.11 (ludzie z niczego, koszyk bez pochodzenia)
+            FGift555 = 67,
+            FKinds = 68;
         private static readonly string[] FName =
         {
             "wsie", "miasta", "zamki", "karczmy AI", "A5", "gracz", "karczma gracza", "pobor wymuszony",
@@ -74,7 +76,7 @@ namespace Armoury
             "z karczmy (WETERANI, E4/10)",
             "Straz z Muru (E4/9)", "Straz z pul wyrzutkow Westeros (E4/9)", "Straz z ludnosci Westeros (E4/9)", "Straz bez pokrycia (podloga, E4/9)", "pojmani z rabunku (E4/9)",
             "polegli w oblezeniu (ostrzal)", "ucieczka z lochu (ponad limit partii; przy pracy 519)",
-            "rozbici pod choragiew (N7)", "wypadki przy pracy jencow (509)", "glod jencow lochu (D3)"
+            "rozbici pod choragiew (N7)", "wypadki przy pracy jencow (509)", "glod jencow lochu (D3)", "dar zalogi Banefort (555)"
         };
 
         // rodzaj rosteru (nazwy "bez pochodzenia" / "z niczego" / "w nicosc")
@@ -2206,6 +2208,7 @@ namespace Armoury
               .Append(", Straz z Westeros (E4/9) ").Append(M0(Sum(_fIn, FWatchWall, FNoneWatchLeft))).Append(" (").Append(Part(_fIn, FWatchWall, FNoneWatchLeft)).Append(")")
               .Append(", pojmani z rabunku (E4/9) ").Append(M0(_fIn[FCapturedRaid]))
               .Append(", rozbici pod choragiew (N7) ").Append(M0(_fIn[FRally]));
+            if (_fIn[FGift555] > 0) sb.Append(", ").Append(FName[FGift555]).Append(' ').Append(M0(_fIn[FGift555]));   // 555 recenzja: dar z rozkazu Jeffa - nazwany naplyw
             if (_pressIn > 0 || _pressLost > 0 || _pressHome > 0)
             {
                 // E4/7b: zdjeci z DOM = wzieci + wrocili do domu (+ bez powrotu tylko przy wylaczonym Press Untaken Go Home)
