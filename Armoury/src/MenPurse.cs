@@ -254,6 +254,7 @@ namespace Armoury
                 Day();
                 if (mp.IsMainParty)
                 {
+                    Drill.SettlePlayer(Drill.WhyTown);   // 562: zapas musztry - nadmiar wraca do zbrojowni przed sprzedaza, braki bitwy przed zakupami brakow (sam zwrot, nie rzuca)
                     SettlePlayerBook(); SellPlayerSurplus(st);
                     SavingsByNeed.VisitBegin();   // m96: jedna wizyta na targu - cel oszczedzania z brakow i lepszych, na ktore nie bylo ich stac (nie rzuca)
                     try { BuyPlayerGaps(st); MenUpgrade.ForPlayer(st); } finally { SavingsByNeed.VisitEnd(mp); }
@@ -1047,6 +1048,9 @@ namespace Armoury
             int sold = 0, cutSum = 0;   // 3.9: cutSum - trzecia oddana juz w tej wizycie (Drobne39.ThirdCut)
             bool stop = false;
             int meleeLeft = AiMeleeLeft(arm, roster);   // K1 A9 - jedna definicja nadwyzki (int.MaxValue = bez grupy broni bialej)
+            // 562: rezerwacja musztry partii lorda (Drill.AiKit) - pierwsze (najgorsze) sztuki nadwyzki zostaja ludziom do musztry, kupiec dostaje reszte; zalogi bez zmian
+            var keep = garrison ? null : Drill.AiKeepCopy(mp);
+            int keptN = 0;
             foreach (var type in QuartermasterLaw.KitTypes)
             {
                 if (stop) break;
@@ -1059,7 +1063,9 @@ namespace Armoury
                 {
                     var it = QuartermasterLaw.ElOf(p).Item;
                     int sold0 = sold;   // GearFit (po recenzji): sprzedane sztuki tego egzemplarza - licznik obcej kultury nizej
-                    for (int k = 0; k < p.Sell && !stop && planned < cap; k++)
+                    int sellN = p.Sell, rsv;
+                    if (keep != null && it != null && keep.TryGetValue(it, out rsv) && rsv > 0) { int d = Math.Min(rsv, sellN); sellN -= d; keep[it] = rsv - d; keptN += d; }
+                    for (int k = 0; k < sellN && !stop && planned < cap; k++)
                     {
                         int cnt;
                         if (it == null || !arm.TryGetValue(it, out cnt) || cnt <= 0) break;
@@ -1087,6 +1093,7 @@ namespace Armoury
                 }
                 if (grp) meleeLeft -= planned;
             }
+            Drill.NoteAiKept(keptN);   // 562: tylko licznik linii "Musztra AI"
             // E8/Z (251, RC8 poz. 28): uprzaz ponad 1.5 x zapas (AiBuyRules.HarnessKeep) - na polke tej osady jak reszta nadwyzek sprzetu (lordowie i zalogi;
             // sztuki i zloto w licznikach nadwyzek tej wizyty, trzecia od sumy wizyty); kasa pusta przy sprzecie - uprzezy tez nie dzis. Przed galezia koni
             if (!stop && AiBuyRules.HarnessOn) SellSpareHarness(mp, st, third, pct, arm, roster, garrison, ref sold, ref gold, ref cutSum, ref stop);

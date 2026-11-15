@@ -96,7 +96,7 @@ namespace Armoury
             try
             {
                 Log.Info(Tag + "latki " + _wired + " | klucz March Pairs Hud " + (On ? "TAK" : "NIE")
-                         + " | 548: gorny rzad bez naszych pozycji (szerokosc jak przed 537); dolny, zawsze 'mam / potrzeba': Horses (na koniach / ludzie), Pack (juczne / limit), Drill (z bronia i zbroja / ludzie, 1 na "
+                         + " | 548: gorny rzad bez naszych pozycji (szerokosc jak przed 537); dolny, zawsze 'mam / potrzeba': Horses (na koniach / ludzie), Pack (juczne / limit), Drill (562: z pelnym zestawem do roli / ludzie, 1 sztuka rodzaju na "
                          + Drill.OnePer + " - zapas musztry "
                          + (Drill.StockOn ? "czynny" : "NIECZYNNY - pozycje ukryte") + ") | pole tekstu dolnego rzedu: " + MarchHudUi.State + (BottomApplied > 0 ? ", nalozone " + BottomApplied + "x" : " (nakladane przy pierwszym wczytaniu paska mapy - po starcie sesji; liczbe pokazuje linia doby)")
                          + " | ikony: " + IconState()
@@ -114,7 +114,7 @@ namespace Armoury
             return "pasek mapy: latki " + (_ok ? "TAK" : "NIE") + ", klucz " + (On ? "TAK" : "NIE") + ", paskow " + _bars + ", dodan pozycji " + _added
                    + ", zdjetych obcych duplikatow " + _dupRemoved + ", zmian tekstu " + _shown + ", w tym ze skrotem do licznika (bezpiecznik szerokosci) " + _shortened
                    + ", MaxWidth dolnego rzedu " + (BottomApplied > 0 ? BottomMaxWidth + " (nalozone " + BottomApplied + "x)" : "52 (wstawka nienalozona)")
-                   + ", ikony " + IconState() + ", przeliczen zapasu musztry " + Drill.HudKitCounts + " (w tym z pelnym liczeniem podgladu bitwy " + Drill.HudKitFullCounts + ")"
+                   + ", ikony " + IconState() + ", przeliczen zestawu musztry " + Drill.HudKitCounts + " (562: bez planow K1 i bez podgladu bitwy)"
                    + (_stumbles > 0 ? ", potkniecia " + _stumbles : "")
                    + (_lastText != null ? ", ostatnio \"" + _lastText + "\"" : "");
         }
@@ -289,8 +289,8 @@ namespace Armoury
                 full[1] = PackText(r); num[1] = r != null ? r.CPack.ToString() : "-"; iv[1] = r != null ? r.CPack : 0;
                 warn[1] = r != null && r.CPack > r.PackLimit;
                 bool men = kit && k.KitN > 0;   // 558: zolnierze + towarzysze, ktorzy cwicza
-                int ready = men ? k.Ready : 0;
-                full[2] = men ? Frac(ready, k.Full) : "-"; num[2] = men ? ready.ToString() : "-"; iv[2] = ready; warn[2] = men && ready < k.Full;
+                int ready = men ? k.Ready : 0;   // 562: ludzie z pelnym zestawem do swojej roli
+                full[2] = men ? Frac(ready, k.KitN) : "-"; num[2] = men ? ready.ToString() : "-"; iv[2] = ready; warn[2] = men && ready < k.KitN;
 
                 // bezpiecznik szerokosci: dolny rzad nie szerszy niz gorny (gorny = szerokosc sprzed 537)
                 float maxB = BottomApplied > 0 ? BottomMaxWidth : GameMaxWidth;
@@ -324,12 +324,12 @@ namespace Armoury
                     if (r != null && (_shown <= 20 || _shown % 50 == 0))
                         try
                         {
-                            Log.Info(Tag + "pasek (" + _shown + ") -> " + text + " | pelne: Horses " + full[0] + " (na koniach / ludzie), Pack " + full[1] + (kit ? ", Drill " + full[2] + " (z bronia i zbroja do musztry / ludzie)" : ", zapas musztry nieczynny")
+                            Log.Info(Tag + "pasek (" + _shown + ") -> " + text + " | pelne: Horses " + full[0] + " (na koniach / ludzie), Pack " + full[1] + (kit ? ", Drill " + full[2] + " (z pelnym zestawem do roli / ludzie)" : ", zapas musztry nieczynny")
                                      + " | szerokosc (szacunek): gora " + top.ToString("0") + " px, dol " + bottom.ToString("0") + " px, MaxWidth dolu " + maxB + ", skrocone do licznika " + cut
                                      + " | jedzie: jazda " + r.CavPairs + ", pula " + r.Ride + " z " + r.PoolMen + ", bohaterowie " + r.HeroMounted + ", pieszo " + Math.Max(0, r.Men - mounted)
                                      + ", konie " + r.AllHorses + " (ladunek " + r.CMounts + ", zbrojownia " + r.AHorses + "), uprzeze " + r.AllHarness
                                      + ", juczne " + r.CPack + " / limit " + r.PackLimit + (r.AtSea ? ", na morzu" : "")
-                                     + (men ? " | musztra: bron " + k.HaveW + " (od Ciebie " + k.GivenW + ", nadwyzka ludzi " + k.SurW + "), zbroje " + k.HaveA + " (" + k.GivenA + " + " + k.SurA + "), komplet " + k.Full + " (1 na " + Drill.OnePer + ")" : "")
+                                     + (men ? " | musztra 562: z kompletem " + k.Ready + "/" + k.KitN + " (bron " + k.ReadyW + ", zbroje " + k.ReadyA + "), zapas " + k.Stock + " szt., rodzaje " + Drill.KitLog(k) + " (1 na " + Drill.OnePer + ")" : "")
                                      + " (rekord liczony " + r.Ms.ToString("0.0") + " ms).");
                         }
                         catch { }
@@ -438,13 +438,24 @@ namespace Armoury
 
         private static void Row(List<TooltipProperty> l, string k, string v) { l.Add(new TooltipProperty(k, v, 0, false, TooltipProperty.TooltipPropertyFlags.None)); }
 
-        // ---------------------------------------------------------------- 541/548: podpowiedz zapasu musztry (po angielsku; z pamieci Drill.HudKit)
-        private static string KitLine(Drill.Kit k, bool w)
+        // ---------------------------------------------------------------- 541/548/562: podpowiedz zestawu musztry (po angielsku; z pamieci Drill.HudKit)
+        private static string HalfLine(Drill.Kit k, int ready, int need, int lo, int hi)
         {
-            int have = w ? k.HaveW : k.HaveA, given = w ? k.GivenW : k.GivenA, sur = w ? k.SurW : k.SurA;
-            int inUse = Math.Min(have, k.Full);
-            return inUse + "/" + k.Full + " (" + given + " from you, " + sur + " men's spare"
-                   + (have > k.Full ? "; " + (have - k.Full) + " extra to replace worn ones)" : have < k.Full ? ") - " + (k.Full - have) + " short" : ")");
+            string sh = k.Shorts(lo, hi, 4);
+            return ready + "/" + need + (sh.Length > 0 ? " - short: " + sh : " - complete");
+        }
+
+        private static string RolesLine(Drill.Kit k)
+        {
+            var parts = new List<string>();
+            int[] r = k.RoleMen;
+            if (r[0] > 0) parts.Add("sword and shield " + r[0]);
+            if (r[1] > 0) parts.Add("two-handed " + r[1]);
+            if (r[2] > 0) parts.Add("cavalry " + r[2]);
+            if (r[3] > 0) parts.Add("archers " + r[3]);
+            if (r[4] > 0) parts.Add("crossbowmen " + r[4]);
+            if (r[5] > 0) parts.Add("with javelins " + r[5]);
+            return parts.Count > 0 ? string.Join(", ", parts) : "-";
         }
 
         private static List<TooltipProperty> KitTooltip()
@@ -455,32 +466,37 @@ namespace Armoury
                 l.Add(new TooltipProperty("Drill kit", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                 var k = Drill.HudKit();
                 if (k == null || !k.Ok) { l.Add(new TooltipProperty("Drill stock is off", "", 0, false, TooltipProperty.TooltipPropertyFlags.None)); return l; }
-                if (k.KitN <= 0) { Row(l, "Nobody to drill", "no soldiers or companions - the stock takes nothing"); return l; }
-                int per = Drill.OnePer, ready = k.Ready;
-                string unit = per == 1 ? "one weapon and one piece of armour per man" : "one weapon and one piece of armour per " + per + " men";
+                if (k.KitN <= 0) { Row(l, "Nobody to drill", "no soldiers or companions - the kit takes nothing"); return l; }
+                int per = Drill.OnePer;
                 // recenzja 548: mianownik inny niz Troops i Horses, wiec mowimy to wprost; 558: zolnierze + towarzysze, ktorzy cwicza (bez gracza)
-                string who = k.Men + " soldiers" + (k.Heroes > 0 ? " and " + k.Heroes + (k.Heroes == 1 ? " companion" : " companions") : "") + (Drill.HudHeroesOn ? " - you lead the drill and are not counted" : " - heroes do not drill and are not counted");   // recenzja 558 pkt 2
-                if (per == 1) Row(l, "Ready to drill / men", ready + " of " + k.KitN + " have a weapon and a piece of armour to drill with" + (ready < k.Full ? " (red)" : "") + " (" + who + ")");
-                else Row(l, "Ready / full set", ready + " of " + k.Full + " sets (" + unit + ", " + who + ")" + (ready < k.Full ? " (red)" : ""));
-                Row(l, "Weapons", KitLine(k, true));
-                Row(l, "Armour", KitLine(k, false));
-                Row(l, "Full set", unit + ", beside his battle kit");
-                Row(l, "They take from you", k.RoomW + " more weapons and " + k.RoomA + " more pieces of armour (up to " + (Drill.IntakeSetsN == 1 ? "one full set" : Drill.IntakeSetsN + " full sets") + ")");
+                string who = k.Men + " soldiers" + (k.Heroes > 0 ? " and " + k.Heroes + (k.Heroes == 1 ? " companion" : " companions") : "") + (Drill.HudHeroesOn ? " - you lead the drill and are not counted" : " - heroes do not drill and are not counted");
+                Row(l, "Full kit / men", k.Ready + " of " + k.KitN + " have a full drill kit for their role" + (k.Ready < k.KitN ? " (red)" : "") + " (" + who + ")");
+                Row(l, "Weapons", HalfLine(k, k.ReadyW, k.KitN, Drill.K1H, Drill.KThrown));
+                if (k.NeedR > 0) Row(l, "Ranged", k.ReadyR + "/" + k.NeedR + " archers, crossbowmen and javelin men" + (k.Shorts(Drill.KBow, Drill.KThrown, 4).Length > 0 ? " - short: " + k.Shorts(Drill.KBow, Drill.KThrown, 4) : ""));
+                Row(l, "Armour", HalfLine(k, k.ReadyA, k.KitN, Drill.KBody, Drill.KCape));
+                Row(l, "Roles", RolesLine(k));
+                Row(l, "Kit per man", "Infantry: a one-handed weapon and a shield, or a two-handed weapon. Cavalry: a one-handed weapon, a shield and a spear. Archers: a bow and a quiver of arrows; "
+                            + "crossbowmen: a crossbow and bolts; javelin men also a stack of javelins. Everyone: body armour, a helmet, leg armour (boots) and a cape. Gloves are not part of the drill kit."
+                            + (per == 1 ? "" : " One piece of each kind serves " + per + " men."));
+                Row(l, "Refill", "Your men take what their drill kit lacks from their spare kit in the troops' armoury - once a day and when the troops change - only pieces the next battle's hand-out leaves unused; "
+                            + "those pieces leave the armoury. Taken today " + k.Taken + ", given back for battle " + k.BackBattle + ", back to the armoury (not needed) " + k.Back + ".");
+                int sh = 0; for (int i = 0; i < Drill.NK; i++) sh += k.Short(i);
+                Row(l, "From you", "Give arms and armour in the inventory (Discard) or leave trophies - your men keep what their kit lacks: " + sh + " pieces.");
                 float bonus = (k.Bonus(true) + k.Bonus(false)) * 100f;
                 float max = Drill.BonusPerSet * 100f * ((k.PerkW ? Drill.BonusPerkMult : 1f) + (k.PerkA ? Drill.BonusPerkMult : 1f));
-                Row(l, "Drill bonus", "+" + bonus.ToString("0.#") + "% of +" + max.ToString("0.#") + "%" + (Drill.HudHeroesOn ? " drill XP of troops and companions" : " troop XP from drill") + " (each half grows with its share of the full set; "
+                Row(l, "Drill bonus", "+" + bonus.ToString("0.#") + "% of +" + max.ToString("0.#") + "%" + (Drill.HudHeroesOn ? " drill XP of troops and companions" : " troop XP from drill") + " (each half grows with the share of men with a full weapons or armour kit; "
                        + "Giving Hands raises the weapons half" + (k.PerkW ? "" : " - not taken") + ", Paid in Promise the armour half" + (k.PerkA ? "" : " - not taken")
                        + ", from +" + (Drill.BonusPerSet * 100f).ToString("0.#") + "% to +" + (Drill.BonusPerSet * 100f * Drill.BonusPerkMult).ToString("0.#") + "%)");
-                float rw = k.WearPerFullDay(true), ra = k.WearPerFullDay(false);
-                Row(l, "Wear", "a full day of drill (8 h) wears out about " + rw.ToString("0.00") + " weapons and " + ra.ToString("0.00") + " pieces of armour - the cheapest first, your gifts first, then the men's spare kit. No drill, no wear.");
-                if (rw > 0f || ra > 0f)
-                    Row(l, "Next one worn out", "weapons " + (rw > 0f ? "after about " + Math.Max(0f, (1f - k.AccW) / rw).ToString("0.#") + " full days" : "-")
-                        + ", armour " + (ra > 0f ? "after about " + Math.Max(0f, (1f - k.AccA) / ra).ToString("0.#") + " full days" : "-"));
-                Row(l, "Worn out today", k.WornW + " weapons, " + k.WornA + " pieces of armour");
-                Row(l, " ", "Give weapons and armour to your men in the inventory (Discard) or leave trophies after a battle - they keep them for drill. "
-                            + "Their spare kit is sold to the merchants of the next town; new recruits take what they need from it. "
-                            + "Worn pieces become scrap the smiths of the next town buy - the coin goes to the men's purse. "
-                            + "Every recruit raises the full set, so the same stock covers less.");
+                float rw = 0f, ra = 0f;
+                for (int i = 0; i < Drill.NK; i++) { if (i <= Drill.KThrown) rw += k.WearPerFullDay(i); else ra += k.WearPerFullDay(i); }
+                Row(l, "Wear", "a full day of drill (8 h) wears out about " + rw.ToString("0.00") + " weapons and " + ra.ToString("0.00") + " pieces of armour - the cheapest first. A piece lasts days of drill: "
+                            + "weapons " + Drill.LifeDays(Drill.K1H).ToString("0") + ", shields " + Drill.LifeDays(Drill.KShield).ToString("0") + ", bows " + Drill.LifeDays(Drill.KBow).ToString("0")
+                            + ", crossbows " + Drill.LifeDays(Drill.KXbow).ToString("0") + ", arrows and bolts " + Drill.LifeDays(Drill.KArrows).ToString("0") + ", javelins " + Drill.LifeDays(Drill.KThrown).ToString("0")
+                            + ", armour " + Drill.LifeDays(Drill.KBody).ToString("0") + ", capes " + Drill.LifeDays(Drill.KCape).ToString("0") + ". No drill, no wear.");
+                var worn = new List<string>();
+                for (int i = 0; i < Drill.NK; i++) if (k.WornToday[i] > 0) worn.Add(k.WornToday[i] + " " + Drill.KindName(i));
+                Row(l, "Worn out today", worn.Count > 0 ? string.Join(", ", worn) : "nothing");
+                Row(l, " ", "Worn pieces become scrap the smiths of the next town buy - the coin goes to the men's purse. What the kit no longer needs (after deaths or promotions) goes back to the armoury and is sold with the men's spare kit.");
             }
             catch (Exception e) { Stumble("KitTooltip", e); }
             return l;

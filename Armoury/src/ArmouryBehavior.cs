@@ -1848,6 +1848,7 @@ namespace Armoury
             CampaignEvents.OnItemsDiscardedByPlayerEvent.AddNonSerializedListener(this, Drill.OnDiscarded);
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("Drill.OnEntered", Drill.OnEntered));
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("Drill.OnPartyDestroyed", Drill.OnPartyDestroyed));
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(this, delegate (MapEvent me, PartyBase a, PartyBase d) { try { Drill.OnMapEventStarted(me); } catch (Exception e) { Log.Error("Drill.OnMapEventStarted", e); } });   // 562: rekruci tej godziny - zapas musztry oddaje braki bitwy przed bitwa
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("Drill.Hourly", delegate { try { Drill.Hourly(); } catch (Exception e) { Log.Error("Drill.Hourly", e); } }));
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("SkillLedger.Hourly", delegate { try { SkillLedger.Hourly(); } catch { } }));   // E8/P1 (243): ksiega umiejetnosci - wylacznik na zywo, znacznik zrodla zerwany wyjatkiem w metodzie gry (tylko log)
             // SUWAKI MCM NA ZYWO (Jeff 03.09: "nadal 1 predkosc, o co chodzi" -
