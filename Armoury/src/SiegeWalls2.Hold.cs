@@ -30,8 +30,10 @@ namespace Armoury
         private static double FreshHours { get { return LongOn ? 240.0 : 48.0; } }
         private const float FreshFoodDays = 1.5f;
         // 545 (Jeff 15.11 Willow Wood: "jak oblegaja to maja oblegac a nie dochodza"): klucz SiegeCampHoldsToEnd - trzymanie bez wygasniecia po FreshHours, ale tylko
-        // tam, gdzie oblezenie konczy limit 471b/542 (TimeOn i Acts471 == null: bez gracza, Innych, skryptu fabuly) - oboz nie siedzi wiecznie. Wyjscia bez zmian:
+        // tam, gdzie dziala regula 471b (TimeOn i Acts471 == null: bez gracza, Innych, skryptu fabuly) - przy 546 NIE oboz konczy tez limit 471b/542. Wyjscia bez zmian:
         // jedzenie, przewazajaca odsiecz (OB5), obrona wlasnej twierdzy, odwrot 334e; pokoj / rozejm konczy oblezenie gra albo Lift384. NIE = FreshHours jak dotad.
+        // 546 (klucz SiegeNoTimeLimit): limitu (e) juz nie ma - trzymanie trwa do prawdziwych wyjsc: zdobycie, kapitulacja z glodu (b), glod obozu (FreshFoodDays),
+        // przewazajaca odsiecz (OB5 / 334e), obrona wlasnej twierdzy, pokoj / rozejm, oboz bez sily (OB6). Warunek trzymania bez zmian (TimeOn i Acts471).
         internal static bool HoldToEnd545Key { get { var s = Settings.Current; return s != null && s.SiegeCampHoldsToEnd; } }
         internal static int HoldOver545;                                                     // 545: godziny trzymania ponad dawny prog (doba, zeruje Time471Daily)
         private static readonly HashSet<SiegeEvent> _over545 = new HashSet<SiegeEvent>();    // 545: oblezenia trzymane dzis ponad dawny prog
@@ -80,7 +82,7 @@ namespace Armoury
             if (!FreshOn || party.IsMainParty || party.AttachedTo != null) return false;
             if (party.Army != null && party.Army.LeaderParty != party) return false;
             if (st.Town == null || !st.IsFortification) return false;
-            if (ev.SiegeStartTime.ElapsedHoursUntilNow >= FreshHours && !HoldsToEnd545(ev)) return false;   // 545: bez wygasniecia (limit 471b/542 konczy oboz)
+            if (ev.SiegeStartTime.ElapsedHoursUntilNow >= FreshHours && !HoldsToEnd545(ev)) return false;   // 545: bez wygasniecia (konczy prawdziwe wyjscie; przy 546 NIE tez limit 471b/542)
             if (party.MapEvent != null || party.IsCurrentlyAtSea || pt.DoNotChangeBehavior || Scripted(party) || Und(party, st)) return false;
             return true;
         }

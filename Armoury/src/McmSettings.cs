@@ -13801,11 +13801,11 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeCampForage { get; set; } = true;
 
-        [SettingPropertyBool("Siege Time By Factors", HintText = "Sieges between lords of the world (not yours) last as long as the place can hold: every siege gets a term set by the garrison's food, the walls, the odds and the defenders' morale - small castle 20-40 days, castle 40-90, town and great fortress 60-150; a relief army on its way stops the clock. When the term runs out with no relief in sight, or the garrison has starved for a week, the place yields: the garrison and the lords inside march out under arms to their own side and the besiegers take the place without a fight. No assault before the lower bound of the term unless the walls are empty or the defenders starve; a castle, town or great fortress is then stormed only through a breach. A siege that drags past Siege Time Limit Factor times the upper bound ends: the place yields if the besiegers are stronger, otherwise they give up and leave it alone for 30 days. Off = sieges end as before", RequireRestart = false)]
+        [SettingPropertyBool("Siege Time By Factors", HintText = "Sieges between lords of the world (not yours) last as long as the place can hold: every siege gets a term set by the garrison's food, the walls, the odds and the defenders' morale - small castle 20-40 days, castle 40-90, town and great fortress 60-150; a relief army on its way stops the clock. When the term runs out with no relief in sight, or the garrison has starved for a week, the place yields: the garrison and the lords inside march out under arms to their own side and the besiegers take the place without a fight. No assault before the lower bound of the term unless the walls are empty or the defenders starve; a castle, town or great fortress is then stormed only through a breach. With Siege No Time Limit off, a siege that drags past Siege Time Limit Factor times the upper bound ends: the place yields if the besiegers are stronger, otherwise they give up and leave it alone for 30 days. Off = sieges end as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeTimeByFactors { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Siege Time Limit Factor", 1.00f, 3.00f, "0.00", HintText = "With Siege Time By Factors: a siege older than this many times the upper bound of its term (small castle 40, castle 90, town 150 days) ends - the place yields to a stronger host, a weaker host leaves", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Siege Time Limit Factor", 1.00f, 3.00f, "0.00", HintText = "With Siege Time By Factors and Siege No Time Limit off: a siege older than this many times the upper bound of its term (small castle 40, castle 90, town 150 days) ends - the place yields to a stronger host, a weaker host leaves", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public float SiegeTimeLimitFactor { get; set; } = 1.5f;
 
@@ -13813,7 +13813,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeNearReliefOnly { get; set; } = true;
 
-        [SettingPropertyBool("Siege Yield Only Starving", HintText = "With Siege Time By Factors: a place no longer yields only because its term has run out - while it has food and beats off the assaults it holds. It yields only after a week of hunger (or falls to an assault); when a siege drags past Siege Time Limit Factor times the upper bound of its term, the besiegers give up and leave it alone for 30 days, unless the defenders are starving and about to yield. Off = the place yields when its term runs out and at the limit to a stronger host, as before", RequireRestart = false)]
+        [SettingPropertyBool("Siege Yield Only Starving", HintText = "With Siege Time By Factors: a place no longer yields only because its term has run out - while it has food and beats off the assaults it holds. It yields only after a week of hunger (or falls to an assault); with Siege No Time Limit off, when a siege drags past Siege Time Limit Factor times the upper bound of its term, the besiegers give up and leave it alone for 30 days, unless the defenders are starving and about to yield. Off = the place yields when its term runs out and at the limit to a stronger host, as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeYieldOnlyStarving { get; set; } = true;
 
@@ -13821,9 +13821,13 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeNoMinDaysGate { get; set; } = true;
 
-        [SettingPropertyBool("Siege Camp Holds To The End", HintText = "With Siege AI Holds Fresh Siege and Siege Time By Factors: an AI host keeps its siege until the place falls instead of only for the first ten days - it leaves only when its food runs out, a stronger relief army comes, its own stronghold needs defending, peace or a truce ends the war, or the siege drags past Siege Time Limit Factor times the upper bound of its term. Sieges with you, the Others or the story keep the old hold. Off = the hold ends after ten days (two without Siege Hold Ten Days), as before", RequireRestart = false)]
+        [SettingPropertyBool("Siege Camp Holds To The End", HintText = "With Siege AI Holds Fresh Siege and Siege Time By Factors: an AI host keeps its siege until the place falls instead of only for the first ten days - it leaves only when its food runs out, a stronger relief army comes, its own stronghold needs defending, peace or a truce ends the war, or (with Siege No Time Limit off) the siege drags past Siege Time Limit Factor times the upper bound of its term. Sieges with you, the Others or the story keep the old hold. Off = the hold ends after ten days (two without Siege Hold Ten Days), as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeCampHoldsToEnd { get; set; } = true;
+
+        [SettingPropertyBool("Siege No Time Limit", HintText = "With Siege Time By Factors: a siege of the lords of the world has no time limit - it ends only when the place falls (assault or breach), the garrison yields after a week of hunger, the besiegers run out of food, a stronger relief army comes, their own stronghold needs defending, or peace or a truce ends the war; Siege Time Limit Factor is then not used. Off = a siege that drags past Siege Time Limit Factor times the upper bound of its term ends (the besiegers leave for 30 days, or the place yields), as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeNoTimeLimit { get; set; } = true;
 
         [SettingPropertyBool("Siege Abandon Grace", HintText = "with Siege Near Relief Only: for the first 2 days of a siege the besieging AI army leaves for a relief only if the enemy is stronger by the same measure the army used when it chose to start the siege (enemies in the field within reach) - the start and the first judgement no longer disagree and the army does not walk away a few hours after arriving. Off = the judgement of a running siege applies from the first hour, as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
@@ -17286,6 +17290,7 @@ namespace Armoury
             s.SiegeYieldOnlyStarving = SiegeYieldOnlyStarving;
             s.SiegeNoMinDaysGate = SiegeNoMinDaysGate;
             s.SiegeCampHoldsToEnd = SiegeCampHoldsToEnd;
+            s.SiegeNoTimeLimit = SiegeNoTimeLimit;
             s.SiegeAbandonGrace = SiegeAbandonGrace;
             s.SiegeAbandonStartMeasure = SiegeAbandonStartMeasure;
             s.SiegeTimeRulesPlayerHoldings = SiegeTimeRulesPlayerHoldings;
