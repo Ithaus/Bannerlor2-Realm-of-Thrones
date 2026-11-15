@@ -141,10 +141,12 @@ namespace Armoury
         internal static void Reset()
         {
             _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0; _endedRelief.Clear();
-            _dRelParties.Clear(); _tmpGone.Clear(); _tmpGated.Clear(); _dUnreadyParties.Clear();
+            _dRelParties.Clear(); _tmpGone.Clear(); _tmpGated.Clear(); _dUnreadyParties.Clear(); _relLogged.Clear();
             lock (_warLead) _warLead.Clear();   // 340: zastepca wladcy ze starej kampanii
             _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = _dRel = _dUnready = _dLateNoCall = 0;
         }
+
+        private static readonly HashSet<Army> _relLogged = new HashSet<Army>();   // 556: armie wladcy z linia "po zbiorce" (raz na armie)
 
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static void Stumble(string where, Exception e)
@@ -469,6 +471,7 @@ namespace Armoury
                 if (scores == null || scores.Count == 0) return;
 
                 float other = 0f, dMax = 0f;
+                int otherIdx = -1;   // 556 (tylko log): najlepsza inna opcja
                 _tmpIdx.Clear(); _tmpSg.Clear();
                 // recenzja p9 (uwaga 5): niegotowa partia (ArmsFirst - jedna regula z ArmsFirst.IsBattle) idzie tylko na odsiecz osady WLASNEGO rodu: odsiecz cudzej
                 // osady nie trafia do zasiegu krolestwa (EligAt / Eligible) ani do podbicia - ArmsFirst i tak dalby jej -1, a zasieg bylby zawyzony
@@ -485,7 +488,7 @@ namespace Armoury
                         if (sg != null && unready && !(pc != null && ReferenceEquals(st.OwnerClan, pc))) { _dUnready++; _dUnreadyParties.Add(party); continue; }   // ani odsiecz, ani "inna opcja"
                     }
                     if (sg != null) { _tmpIdx.Add(i); _tmpSg.Add(sg); if (e.Item2 > dMax) dMax = e.Item2; }
-                    else if (e.Item2 > other) other = e.Item2;
+                    else if (e.Item2 > other) { other = e.Item2; otherIdx = i; }
                 }
                 // f12: ocena obrony od gry przy tej mysli - wpis do zasiegu krolestwa (godzina); oblezona twierdza krolestwa bez tej oceny - druzyna poza zasiegiem.
                 // Wodz armii w zbiorce (dnc) tez odswieza wpis (mysli co 1 h), ale nie wchodzi do Eligible (linia "koniec" liczy jak przed f12).
@@ -497,8 +500,26 @@ namespace Armoury
                     else t.EligAt.Remove(party);
                 }
                 if (dnc) return;   // wodz armii czekajacej na czlonkow - bez podbicia (jak przed f12)
-                if (_tmpIdx.Count == 0) return;
-                if (party.Party.IsStarving) { _dStarve++; return; }   // najpierw jedzenie - droga gry
+                // 556 (tylko log, Jeff 15.11 "sprawdz czemu tak jest z armia Joffreya"): pierwsza mysl armii wladcy (WarLeader) po koncu zbiorki 326c - ocena gry obrony
+                // osady odsieczy, ocena po OB5 i najlepsza inna opcja; raz na armie. Niczego nie zmienia.
+                Settlement relSt = null;
+                if (party.Army != null && party.LeaderHero != null && !_relLogged.Contains(party.Army))
+                {
+                    relSt = ReliefStrike.ReleasedTo(party.Army);
+                    if (relSt != null && !WarLeader(party.LeaderHero, k)) relSt = null;
+                }
+                string relWhy = null; float relGame = -1f, relNew = -1f;
+                if (_tmpIdx.Count == 0)
+                {
+                    if (relSt != null) LogAfterMuster(party, k, relSt, -1f, -1f, "brak oceny gry obrony oblezonych twierdz krolestwa (poza zasiegiem gry albo niegotowa)", otherIdx, scores, null, -1f);
+                    return;
+                }
+                if (party.Party.IsStarving)   // najpierw jedzenie - droga gry
+                {
+                    _dStarve++;
+                    if (relSt != null) LogAfterMuster(party, k, relSt, -1f, -1f, "glod - bez podbicia (droga gry)", otherIdx, scores, null, -1f);
+                    return;
+                }
 
                 float b = Math.Max(Math.Max(other, FloorBase), dMax);
                 bool ownSiege = party.BesiegedSettlement != null;   // druzyna (wodz armii) sama oblega twierdze wroga
@@ -508,19 +529,22 @@ namespace Armoury
                 for (int j = 0; j < _tmpIdx.Count; j++)
                 {
                     var sg = _tmpSg[j];
+                    bool isRel = relSt != null && ReferenceEquals(sg.St, relSt);   // 556 (tylko log)
+                    if (isRel) relGame = scores[_tmpIdx[j]].Item2;
                     // recenzja 14.10: odsiecz ZAMKU nie zdejmuje wlasnego oblezenia (decyzja Jeffa wymienia "oblezenia gdzie indziej" przy stolicy i miescie);
                     // bez tego dwa krolestwa oblegajace nawzajem swoje zamki w zasiegu zwijalyby oba obozy co kilka godzin (petla odsieczy)
-                    if (ownSiege && sg.Cls == CCastle) { _dOwnSiege++; continue; }
+                    if (ownSiege && sg.Cls == CCastle) { _dOwnSiege++; if (isRel) relWhy = "bez podbicia: wlasne oblezenie, odsiecz zamku"; continue; }
                     float rest = sg.Committed - (sg.In.Contains(party) ? Contrib(party) : 0f);
-                    if (rest >= sg.Need) continue;   // odsiecz wystarczy bez tej druzyny
+                    if (rest >= sg.Need) { if (isRel) relWhy = "bez podbicia: odsiecz wystarczy bez tej druzyny"; continue; }   // odsiecz wystarczy bez tej druzyny
                     // 326c-D (recenzja R1-2): druzyna, ktora nie dojdzie przed szacowanym szturmem, nie jest wolana do tej odsieczy (inaczej - bo sama nigdy nie wejdzie do
                     // zebranej - podbicie szloby do wszystkich druzyn krolestwa co godzine). Recenzja R3-1: kto juz idzie na te osade (DefendSettlement tej osady albo armia
                     // z ta osada odsieczy) - podbicie zostaje, zeby gra nie odciagnela go tuz przed celem
-                    if (InTimeOn && !InTime(party, sg) && !OnWayTo(party, sg.St)) { _dLateNoCall++; continue; }
+                    if (InTimeOn && !InTime(party, sg) && !OnWayTo(party, sg.St)) { _dLateNoCall++; if (isRel) relWhy = "bez podbicia: nie dojdzie przed szacowanym szturmem (326c-D)"; continue; }
                     // f12: krolestwo nie zbierze odsieczy, ktora gra rzuci na oboz (zasieg < min(R, 1.2 x oboz)) - bez podbicia, wracaja oceny gry
                     if (gateOn && sg.Ready && sg.Reach < sg.Floor)
                     {
                         _tmpGated.Add(sg);
+                        if (isRel) relWhy = "bez podbicia: bramka zasiegu f12 (zasieg krolestwa ponizej progu)";
                         continue;
                     }
                     var e = scores[_tmpIdx[j]];
@@ -533,8 +557,10 @@ namespace Armoury
                         if (sg.T != null) { sg.T.Raised++; if (!sg.In.Contains(party)) sg.T.Pulled.Add(party); }
                     }
                     else nv = e.Item2;
+                    if (isRel) { relNew = nv; if (nv <= e.Item2) relWhy = "bez podbicia: ocena gry juz >= podbicia"; }
                     if (nv > topScore) { topScore = nv; top = sg; topData = e.Item1; }
                 }
+                if (relSt != null) LogAfterMuster(party, k, relSt, relGame, relNew, relWhy, otherIdx, scores, top, topScore);
                 // f12: zwolniona = bramka zamknela co najmniej jedna osade, a OB5 nie zostawil druzynie zadnej odsieczy (top == null). Recenzja: przy top != null
                 // druzyna idzie na inna odsiecz (podbita albo z ocena gry juz >= nv - i tak najwyzsza) - to nie zwolnienie; DayRel tylko dla zwolnionych
                 if (_tmpGated.Count > 0 && top == null)
@@ -564,6 +590,39 @@ namespace Armoury
                 if (!top.In.Contains(party) && (!InTimeOn || InTime(party, top))) { top.In.Add(party); top.Committed += Contrib(party); }
             }
             catch (Exception e) { Stumble("ThinkPostfix", e); }
+        }
+
+        /// <summary>556 (tylko log): linia "armia wladcy po zbiorce" - raz na armie. Nie rzuca.</summary>
+        private static void LogAfterMuster(MobileParty party, Kingdom k, Settlement relSt, float game, float boosted, string why, int otherIdx,
+                                           TaleWorlds.Library.MBReadOnlyList<(AIBehaviorData, float)> scores, Siege top, float topScore)
+        {
+            try
+            {
+                _relLogged.Add(party.Army);
+                string oth = "brak";
+                float ov = -1f;
+                if (otherIdx >= 0 && otherIdx < scores.Count)
+                {
+                    var d = scores[otherIdx].Item1;
+                    ov = scores[otherIdx].Item2;
+                    string pn;
+                    try { pn = d.Party != null && d.Party.Name != null ? d.Party.Name.ToString() : "punkt"; } catch { pn = "?"; }
+                    oth = d.AiBehavior + " " + pn + " " + ov.ToString("0.000", Inv) + (d.WillGatherArmy ? " zbiorka armii" : "");
+                }
+                if (game < 0f && why == null) why = "brak oceny gry obrony tej osady w tej mysli";
+                float fin = boosted >= 0f ? boosted : game;
+                string verdict = fin < 0f ? "obrona " + Nm(relSt) + " bez oceny - gra wybierze inna opcje"
+                               : fin > ov ? "obrona " + Nm(relSt) + " wyzej niz inne opcje spoza odsieczy"
+                               : "inna opcja wyzej - armia moze nie isc na " + Nm(relSt);
+                Log.Info("Odsiecz (OB5) armia wladcy po zbiorce (556): dzien " + Today + " | wodz " + Nm(party.LeaderHero) + " (" + Nm(k) + ", druzyn armii " + party.Army.Parties.Count
+                         + ") -> odsiecz 326c " + Nm(relSt) + " (" + relSt.StringId + ")"
+                         + " | ocena gry obrony " + (game >= 0f ? game.ToString("0.000", Inv) : "brak") + " -> po OB5 " + (boosted >= 0f ? boosted.ToString("0.000", Inv) : "-")
+                         + (why != null ? " (" + why + ")" : "")
+                         + " | najlepsza inna opcja: " + oth
+                         + " | najwyzsza odsiecz OB5: " + (top != null ? Nm(top.St) + " " + topScore.ToString("0.000", Inv) : "brak")
+                         + " | wynik: " + verdict + ".");
+            }
+            catch (Exception e) { Stumble("LogAfterMuster", e); }
         }
 
         // ------------------------------------------------------------ 340 (b): wodz wojny krolestwa

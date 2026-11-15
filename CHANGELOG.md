@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 556: armia w zbiorce w linii "dlaczego stoi" i linia OB5 "armia wladcy po zbiorce" - TYLKO LOG - Armoury (CanonWarWatch.cs, BesiegedRelief.cs, ReliefStrike326.cs)
+
+**Problem:** Jeff, czat 15.11: "sprawdz czemu tak jest z armia Joffreya". Armoury-2026-11-15_15-14-12.log:10822 (16:29:09): mysl AI Joffreya "1. BesiegeSettlement Maidenpool 51.038 ... 3. DefendSettlement Banefort 2.560", a "dlaczego stoi: SCA: wyczerpane - cele oblezen x0.55". Oceny zapisane w czasie zbiorki armii (gra ustawia DoNotChangeBehavior - AiMilitaryBehavior.cs:496-499; OB5 BesiegedRelief nie podbija w zbiorce); zbiorke zakonczyl 326c o 16:29:08 (linia "koniec zbiorki ... odsiecz Banefort", powod czas 24.4 h), gra zamknieta 30 s pozniej. Po zbiorce OB5 powinien dac obronie Banefort ok. 56 > 51 - brak dowodu, bo nie bylo ani jednej mysli po koncu zbiorki.
+
+**Przyczyna:** linia 264 podawala SCA jako powod postoju, choc w zbiorce gra i tak nie zmienia rozkazu (oceny bez skutku); nie bylo linii, ktora pokaze pierwsza mysl armii wladcy po koncu zbiorki (ocena gry, podbicie OB5, najlepsza inna opcja).
+
+**Zmiana (tylko log, bez zmiany zachowania):**
+- CanonWarWatch: postfiks mysli zapisuje `PartyThinkParams.DoNotChangeBehavior` (ostatnia mysl + liczba mysli doby). Gdy wodz armii mial je w ostatniej mysli, "dlaczego stoi" zaczyna sie od "armia w zbiorce (N h, dolaczonych a/b) - oceny bez skutku" (N = godziny od Army._creationTime; a = wodz + doczepieni, b = partie armii; "(zbiorka w x z y mysli)" gdy nie cala doba; "; zbiorka skonczona (326c, odsiecz X) po ostatniej mysli - oceny dzialaja od nastepnej" gdy 326c juz ja zwolnil), a pozycje "SCA: ..." sa zdejmowane z powodow (stan SCA dalej w czesci "| SCA:").
+- BesiegedRelief (OB5): raz na armie - pierwsza mysl wodza armii wladcy (`WarLeader`: wladca albo zastepca 340) po koncu zbiorki 326c (juz bez DoNotChangeBehavior): "Odsiecz (OB5) armia wladcy po zbiorce (556): dzien D | wodz ... -> odsiecz 326c X | ocena gry obrony G -> po OB5 N (powod, gdy bez podbicia: bramka f12, 326c-D, odsiecz wystarczy, wlasne oblezenie zamku, ocena gry juz wyzsza, glod, brak oceny) | najlepsza inna opcja: zachowanie cel ocena | najwyzsza odsiecz OB5 | wynik: ...".
+- ReliefStrike: dwa odczyty dla logu - `ReleasedTo(Army)` (osada odsieczy po koncu zbiorki) i `ArmyHours(Army)` (godziny od zalozenia armii).
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci (kod): nowe linie po `if (dnc) return;` - zbiorka bez zmian; podbicie, rezerwacje (`In`/`Committed`), liczniki doby, zasieg f12 i armia krola bez zmian (dodane tylko przypisania zmiennych logu i `otherIdx` przy szukaniu najlepszej innej opcji). `WarLeader` wolany tylko dla zwolnionej armii bez linii (pamiec godziny `_warLead` - ten sam wynik co dalej w mysli). `_relLogged` czyszczony w `Reset`; rosnie o 1 armie na zwolnienie (male).
+- CanonWarWatch: tylko tekst linii dobowej; nowe pola `W` zerowane w `ZeroDay`. Wyjatek w nowym bloku -> `Stumble("Muster")`, linia dalej sie pisze.
+- Co czytac w nastepnej sesji: linia "armia wladcy po zbiorce (556)" dla Joffreya - czy obrona Banefort po OB5 > Maidenpool; potem linia 264 Joffreya - "AI: DefendSettlement -> Banefort" albo nadal oblezenie Maidenpool. Jesli "bez podbicia: bramka zasiegu f12" albo "326c-D" - przyczyna w bramce, nie w ocenach.
+- Build: 0 bledow. Nie wgrane, w grze nie testowane.
+
+**Status:** DO SPRAWDZENIA
+
 ## 550: AI przy sztandarze - biegacz tylko bez zagrozenia, straz reaguje na podejscie (smycz od miejsca ofiary), kusznicy szyku piechoty wrecz albo czysty strzal - Armoury (BannerCompanies.Pickup.cs, BannerCompanies.Guard550.cs NOWY, BannerCompanies.cs, HorsePursuit.React.cs / ReactFire.cs / Hunt.cs; klucze NOWE BannerPickupSafeRadius = 10, BannerGuardsAnswer = TAK, MCM "Banner Pickup Safe Radius", "Standard Guards Close In")
 
 **Problem:** Jeff, czat 15.11, w trakcie bitwy: "podszedlem do goscia z banerem, armia przeciwnika stoi w obronie, atakuje go, zabilem, reszta jego ludzi gapi sie jak idioci, stoja, ludzie z wloczniami i kusznicy - zabijam jednego po drugim, normalnie rzucili by sie na mnie od razu jak tylko podejde do baneru, nie pozwolili go przechwycic; a druga rzecz jak upadnie baner nastepny uruchamia marsz ze idzie go przejac, ale ja stoje miedzy nim a banerem, ma to gdzies, idzie jak zombie, jak go bije on sie nie broni bo ma misje podniesc baner - podniesc baner tak, jak nie ma zagrozenia; oni zachowuja sie jak boty!" Log 16:09:31-16:10:09: 7 biegaczy 158, 3 zgineli w biegu, 0 rezygnacji "wrogowie przy sztandarze"; kusznicy z kusza w rece 2-3 m od Jeffa (16:14:34, 16:14:46); start 283 przy sztandarze z "piechoty 0", szyk 153 m szerokosci, Jeff 60-76 m od jego mediany.
