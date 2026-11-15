@@ -1471,6 +1471,7 @@ namespace Armoury
                 MoneyLedger.Mark(MoneyLedger.MRest);          // ksiega przeplywow osad (tylko log): to, co zmienilo kasy dotad, to nie bandy
                 LifeDay(s);
                 StashDay(s);                                  // nskarbiec: dola dzienna band do kryjowek - po zyciu (dzisiejsza wplata nie idzie dzis na zycie); kryjowki nie sa w migawkach Mark
+                if (!_goldTick) HideoutGoods.Day(s);          // 568: towar z lupu band do magazynu kryjowki - przed paserem (paser bierze reszte); zloto nietkniete
                 MoneyLedger.Mark(MoneyLedger.MLife);          // ... zmiana kas od poprzedniej migawki to wydatki band i kryjowek na zycie
                 float fenceShare = MBMath.ClampFloat(s.OutlawFenceLootShare, 0f, 1f);
                 if (s.OutlawFenceBuysLoot && fenceShare > 0f)
@@ -1525,6 +1526,7 @@ namespace Armoury
                          + " | hearth za tych ludzi (E4/3, PeopleBook.Move): rabunki (przy spustoszeniu E4/5 hearth w ksiedze: spustoszenie) -" + _hRaid.ToString("0.###", CultureInfo.InvariantCulture)
                          + ", bieda/wojna -" + _hMisery.ToString("0.###", CultureInfo.InvariantCulture) + ", powrot do wsi +" + _hReturn.ToString("0.###", CultureInfo.InvariantCulture) + ".");
                 try { Log.Info(PoolLine(s, tot)); } catch (Exception e) { Log.Error("OutlawLaw.PoolLine", e); }   // E4/3: naplyw i odplyw puli wedlug przyczyny
+                try { HideoutGoods.LogDay(s); } catch (Exception e) { Log.Error("HideoutGoods.LogDay", e); }   // 568: linia "Lup w kryjowkach (568)"
                 HoardLog(s);                                  // nskarbiec: linia "Skarbce kryjowek (nskarbiec)" - przed FenceLog, ktory zeruje liczniki dnia kryjowek
                 FenceLog(s, _upFence, _fenceGold);
                 H3NewDay();
@@ -2045,6 +2047,9 @@ namespace Armoury
             var home = HomeHideout(p);
             return home != null && HoardSurplus(home) >= lack ? home : null;
         }
+
+        /// <summary>568: kryjowka bandy dla HideoutGoods (ta sama regula co dola zlota).</summary>
+        internal static Settlement HomeOf(MobileParty p) { return HomeHideout(p); }
 
         /// <summary>Kryjowka, z ktorej jest banda (lupiezcy i piraci jej nie maja).</summary>
         private static Settlement HomeHideout(MobileParty p)
