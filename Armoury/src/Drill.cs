@@ -793,8 +793,9 @@ namespace Armoury
                     if (c.M != null) { c.Ready = c.M.Ready; c.ReadyW = c.M.ReadyW; c.ReadyA = c.M.ReadyA; }
                     c.PerkW = mp.HasPerk(DefaultPerks.Steward.GivingHands);
                     c.PerkA = mp.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
-                    // 562: u = ludzie z kompletem broni / zbroi do swojej roli wobec kompletu ludzi (zolnierze + bohaterowie musztry)
-                    float uB = Math.Min(1f, c.ReadyW / (float)c.Kit), uZ = Math.Min(1f, c.ReadyA / (float)c.Kit);
+                    // 562c (Jeff 15.11 "1. ok"): u = pokrycie sztuk polowy - suma min(Cov, Need) / suma Need rodzajow broni (1H..oszczepy) / zbroi (korpus, helm,
+                    // nogi; oponcza to dodatek) - ta sama miara co zuzycie i pasek; dawniej ludzie z pelnym kompletem (premia 0 do pierwszego kompletu)
+                    float uB = c.M != null ? c.M.Cover(K1H, KThrown) : 0f, uZ = c.M != null ? c.M.Cover(KBody, KLeg) : 0f;
                     c.S = 1f + StockBonus * uB * (c.PerkW ? PerkMult : 1f) + StockBonus * uZ * (c.PerkA ? PerkMult : 1f);
                 }
             }
@@ -1415,7 +1416,7 @@ namespace Armoury
                                   + (s.NightRestEnabled ? ", gracz z kara" : ""))
                      + ", Z14b (Drill Law Ai) " + On(s.DrillLawAi) + "; " + masks + "; stale: postoj x" + F2(RestDay) + " (ruch < " + RestBelowHours + " h z 24, godzina postoju: osada, oboz, <= "
                      + F2(RestStep) + " jedn./h), marsz x" + F2(MarchDay) + ", dowodca Przywodztwo/" + (int)LeadNorm + " [" + F2(LeadMin) + "-" + F2(LeadMax) + "], zapas +"
-                     + (int)(StockBonus * 100) + "% za polowe (bron, zbroja; u = ludzie z kompletem do roli / komplet ludzi; perk x" + F2(PerkMult) + "), zycie rodzajow w dniach musztry: " + LifeLog() + ", zlom x" + F2(Yield())
+                     + (int)(StockBonus * 100) + "% za polowe (bron, zbroja; 562c: u = pokryte sztuki / potrzebne sztuki polowy, oponcza dodatkiem; perk x" + F2(PerkMult) + "), zycie rodzajow w dniach musztry: " + LifeLog() + ", zlom x" + F2(Yield())
                      + "; zapas musztry (562 - pelny zestaw do roli, ludzie biora braki ze zbrojowni): bron " + w + ", zbroje " + a + (imp != null ? "; " + imp : "") + ".");
         }
 

@@ -17,13 +17,15 @@ namespace Armoury
     /// cwiczebne + luk zapasowy / kusza ... i samo sie uzupelnia i schodzi ze stanu Armoury"): PELNY ZESTAW DO MUSZTRY wedlug roli zolnierza.
     ///  - Rola z zestawu bitewnego typu (wiekszosc wzorcow BattleEquipments; bohater - Hero.BattleEquipment): lucznik (luk + strzaly), kusznik (kusza +
     ///    belty), jazda (bron 1H + tarcza + wlocznia), piechota dwureczna (bron 2H), reszta piechoty (bron 1H + tarcza); oszczepnik dodatkowo oszczepy;
-    ///    kazdy: zbroja korpusu, helm, nogawice (z butami - jeden slot gry) i oponcza. Rekawice poza zestawem.
+    ///    kazdy: zbroja korpusu, helm, nogawice (z butami - jeden slot gry). Rekawice poza zestawem; oponcza (562c) - dodatek: poza zestawem, ale oponcze
+    ///    juz lezace w zapasie zostaja (do jednej na czlowieka), sluza musztrze i zuzywaja sie, nowych ludzie nie biora i nie przyjmuja.
     ///  - Gracz: braki zestawu ludzie biora SAMI ze swojej nadwyzki w zbrojowni DTE (plan K1 z podgladem bitwy - KeepGiven: nigdy sprzet, ktory nastepna
     ///    bitwa wydaje); sztuka schodzi ze stanu zbrojowni do zapasu musztry (_stock). Nadmiar (smierc, awans, zmiana roli) wraca do zbrojowni, brak bitwy
     ///    tez (zestaw bitewny ma pierwszenstwo). Codziennie, po zmianie skladu, przy starcie bitwy (sam zwrot) i w miescie przed sprzedaza (sam zwrot).
     ///  - AI: ta sama regula, ale zapasem jest rezerwacja w slowniku zbrojowni DTE (sztuki zostaja w zbrojowni - DTE i tak wydaje cala w bitwie), liczona
     ///    od nowa raz na dobe; sprzedaz nadwyzek AI (MenPurse.SellArmorySurplus) omija zarezerwowane.
-    ///  - S = 1 + 0.10 x uB x kB + 0.10 x uZ x kZ, u = ludzie z kompletem broni / zbroi do swojej roli wobec kompletu ludzi.
+    ///  - S = 1 + 0.10 x uB x kB + 0.10 x uZ x kZ, u = pokrycie sztuk polowy (562c: suma min(Cov, Need) / suma Need rodzajow broni / zbroi - ta sama miara,
+    ///    co zuzycie i pasek; dawniej ludzie z pelnym kompletem, przez co premia stala na zerze do pierwszego pelnego kompletu).
     ///  - Zuzycie wedlug rodzaju (zycie w dniach musztry = WearDays x LifeX).
     /// </summary>
     internal static partial class Drill
@@ -34,7 +36,7 @@ namespace Armoury
                            KBody = 9, KHead = 10, KLeg = 11, KCape = 12, NK = 13;
         private const int MMelee = (1 << K1H) | (1 << K2H) | (1 << KPole) | (1 << KShield);
         private const int MRanged = (1 << KBow) | (1 << KArrows) | (1 << KXbow) | (1 << KBolts) | (1 << KThrown);
-        private const int MWeap = MMelee | MRanged, MArm = (1 << KBody) | (1 << KHead) | (1 << KLeg) | (1 << KCape);
+        private const int MWeap = MMelee | MRanged, MArm = (1 << KBody) | (1 << KHead) | (1 << KLeg);   // 562c (Jeff 15.11 "dodatek"): oponcza poza wymaganym zestawem
         private const int DefaultRole = MArm | (1 << K1H) | (1 << KShield);
         private static readonly ItemObject.ItemTypeEnum[] KindType = { ItemObject.ItemTypeEnum.OneHandedWeapon, ItemObject.ItemTypeEnum.TwoHandedWeapon,
             ItemObject.ItemTypeEnum.Polearm, ItemObject.ItemTypeEnum.Shield, ItemObject.ItemTypeEnum.Bow, ItemObject.ItemTypeEnum.Arrows,
@@ -146,7 +148,15 @@ namespace Armoury
             internal int Other;                  // sztuki spoza rodzajow (rekawice ze starego zapasu) - zawsze nadmiar
             internal int L2N, L21, LP0, LP2, LP1, LPb;   // po przydziale: wolne dwureczne (bez 1H / z 1H) i drzewce wedlug klasy
             internal int Men, Heroes, Ready, ReadyW, ReadyA, ReadyM, NeedM, ReadyR, NeedR, Sig;
+            internal int CapeOpt;                // 562c: oponcza-dodatek - ile sztuk zapasu moze sluzyc (1 na MenPerPiece ludzi kazdej grupy); Need[KCape] = 0
             internal int Kit { get { return Men + Heroes; } }
+            /// <summary>562c: pokrycie sztuk rodzajow lo..hi (suma min(Cov, Need) / suma Need), 0..1; bez popytu - 0.</summary>
+            internal float Cover(int lo, int hi)
+            {
+                int n = 0, c = 0;
+                for (int i = lo; i <= hi; i++) { n += Need[i]; c += Math.Min(Cov[i], Need[i]); }
+                return n > 0 ? Math.Min(1f, c / (float)n) : 0f;
+            }
             internal int Short(int k) { return Math.Max(0, Need[k] - Cov[k]); }
             internal int Pieces { get { int n = Other; for (int k = 0; k < NK; k++) n += Have[k]; return n; } }
         }
@@ -185,6 +195,7 @@ namespace Armoury
                 if ((mask & (1 << KThrown)) != 0) m.RoleMen[RJav] += men;
                 int u = Units(men);
                 for (int k = 0; k < NK; k++) if ((mask & (1 << k)) != 0) m.Need[k] += u;
+                m.CapeOpt += u;
             }
             m.Sig = unchecked(sig * 31 + MenPerPiece);
             return m;
@@ -215,6 +226,9 @@ namespace Armoury
             Array.Clear(m.Cov, 0, NK); Array.Clear(m.Used, 0, NK);
             for (int k = 0; k < NK; k++)
                 if (k != K1H && k != K2H && k != KPole) { m.Cov[k] = Math.Min(m.Need[k], m.Have[k]); m.Used[k] = m.Cov[k]; }
+            // 562c: oponcza-dodatek - bez popytu (Cov 0, poza premia i paskiem), ale sztuki w zapasie do CapeOpt sa w uzyciu: nie wracaja jako nadmiar
+            // (ReturnExcess liczy od Used) i zuzywaja sie w musztrze (Wear); ponad CapeOpt (smierc, awans) - nadmiar jak kazdy rodzaj
+            m.Used[KCape] = Math.Min(m.Have[KCape], m.CapeOpt);
             int p0 = Math.Max(0, m.Have[KPole] - m.Pc1 - m.Pc2 - m.Pcb), p2 = m.Pc2, p1 = m.Pc1, pb = m.Pcb;
             int need = m.Need[KPole];
             // recenzja 562 (4): wlocznia najpierw z drzewc bez uzycia bialego, potem z tych, ktorych 1H / 2H nie potrzebuja (reszta po wlasnym typie
@@ -714,7 +728,7 @@ namespace Armoury
             {
                 for (int k = 0; k < NK; k++)
                 {
-                    int inUse = Math.Min(m.Cov[k], m.Need[k]);
+                    int inUse = k == KCape ? m.Used[KCape] : Math.Min(m.Cov[k], m.Need[k]);   // 562c: oponcze-dodatek w uzyciu tez sie zuzywaja
                     if (inUse <= 0) continue;
                     a.WK[k] += inUse * dw / (WearDays * LifeX[k]);
                     int n = (int)a.WK[k];
@@ -944,6 +958,8 @@ namespace Armoury
             {
                 if (m.Need[k] == 0 && m.Have[k] == 0) continue;
                 if (sb.Length > 0) sb.Append(", ");
+                if (k == KCape && m.Need[k] == 0)   // 562c: dodatek - w uzyciu / w zapasie
+                { sb.Append(KindPl[k]).Append(" (dodatek) ").Append(m.Used[k]).Append('/').Append(m.Have[k]); continue; }
                 sb.Append(KindPl[k]).Append(' ').Append(m.Cov[k]).Append('/').Append(m.Need[k]);
                 if (m.Have[k] > m.Used[k]) sb.Append(" (+").Append(m.Have[k] - m.Used[k]).Append(')');
             }
@@ -956,6 +972,7 @@ namespace Armoury
         {
             var sb = new StringBuilder();
             for (int i = 0; i < NK; i++) { if (k.Need[i] == 0) continue; if (sb.Length > 0) sb.Append(", "); sb.Append(KindPl[i]).Append(' ').Append(k.Cov[i]).Append('/').Append(k.Need[i]); }
+            if (k.CapeUse > 0) sb.Append(sb.Length > 0 ? ", " : "").Append(KindPl[KCape]).Append(" (dodatek) ").Append(k.CapeUse);   // 562c
             return sb.Length > 0 ? sb.ToString() : "-";
         }
 
@@ -982,19 +999,21 @@ namespace Armoury
             internal readonly int[] Need = new int[NK], Cov = new int[NK], WornToday = new int[NK], RoleMen = new int[NR];
             internal readonly float[] Acc = new float[NK];     // ulamek zuzycia do nastepnej sztuki rodzaju (0..1)
             internal int Taken, Back, BackBattle, LastTook;
+            internal int CapeUse;                              // 562c: oponcze-dodatek z zapasu w uzyciu (KitM.Used[KCape])
             internal int CovSum(int lo, int hi) { int n = 0; for (int i = lo; i <= hi; i++) n += Math.Min(Cov[i], Need[i]); return n; }   // 562b: pokryte sztuki rodzajow lo..hi
             internal int NeedSum(int lo, int hi) { int n = 0; for (int i = lo; i <= hi; i++) n += Need[i]; return n; }
             /// <summary>562b: pokrycie sztuk calego zestawu w procentach (postep widoczny przed pierwszym pelnym zestawem); 100 tylko przy zerowych brakach.</summary>
+            internal float Cover(int lo, int hi) { int n = NeedSum(lo, hi); return n > 0 ? Math.Min(1f, CovSum(lo, hi) / (float)n) : 0f; }   // 562c: jak KitM.Cover
             internal int Pct { get { int n = NeedSum(0, NK - 1), c = CovSum(0, NK - 1); return n <= 0 ? 100 : (c >= n ? 100 : Math.Min(99, (int)(c * 100L / n))); } }
             internal bool PerkW, PerkA;
             internal int Short(int k) { return Math.Max(0, Need[k] - Cov[k]); }
-            internal float Bonus(bool weapons)                 // premia S tej polowy (0.10 przy pelnej, x1.5 z perkiem)
+            internal float Bonus(bool weapons)                 // premia S tej polowy (0.10 przy pelnej, x1.5 z perkiem); 562c: u = pokrycie sztuk polowy (jak Drill.CtxOf)
             {
-                float u = KitN > 0 ? Math.Min(1f, (weapons ? ReadyW : ReadyA) / (float)KitN) : 0f;
+                float u = Cover(weapons ? K1H : KBody, weapons ? KThrown : KLeg);
                 return StockBonus * u * ((weapons ? PerkW : PerkA) ? PerkMult : 1f);
             }
             internal float WearPerFullDay(int k)               // sztuk rodzaju na pelny dzien cwiczen (8 h, CampDrill.DayFull)
-            { return Math.Min(Cov[k], Need[k]) * CampDrill.DayFull / (WearDays * LifeX[k]); }
+            { return (k == KCape ? CapeUse : Math.Min(Cov[k], Need[k])) * CampDrill.DayFull / (WearDays * LifeX[k]); }   // 562c: oponcze-dodatek jak Wear
             internal string Shorts(int lo, int hi, int max)
             {
                 var sh = new int[NK];
@@ -1031,7 +1050,7 @@ namespace Armoury
                     _hudAt = now; _hudN++; _hudDirty = false;
                     var m = MeasurePlayer();
                     k.Men = m.Men; k.Heroes = m.Heroes; k.Ready = m.Ready; k.ReadyW = m.ReadyW; k.ReadyA = m.ReadyA; k.ReadyM = m.ReadyM; k.NeedM = m.NeedM;
-                    k.ReadyR = m.ReadyR; k.NeedR = m.NeedR; k.Stock = m.Pieces; k.Other = m.Other;
+                    k.ReadyR = m.ReadyR; k.NeedR = m.NeedR; k.Stock = m.Pieces; k.Other = m.Other; k.CapeUse = m.Used[KCape];
                     Array.Copy(m.Need, k.Need, NK); Array.Copy(m.Cov, k.Cov, NK); Array.Copy(m.RoleMen, k.RoleMen, NR);
                     _hudStockVer = sv; _hudRosVer = rv; _hudHeroes = hn; _hudDay = day; _hudCfg = cfg; _hudHave = true;
                 }

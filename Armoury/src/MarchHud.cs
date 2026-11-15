@@ -477,16 +477,17 @@ namespace Armoury
                 string who = k.Men + " soldiers" + (k.Heroes > 0 ? " and " + k.Heroes + (k.Heroes == 1 ? " companion" : " companions") : "") + (Drill.HudHeroesOn ? " - you lead the drill and are not counted" : " - heroes do not drill and are not counted");
                 Row(l, "Full kit / men", k.Ready + " of " + k.KitN + " have a full drill kit for their role" + (k.Ready < k.KitN ? " (red)" : "") + " (" + who + ")");
                 // 562b: postep w sztukach i najwieksze braki - to, co gracz moze dac (pasek pokazuje ten procent)
-                int cw = k.CovSum(Drill.K1H, Drill.KThrown), nw = k.NeedSum(Drill.K1H, Drill.KThrown), ca = k.CovSum(Drill.KBody, Drill.KCape), na = k.NeedSum(Drill.KBody, Drill.KCape);
+                int cw = k.CovSum(Drill.K1H, Drill.KThrown), nw = k.NeedSum(Drill.K1H, Drill.KThrown), ca = k.CovSum(Drill.KBody, Drill.KLeg), na = k.NeedSum(Drill.KBody, Drill.KLeg);   // 562c: oponcza poza zestawem
                 Row(l, "Pieces in kit", (cw + ca) + " of " + (nw + na) + " (" + k.Pct + "%, shown on the bar) - weapons " + cw + "/" + nw + ", armour " + ca + "/" + na);
                 string most = k.Shorts(0, Drill.NK - 1, 4);
                 if (most.Length > 0) Row(l, "Missing most", most);
                 Row(l, "Weapons", HalfLine(k, k.ReadyW, k.KitN, Drill.K1H, Drill.KThrown));
                 if (k.NeedR > 0) Row(l, "Ranged", k.ReadyR + "/" + k.NeedR + " archers, crossbowmen and javelin men" + (k.Shorts(Drill.KBow, Drill.KThrown, 4).Length > 0 ? " - short: " + k.Shorts(Drill.KBow, Drill.KThrown, 4) : ""));
-                Row(l, "Armour", HalfLine(k, k.ReadyA, k.KitN, Drill.KBody, Drill.KCape));
+                Row(l, "Armour", HalfLine(k, k.ReadyA, k.KitN, Drill.KBody, Drill.KLeg));
+                if (k.CapeUse > 0) Row(l, "Capes (extra)", k.CapeUse + " capes left in the drill stock are still worn at drill until they wear out - they add nothing to the bonus and no new ones are taken");
                 Row(l, "Roles", RolesLine(k));
                 Row(l, "Kit per man", "Infantry: a one-handed weapon and a shield, or a two-handed weapon. Cavalry: a one-handed weapon, a shield and a spear. Archers: a bow and a quiver of arrows; "
-                            + "crossbowmen: a crossbow and bolts; javelin men also a stack of javelins. Everyone: body armour, a helmet, leg armour (boots) and a cape. Gloves are not part of the drill kit."
+                            + "crossbowmen: a crossbow and bolts; javelin men also a stack of javelins. Everyone: body armour, a helmet and leg armour (boots). Gloves and capes are not part of the drill kit."
                             + (per == 1 ? "" : " One piece of each kind serves " + per + " men."));
                 Row(l, "Refill", "Your men take what their drill kit lacks from their spare kit in the troops' armoury - once a day and when the troops change - only pieces the next battle's hand-out leaves unused; "
                             + "those pieces leave the armoury. Nothing to click. Taken today " + k.Taken + ", given back for battle " + k.BackBattle + ", back to the armoury (not needed) " + k.Back + "."
@@ -495,7 +496,7 @@ namespace Armoury
                 Row(l, "From you", "Give arms and armour in the inventory (Discard) or leave trophies - your men keep what their kit lacks: " + sh + " pieces" + (most.Length > 0 ? " (most needed: " + most + ")" : "") + ".");
                 float bonus = (k.Bonus(true) + k.Bonus(false)) * 100f;
                 float max = Drill.BonusPerSet * 100f * ((k.PerkW ? Drill.BonusPerkMult : 1f) + (k.PerkA ? Drill.BonusPerkMult : 1f));
-                Row(l, "Drill bonus", "+" + bonus.ToString("0.#") + "% of +" + max.ToString("0.#") + "%" + (Drill.HudHeroesOn ? " drill XP of troops and companions" : " troop XP from drill") + " (each half grows with the share of men with a full weapons or armour kit - pieces alone do not count; "
+                Row(l, "Drill bonus", "+" + bonus.ToString("0.#") + "% of +" + max.ToString("0.#") + "%" + (Drill.HudHeroesOn ? " drill XP of troops and companions" : " troop XP from drill") + " (each half grows with the share of the pieces its kit needs that are in place - every piece counts, the same pieces that wear out; "
                        + "Giving Hands raises the weapons half" + (k.PerkW ? "" : " - not taken") + ", Paid in Promise the armour half" + (k.PerkA ? "" : " - not taken")
                        + ", from +" + (Drill.BonusPerSet * 100f).ToString("0.#") + "% to +" + (Drill.BonusPerSet * 100f * Drill.BonusPerkMult).ToString("0.#") + "%)");
                 float rw = 0f, ra = 0f;

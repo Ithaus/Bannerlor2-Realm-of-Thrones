@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 562c: musztra - premia wedlug sztuk (nie pelnych kompletow), oponcza dodatkiem jak rekawice - Armoury (DrillKit.cs, Drill.cs, MarchHud.cs; opisy kluczy DrillStock i DrillMenPerPiece w Settings.cs + McmSettings.cs recznie, bez nowych kluczy)
+
+**Problem:** po 562b pasek Drill pokazuje pokrycie sztuk, ale premia do szkolenia liczyla sie dalej z ludzi z PELNYM kompletem (ReadyW / ReadyA) - u Jeffa bron 114/357 sztuk, zbroje z oponczami ~130/656, a premia +0%, bo nikt nie ma kompletu (oponcze 0/164, w zbrojowni ani jednej wolnej). Sztuki niepelnych kompletow i tak sie zuzywaja (Wear liczy min(Cov, Need)) - koszt bez premii. Jeff 15.11 na dwa pytania: "1. ok  2. dodatek" (1 = premia wedlug sztuk, 2 = oponcza jako dodatek jak rekawice).
+
+**Przyczyna:** Drill.CtxOf: uB = ReadyW / Kit, uZ = ReadyA / Kit (ReadyOf - min po rodzajach maski roli); MArm zawieral KCape, wiec kazda rola wymagala oponczy.
+
+**Zmiana:**
+- Premia: u polowy = pokrycie sztuk - suma min(Cov, Need) / suma Need rodzajow broni (1H..oszczepy) albo zbroi (korpus, helm, nogi). KitM.Cover / Kit.Cover; Drill.CtxOf (S gracza i AI) i Kit.Bonus (podpowiedz paska) licza to samo. Ta sama miara co zuzycie i pasek %. Przyklad Jeffa: bron 114/357 = 0.319 -> +3.2%, zbroje bez oponczy 130/492 = 0.264 -> +2.6%, razem +5.8% (S = 1.058; z oboma perkami x1.5: +4.8% + 4.0% = +8.8%) zamiast +0%.
+- Oponcza: poza MArm (wymagana maska roli) - Need[KCape] = 0: nie liczy sie do pokrycia, paska, premii ani "Full kit"; pobor (TakePlayer), przyjecie od gracza (Accept), autotest i rezerwacja AI jej nie biora. WYBOR: oponcze juz lezace w zapasie gracza NIE sa wyrzucane naraz - KitM.CapeOpt (1 na MenPerPiece ludzi) i Used[KCape] = min(Have, CapeOpt): do tej liczby zostaja (ReturnExcess liczy nadmiar od Used), dalej sluza w musztrze i zuzywaja sie (Wear, zlom jak dotad), wiec znikaja stopniowo; ponad CapeOpt (smierc, awans) wracaja do zbrojowni jak kazdy nadmiar; brak bitwy (ReturnForBattle) dalej ma pierwszenstwo. AI: rezerwacja liczona od nowa co dobe, wiec oponcze AI po prostu przestaja byc zarezerwowane (zostaja w zbrojowni AI).
+- Podpowiedz: "Pieces in kit" i "Armour" bez oponczy; nowy wiersz "Capes (extra)" gdy w zapasie sa oponcze w uzyciu; "Kit per man": gloves and capes are not part of the drill kit; "Drill bonus": every piece counts (bez "pieces alone do not count"). "Full kit / men" zostaje jako informacja. Wear liczy oponcze-dodatek. Log: KindLog / KitLog "oponcze (dodatek) w uzyciu/w zapasie"; linia ustawien "u = pokryte sztuki / potrzebne sztuki polowy".
+- Opisy MCM DrillStock i DrillMenPerPiece: bez oponczy, premia rosnie z kazda sztuka (recznie w McmSettings.cs - gen_mcm.py przepisalby ~1250 linii roznic z bazy, wiec cofniety).
+
+**Ryzyko / co sprawdzic:**
+- Regresje: MArm uzywaja tylko RoleOfEq, DefaultRole i FillReady (Ready, ReadyA); ReadyW/ReadyA czyta juz tylko log i "Full kit / men" (Drill.cs 793/1778, MarchHud) - S nie zalezy od nich. Need[KCape] = 0 wylacza oponcze ze wszystkich miejsc liczacych braki (Short, Shorts, TakeOrder, AiKit, Accept, AutotestFeed, Pct, CovSum/NeedSum).
+- Premia AI tez rosnie (ta sama formula) - AI z czesciowa rezerwacja cwiczy szybciej niz dotad (do +20% / +30% jak przedtem przy pelnym). To zamierzone (jedna regula dla wszystkich), ale wplywa na tempo awansu wojsk AI.
+- Oponcze: zuzycie WK[KCape] liczone dalej (format zapisu A= bez zmian, SumW(KBody, KCape)). Po wczytaniu zapisu z 562/562b oponcze w zapasie zostaja do CapeOpt - sprawdzic w logu "oponcze (dodatek) X/Y" i brak skoku "do zbrojowni" w pierwszym rozliczeniu.
+- W grze: podpowiedz Drill - "Drill bonus" > 0 przy niepelnych kompletach; linia musztry "S=" gracza zgodna z +X% z podpowiedzi.
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; NIE wgrane).
+
 ## 562b: musztra - pasek Drill pokazuje postep w sztukach (%), podpowiedz mowi, czego brakuje najbardziej i dlaczego pobor nic nie bierze - Armoury (DrillKit.cs, MarchHud.cs)
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 262: Horses 165/165, Pack 80/139, Drill 0/164 czerwone - "mam rzeczy w armoury, ale wojsko nie pobiera - jak mam cos kliknac?". Log Armoury-2026-11-15_19-36-27.log, linia 953: migracja 562 - zapas 299 -> 255 szt., do zbrojowni 53, wzieto z nadwyzki 9 (wlocznie 14 -> 23/26), kontrola ZGODNE. Pokrycie rodzajow: 1H 88/88, 2H 3/3, wlocznie 23/26, tarcze 0/88, luki 0/73, strzaly 0/73, oszczepy 0/7, korpus 61/164, helmy 38/164, nogi 31/164, oponcze 0/164 = 244/1013 sztuk (24%).
