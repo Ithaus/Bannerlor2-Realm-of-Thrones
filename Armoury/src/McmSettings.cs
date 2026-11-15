@@ -8765,7 +8765,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool StableRidersFirst { get; set; } = true;
 
-        [SettingPropertyInteger("Footmen Riding Waiver", 0, 100, "0", HintText = "your footmen ride a horse only on the march and fight on foot, so a horse and a harness that need up to this much Riding no longer need it from a footman; above it his own Riding counts as before. Cavalry, wounded riders and heroes keep the Riding the item asks for. You and your clan's parties (0 = as before)", RequireRestart = false)]
+        [SettingPropertyInteger("Footmen Riding Waiver", 0, 100, "0", HintText = "your footmen ride a horse only on the march and fight on foot, so a horse and a harness that need up to this much Riding no longer need it from a footman; above it his own Riding counts as before. Heroes without a horse of their own count as footmen here; cavalry and wounded riders keep the Riding the item asks for. You and your clan's parties (0 = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int FootmenRidingWaiver { get; set; } = 20;
 

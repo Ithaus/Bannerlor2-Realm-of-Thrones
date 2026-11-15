@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
+
+**Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".
+
+**Przyczyna:** 538 dawal ulge FootmenRidingWaiver tylko KFoot; bohater bez wlasnego konia (KHero, pula pieszych) mial wymog przedmiotu.
+
+**Zmiana:** MarchPairs.Eff - ulga takze dla KHero (bohater w puli = bez konia w ekwipunku, tylko marsz; w bitwie walczy z wlasnym ekwipunkiem, bez konia). Pierwszenstwo par (538) bez zmian: KHero dalej w kroku 1 po jezdzcach bez pary i rannych jezdzcach. Opis MCM Footmen Riding Waiver poprawiony.
+
+**Ryzyko / co sprawdzic:** w linii "Pary marszowe" bohaterowie bez konia jada (za niska Jazda 0 przy parach do 20); bitwa bez zmian (Eff prywatny w MarchPairs). Build 0 bledow, w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 548: pasek mapy czytelny - kazda pozycja "mam / potrzeba", pelne ulamki; zestaw do musztry 1 na czlowieka - Armoury (MarchHud.cs, Drill.cs, RiddenBy.cs; klucz NOWY DrillMenPerPiece = 1, MCM "Drill Men Per Piece")
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 250 (gora: troops 133; dol: Horses 131/146 CZERWONE, Pack 59/117, Weapons 82/43, Armour 82): "nie rozumiem tej tabelki, mam 131 ludzi czemu 146 czerwone, potem 82/43 czyli co, za duzo mam broni czy za malo, i 1 miecz i jeden pancerz na osobe a nie na 3 ludzi ... i te 82 czyli co 82/82 ... zrob aby UX/UI byl czytelny". Log Armoury-2026-11-15_15-14-12: 146 = wszystkie konie wierzchowe (ladunek + zbrojownia + stajnia), czerwien = 1 osoba pieszo (Amanda, Jazda 5); 82/43 = od gracza + nadwyzka ludzi / ceil(129/3); "Armour 82" = 82/43 skrocone bezpiecznikiem szerokosci (16:01:24 "skrocone do licznika 1", gora 690 px); liczniki broni skakaly 83 -> 187 -> 87 z nadwyzka ludzi.

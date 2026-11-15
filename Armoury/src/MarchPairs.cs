@@ -280,7 +280,7 @@ namespace Armoury
         /// FootmenRidingWaiver (20) go nie dotyczy. Jazda "do doboru" = max(Jazda, prog); jezdzcy, ranni jezdzcy i bohaterowie bez zmian.</summary>
         private static int Eff(int riding, byte kind)
         {
-            if (kind != KFoot) return riding;
+            if (kind != KFoot && kind != KHero) return riding;   // 553 (Jeff 15.11): bohater bez wlasnego konia tez tylko przemieszcza sie po mapie
             var s = Settings.Current; int w = s != null ? s.FootmenRidingWaiver : 0;
             return w > riding ? w : riding;
         }
