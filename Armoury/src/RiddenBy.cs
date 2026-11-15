@@ -78,7 +78,10 @@ namespace Armoury
         // ---------------------------------------------------------------- panel przedmiotu (ekwipunek, handel, stash)
         /// <summary>Wiersze panelu (nazwa, tresc) dla sztuki el (amount w tym wierszu ekranu); null - nic do dopisania. armourySide - strona zbrojowni
         /// przy otwartym stash (pary piechoty z wolnych sztuk zbrojowni, wedlug przedmiotu).</summary>
-        internal static List<string[]> PanelRows(EquipmentElement el, int amount, bool armourySide)
+        internal static List<string[]> PanelRows(EquipmentElement el, int amount, bool armourySide) { return PanelRows(el, amount, armourySide, false); }
+
+        /// <summary>537 E6: stableSide - strona stajni piechoty (okno "Footmen's mounts"): sztuki ze stajni, wedlug przedmiotu i modyfikatora (stajnia trzyma stan).</summary>
+        internal static List<string[]> PanelRows(EquipmentElement el, int amount, bool armourySide, bool stableSide)
         {
             var it = el.Item;
             if (it == null || amount <= 0) return null;
@@ -94,7 +97,8 @@ namespace Armoury
             if (r.AtSea) { rows.Add(new[] { "At sea", "nobody rides - pairs count again on land" }); return rows; }
             if (horse && !Stables.IsPlainMount(it)) { rows.Add(new[] { "Not in a pair", "only a riding horse takes a harness for the march" }); return rows; }
             if (harness && !SaddleLaw.Fits(it)) { rows.Add(new[] { "Not in a pair", "this harness fits no riding horse" }); return rows; }
-            byte src = armourySide ? MarchPairs.SrcArmoury : MarchPairs.SrcCargo;
+            byte src = stableSide ? MarchPairs.SrcStable : armourySide ? MarchPairs.SrcArmoury : MarchPairs.SrcCargo;
+            if (stableSide) armourySide = false;   // stajnia trzyma modyfikator - liczenie jak ladunek (wedlug wiersza)
             var by = new Dictionary<CharacterObject, int>();
             var with = new Dictionary<string, int>();   // druga polowa pary (kon -> uprzeze, uprzaz -> konie)
             int ridden = 0, paired = 0, req = -1;
@@ -135,6 +139,7 @@ namespace Armoury
             if (lone > 0) rows.Add(new[] { horse ? "No fitting harness" : "No horse for it", lone + (horse ? " - in the herd" : " - weighs as cargo") });
             if (harness && !armourySide && ridden > 0 && MarchPairs.WeightOn) rows.Add(new[] { "Weight", ridden + " on ridden horses weigh nothing" });
             if (armourySide) rows.Add(new[] { "Counted", "all pieces of this kind in the troops' armoury" });
+            if (stableSide) rows.Add(new[] { "Footmen's mounts", "kept apart from the baggage; take a pair out to sell it - the pairs are counted again later" });
             rows.Add(new[] { "Horses (map bar)", MarchHud.HorsesText(r) + " ridden" + (QuartermasterEscrow.Active ? " (as when the stash opened)" : "") });
             return rows;
         }
@@ -208,6 +213,7 @@ namespace Armoury
                         if (k > 0) sb.Append("; ");
                         sb.Append(x.N).Append("x ").Append(Nm(x.HIt, x.HMd)).Append(" with ").Append(Nm(x.UIt, x.UMd));
                         if (x.HSrc == MarchPairs.SrcArmoury || x.USrc == MarchPairs.SrcArmoury) sb.Append(" (troops' armoury)");
+                        else if (x.HSrc == MarchPairs.SrcStable || x.USrc == MarchPairs.SrcStable) sb.Append(" (footmen's mounts)");   // 537 E6
                         k++;
                     }
                     if (rest > 0) sb.Append("; ").Append(rest).Append(" on other pairs");
@@ -225,7 +231,12 @@ namespace Armoury
             }
             sb.Append('.');
             if (r.SkillLowEn.Count > 0) sb.Append("\n\nRiding too low for the pairs left: ").Append(string.Join(", ", r.SkillLowEn)).Append('.');
-            sb.Append("\n\nNothing is moved: the horses and harness stay in your baggage and in the troops' armoury. The hover panel of a horse or harness in your inventory shows who rides it.");
+            // 537 E6: przy stajni piechoty pary piechoty stoja osobno (Footmen's mounts), wolne konie i uprzeze w ladunku
+            if (FootStable.On || r.SMounts + r.SHarness > 0)
+                sb.Append("\n\nThe footmen's pairs stand apart in the footmen's mounts (").Append(r.SMounts).Append(" horses, ").Append(r.SHarness)
+                  .Append(" harness - town or camp menu); your baggage keeps the free horses and harness, the troops' armoury the cavalry's kit. The hover panel of a horse or harness shows who rides it.");
+            else
+                sb.Append("\n\nNothing is moved: the horses and harness stay in your baggage and in the troops' armoury. The hover panel of a horse or harness in your inventory shows who rides it.");
             return sb.ToString();
         }
 
@@ -257,18 +268,19 @@ namespace Armoury
             {
                 if (!RiddenBy.On || spItem == null || Campaign.Current == null || MobileParty.MainParty == null) return;
                 var side = spItem.InventorySide;
-                bool armoury = false;
+                bool armoury = false, stable = false;
                 if (side == TaleWorlds.CampaignSystem.Inventory.InventoryLogic.InventorySide.OtherInventory)
                 {
-                    if (!QuartermasterEscrow.Active) return;   // strona kupca / lupu - nie nasze sztuki
-                    armoury = true;                            // stash DTE: OpenScreenAsStash(ArmyArmory.Armory) - zbrojownia po stronie OtherInventory
+                    if (FootStable.ScreenOpen) stable = true;  // 537 E6: okno "Footmen's mounts" - stajnia piechoty po stronie OtherInventory
+                    else if (!QuartermasterEscrow.Active) return;   // strona kupca / lupu - nie nasze sztuki
+                    else armoury = true;                       // stash DTE: OpenScreenAsStash(ArmyArmory.Armory) - zbrojownia po stronie OtherInventory
                 }
                 else if (side != TaleWorlds.CampaignSystem.Inventory.InventoryLogic.InventorySide.PlayerInventory) return;   // rynsztunek bohatera - wlasne Equipment
                 if (_targetField == null)
                     _targetField = AccessTools.Field(typeof(TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemMenuVM), "_targetItem");
                 var itemVm = _targetField != null ? _targetField.GetValue(__instance) as TaleWorlds.Core.ViewModelCollection.ItemVM : null;
                 if (itemVm == null) return;
-                var rows = RiddenBy.PanelRows(itemVm.ItemRosterElement.EquipmentElement, itemVm.ItemRosterElement.Amount, armoury);
+                var rows = RiddenBy.PanelRows(itemVm.ItemRosterElement.EquipmentElement, itemVm.ItemRosterElement.Amount, armoury, stable);
                 if (rows == null) return;
                 var list = __instance.TargetItemProperties;
                 if (list == null) return;

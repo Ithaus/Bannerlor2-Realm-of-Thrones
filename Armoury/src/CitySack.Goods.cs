@@ -50,7 +50,7 @@ namespace Armoury
             {
                 var r = mp.ItemRoster;
                 int men = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0;
-                int herd = r.NumberOfPackAnimals + r.NumberOfLivestockAnimals + Math.Max(0, r.NumberOfMounts - mp.Party.NumberOfMenWithoutHorse);
+                int herd = r.NumberOfPackAnimals + r.NumberOfLivestockAnimals + Math.Max(0, r.NumberOfMounts + FootStable.MountsOf(mp) - mp.Party.NumberOfMenWithoutHorse);   // 537 E6: + konie stajni piechoty
                 return Math.Max(0, men - herd);
             }
             catch { return 0; }

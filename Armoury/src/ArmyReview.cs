@@ -561,6 +561,7 @@ namespace Armoury
             int bagHorses = bag != null ? bag.NumberOfMounts : 0;
             int bagHarness = SaddleLaw.BagFit(bag);
             sb.Append("\nIn your baggage: ").Append(bagHorses).Append(" spare horses, ").Append(bagHarness).Append(" harness.");
+            try { var fs = FootStable.Current; if (fs.Pieces > 0) sb.Append(" In the footmen's mounts: ").Append(fs.Mounts).Append(" horses, ").Append(fs.Harness).Append(" harness."); } catch { }   // 537 E6
             if (!dte) sb.Append("\n\nThe troops' armoury (Dynamic Troop Equipment) cannot be read now - the numbers above may be empty.");
             sb.Append("\n\n");
             if (!GarrisonKit.OwnKitOn)

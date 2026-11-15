@@ -318,6 +318,7 @@ namespace Armoury
             int pu = MarchPairs.CargoUnderMen(mp, mounts);
             if (pu >= 0) return mounts - pu;
             int foot = mp.Party != null ? mp.Party.NumberOfMenWithoutHorse : 0;
+            foot = Math.Max(0, foot - FootStable.MountsOf(mp));   // 537 E6: piechurzy na koniach stajni (poza NumberOfMounts) nie biora luzaka z ladunku
             int pris = mp.PrisonRoster != null ? mp.PrisonRoster.TotalManCount : 0;
             int arm = k0 ? HorseState.FreeOf(mp) : 0;
             return mounts + arm - foot - pris;

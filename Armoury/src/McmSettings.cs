@@ -8740,6 +8740,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ArmouryHasWeight { get; set; } = true;
 
+        [SettingPropertyBool("Footmen Mounts Stable", HintText = "your footmen's horses and harness - every horse and harness from your baggage in a pair ridden by a footman (the same pairs as Horses on the map bar) - stand apart from the baggage in Footmen's mounts (town menu and your camp menu): the baggage keeps only free horses and harness to sell, load or give away. They are moved only at safe moments - after you close an inventory or trade screen, at dawn, after a battle, when your men change - never while a screen is open; close Footmen's mounts and what you took out stays out until then. They weigh nothing, eat like the herd, give the same carry capacity (Footmen's mounts) and the same party speed as in the baggage; before the party screen and before the loot of a lost battle they go back to the baggage, so upgrades use them and a defeat loses them like the baggage. At sea they wait in the baggage. Needs March Pairs Speed; your party only (off = they go back to the baggage at the next safe moment)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool FootmenMountsStable { get; set; } = true;
+
+        [SettingPropertyBool("Stable Riders First", HintText = "a pair from Footmen's mounts that a cavalryman of yours rides on the march only because the troops' armoury has no horse or harness for him goes to the troops' armoury as your own piece, so he rides it into the next battle (with Troops Fight With Own Kit Only). Nothing comes back from the armoury to the footmen (off = the pair stays with the footmen)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool StableRidersFirst { get; set; } = true;
+
         [SettingPropertyBool("Ridden By View", HintText = "the hover panel of a riding horse or a horse harness in your inventory shows who rides it on the march ('Ridden by', the other half of the pair, pieces paired but not ridden, pieces with no fitting partner) - in the stash also for the footmen's pairs from the troops' armoury; Review the army - Horses and harness ends with a 'Who rides what' page. The same pairs as Horses on the map bar. Display only: nothing is moved (off = no such lines)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool RiddenByView { get; set; } = true;
@@ -15979,6 +15987,8 @@ namespace Armoury
             s.RiddenHarnessWeightless = RiddenHarnessWeightless;
             s.ArmouryHasWeight = ArmouryHasWeight;
             s.RiddenByView = RiddenByView;
+            s.FootmenMountsStable = FootmenMountsStable;
+            s.StableRidersFirst = StableRidersFirst;
             s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;

@@ -34,10 +34,15 @@ namespace Armoury
     /// RideQ (HorsePace: "Horse quality: spare horses" z koni w parach). Opis przy sekcji E2 nizej.
     /// E3 (klucz RiddenHarnessWeightless): waga uprzezy z ladunku na koniach pod piechota (WeightPostfix - "Harness on ridden horses") i udzwig z par
     /// (PackMarket: UnderPacks, "Saddled spare horses", "Ridden horses" gracza - CargoUnderMen / CapRiders). Opis przy sekcji E3 nizej.
+    /// E6 (FootStable): stajnia piechoty gracza "Footmen's mounts" - trzecie zrodlo par (SStable, najpierw przy tym samym wymogu - Rank); kon w stajni poza
+    /// NumberOfMounts gry (FreeHerd, Compute.FreeO, CapRiders licza go jak kon spoza ladunku), uprzaz poza waga ladunku. Rekord.RiddenBy mowi stajni, co ma stac.
     /// </summary>
     internal static class MarchPairs
     {
-        private const byte SCargo = 0, SArm = 1;
+        private const byte SCargo = 0, SArm = 1, SStable = 2;   // 537 E6: SStable - stajnia piechoty "Footmen's mounts" (FootStable)
+        /// <summary>E6: kolejnosc zrodel przy tym samym wymogu - stajnia, ladunek, zbrojownia (bez stajni jak dotad: ladunek przed zbrojownia). Stajnia najpierw:
+        /// para, ktora juz w niej stoi, jedzie dalej (bez przerzucania sztuk tam i z powrotem przy kazdym przeliczeniu).</summary>
+        private static int Rank(byte s) { return s == SStable ? 0 : s == SCargo ? 1 : 2; }
         // rodzaj czlowieka w puli piechoty
         private const byte KFoot = 0, KWoundedRider = 1, KCavWalk = 2, KHero = 3;
 
@@ -52,7 +57,7 @@ namespace Armoury
         internal sealed class RideLot { public CharacterObject Ch; public byte Kind; public ItemObject HIt, UIt; public ItemModifier HMd, UMd; public byte HSrc, USrc; public int Req, N; }
         /// <summary>E5: jazda z podgladu DTE (albo z wlasnego doboru) wedlug typu - z para, na koniu bez uprzezy, bez konia / kon zdjety.</summary>
         internal sealed class CavLot { public CharacterObject Ch; public int Pairs, NoHarness, NoHorse; }
-        internal const byte SrcCargo = SCargo, SrcArmoury = SArm;
+        internal const byte SrcCargo = SCargo, SrcArmoury = SArm, SrcStable = SStable;
         internal const byte KindFoot = KFoot, KindWoundedRider = KWoundedRider, KindCavWalk = KCavWalk, KindHero = KHero, KindCav = 4;
         /// <summary>E3: uprzaz z ladunku na koniu pod piechurem (para przydzielona w Assign) - sztuka i liczba; waga liczona przez model przy wpisie wagi.</summary>
         internal struct HLot { public EquipmentElement E; public int N; }
@@ -68,6 +73,9 @@ namespace Armoury
             public int CMounts, CPlain, COtherMount, CPack, CLive, GameMounts, CHarFam, CHarSaddle, CHarOther, CPackSaddle;
             // zbrojownia DTE gracza
             public int AHorses, AHarness, AHarOther, AFreeHorses, AFreeHarness;
+            // E6: stajnia piechoty gracza (FootStable): konie wierzchowe, uprzeze pasujace, inne sztuki (wroca do ladunku); jadacy na koniach ze stajni, pary
+            // puli z koniem ze stajni, pary niewykorzystane z koniem ze stajni
+            public int SMounts, SHarness, SOther, RideStableHorse, PoolPairsStable, UnusedStableHorse;
             // jazda
             public int CavMen, CavPairs, CavNoHarness, CavNoHorse, CavNoSaddle, CavWounded;
             public int HeroMounted, HeroNoHarness, HeroFoot;
@@ -108,9 +116,9 @@ namespace Armoury
             /// <summary>E1: koni pod ludzmi (pary jazdy + pary puli); na morzu 0 - nikt nie jedzie (rozdz. 1.3). Ta sama liczba w linii doby i w HUD.</summary>
             public int Ridden { get { return AtSea ? 0 : CavPairs + Ride; } }
             /// <summary>E1: wszystkie konie wierzchowe - ladunek + zbrojownia DTE (mianownik HUD, D10 a).</summary>
-            public int AllHorses { get { return CMounts + AHorses; } }
+            public int AllHorses { get { return CMounts + AHorses + SMounts; } }
             /// <summary>E1: wszystkie pasujace uprzeze - ladunek + zbrojownia DTE.</summary>
-            public int AllHarness { get { return CHarFam + CHarSaddle + AHarness; } }
+            public int AllHarness { get { return CHarFam + CHarSaddle + AHarness + SHarness; } }
         }
 
         private static int _stumbles, _stumblesDay;
@@ -180,10 +188,10 @@ namespace Armoury
         private static List<PairLot> MakePairs(List<Lot> horses, List<Lot> harness)
         {
             var res = new List<PairLot>();
-            horses.Sort((a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : a.Src.CompareTo(b.Src));
+            horses.Sort((a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : Rank(a.Src).CompareTo(Rank(b.Src)));   // E6: Rank (bez stajni jak dotad)
             var fam = new List<Lot>(); var sad = new List<Lot>();
             foreach (var h in harness) { var c = new Lot { It = h.It, Md = h.Md, Q = h.Q, Req = h.Req, N = h.N, Src = h.Src }; if (h.It.ArmorComponent != null) fam.Add(c); else sad.Add(c); }
-            Comparison<Lot> asc = (a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : a.Src.CompareTo(b.Src);
+            Comparison<Lot> asc = (a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : Rank(a.Src).CompareTo(Rank(b.Src));
             fam.Sort(asc); sad.Sort(asc);
             var left = new int[horses.Count];
             for (int i = 0; i < horses.Count; i++) left[i] = horses[i].N;
@@ -205,7 +213,7 @@ namespace Armoury
             }
             // E3: przy tym samym wymogu i zrodle konia - ciezsza uprzaz z ladunku najpierw pod czlowieka (jak dawne HarnessOne "najciezsze najpierw");
             // liczba jadacych bez zmian (kolejnosc wymogu ta sama)
-            res.Sort((a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : a.HSrc != b.HSrc ? a.HSrc.CompareTo(b.HSrc) : b.UW.CompareTo(a.UW));
+            res.Sort((a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : a.HSrc != b.HSrc ? Rank(a.HSrc).CompareTo(Rank(b.HSrc)) : b.UW.CompareTo(a.UW));
             return res;
         }
 
@@ -273,6 +281,7 @@ namespace Armoury
                     r.Ride += t;
                     if (pairs[p].N > 0) r.AddRideQ((float)(pairs[p].Q / pairs[p].N), t);   // E2: srednia szybkosc koni tej grupy par
                     if (pairs[p].HSrc == SCargo) r.RideCargoHorse += t;
+                    else if (pairs[p].HSrc == SStable) r.RideStableHorse += t;   // E6: kon ze stajni (poza NumberOfMounts gry)
                     if (pairs[p].UIt != null) r.AddRideHarness(pairs[p].UIt, pairs[p].UMd, t);   // E3: uprzaz z ladunku na koniu pod czlowiekiem
                     try { TakeSubs(pairs[p], t, m.Ch, m.Kind, r); } catch (Exception e) { Stumble("Assign.RiddenBy", e); }   // E5: tylko widok
                 }
@@ -280,9 +289,9 @@ namespace Armoury
             // E5: pary niewykorzystane po sztukach (pod jencow albo za trudne) - widok "Ridden by"
             try { for (int i = 0; i < pairs.Count; i++) if (pl[i] > 0) foreach (var s in pairs[i].Subs) if (s.Left > 0) AddRide(r.UnusedBy, null, 0, pairs[i], s, s.Left); }
             catch (Exception e) { Stumble("Assign.UnusedBy", e); }
-            int unused = 0, umin = -1, ucargo = 0;
-            for (int i = 0; i < pairs.Count; i++) if (pl[i] > 0) { unused += pl[i]; if (pairs[i].HSrc == SCargo) ucargo += pl[i]; if (umin < 0 || pairs[i].Req < umin) umin = pairs[i].Req; }
-            r.UnusedPairs = unused; r.UnusedReqMin = umin; r.UnusedCargoHorse = ucargo;
+            int unused = 0, umin = -1, ucargo = 0, ustable = 0;
+            for (int i = 0; i < pairs.Count; i++) if (pl[i] > 0) { unused += pl[i]; if (pairs[i].HSrc == SCargo) ucargo += pl[i]; else if (pairs[i].HSrc == SStable) ustable += pl[i]; if (umin < 0 || pairs[i].Req < umin) umin = pairs[i].Req; }
+            r.UnusedPairs = unused; r.UnusedReqMin = umin; r.UnusedCargoHorse = ucargo; r.UnusedStableHorse = ustable;
             // pieszo z powodu Jazdy: tyle, ile zostalo par (najlepsi z idacych pieszo - najblizej wymogu); reszta to brak konia albo uprzezy
             int walk = 0; foreach (var m in men) walk += m.N - m.Got;
             int skill = Math.Min(walk, unused);
@@ -359,6 +368,34 @@ namespace Armoury
                         case 4: r.CPackSaddle += el.Amount; break;
                     }
                 }
+            }
+
+            // E6: stajnia piechoty gracza (FootStable, watek glowny - Of gracza wolany tylko z Main/Daily): konie i uprzeze jak z ladunku, zrodlo SStable
+            // (kon poza NumberOfMounts gry, uprzaz poza waga ladunku); sztuki spoza par (SOther) wroca do ladunku przy nastepnym przeliczeniu stajni
+            if (main)
+            {
+                try
+                {
+                    var st = FootStable.ForRecord();
+                    if (st != null)
+                        for (int i = 0; i < st.Count; i++)
+                        {
+                            var el = st.GetElementCopyAtIndex(i);
+                            var it = el.EquipmentElement.Item;
+                            if (it == null || el.Amount <= 0) continue;
+                            if (KitPreview.RidingMount(it))
+                            {
+                                r.SMounts += el.Amount;
+                                if (Stables.IsPlainMount(it)) AddLot(horses, it, el.EquipmentElement.ItemModifier, el.Amount, SStable);
+                                else r.SOther += el.Amount;
+                                continue;
+                            }
+                            int hk = HarnessKind(it);
+                            if (hk == 1 || hk == 2) { r.SHarness += el.Amount; AddLot(harness, it, el.EquipmentElement.ItemModifier, el.Amount, SStable); }
+                            else r.SOther += el.Amount;
+                        }
+                }
+                catch (Exception e) { Stumble("Of.stajnia", e); }
             }
 
             var men = new List<ManLot>();
@@ -462,7 +499,7 @@ namespace Armoury
             foreach (var p in pairs)
             {
                 r.PoolPairs += p.N;
-                if (p.HSrc == SCargo) r.PoolPairsCargo += p.N; else r.PoolPairsArm += p.N;
+                if (p.HSrc == SCargo) r.PoolPairsCargo += p.N; else if (p.HSrc == SStable) r.PoolPairsStable += p.N; else r.PoolPairsArm += p.N;
                 if (r.PairReqMin < 0 || p.Req < r.PairReqMin) r.PairReqMin = p.Req;
                 if (p.Req > r.PairReqMax) r.PairReqMax = p.Req;
             }
@@ -473,7 +510,7 @@ namespace Armoury
             r.GameFoot = mp.Party.NumberOfMenWithoutHorse;
             r.GameNum10 = Math.Min(r.GameFoot, r.GameMounts);
             r.GameHerd = r.CPack + r.CLive + Math.Max(0, r.GameMounts - r.GameNum10);
-            r.FreeHerd = Math.Max(0, r.CMounts - r.RideCargoHorse);
+            r.FreeHerd = Math.Max(0, r.CMounts + r.SMounts - r.RideCargoHorse - r.RideStableHorse);   // E6: kon ze stajni bez jezdzca tez idzie w stadzie
             r.OurHerd = r.CPack + r.CLive + r.FreeHerd;
             r.PackLimit = Math.Max(0, r.Men - r.CLive - r.FreeHerd);
             if (r.Men > 0)
@@ -500,7 +537,8 @@ namespace Armoury
             var arm = HorseFate.PlayerArmory();
             var ir = mp.ItemRoster;
             return (arm != null ? arm.VersionNo : -1) + "|" + mp.MemberRoster.VersionNo + "|" + (mp.PrisonRoster != null ? mp.PrisonRoster.VersionNo : -1)
-                   + "|" + (ir != null ? ir.VersionNo : -1) + "|" + (int)CampaignTime.Now.ToDays + "|" + (mp.IsCurrentlyAtSea ? 1 : 0) + (SaddleLaw.On ? 1 : 0);
+                   + "|" + (ir != null ? ir.VersionNo : -1) + "|" + (int)CampaignTime.Now.ToDays + "|" + (mp.IsCurrentlyAtSea ? 1 : 0) + (SaddleLaw.On ? 1 : 0)
+                   + "|" + FootStable.Version;   // E6: stajnia piechoty
         }
 
         /// <summary>E1: rekord par gracza z pamieci. Liczony od nowa najwyzej raz na 1 s i tylko po zmianie klucza, albo co 10 s (sprzet bohaterow,
@@ -580,6 +618,8 @@ namespace Armoury
         private static TextObject TxFootMore { get { return _txFootMore ?? (_txFootMore = new TextObject("{=!}Footmen on horses: armoury pairs")); } }
         private static TextObject TxCav { get { return _txCav ?? (_txCav = new TextObject("{=!}Riders without harness")); } }
         private static TextObject TxHerd { get { return _txHerd ?? (_txHerd = new TextObject("{=!}Herding: horses without riders")); } }
+        private static TextObject _txFootStable;
+        private static TextObject TxFootStable { get { return _txFootStable ?? (_txFootStable = new TextObject("{=!}Footmen on horses: footmen's mounts")); } }   // E6
 
         /// <summary>E2: klucz MarchPairsSpeed (NOWY).</summary>
         internal static bool SpeedOn { get { var s = Settings.Current; return s != null && s.MarchPairsSpeed; } }
@@ -651,6 +691,7 @@ namespace Armoury
                 // E3: waga i udzwig - uprzeze par jadacych, pary pod jencami, prawo wagi (przelaczenie klucza tez liczy wage od nowa)
                 h = h * 397 + (int)(r.RideHarnessKg * 10f); h = h * 397 + r.UnusedCargoHorse; h = h * 397 + r.Prisoners;
                 h = h * 397 + (WeightOn ? 1 : 0) + (SpeedOn ? 2 : 0);
+                h = h * 397 + r.SMounts; h = h * 397 + r.RideStableHorse; h = h * 397 + r.SHarness;   // E6: stajnia piechoty
                 return h;
             }
         }
@@ -727,10 +768,10 @@ namespace Armoury
             c.CavO = c.CavRule ? Math.Min(cavG, r.CavPairs + r.HeroMounted) : cavG;
             int poolM = Math.Max(0, menM - c.CavO);
             c.RideO = Math.Min(r.Ride, poolM);
-            int rideCargo = Math.Min(r.RideCargoHorse, c.RideO);
+            int rideCargo = Math.Min(r.RideCargoHorse + r.RideStableHorse, c.RideO);   // E6: konie ze stajni pod piechota tez nie ida w stadzie
             c.AttRide = Math.Min(footA, mountsA);
             c.Num10O = c.RideO + c.AttRide;
-            c.FreeO = Math.Max(0, r.CMounts - rideCargo);
+            c.FreeO = Math.Max(0, r.CMounts + r.SMounts - rideCargo);
             c.HerdO = herdBase + c.FreeO + (mountsA - c.AttRide);
             c.Wet = HorsePace.WetOf(mp);
             try { var lh = mp.LeaderHero; var pk = DefaultPerks.Riding.NomadicTraditions; if (lh != null && pk != null && lh.GetPerkValue(pk)) c.Nomad = pk.PrimaryBonus; } catch { c.Nomad = 0f; }
@@ -755,7 +796,8 @@ namespace Armoury
                 Interlocked.Increment(ref _applyCalls);
                 if (mp.IsMainParty) _lastCalc = c;
                 if (Math.Abs(c.DCav) > 1e-6f) result.AddFactor(c.DCav, TxCav);
-                if (Math.Abs(c.DFoot) > 1e-6f) result.AddFactor(c.DFoot, c.DFoot < 0f ? TxFootLess : TxFootMore);
+                // E6: konie stajni piechoty sa poza NumberOfMounts gry - wpis dodatni nazwany od stajni, gdy w niej jada ludzie
+                if (Math.Abs(c.DFoot) > 1e-6f) result.AddFactor(c.DFoot, c.DFoot < 0f ? TxFootLess : r.RideStableHorse > 0 ? TxFootStable : TxFootMore);
                 if (Math.Abs(c.DHerd) > 1e-6f) result.AddFactor(c.DHerd, TxHerd);
             }
             catch (Exception e) { Stumble("ApplySpeed", e); }
@@ -1031,6 +1073,9 @@ namespace Armoury
                       .Append(" | pamiec rekordu: liczen od startu sesji ").Append(_mainCount).Append(", ostatnie ").Append(r.Ms.ToString("0.0", Inv)).Append(" ms")
                       .Append(" | ").Append(MarchHud.State());
                     try { sb.Append(" | ").Append(RiddenBy.State(r)); } catch (Exception e) { Stumble("RiddenBy.State", e); }   // E5
+                    sb.Append(" | stajnia piechoty (E6): konie ").Append(r.SMounts).Append(", uprzeze ").Append(r.SHarness).Append(", inne ").Append(r.SOther)
+                      .Append(", pary puli z koniem ze stajni ").Append(r.PoolPairsStable).Append(", jedzie na koniach stajni ").Append(r.RideStableHorse)
+                      .Append(", par stajni niewykorzystanych ").Append(r.UnusedStableHorse);
                     try { SpeedLine(sb, mp, r); } catch (Exception e) { Stumble("SpeedLine", e); }   // E2
                     try { WeightLine(sb, mp, r); } catch (Exception e) { Stumble("WeightLine", e); }   // E3
                     // HorsePace dla porownania (krok 1 i 3 - E2 zastapi wpis "riders without horses")

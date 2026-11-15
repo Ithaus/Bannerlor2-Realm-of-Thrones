@@ -111,6 +111,7 @@ namespace Armoury
             try
             {
                 if (vm == null || vm.PrimaryInfoItems == null || vm.SecondaryInfoItems == null) return;
+                if (_live) FootStable.Pump();   // 537 E6: stajnia piechoty - przenoszenie tylko tu (stan mapy, najwyzej raz na 1 s, tylko przy powodzie)
                 if (_live) StashWeight.Refresh();   // 537 E4: waga zbrojowni (lista na ludziach z pamieci, najwyzej raz na 1 s) - takze bez pozycji paska
                 Items it;
                 if (!On)
@@ -205,6 +206,7 @@ namespace Armoury
                     Row(l, "Footmen on spare horses", r.Ride + "/" + r.PoolMen);
                     if (r.HeroMounted > 0) Row(l, "Heroes on their own horses", r.HeroMounted.ToString());
                 }
+                if (r.SMounts + r.SHarness + r.SOther > 0) Row(l, "Footmen's mounts", r.SMounts + " horses, " + r.SHarness + " harness kept apart from the baggage (town or camp menu)");   // 537 E6
                 int notRidden = Math.Max(0, r.AllHorses - r.Ridden);
                 Row(l, "Horses", r.Ridden + " ridden, " + notRidden + " not ridden (" + r.FreeHerd + " free in the herd)");
                 int unusedH = Math.Max(0, r.AllHarness - r.Ridden);
