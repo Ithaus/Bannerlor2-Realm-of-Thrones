@@ -50,6 +50,10 @@ namespace Armoury
         private static int _pursuitRenewals;
         // lup przedmiotowy - ekran jak po bitwie, otwierany na czystej mapie
         private static ItemRoster _lootRoster;
+        // recenzja 568 (1): lista pokazana na ekranie lupu - trzymana do zamkniecia ekranu (InventoryLogic zmienia ja w miejscu), reszta na polke
+        // najblizszej przyjaznej warowni jak lup z pola (SpoilsRemnantsHome, wzor SiegeSpoils380.LootClosed); _lootOpenMissing - takty bez ekranu na stosie
+        private static ItemRoster _lootOpen;
+        private static int _lootOpenIn, _lootOpenMissing;
         // E8/S (246, rozpoznanie C poz. 11): potkniecia OnTick Z RZEDU przy czekajacym przeszukaniu. Dotad jeden wyjatek gasil _pending
         // (przeszukanie przepadalo); teraz _pending zostaje, kolejna proba najwczesniej po PendingRetrySeconds, najwyzej PendingStrikesMax
         // prob - dopiero wtedy jak dotad (_pending gasnie; kasa zostaje w kryjowce - schodzi dopiero w DoSearch). Udane otwarcie menu zeruje licznik
@@ -66,11 +70,12 @@ namespace Armoury
         /// Zwraca, ile rzeczy zostalo w pamieci (do linii startu "Porzadek stanu (E8/S)").</summary>
         internal static int Reset()
         {
-            int had = (_pending ? 1 : 0) + _reprisalPack.Count + (_lootRoster != null && _lootRoster.Count > 0 ? 1 : 0) + (_searchLeave ? 1 : 0);
+            int had = (_pending ? 1 : 0) + _reprisalPack.Count + (_lootRoster != null && _lootRoster.Count > 0 ? 1 : 0) + (_searchLeave ? 1 : 0) + (_lootOpen != null ? 1 : 0);
             _pending = false; _pendingGold = 0; _pendingBands = 0; _pendingName = ""; _pendingPos = default(CampaignVec2); _pendingHasPos = false; _pendingHideout = null;
             _reprisalPack.Clear();
             _searchLeave = false;
             _lootRoster = null;
+            _lootOpen = null; _lootOpenIn = 0; _lootOpenMissing = 0;
             _pendingStrikes = 0; _pendingRetryAt = DateTime.MinValue;
             return had;
         }
@@ -221,7 +226,9 @@ namespace Armoury
         {
             try
             {
-                _lootRoster = new ItemRoster();
+                // recenzja 568 (2): lista juz z towarem (klucz HideoutGoodsStash przelaczony OFF -> ON miedzy bitwa a przeszukaniem albo
+                // niepokazany lup poprzedniej kryjowki) - dopisujemy do niej, nie nadpisujemy (dotad towar zdjety przy bitwie przepadal)
+                if (_lootRoster == null) _lootRoster = new ItemRoster();
                 var src = sett != null ? sett.ItemRoster : null;
                 if (src == null || src.Count == 0) { Log.Info("HideoutPurge: magazyn kryjowki pusty - lup tylko z band (vanilla)."); return; }
                 for (int i = src.Count - 1; i >= 0; i--)
@@ -233,7 +240,7 @@ namespace Armoury
                 }
                 Log.Info("HideoutPurge: lup przedmiotowy z magazynu kryjowki (" + _lootRoster.Count + " pozycji).");
             }
-            catch (Exception e) { Log.Error("HideoutPurge.BuildLoot", e); _lootRoster = null; }
+            catch (Exception e) { Log.Error("HideoutPurge.BuildLoot", e); if (!HideoutGoods.On) _lootRoster = null; }   // 568 rec.: z kluczem lista zostaje (zdjete juz sztuki nie przepadaja)
         }
 
         private void OnTick(float dt)
@@ -253,13 +260,42 @@ namespace Armoury
                 bool cleanMap = st != null && !st.AtMenu
                     && PlayerEncounter.Current == null && MobileParty.MainParty.MapEvent == null;
 
+                // recenzja 568 (1): ekran lupu kryjowki zamkniety (2 takty mapy bez InventoryState na stosie) - reszta listy na polke warowni
+                if (_lootOpen != null)
+                {
+                    if (LootScreenOnStack()) _lootOpenMissing = 0;
+                    else if (++_lootOpenMissing >= 2) LootClosed();
+                    return;   // nowy ekran lupu / menu przeszukania dopiero po rozliczeniu poprzedniego
+                }
+
                 // ekran lupow jak po bitwie - po przeszukaniu, na czystej mapie
                 if (!_pending && _lootRoster != null && _lootRoster.Count > 0 && cleanMap)
                 {
                     var roster = _lootRoster; _lootRoster = null;
                     var dict = new System.Collections.Generic.Dictionary<PartyBase, ItemRoster>
                     { { PartyBase.MainParty, roster } };
-                    Helpers.InventoryScreenHelper.OpenScreenAsLoot(dict);
+                    if (!HideoutGoods.On) { Helpers.InventoryScreenHelper.OpenScreenAsLoot(dict); return; }   // klucz off - jak dotad
+                    int pcs = Pieces(roster);
+                    try
+                    {
+                        _lootOpen = roster; _lootOpenIn = pcs; _lootOpenMissing = 0;
+                        Helpers.InventoryScreenHelper.OpenScreenAsLoot(dict);
+                        Log.Info("Lup w kryjowkach (568): ekran lupu kryjowki - " + pcs + " szt. na liscie.");
+                    }
+                    catch (Exception e)
+                    {
+                        // recenzja 568 (1): ekran sie nie otworzyl - cala lista do sakw (dotad lista byla juz wyzerowana i lup przepadal)
+                        _lootOpen = null;
+                        HideoutGoods.Stumble("OpenLoot", e);
+                        try
+                        {
+                            var bag = MobileParty.MainParty.ItemRoster;
+                            for (int i = 0; i < roster.Count; i++) { var el = roster.GetElementCopyAtIndex(i); if (el.Amount > 0 && el.EquipmentElement.Item != null) bag.AddToCounts(el.EquipmentElement, el.Amount); }
+                            roster.Clear();
+                            Log.Info("Lup w kryjowkach (568): ekran lupu kryjowki sie nie otworzyl - " + pcs + " szt. do sakw gracza.");
+                        }
+                        catch (Exception e2) { HideoutGoods.Stumble("OpenLoot.bag", e2); }
+                    }
                     return;
                 }
 
@@ -294,6 +330,66 @@ namespace Armoury
                 }
                 _pending = false;
             }
+        }
+
+        private static int Pieces(ItemRoster r)
+        {
+            int n = 0;
+            if (r == null) return 0;
+            for (int i = 0; i < r.Count; i++) { int a = r.GetElementCopyAtIndex(i).Amount; if (a > 0) n += a; }
+            return n;
+        }
+
+        private static bool LootScreenOnStack()
+        {
+            try
+            {
+                var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
+                if (gsm == null) return false;
+                foreach (var g in gsm.GameStates) if (g is TaleWorlds.CampaignSystem.GameState.InventoryState) return true;
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>Recenzja 568 (1): ekran lupu kryjowki zdjety ze stosu - InventoryLogic zmienia liste w miejscu (Done; Cancel = stan z otwarcia).
+        /// To, co gracz zostawil, idzie bez zaplaty na polke najblizszej przyjaznej warowni (HorseFate.AbandonedShelf, klucz SpoilsRemnantsHome) - jak trofea
+        /// z pola (SpoilsSeal.RemnantPostfix) i okno lupu obrony (SiegeSpoils380.LootClosed). Klucz off albo brak warowni - przepada jak w grze.</summary>
+        private static void LootClosed()
+        {
+            var r = _lootOpen;
+            _lootOpen = null; _lootOpenMissing = 0;
+            int left = Pieces(r), moved = 0, kept = 0;
+            string where = "-";
+            try
+            {
+                var s = Settings.Current;
+                if (left > 0 && s != null && s.SpoilsRemnantsHome)
+                {
+                    var st = HorseFate.AbandonedShelf(MobileParty.MainParty);
+                    if (st != null && st.ItemRoster != null)
+                    {
+                        where = st.Name != null ? st.Name.ToString() : st.StringId;
+                        for (int i = r.Count - 1; i >= 0; i--)
+                        {
+                            var el = r.GetElementCopyAtIndex(i);
+                            var it = el.EquipmentElement.Item;
+                            if (el.Amount <= 0 || it == null) continue;
+                            if (it.NotMerchandise || it.IsBannerItem || el.EquipmentElement.IsQuestItem || UniqueSpoils.Is(it)) { kept += el.Amount; continue; }
+                            st.ItemRoster.AddToCounts(el.EquipmentElement, el.Amount);
+                            r.AddToCounts(el.EquipmentElement, -el.Amount);
+                            moved += el.Amount;
+                        }
+                        if (moved > 0) Log.Player("What you left of the hideout plunder - " + moved + " pieces - is carted off to the market of " + where + ".");
+                    }
+                }
+                if (r != null) r.Clear();
+            }
+            catch (Exception e) { HideoutGoods.Stumble("LootClosed", e); }
+            Log.Info("Lup w kryjowkach (568): ekran lupu kryjowki zamkniety - na liscie " + _lootOpenIn + " szt., zostawione " + left
+                     + (moved > 0 ? " -> na polke " + where + " " + moved : "")
+                     + (left - moved > 0 ? ", przepadlo (jak w grze) " + (left - moved) + (kept > 0 ? " (w tym unikaty / nie-towar " + kept + ")" : "") : "") + ".");
+            _lootOpenIn = 0;
         }
 
         /// <summary>E7/C (227): czy pora odnowic rozkaz pogoni. Zegar gry - co HideoutPursuitHours h gry
