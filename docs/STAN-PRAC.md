@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 246 (539 napis godzin kuzni = godziny paska), bez autotestu
+
+- Armoury.dll 298d52b6 = noc/scal-perki 34ff302c (245 + 539). Kopie: .bak-2026-11-15-przed-wgranie246, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie246 i -przed).
+- Sesja 05:07 (245): 538 dziala - pula piechoty 74, jedzie 73, za niska Jazda 1; stajnia dziala TAK; 0 potkniec, te same 23 cudze bledy. Drogi nadal ok. 24% na drodze (cel 60%). Do sprawdzenia 539: linia 'Robota w kuzni (m96)' - 'ustawien napisu' > 0, 'wywolan GetSpentHours' 0; napis = pasek.
+
 ## STAN 15.11 - WGRANIE 245 (538 piechur na koniu w marszu bez wymogu Jazdy do 20), bez autotestu
 
 - Armoury.dll f9b0ccf2 = noc/scal-perki f2fad9ff (244 + 538). Kopie: .bak-2026-11-15-przed-wgranie245, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie245 i -przed). Klucz NOWY FootmenRidingWaiver = 20 (nie ma go w Armoury.json Jeffa).
