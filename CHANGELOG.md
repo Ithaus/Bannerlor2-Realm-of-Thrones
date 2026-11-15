@@ -27,6 +27,25 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 576
+
+Trzy niezalezne recenzje: wykrycie "ekranu nie bedzie" pewne (Spoils `OnMapEventEnded` - `!IsFieldBattle` -> return, ekran gry pusty przez `AfterCollectLoot`), bez dubla z ekranem, ksiega gracza / ReconcileStock i zapis w porzadku. Zgloszenia sprawdzone w kodzie:
+
+**Poprawione:**
+- Towar i zywnosc na polce zbrojowni (recenzja 2.1): przy Spoils `AfterCollectLoot` wklada do kolejki cale `RosterToReceiveLootItems` gry, a `MapEvent.LootDefeatedPartyItems` (dek MapEvent.cs:1602) bierze z bagazy pokonanych wszystko poza NotMerchandise - zboze, towar, zwierzeta. Wszystko poza koniem i uprzeza szlo do zbrojowni DTE i na liste gracza (zywnosc nie karmila druzyny). Teraz `IsArmouryPiece`: do zbrojowni tylko zbroja/bron (tarcze, pociski), bez konia, uprzezy i sztandaru; reszta do sakw jak dotad. Komunikat: " Horses, harness and goods (M) go to your baggage."; w linii logu "inne ... - powinno byc 0" (kontrola).
+- Okno lupu 117/326d bez dzialki w zbrojowni (recenzje 1, 2.2): ramki SpoilsReport licza tylko sakwy, a przelew od reki biegnie w ramce A (MapEventEnded w DoEnd) - okno pokazaloby 0 szt. przy komunikacie o 67. Nowe `SpoilsReport.NoteArmouryShare(e, n)` (wolane z `DepositShare` po wlozeniu na polke): otwarta ramka liczaca (A albo F po terminie) - lista `Snap.Arm`, `Apply` dolicza ja do `r.Gear` raportu (linia ramki "+ do zbrojowni gracza (576) N szt. za W"); bez ramki - prosto do niepokazanego raportu bitwy; bez raportu - licznik w `Counters`. CloseF liczy te sztuki w linii F i w "zbrojownia gracza bez raportu". Linia zamkniecia raportu: "(z tego do zbrojowni gracza N szt. za W)".
+- Druga loteria stanu i "off = jak dotad" (recenzja 3): (a) nowa galaz w `OnMapEventEnded` dziala tylko przy wlaczonym `LootShareToArmouryNoScreen` - wylaczony klucz zostawia stary termin 1 h (sakwy po WearTheLoot, dokladnie jak przed 576); (b) przelew od reki (kryjowka, nowa galaz) idzie z `beforeWear = true`: sztuka wysypana do sakw, ktorej `PickWornModifier` zostawil stan sprawny, trafia do `_soundFlushed` (`NoteSoundBag`), wiec WearTheLoot tej bitwy nie losuje jej drugi raz - takze konie/uprzaz z `FlushMountsToBaggageCore` i powrot do sakw bez zbrojowni DTE / przy otwartym ekranie zbrojowni. Przelewy po terminie (godzina, 380 po 24 h, Send troops) bez tej flagi - wpis przetrwalby do nastepnej bitwy i oslonilby jej lup. Uwaga: kryjowka przy wylaczonym kluczu tez przestaje losowac drugi raz (byl to blad sprzed 576, ta sama droga).
+- Wyjatek w petli `DepositShare` (recenzja 2, drobna): kazda pozycja osobno w try - polka nie przyjela -> sztuki do sakw (licznik "polka nie przyjela" w logu); wywrotka ksiegi (`StockDepositKey`) nie gubi sztuki z polki.
+- Komentarz przy kryjowce w `ArmouryBehavior` ("prosto do sakw") poprawiony (recenzja 1, uwaga).
+
+**Odrzucone / bez zmiany:**
+- Kolumna "Sakwy" w LootTally liczy tez zbrojownie (recenzja 2.2 b, watpliwosc 2) - pomiar dzienny, nie wplywa na gre; osobna kolumna to zmiana ksztaltu tablic LootTally (BCols) - znany rozjazd: "do sakw" w linii dnia = "poza ekranem do gracza" (sakwy albo zbrojownia). Rozbicie jest w linii "BattlefieldLaw (576)".
+- Rabunek bez okna godzinnego (recenzja 1.3) - MapEvent konczy sie z koncem rabunku, wtedy nowa galaz przelewa od reki; bylo tak przed 576.
+
+**Nierozstrzygniete:** (1) 573 (kapitulanci do zbrojowni) ma ten sam brak w oknie lupu - nie ruszone (jedna zmiana naraz); `NoteArmouryShare` gotowe do uzycia. (2) Okno lupu pokazuje dzialke w zbrojowni razem ze sprzetem z sakw, bez osobnego napisu "to your armoury" (UI okna bez zmian). (3) Konie i uprzaz przy 576 do sakw (573 przy CaptiveSpoilsIncludeMounts do zbrojowni) - zostawione, decyzja Jeffa.
+
+Build Armoury 0 bledow (Release). NIE wgrane.
+
 ## 577: nocny postoj przy rabunku - o zmierzchu kolumna gracza przestaje rabowac i spi przy wsi (sen jak w obozie), o swicie rabunek idzie dalej sam - Armoury (nowy NightRest.RaidHalt.cs; NightRest.cs, NightMarch.cs, DistrictRaid.cs, Devastation.cs, SmallGold.cs; nowy klucz RaidNightHalt w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 16.11 (zrzut "You are raiding High Rock", pasek ok. 30%, komunikat "Second night without sleep - the column staggers (speed -40%, morale -40%)..."): "czemu jak pale wioske to mam no sleep, to jest bez sensu co mam przerwac??". Log Armoury-2026-11-15_23-13-58.log linia 26959: "NocnyMarsz: gracz o swicie - odpoczynek doby 0.0 h ... dlug przed 1, po 2 ... godziny rabunku bez odpoczynku (Raid Counts As Work) 24". Rabunek osada po osadzie (E7/R1) trwa kilka dob, jedyny sposob na sen = End Raiding. Jeff wybral "pierwszy wariant" (noc postoj, dzien rabunek).

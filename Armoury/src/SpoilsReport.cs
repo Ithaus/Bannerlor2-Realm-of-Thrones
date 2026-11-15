@@ -112,6 +112,7 @@ namespace Armoury
             public double ReadyDay;
             public long ReadyTicks;
             public int Given;                     // sztuki oddane z sakw w ramkach (ujemna roznica) - tylko log
+            public int ArmN; public long ArmW;    // recenzja 576: z Gear - dzialka gracza wlozona do zbrojowni DTE (bitwa bez ekranu lupow) - tylko log
             public int SN, SpN; public long SW, SpW;   // ekran trofeow: nasze sztuki i wartosc, Spoils _takenCount/_takenValue
             public readonly StringBuilder Lines = new StringBuilder();   // segmenty linii logu ramek
             public TInfo T;                       // noc P11: turniej (szranki, mistrz, nagroda, oddany rynsztunek) - tylko KTourney
@@ -190,6 +191,7 @@ namespace Armoury
             public long CrownMen0;                // 326d: Ransom178.PendingMenClaim gracza przy otwarciu ramki
             public long CrownEarly;               // ramka A: korona z czesci lupu z kies zapisana juz w MapEvent.OnBattleWon (BeatenPurse.SplitPostfix) - Crown0 o nia nizej
             public long CrownSaid;                // korona wedlug CitySack (NoteSack) - tylko kontrola w linii logu
+            public readonly List<Gain> Arm = new List<Gain>();   // recenzja 576: dzialka gracza wlozona w tej ramce do zbrojowni DTE (BattlefieldLaw.DepositShare) - ramka widzi tylko sakwy
             // kontekst ramki A
             public MapEvent Me;
             public bool Won, Siege, SiegeApplied, Attacker;
@@ -380,6 +382,32 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteCoin", e); }
         }
 
+        /// <summary>
+        /// Recenzja 576: dzialka gracza wlozona do zbrojowni DTE na jego liste (bitwa bez ekranu lupow) - ramki licza tylko sakwy, wiec sztuki zglaszamy osobno.
+        /// Otwarta ramka liczaca (A - przelew od reki w MapEventEnded, F - przelew po terminie) - do ramki, Apply doliczy je do sprzetu raportu; bez ramki -
+        /// prosto do niepokazanego raportu bitwy; bez raportu - tylko log. Nigdy nie rzuca.
+        /// </summary>
+        internal static void NoteArmouryShare(EquipmentElement e, int n)
+        {
+            try
+            {
+                if (n <= 0 || e.Item == null) return;
+                var f = _frame;
+                if (f != null) { f.Arm.Add(new Gain { E = e, N = n }); return; }
+                var r = Target(KBattle, false);
+                if (r == null) { _armNoRep += n; return; }
+                string k = KeyOf(e);
+                if (k == null) return;
+                Gain had;
+                if (r.Gear.TryGetValue(k, out had)) had.N += n;
+                else r.Gear[k] = new Gain { E = e, N = n };
+                r.ArmN += n; r.ArmW += (long)Math.Max(0, e.ItemValue) * n;
+            }
+            catch (Exception ex) { Stumble("NoteArmouryShare", ex); }
+        }
+
+        private static int _armNoRep;   // recenzja 576: sztuki do zbrojowni bez ramki i bez raportu (okno juz pokazane) - tylko linia logu Counters
+
         /// <summary>Wplyw roznicy ramki na raport: zloto z etykietami + reszta, sakiewki ludzi, sprzet, jency, slawa. Zwraca opis do linii logu.</summary>
         private static string Apply(Rep r, Delta d, string restLabel)
         {
@@ -404,6 +432,17 @@ namespace Armoury
                 else r.Gear[k] = new Gain { E = g.E, N = g.N };
                 n += g.N; w += (long)Math.Max(0, g.E.ItemValue) * g.N;
             }
+            int an = 0; long aw = 0;
+            foreach (var g in f.Arm)
+            {
+                string k = KeyOf(g.E);
+                if (k == null || g.N <= 0) continue;
+                Gain had;
+                if (r.Gear.TryGetValue(k, out had)) had.N += g.N;
+                else r.Gear[k] = new Gain { E = g.E, N = g.N };
+                an += g.N; aw += (long)Math.Max(0, g.E.ItemValue) * g.N;
+            }
+            r.ArmN += an; r.ArmW += aw;
             r.Given += d.Given;
             int t = 0;
             foreach (var kv in d.Troops) { int c; r.Troops.TryGetValue(kv.Key, out c); r.Troops[kv.Key] = c + kv.Value; t += kv.Value; }
@@ -416,6 +455,7 @@ namespace Armoury
             sb.Append(d.TimeMoved ? "reszta pominieta (czas plynal)" : "reszta " + Sg(rest));
             sb.Append(", czas stal ").Append(d.TimeMoved ? "NIE" : "TAK");
             sb.Append(", sakiewka ludzi ").Append(Sg(d.Men)).Append(", sztuk ").Append(n).Append(" za ").Append(w.ToString(Inv));
+            if (an > 0) sb.Append(" + do zbrojowni gracza (576) ").Append(an).Append(" szt. za ").Append(aw.ToString(Inv));
             if (d.Given > 0) sb.Append(" (oddane z sakw ").Append(d.Given).Append(')');
             sb.Append(", jency ").Append(t).Append(" (lordow ").Append(d.Lords.Count);
             if (d.Lords.Count > 0) { sb.Append(": "); for (int i = 0; i < d.Lords.Count; i++) { if (i > 0) sb.Append(", "); sb.Append(Nm(d.Lords[i])); } }
@@ -856,11 +896,15 @@ namespace Armoury
                 var r = Target(KBattle, false);
                 int n = 0; long w = 0;
                 foreach (var g in d.Gains) { n += g.N; w += (long)Math.Max(0, g.E.ItemValue) * g.N; }
+                int an = 0; long aw = 0;   // recenzja 576: dzialka do zbrojowni gracza w tej ramce
+                foreach (var g in t.S.Arm) { an += g.N; aw += (long)Math.Max(0, g.E.ItemValue) * g.N; }
                 if (r == null)
                 {
                     if (n > 0) Log.Info(Tag + "sakwy bez raportu (" + why + "): " + n + " szt. za " + w.ToString(Inv) + " - okno juz pokazane albo bitwa bez okna; sztuki sa w sakwach.");
+                    if (an > 0) Log.Info(Tag + "zbrojownia gracza bez raportu (" + why + "): " + an + " szt. za " + aw.ToString(Inv) + " - okno juz pokazane albo bitwa bez okna; sztuki sa na liscie gracza.");
                     return;
                 }
+                n += an; w += aw;
                 string a = Apply(r, d, LOther);
                 r.Lines.Append(" | F sakwy (").Append(why).Append("): ").Append(n).Append(" szt. za ").Append(w.ToString(Inv)).Append("; ").Append(a);
                 if (r.WaitFor == "sakwy") { r.WaitFor = ""; r.ShareWaitDone = true; r.Lines.Append(" | sakwy przyszly (koniec czekania)"); }   // recenzja P5 (1)
@@ -1117,7 +1161,7 @@ namespace Armoury
                 sb.Append(Tag).Append(KindName(r.Kind)).Append(' ').Append(r.Id).Append(" (bitew ").Append(r.Battles).Append(") ").Append(Nm(r.Town) != "-" ? Nm(r.Town) : r.Place)
                   .Append(r.Lines.ToString())
                   .Append(" | razem: zloto ").Append(r.CoinTotal.ToString(Inv)).Append(", sakiewki ludzi ").Append(r.Men.ToString(Inv)).Append(", sprzet ").Append(r.GearCount)
-                  .Append(" szt. za ").Append(r.GearWorth.ToString(Inv)).Append(", jency ").Append(r.TroopCount).Append(" + lordow ").Append(r.Lords.Count)
+                  .Append(" szt. za ").Append(r.GearWorth.ToString(Inv)).Append(r.ArmN > 0 ? " (z tego do zbrojowni gracza " + r.ArmN + " szt. za " + r.ArmW.ToString(Inv) + ")" : "").Append(", jency ").Append(r.TroopCount).Append(" + lordow ").Append(r.Lords.Count)
                   .Append(" okup ~").Append(r.RansomWorth.ToString(Inv)).Append(", korona ").Append(r.Crown.ToString(Inv))
                   .Append(r.TimeMoved ? ", czas plynal TAK" : "")
                   .Append(" | ").Append(outcome).Append(why != null ? " (" + why + ")" : "")
@@ -1146,6 +1190,7 @@ namespace Armoury
                 sb.Append(')');
             }
             sb.Append(", bez okna (przegrana) ").Append(_sLost).Append(", zapas ").Append(_sFallback).Append(", potkniecia ").Append(_stumbles + SpoilsWindow.Stumbles);
+            if (_armNoRep > 0) sb.Append(", do zbrojowni bez raportu (576) ").Append(_armNoRep).Append(" szt.");
             return sb.ToString();
         }
 

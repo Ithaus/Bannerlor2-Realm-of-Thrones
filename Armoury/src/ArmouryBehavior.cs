@@ -3813,20 +3813,24 @@ namespace Armoury
                 BanditCheer.AfterVictory(mapEvent);
 
                 // KRYJOWKA: zaden ekran lupow nie przyjdzie - dzialka gracza
-                // z kolejki BattlefieldLaw idzie prosto do sakw, a jency
+                // z kolejki BattlefieldLaw idzie od reki do zbrojowni gracza (576, klucz
+                // LootShareToArmouryNoScreen; wylaczony - do sakw jak dotad), a jency
                 // (bandyci poddani po walce) sa obszukiwani od reki
                 if (mapEvent.IsHideoutBattle)
                 {
-                    // 576: kryjowka jak kazda bitwa bez ekranu - do zbrojowni gracza na jego liste (klucz LootShareToArmouryNoScreen), inaczej sakwy
-                    BattlefieldLaw.FlushShareOffScreen("kryjowka zdobyta");
+                    // 576: kryjowka jak kazda bitwa bez ekranu - do zbrojowni gracza na jego liste (klucz LootShareToArmouryNoScreen), inaczej sakwy;
+                    // beforeWear - przelew przed WearTheLoot tej bitwy (recenzja 576: bez drugiej loterii stanu w sakwach)
+                    BattlefieldLaw.FlushShareOffScreen("kryjowka zdobyta", true);
                     try { _prisonerBaseline = SnapshotPrisoners(); } catch { }   // jency z walki - bez drugiego obszukania (W3)
                     _lootFlushDue = CampaignTime.Zero;
                 }
-                else if (BattlefieldLaw.SharePending() && BattlefieldLaw.NoLootScreen(mapEvent))
+                else if (Settings.Current.LootShareToArmouryNoScreen && BattlefieldLaw.SharePending() && BattlefieldLaw.NoLootScreen(mapEvent))
                 {
                     // 576 (Jeff 16.11): bitwa na ladzie, ktora nie jest polowa (wymuszenie zaopatrzenia, rabunek, szturm, wypad...) - Spoils jej nie obsluguje,
-                    // ekranu nie bedzie: dzialka od razu do zbrojowni gracza, a nie po godzinie do sakw (kolejka bez zapisu - zapis w tej godzinie ja gubil)
-                    BattlefieldLaw.FlushShareOffScreen("ekran lupow nie przyjdzie - bitwa " + mapEvent.EventType);
+                    // ekranu nie bedzie: dzialka od razu do zbrojowni gracza, a nie po godzinie do sakw (kolejka bez zapisu - zapis w tej godzinie ja gubil).
+                    // Recenzja 576 (3): tylko przy wlaczonym kluczu - wylaczony zostaje stary termin godzinny ponizej (sakwy jak dotad, po WearTheLoot);
+                    // powrot do sakw bez zbrojowni DTE / przy otwartym ekranie zbrojowni - od reki, ale beforeWear chroni przed druga loteria stanu
+                    BattlefieldLaw.FlushShareOffScreen("ekran lupow nie przyjdzie - bitwa " + mapEvent.EventType, true);
                     _lootFlushDue = BattlefieldLaw.SharePending() ? CampaignTime.HoursFromNow(1f) : CampaignTime.Zero;
                 }
                 else if (BattlefieldLaw.SharePending())

@@ -64,6 +64,16 @@ namespace Armoury
         // m110-stan (LootStateFromWounds): sprawne sztuki lupu z obrazen wysypane do sakw (FlushShareToBaggage, FlushMountsToBaggage) - WearTheLoot nie daje im
         // loterii stanu (kryjowka: sakwy przed WearTheLoot); czyszczone przy odczycie i na poczatku rozliczenia nastepnej bitwy
         private static readonly Dictionary<ItemObject, int> _soundFlushed = new Dictionary<ItemObject, int>();
+        // recenzja 576 (3): przelew PRZED WearTheLoot tej samej bitwy (kryjowka, bitwa bez ekranu - od reki w OnMapEventEnded) - sztuka wysypana do sakw,
+        // ktorej loteria (PickWornModifier) zostawila stan sprawny, tez trafia do _soundFlushed, zeby WearTheLoot nie losowal jej drugi raz.
+        // Poza tym oknem (przelew godzine pozniej, po WearTheLoot) - nie, bo wpis przetrwalby do nastepnej bitwy i oslonilby jej lup.
+        private static bool _beforeWear;
+
+        private static void NoteSoundBag(ItemObject it)
+        {
+            if (!_beforeWear || it == null) return;
+            int f; _soundFlushed.TryGetValue(it, out f); _soundFlushed[it] = f + 1;
+        }
 
         /// <summary>m110-stan: sprawne sztuki B wysypane do sakw od ostatniego odczytu (przedmiot -> ile) - zwraca kopie i czysci; null - brak.</summary>
         internal static Dictionary<ItemObject, int> TakeSoundFlushed()
@@ -817,7 +827,7 @@ namespace Armoury
                     for (int n = 0; n < el.Amount; n++)
                     {
                         var mod = el.EquipmentElement.ItemModifier;
-                        if (mod == null && !TakeBSound(it)) mod = ArmouryBehavior.PickWornModifier(it);   // m110-stan: sprawna sztuka B zostaje sprawna
+                        if (mod == null && !TakeBSound(it)) { mod = ArmouryBehavior.PickWornModifier(it); if (mod == null) NoteSoundBag(it); }   // m110-stan: sprawna sztuka B zostaje sprawna; recenzja 576 (3)
                         bag.AddToCounts(new EquipmentElement(it, mod), 1);
                     }
                     MountHold.AddToCounts(el.EquipmentElement, -el.Amount);
@@ -1711,12 +1721,13 @@ namespace Armoury
         /// bojowy, wraki jada jak wraki. Wolana od razu po kryjowce i godzine
         /// po kazdej bitwie, ktorej ekran sie nie upomnial.
         /// </summary>
-        internal static int FlushShareToBaggage(string why)
+        internal static int FlushShareToBaggage(string why, bool beforeWear = false)
         {
             // noc 25.10 P5: ramka F okna lupu wokol calego przelewu (tylko odczyt sakw przed i po; w ramce bitwy/Spoils nic nie liczy - liczy ramka zewnetrzna)
             var spoilsF = SpoilsReport.OpenF();
+            _beforeWear = beforeWear;   // recenzja 576 (3)
             try { return FlushShareToBaggageCore(why, null, null); }
-            finally { SpoilsReport.CloseF(spoilsF, why); }
+            finally { _beforeWear = false; SpoilsReport.CloseF(spoilsF, why); }
         }
 
         /// <summary>
@@ -1743,16 +1754,18 @@ namespace Armoury
         /// GRACZA (jak 573: zbrojownia + StockDepositKey), ze stanem bojowym jak w sakwach; konie i uprzaz do sakw (tabor - jak po ekranie Spoils).
         /// Klucz LootShareToArmouryNoScreen wylaczony, brak zbrojowni DTE albo otwarty ekran zbrojowni (depozyt kwatermistrza) - sakwy jak dotad.
         /// </summary>
-        internal static int FlushShareOffScreen(string why)
+        /// beforeWear (recenzja 576): przelew od reki w OnMapEventEnded, PRZED WearTheLoot tej bitwy (kryjowka, bitwa bez ekranu).
+        internal static int FlushShareOffScreen(string why, bool beforeWear = false)
         {
             var s = Settings.Current;
-            if (s == null || !s.LootShareToArmouryNoScreen) return FlushShareToBaggage(why);
+            if (s == null || !s.LootShareToArmouryNoScreen) return FlushShareToBaggage(why, beforeWear);
             var arm = HorseFate.PlayerArmory();
             if (arm == null || ArmouryBehavior.Instance == null || QuartermasterEscrow.Active)
-                return FlushShareToBaggage(why + " (576: " + (arm == null ? "brak zbrojowni DTE" : ArmouryBehavior.Instance == null ? "brak zachowania Armoury" : "ekran zbrojowni otwarty") + " - sakwy)");
+                return FlushShareToBaggage(why + " (576: " + (arm == null ? "brak zbrojowni DTE" : ArmouryBehavior.Instance == null ? "brak zachowania Armoury" : "ekran zbrojowni otwarty") + " - sakwy)", beforeWear);
             var spoilsF = SpoilsReport.OpenF();
+            _beforeWear = beforeWear;
             try { return FlushShareToBaggageCore(why, null, arm); }
-            finally { SpoilsReport.CloseF(spoilsF, why); }
+            finally { _beforeWear = false; SpoilsReport.CloseF(spoilsF, why); }
         }
 
         /// <summary>380: kolejka lupu do podanego rostera (ekran lupu po odpartym szturmie, SiegeSpoils380) - ta sama droga co sakwy (stan bojowy, wraki jak wraki,
@@ -1780,7 +1793,9 @@ namespace Armoury
                     var el = ShareQueue.GetElementCopyAtIndex(i);
                     var item = el.EquipmentElement.Item;
                     if (item == null) continue;
-                    bool armPiece = toArm != null && !IsMountPiece(item);   // 576: kon i uprzaz - tabor (sakwy), reszta do zbrojowni
+                    // 576: do zbrojowni tylko sprzet wojska (zbroja, bron, tarcza, pociski); kon, uprzaz, sztandar, zywnosc i towar z bagazy pokonanych
+                    // (LootDefeatedPartyItems bierze wszystko poza NotMerchandise) - do sakw jak dotad (recenzja 576 (2): zboze na polce zbrojowni nie karmi druzyny)
+                    bool armPiece = toArm != null && IsArmouryPiece(item);
                     for (int n = 0; n < el.Amount; n++)
                     {
                         var mod = el.EquipmentElement.ItemModifier;
@@ -1791,7 +1806,11 @@ namespace Armoury
                             if (mod != null) wMod++;
                             else if (!armPiece) { int f; _soundFlushed.TryGetValue(item, out f); _soundFlushed[item] = f + 1; }
                         }
-                        else if (mod == null && !TakeBSound(item, !armPiece)) mod = ArmouryBehavior.PickWornModifier(item);   // m110-stan: sprawna sztuka B zostaje sprawna
+                        else if (mod == null && !TakeBSound(item, !armPiece))
+                        {
+                            mod = ArmouryBehavior.PickWornModifier(item);   // m110-stan: sprawna sztuka B zostaje sprawna
+                            if (mod == null && !armPiece) NoteSoundBag(item);   // recenzja 576 (3): loteria juz byla - WearTheLoot bez drugiej
+                        }
                         if (armPiece) { toArm.AddToCounts(new EquipmentElement(item, mod), 1); armMoved++; }
                         else { bag.AddToCounts(new EquipmentElement(item, mod), 1); bagMoved++; }
                         moved++;
@@ -1803,7 +1822,7 @@ namespace Armoury
                 if (MountHold.Count > 0) { int mh = FlushMountsToBaggage(why); moved += mh; bagMoved += mh; }   // m109-lup: siatka bezpieczenstwa (MountHold zyje tylko w wywolaniu Spoils)
                 if (toArm != null)
                 {
-                    if (moved > 0) DepositShare(toArm, armory, armMoved, bagMoved, why);
+                    if (moved > 0) DepositShare(toArm, armory, bag, armMoved, bagMoved, why);
                 }
                 else if (moved > 0 && target != null) Log.Info("BattlefieldLaw: kolejka lupow na ekran lupu (" + moved + " szt.) - " + why + ".");
                 else if (moved > 0)
@@ -1826,39 +1845,60 @@ namespace Armoury
             return it != null && (it.IsMountable || it.ItemType == ItemObject.ItemTypeEnum.Horse || it.ItemType == ItemObject.ItemTypeEnum.HorseHarness);
         }
 
+        /// <summary>576 (recenzja): sztuka na polke zbrojowni - zbroja albo bron (z tarcza i pociskami), nie kon, nie uprzaz, nie sztandar; reszta (zywnosc, towar,
+        /// zwierzeta z bagazy pokonanych) do sakw.</summary>
+        private static bool IsArmouryPiece(ItemObject it)
+        {
+            return it != null && !IsMountPiece(it) && !it.IsBannerItem && (it.HasArmorComponent || it.HasWeaponComponent);
+        }
+
         /// <summary>576: dzialka zebrana w toArm (stan juz nadany) do zbrojowni DTE gracza i na liste gracza (StockDepositKey - ten sam klucz egzemplarza
         /// co na polce, wiec ReconcileStock nie tnie jej jako ducha); log z podzialem na rodzaje, komunikat po angielsku.</summary>
-        private static void DepositShare(ItemRoster toArm, ItemRoster armory, int armMoved, int bagMoved, string why)
+        private static void DepositShare(ItemRoster toArm, ItemRoster armory, ItemRoster bag, int armMoved, int bagMoved, string why)
         {
-            int zbroje = 0, bron = 0, tarcze = 0, pociski = 0, wraki = 0, inne = 0;
-            try
+            int zbroje = 0, bron = 0, tarcze = 0, pociski = 0, wraki = 0, inne = 0, wrot = 0;
+            long worth = 0;
+            ItemModifier wreck = null;
+            try { wreck = WreckModifier(); } catch { }
+            for (int i = 0; i < toArm.Count; i++)
             {
-                var wreck = WreckModifier();
-                for (int i = 0; i < toArm.Count; i++)
+                EquipmentElement e; int n;
+                try
                 {
                     var el = toArm.GetElementCopyAtIndex(i);
-                    var it = el.EquipmentElement.Item;
-                    if (it == null || el.Amount <= 0) continue;
-                    armory.AddToCounts(el.EquipmentElement, el.Amount);
-                    ArmouryBehavior.StockDepositKey(el.EquipmentElement, el.Amount);
-                    if (wreck != null && el.EquipmentElement.ItemModifier == wreck) wraki += el.Amount;
-                    else if (it.ItemType == ItemObject.ItemTypeEnum.Shield) tarcze += el.Amount;
-                    else if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts
-                             || it.ItemType == ItemObject.ItemTypeEnum.Bullets) pociski += el.Amount;
-                    else if (it.HasArmorComponent) zbroje += el.Amount;
-                    else if (it.HasWeaponComponent) bron += el.Amount;
-                    else inne += el.Amount;
+                    e = el.EquipmentElement; n = el.Amount;
                 }
-                ArmouryBehavior.StockVersion++;
+                catch (Exception ex) { Log.Error("DepositShare (576) odczyt", ex); continue; }
+                var it = e.Item;
+                if (it == null || n <= 0) continue;
+                // recenzja 576: kazda pozycja osobno - wywrotka jednej nie gubi reszty (kolejka juz wyczyszczona); polka nie przyjela - sztuki do sakw
+                try { armory.AddToCounts(e, n); }
+                catch (Exception ex)
+                {
+                    Log.Error("DepositShare (576) polka", ex);
+                    try { if (bag != null) { bag.AddToCounts(e, n); armMoved -= n; bagMoved += n; wrot += n; } } catch { }
+                    continue;
+                }
+                try { ArmouryBehavior.StockDepositKey(e, n); } catch (Exception ex) { Log.Error("DepositShare (576) ksiega", ex); }
+                SpoilsReport.NoteArmouryShare(e, n);   // recenzja 576 (1): okno lupu bitwy liczy tez dzialke w zbrojowni (metoda nie rzuca)
+                worth += (long)Math.Max(0, e.ItemValue) * n;
+                if (wreck != null && e.ItemModifier == wreck) wraki += n;
+                else if (it.ItemType == ItemObject.ItemTypeEnum.Shield) tarcze += n;
+                else if (it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts
+                         || it.ItemType == ItemObject.ItemTypeEnum.Bullets) pociski += n;
+                else if (it.HasArmorComponent) zbroje += n;
+                else if (it.HasWeaponComponent) bron += n;
+                else inne += n;
             }
-            catch (Exception e) { Log.Error("DepositShare (576)", e); }
-            Log.Info("BattlefieldLaw (576): dzialka gracza bez ekranu lupow - " + why + ": do zbrojowni DTE na liste gracza " + armMoved + " szt. (zbroje " + zbroje
-                     + ", bron " + bron + ", tarcze " + tarcze + ", pociski " + pociski + ", wraki " + wraki + ", inne " + inne + "), konie i uprzaz do sakw " + bagMoved + " szt.");
+            ArmouryBehavior.StockVersion++;
+            Log.Info("BattlefieldLaw (576): dzialka gracza bez ekranu lupow - " + why + ": do zbrojowni DTE na liste gracza " + armMoved + " szt. za " + worth
+                     + " (zbroje " + zbroje + ", bron " + bron + ", tarcze " + tarcze + ", pociski " + pociski + ", wraki " + wraki + ", inne " + inne
+                     + " - powinno byc 0), konie, uprzaz, sztandary i towary do sakw " + bagMoved + " szt." + (wrot > 0 ? " (z tego " + wrot + " - polka nie przyjela)" : ""));
             if (armMoved > 0)
                 Log.Player("Your share of the spoils (" + armMoved + " pcs) went to your list in the troops' armoury - there was no loot screen after this fight."
-                           + (bagMoved > 0 ? " Horses and harness (" + bagMoved + ") go to your baggage." : ""), true);
+                           + (bagMoved > 0 ? " Horses, harness and goods (" + bagMoved + ") go to your baggage." : ""), true);
             else if (bagMoved > 0)
-                Log.Player("The spoils are packed into your baggage: " + bagMoved + " horses and harness.", true);
+                Log.Player("The spoils are packed into your baggage: " + bagMoved + " pieces (horses, harness and goods).", true);
         }
 
         private static int AppendWrecks(ItemRoster roster)
