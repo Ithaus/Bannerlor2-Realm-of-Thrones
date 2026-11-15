@@ -386,7 +386,7 @@ namespace Armoury
                         + " | dzis: start " + _d471Start + ", koniec " + _d471End + ", poza regula " + _d471Out
                         + " | 471b: kapitulacje " + _d471Yield + " (z glodu " + _d471Starve + "), odejscia po limicie " + _d471Lift + ", wstrzymane " + _d471Refused + ", oblezen trzymanych bramka (raz na dobe) " + _d471Gate
                         + " | 542 " + (OnlyStarve542 ? "TAK (bez kapitulacji z terminu; odejscia zamiast kapitulacji po limicie " + _d542Lift + ", czekaja po limicie na glod " + _d542Wait + ")" : "NIE (kapitulacja z terminu jak dotad)")
-                        + " | 545: szturmow przed dawna bramka " + _d545Gate + " (klucz " + (NoMinDays545 ? "TAK" : "NIE") + "), trzyman obozu ponad 240 h " + SiegeWalls2.HoldOver545 + " h (oblezen " + SiegeWalls2.HoldOver545Sieges
+                        + " | 545: szturmow przed dawna bramka " + _d545Gate + " (klucz " + (NoMinDays545 ? "TAK" : "NIE") + "), trzyman obozu ponad " + SiegeWalls2.FreshHoursLog545 + " h " + SiegeWalls2.HoldOver545 + " druzyno-h (oblezen " + SiegeWalls2.HoldOver545Sieges
                         + ", klucz " + (SiegeWalls2.HoldToEnd545Key ? "TAK" : "NIE") + ")"
                         + " | wiek/R: " + (sbList.Length == 0 ? "-" : sbList.ToString()) + ".");
             }

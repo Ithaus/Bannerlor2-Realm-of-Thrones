@@ -36,6 +36,7 @@ namespace Armoury
         internal static int HoldOver545;                                                     // 545: godziny trzymania ponad dawny prog (doba, zeruje Time471Daily)
         private static readonly HashSet<SiegeEvent> _over545 = new HashSet<SiegeEvent>();    // 545: oblezenia trzymane dzis ponad dawny prog
         internal static int HoldOver545Sieges { get { return _over545.Count; } }
+        internal static int FreshHoursLog545 { get { return (int)FreshHours; } }   // recenzja 545 (3): prog do linii doby (240 h albo 48 h)
         internal static void ZeroHold545() { HoldOver545 = 0; _over545.Clear(); }
         private static bool HoldsToEnd545(SiegeEvent ev)
         {

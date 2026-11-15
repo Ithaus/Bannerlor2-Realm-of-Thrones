@@ -21,6 +21,15 @@
 
 **Status:** DO SPRAWDZENIA (nie wgrane; galaz noc/545-oblegaj na noc/542-oblezenia).
 
+### Recenzja 545
+
+Recenzja (e57a786e): uwag blokujacych brak; klucze NIE = stare zachowanie, przerwa po odparciu / 307c / OB1 dalej wstrzymuja, glod (b), limit (e)/542, wyjscia obozu i 334e bez zmian - potwierdzone w kodzie. Trzy uwagi drobne:
+- (1) slaby oboz (np. 300 na 400 zalogi, bez odsieczy) trzymany przez HoldFresh do limitu 471b/542 albo do glodu obozu (FoodDays < 1.5) zamiast 240 h - SPRAWDZONE (FreshCandidate :82 + HoldFresh nie patrzy na sile), BEZ ZMIANY: to dokladnie lista wyjsc Jeffa ("odchodzi tylko z braku jedzenia, przed silniejsza odsiecza albo do obrony swojej twierdzy"). Gdyby Jeff chcial inaczej - trzymac ponad 240 h tylko przy ratio > 1 albo stanie 334e 1/3. Do obserwacji w logu.
+- (2) okup oblezenia O0 (SiegeRansom.AssaultPost) mozliwy od pierwszych dob, bo bramka go juz nie wstrzymuje - SPRAWDZONE, BEZ ZMIANY (tak bylo przed 471b; okup to tez sposob zakonczenia oblezenia). Po wgraniu sprawdzic linie "Okup oblezenia (O0)" przy mlodych oblezeniach.
+- (3) kosmetyka logu - ZROBIONE: linia doby pisze prog z FreshHours (SiegeWalls2.FreshHoursLog545: 240 h albo 48 h przy Siege Hold Ten Days NIE) zamiast sztywnego "240 h", a licznik M ma jednostke "druzyno-h" (HoldOver545 liczy godziny kazdej trzymanej druzyny-wodza, nie godziny obozu). Tylko tekst logu, logika bez zmian.
+
+Ryzyko: brak (tylko napis w linii doby; nowa wlasciwosc tylko do odczytu). Status: DO SPRAWDZENIA (nie wgrane).
+
 ## 542: oblezenia - zamek nie poddaje sie z samego uplywu czasu; po limicie oboz odchodzi; dluga przerwa po odparciu szturmu symulowanego - Armoury (SiegeWalls.Time471.cs (a)/(e), SiegeWalls.cs Repel; klucze NOWE SiegeYieldOnlyStarving = true, SiegeSimRepelLongPause = true)
 
 **Problem:** Jeff, czat 15.11: "zaloga, ktora ma pelny spichlerz i wygrywa kazdy szturm, nie ma powodu sie poddac - szczegolnie ze wygrywaja wojne, bo war exhaustion i wynik wojny jest po stronie Lannisterow". Log Armoury-2026-11-15_04-07-23: Banefort (ROT_castle20, maly zamek, mury 1) - jedzenie zalogi 144 dob (9434 / -65.5/d), 4 szturmy odparte (dzien 109016, 109018, 109021, 109025; przerwy 1.7-4.3 doby), a dzien 109026 "termin minal: zegar 27 >= R 26.4 ... 471b: KAPITULACJA z terminu" - po 31.1 dob zamek przeszedl do Polnocy (Ondrew Locke, battania) bez glodu i bez przegranego szturmu. W logach 15.11: 5 kapitulacji "droga a - termin R minal".
