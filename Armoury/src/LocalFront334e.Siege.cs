@@ -35,6 +35,7 @@ namespace Armoury
             public int Hour = -1, Bad, State = -1, SaidDay = -1, StaySaid = -1; public double Q; public double PrepH = -1, Wall0 = 1;
             public double BadH = -1;   // 334f: godzina ostatniej oceny ODSTAP (histereza z mysli dowodcy, nie z godzin zegara)
             public int TLeftH = -1; public float TLeft;   // 334g (W3): pozostaly czas - raz na godzine zegara
+            public IFaction K;   // 543: strona, ktora wydala ostatni sad (stan z pamieci tylko dla tej samej strony)
             public readonly Dictionary<MobileParty, float> Dist = new Dictionary<MobileParty, float>();
             public readonly Dictionary<MobileParty, KeyValuePair<double, float>> Mem = new Dictionary<MobileParty, KeyValuePair<double, float>>();   // 334f: odsiecz z zamiarem -> (godzina, odleglosc)
             public readonly List<MobileParty> RelLeads = new List<MobileParty>();   // 340 (c): odsiecz policzona w ostatnim sadzie (do pamieci po odwrocie)
@@ -73,6 +74,7 @@ namespace Armoury
         private static readonly Dictionary<MapEvent, int[]> _raidBad = new Dictionary<MapEvent, int[]>();        // [godzina, kolejne zle]
         private static int _dJudge, _dKeep, _dMid, _dRetreat, _dRetreatCand, _dStay, _dKeepVeto, _dGrace, _dBreak, _dStickYield, _dFreshYield, _dIronOffers, _dIronVeto, _dSiegeLines;
         private static readonly int[] _dStates = new int[6];
+        private static int _dStale, _dStaleMaxH;   // 543: sady bez migawki z dzis - ze stanu obozu (ile, najstarszy w godzinach)
         private static readonly List<string> _dRetreatNotes = new List<string>();
         private static int _sRetreat;
 
@@ -80,7 +82,7 @@ namespace Armoury
         private static void ZeroSiegeDay()
         {
             _dJudge = _dKeep = _dMid = _dRetreat = _dRetreatCand = _dStay = _dKeepVeto = _dGrace = _dBreak = _dStickYield = _dFreshYield = _dIronOffers = _dIronVeto = _dSiegeLines = _dKBlock = 0;
-            _dKRelHold = _dKRelFree = 0; _dIronMuster = _dIronKeepSea = _dIronPrio = _dIronMusterLines = _dIronMusterFail = _dIronMusterBan = 0; Array.Clear(_dIronWhy, 0, _dIronWhy.Length);
+            _dKRelHold = _dKRelFree = 0; _dStale = _dStaleMaxH = 0; _dIronMuster = _dIronKeepSea = _dIronPrio = _dIronMusterLines = _dIronMusterFail = _dIronMusterBan = 0; Array.Clear(_dIronWhy, 0, _dIronWhy.Length);
             Array.Clear(_dStates, 0, _dStates.Length); _dRetreatNotes.Clear();
             Array.Clear(_dIronX, 0, _dIronX.Length); _dIronMinQ = -1; _dIronMinT = "-"; _dIronMinStr = 0;
             Array.Clear(_dIronMx, 0, _dIronMx.Length); Array.Clear(_dIronC, 0, _dIronC.Length); Array.Clear(_dIronCBest, 0, _dIronCBest.Length);
@@ -401,6 +403,22 @@ namespace Armoury
             catch (Exception e) { Stumble("Judge", e); return -1; }
         }
 
+        /// <summary>543: bez migawki z dzis (mysl na poczatku doby przed Daily) - ostatni stan tego obozu: ten sam SiegeEvent (oboz i osada), ta sama strona,
+        /// sad nie starszy niz StaleMaxHours. ODSTAP (4) i brak stanu - -1 (jak dotad: bez sadu). Licznik do linii koszt. Pod _lk.</summary>
+        private static int StaleState(SiegeEvent ev, IFaction k, out double q)
+        {
+            q = 0;
+            CampRec r;
+            if (!_camps.TryGetValue(ev, out r) || r.Hour < 0 || r.State < 0 || r.State == 4 || !ReferenceEquals(r.K, k)) return -1;
+            int age = NowH - r.Hour;
+            if (age < 0 || age > StaleMaxHours) return -1;
+            q = r.Q;
+            _dStale++;
+            if (age > _dStaleMaxH) _dStaleMaxH = age;
+            return r.State;
+        }
+        private const int StaleMaxHours = 24;
+
         private static int JudgeCore(MobileParty party, BesiegerCamp camp, SiegeEvent ev, Settlement st, PartyThinkParams pt, out long wait)
         {
             wait = 0;
@@ -415,124 +433,135 @@ namespace Armoury
             lock (_lk)
             {
                 wait = Ts() - w0;
-                if (!SnapFresh) return -1;
-                _dJudge++;
-                CampRec r;
-                if (!_camps.TryGetValue(ev, out r)) { r = new CampRec(); _camps[ev] = r; }
-                // 334g (W3): pozostaly czas raz na godzine zegara (Measure + model budowy - drogie; mury i postep zmieniaja sie wolniej)
-                int th = NowH;
-                if (r.TLeftH == th) tLeft = r.TLeft;
-                else { tLeft = TimeLeft(camp, ev, st, r); r.TLeft = tLeft; r.TLeftH = th; }
-                var l = ListOf(st);
-                var sc = ScoutOf(party);
-                var rel = new List<KeyValuePair<float, float>>();
-                var allies = new List<KeyValuePair<float, float>>();
-                var seen = new HashSet<MobileParty>();
-                var newDist = new Dictionary<MobileParty, float>();
-                var relL = new List<MobileParty>();
-                double nowH = CampaignTime.Now.ToHours;
-                Action<MobileParty> consider = lead =>
+                // 543 (Acorn Hall 2x, d109018-109040: mysl obozu na poczatku doby PRZED migawka Daily - bez sadu i bez opcji oblezenia, m116 juz nie trzymal,
+                // GoToSettlement 0.43 wygral i oboz zwiniety przy q 13:1): bez migawki z dzis - ostatni stan tego obozu (ta sama strona, nie starszy niz 24 h); ODSTAP
+                // (4) z pamieci nie - odwrot tylko z nowego sadu (2 mysli jak dotad)
+                if (!SnapFresh)
                 {
-                    if (lead == null || !seen.Add(lead) || lead == party) return;
-                    var v = LVOf(lead);
-                    if (!v.Active || v.Cur == st || lead.BesiegerCamp == camp) return;
-                    var lf = v.F;
-                    if (lf == null) return;
-                    if (!FactionManager.IsAtWarAgainstFaction(k, lf))
+                    state = StaleState(ev, k, out q);
+                    if (state < 0) return -1;
+                    bad = 0;
+                }
+                else
+                {
+                    _dJudge++;
+                    CampRec r;
+                    if (!_camps.TryGetValue(ev, out r)) { r = new CampRec(); _camps[ev] = r; }
+                    // 334g (W3): pozostaly czas raz na godzine zegara (Measure + model budowy - drogie; mury i postep zmieniaja sie wolniej)
+                    int th = NowH;
+                    if (r.TLeftH == th) tLeft = r.TLeft;
+                    else { tLeft = TimeLeft(camp, ev, st, r); r.TLeft = tLeft; r.TLeftH = th; }
+                    var l = ListOf(st);
+                    var sc = ScoutOf(party);
+                    var rel = new List<KeyValuePair<float, float>>();
+                    var allies = new List<KeyValuePair<float, float>>();
+                    var seen = new HashSet<MobileParty>();
+                    var newDist = new Dictionary<MobileParty, float>();
+                    var relL = new List<MobileParty>();
+                    double nowH = CampaignTime.Now.ToHours;
+                    Action<MobileParty> consider = lead =>
                     {
-                        // nasi w drodze na te osade (dolacza do obozu)
-                        if (!SameSide(k, lf) || !GoingToV(v, st)) return;
-                        var ua = LiveUnit(lead);
-                        if (ua == null) return;
-                        float da = DaysTo(ua, st);
-                        if (da >= 0f && da <= HorizonDays) allies.Add(new KeyValuePair<float, float>(da, ua.Str));
-                        return;
-                    }
-                    if (!Foe(k, lf, st)) return;   // trzecia strona - nie odsiecz
-                    bool intent = RelievesV(v, st);
-                    bool spotted = sc.Contains(lead);
-                    KeyValuePair<double, float> mv = default(KeyValuePair<double, float>);
-                    // 334f (L14): pamiec dowodcy - zamiar obrony zmienia sie przy kazdej mysli lorda ("miga"); widziany zamiar pamietamy 12 h (2 x okres mysli gry)
-                    bool mem = !intent && r.Mem.TryGetValue(lead, out mv) && nowH - mv.Key <= MemHours;
-                    if (!intent && !spotted && !mem) return;
-                    var u = LiveUnit(lead);
-                    if (u == null) return;
-                    float dd = u.Pos.Distance(st.GetPosition2D);
-                    newDist[lead] = dd;
-                    bool memUsed = false;
-                    if (intent) r.Mem[lead] = new KeyValuePair<double, float>(nowH, dd);
-                    else
-                    {
-                        bool ok = false;
-                        if (mem && dd <= mv.Value + 0.5f * u.Land) { ok = true; memUsed = true; }   // pamietany zamiar: liczy sie, dopoki sie nie oddala (pol godziny drogi zapasu)
-                        if (!ok && spotted)
+                        if (lead == null || !seen.Add(lead) || lead == party) return;
+                        var v = LVOf(lead);
+                        if (!v.Active || v.Cur == st || lead.BesiegerCamp == camp) return;
+                        var lf = v.F;
+                        if (lf == null) return;
+                        if (!FactionManager.IsAtWarAgainstFaction(k, lf))
                         {
-                            float prev;
-                            ok = r.Dist.TryGetValue(lead, out prev) && dd < prev - 0.01f;   // widziany zwiadem: tylko gdy sie zbliza (stoi albo sie oddala - nie wywoluje odwrotu)
+                            // nasi w drodze na te osade (dolacza do obozu)
+                            if (!SameSide(k, lf) || !GoingToV(v, st)) return;
+                            var ua = LiveUnit(lead);
+                            if (ua == null) return;
+                            float da = DaysTo(ua, st);
+                            if (da >= 0f && da <= HorizonDays) allies.Add(new KeyValuePair<float, float>(da, ua.Str));
+                            return;
                         }
-                        if (!ok) return;
-                    }
-                    float d = DaysTo(u, st);
-                    if (d < 0f || d > HorizonDays) return;
-                    rel.Add(new KeyValuePair<float, float>(d, u.Str));
-                    relL.Add(lead);
-                    if (intent) nGo++; else if (memUsed) nMem++; else nScout++;
-                };
-                for (int i = 0; i < l.E.Count; i++) consider(l.E[i].U.Lead);
-                foreach (var m in sc) consider(m);
-                if (r.Mem.Count > 0)
-                {
-                    var keys = new List<MobileParty>(r.Mem.Keys);
-                    foreach (var m in keys) consider(m);
-                    foreach (var m in keys)
+                        if (!Foe(k, lf, st)) return;   // trzecia strona - nie odsiecz
+                        bool intent = RelievesV(v, st);
+                        bool spotted = sc.Contains(lead);
+                        KeyValuePair<double, float> mv = default(KeyValuePair<double, float>);
+                        // 334f (L14): pamiec dowodcy - zamiar obrony zmienia sie przy kazdej mysli lorda ("miga"); widziany zamiar pamietamy 12 h (2 x okres mysli gry)
+                        bool mem = !intent && r.Mem.TryGetValue(lead, out mv) && nowH - mv.Key <= MemHours;
+                        if (!intent && !spotted && !mem) return;
+                        var u = LiveUnit(lead);
+                        if (u == null) return;
+                        float dd = u.Pos.Distance(st.GetPosition2D);
+                        newDist[lead] = dd;
+                        bool memUsed = false;
+                        if (intent) r.Mem[lead] = new KeyValuePair<double, float>(nowH, dd);
+                        else
+                        {
+                            bool ok = false;
+                            if (mem && dd <= mv.Value + 0.5f * u.Land) { ok = true; memUsed = true; }   // pamietany zamiar: liczy sie, dopoki sie nie oddala (pol godziny drogi zapasu)
+                            if (!ok && spotted)
+                            {
+                                float prev;
+                                ok = r.Dist.TryGetValue(lead, out prev) && dd < prev - 0.01f;   // widziany zwiadem: tylko gdy sie zbliza (stoi albo sie oddala - nie wywoluje odwrotu)
+                            }
+                            if (!ok) return;
+                        }
+                        float d = DaysTo(u, st);
+                        if (d < 0f || d > HorizonDays) return;
+                        rel.Add(new KeyValuePair<float, float>(d, u.Str));
+                        relL.Add(lead);
+                        if (intent) nGo++; else if (memUsed) nMem++; else nScout++;
+                    };
+                    for (int i = 0; i < l.E.Count; i++) consider(l.E[i].U.Lead);
+                    foreach (var m in sc) consider(m);
+                    if (r.Mem.Count > 0)
                     {
-                        KeyValuePair<double, float> mv;
-                        if (!r.Mem.TryGetValue(m, out mv)) continue;
-                        bool drop = m == null || !m.IsActive || nowH - mv.Key > MemHours;
-                        if (!drop) { var mf = m.MapFaction; drop = mf == null || !FactionManager.IsAtWarAgainstFaction(k, mf); }
-                        if (drop) r.Mem.Remove(m);
+                        var keys = new List<MobileParty>(r.Mem.Keys);
+                        foreach (var m in keys) consider(m);
+                        foreach (var m in keys)
+                        {
+                            KeyValuePair<double, float> mv;
+                            if (!r.Mem.TryGetValue(m, out mv)) continue;
+                            bool drop = m == null || !m.IsActive || nowH - mv.Key > MemHours;
+                            if (!drop) { var mf = m.MapFaction; drop = mf == null || !FactionManager.IsAtWarAgainstFaction(k, mf); }
+                            if (drop) r.Mem.Remove(m);
+                        }
                     }
-                }
-                r.Dist.Clear(); foreach (var kv in newDist) r.Dist[kv.Key] = kv.Value;
-                r.RelLeads.Clear(); r.RelLeads.AddRange(relL);
-                rel.Sort((a, b) => a.Key.CompareTo(b.Key));
-                foreach (var kv in rel) relief += kv.Value;
-                // nasi w drodze: doliczeni, jesli dojda przed przewaga wroga (bez przewagi - przed koncem oblezenia)
-                float a0 = Arrival(rel, GarCap(gar, camp0), camp0);
-                float lim = a0 == float.MaxValue ? tLeft : a0;
-                foreach (var kv in allies) if (kv.Key <= lim) allyIn += kv.Value;
-                campS = camp0 + allyIn;
-                arrival = Arrival(rel, GarCap(gar, campS), campS);
-                state = JudgeRule(campS, relief, gar, arrival, tLeft, food, out q);
-                // 477-c (klucz Siege Abandon Grace; analiza 120b P3, Saath: start q 0.64 wg ZFor, po 4.5 doby odstapienie przy q_obl 1.44 z innej miary): przez pierwsze
-                // 2 doby oblezenia odstapienie (4) wymaga przewagi wedlug tej samej miary co start (ZFor - wrogowie w polu w zasiegu, jak IsGood przy starcie)
-                string grace = null;
-                if (state == 4 && AbandonGraceOn)
-                {
-                    double age = 99; try { age = ev.SiegeStartTime.ElapsedDaysUntilNow; } catch { }
-                    if (age < AbandonGraceDays || AbandonWholeOn)   // 478-S4 (analiza 120c pkt 6, Lorath: q_obl 1.31 przy q miary startu 1.01, odstapienie po 2.1 doby)
+                    r.Dist.Clear(); foreach (var kv in newDist) r.Dist[kv.Key] = kv.Value;
+                    r.RelLeads.Clear(); r.RelLeads.AddRange(relL);
+                    rel.Sort((a, b) => a.Key.CompareTo(b.Key));
+                    foreach (var kv in rel) relief += kv.Value;
+                    // nasi w drodze: doliczeni, jesli dojda przed przewaga wroga (bez przewagi - przed koncem oblezenia)
+                    float a0 = Arrival(rel, GarCap(gar, camp0), camp0);
+                    float lim = a0 == float.MaxValue ? tLeft : a0;
+                    foreach (var kv in allies) if (kv.Key <= lim) allyIn += kv.Value;
+                    campS = camp0 + allyIn;
+                    arrival = Arrival(rel, GarCap(gar, campS), campS);
+                    state = JudgeRule(campS, relief, gar, arrival, tLeft, food, out q);
+                    // 477-c (klucz Siege Abandon Grace; analiza 120b P3, Saath: start q 0.64 wg ZFor, po 4.5 doby odstapienie przy q_obl 1.44 z innej miary): przez pierwsze
+                    // 2 doby oblezenia odstapienie (4) wymaga przewagi wedlug tej samej miary co start (ZFor - wrogowie w polu w zasiegu, jak IsGood przy starcie)
+                    string grace = null;
+                    if (state == 4 && AbandonGraceOn)
                     {
-                        float gf; double ga;
-                        double zs = ZFor(st, k, party, SiegeDays, out gf, out ga);
-                        double qs = Ratio(zs, camp0 + ga);
-                        if (qs <= AbandonQ) { state = 3; _dGrace++; grace = (age < AbandonGraceDays ? " | karencja 477-c: wiek " : " | miara startu 478-S4: wiek ") + F2((float)age) + " doby, q miary startu " + F2(qs) + " <= " + F2(AbandonQ) + " - zostaje"; }
+                        double age = 99; try { age = ev.SiegeStartTime.ElapsedDaysUntilNow; } catch { }
+                        if (age < AbandonGraceDays || AbandonWholeOn)   // 478-S4 (analiza 120c pkt 6, Lorath: q_obl 1.31 przy q miary startu 1.01, odstapienie po 2.1 doby)
+                        {
+                            float gf; double ga;
+                            double zs = ZFor(st, k, party, SiegeDays, out gf, out ga);
+                            double qs = Ratio(zs, camp0 + ga);
+                            if (qs <= AbandonQ) { state = 3; _dGrace++; grace = (age < AbandonGraceDays ? " | karencja 477-c: wiek " : " | miara startu 478-S4: wiek ") + F2((float)age) + " doby, q miary startu " + F2(qs) + " <= " + F2(AbandonQ) + " - zostaje"; }
+                        }
                     }
-                }
-                qr = Ratio(relief + GarCap(gar, campS), campS);
-                int h = NowH;
-                // 334f (L14): histereza z ocen dowodcy (mysl obozu co ok. 3 h), nie z dwoch kolejnych godzin zegara - ta nie spelniala sie nigdy
-                r.Bad = BadStep(r.Bad, r.BadH, state, nowH, out r.BadH);
-                bad = r.Bad;
-                r.Hour = h; r.Q = q;
-                if (state >= 0 && state < _dStates.Length) _dStates[state]++;
-                bool change = r.State != state;
-                r.State = state;
-                if ((change || r.SaidDay != Today) && S != null && S.LogEnabled && _dSiegeLines < 60)
-                {
-                    r.SaidDay = Today; _dSiegeLines++;
-                    Log.Info(Tag + "oblezenie | dzien " + Today + " | " + st.StringId + " (" + Nm(st) + ") | " + Nm(party) + " (" + Id(k) + ") | oboz " + F0(campS) + (allyIn > 0 ? " (w drodze " + F0(allyIn) + ")" : "")
-                             + " | odsiecz " + F0(relief) + " (idzie " + nGo + ", pamiec " + nMem + ", zwiad " + nScout + ", zaloga " + F0(gar) + ") | q_obl " + F2(q) + " | q_odw " + F2(qr) + " | przyjazd " + (arrival == float.MaxValue ? "-" : F2(arrival))
-                             + " | pozostalo " + F2(tLeft) + " | jedzenie " + (food >= 999f ? "-" : F2(food)) + " | stan " + StateName[state] + (state == 4 ? " (" + bad + "/2 mysli)" : "") + (grace ?? "") + ".");
+                    qr = Ratio(relief + GarCap(gar, campS), campS);
+                    int h = NowH;
+                    // 334f (L14): histereza z ocen dowodcy (mysl obozu co ok. 3 h), nie z dwoch kolejnych godzin zegara - ta nie spelniala sie nigdy
+                    r.Bad = BadStep(r.Bad, r.BadH, state, nowH, out r.BadH);
+                    bad = r.Bad;
+                    r.Hour = h; r.Q = q; r.K = k;
+                    if (state >= 0 && state < _dStates.Length) _dStates[state]++;
+                    bool change = r.State != state;
+                    r.State = state;
+                    if ((change || r.SaidDay != Today) && S != null && S.LogEnabled && _dSiegeLines < 60)
+                    {
+                        r.SaidDay = Today; _dSiegeLines++;
+                        Log.Info(Tag + "oblezenie | dzien " + Today + " | " + st.StringId + " (" + Nm(st) + ") | " + Nm(party) + " (" + Id(k) + ") | oboz " + F0(campS) + (allyIn > 0 ? " (w drodze " + F0(allyIn) + ")" : "")
+                                 + " | odsiecz " + F0(relief) + " (idzie " + nGo + ", pamiec " + nMem + ", zwiad " + nScout + ", zaloga " + F0(gar) + ") | q_obl " + F2(q) + " | q_odw " + F2(qr) + " | przyjazd " + (arrival == float.MaxValue ? "-" : F2(arrival))
+                                 + " | pozostalo " + F2(tLeft) + " | jedzenie " + (food >= 999f ? "-" : F2(food)) + " | stan " + StateName[state] + (state == 4 ? " (" + bad + "/2 mysli)" : "") + (grace ?? "") + ".");
+                    }
                 }
             }
             var scores = pt.AIBehaviorScores;

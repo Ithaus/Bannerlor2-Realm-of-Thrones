@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 543: oblezenie - mysl obozu przed migawka doby nie zwija obozu (stan obozu sprzed <= 24 h) - Armoury (LocalFront334e.JudgeCore/StaleState, linia koszt)
+
+**Problem:** Jeff, czat 15.11: "sprawdz wojne czemu znowu lanisterowie przegrywaja i czemu odstepuja od obleganych zamkow kiedy mogli je zdobyc" oraz "Zaloga, ktora ma pelny spichlerz i wygrywa kazdy szturm, nie ma powodu sie poddac". Log Armoury-2026-11-15_04-07-23: armia korony (Joffrey, wodz obozu Garth) dwa razy zwinela oboz pod Acorn Hall (castle_EN5, d109018-109040) przy przewadze ok. 13:1 i szansie szturmu gry 0.46 - linia 13127 "Koniec oblezenia (KO): dzien 109029 ... oblezenie 10.5 dob | przyczyna: odejscie z obozu (zmiana celu - ostatnia mysl: GoToSettlement town_V3)", jedzenie obozu 9.7 dob; mysl (13590) bez opcji oblezenia; migawka 334e tej doby dopiero w 13738; drugi raz tak samo (23031/23043/23748).
+
+**Przyczyna:** na poczatku nowej doby mysl wodza obozu szla PRZED zbudowaniem migawki doby (Daily po liniach doby, Hourly dopiero od 1. godziny). LocalFront334e.JudgeCore mialo `if (!SnapFresh) return -1;` - bez sadu nikt nie dokladal opcji oblezenia (KONTYNUUJ), trzymanie m116 (SiegeWalls2.Hold, 240 h) juz wygaslo (oblezenie 10.5 doby), wiec GoToSettlement 0.43 wygral i gra zwinela oboz.
+
+**Zmiana:** bez migawki z dzis JudgeCore bierze ostatni stan tego obozu (StaleState): ten sam SiegeEvent (oboz i osada), ta sama strona (nowe pole CampRec.K = frakcja ostatniego sadu), sad nie starszy niz 24 h (CampRec.Hour, liczony tylko z prawdziwego sadu - stan z pamieci nie przedluza okna). Stan KONTYNUUJ / NIE-ZDAZY dalej idzie przez ten sam kod trzymania (weta, rozejm, obrona wlasnej twierdzy, 335 bez zmian). ODSTAP (4) z pamieci nie jest uzywany (-1 jak dotad) - odwrot tylko z nowego sadu po 2 myslach, licznik Bad nie rusza. Brak stanu / inna strona / starszy niz 24 h - -1 jak dotad. Linia doby "koszt" 334e: ", bez migawki z dzis: uzyto stanu sprzed N h (M razy, 543)". Bez nowego klucza MCM.
+
+**Ryzyko / co sprawdzic:**
+- Jedyny wolajacy Judge: SiegeWalls2.Oblezenia3 ThinkPost (judged != 4 dla m116) - stany 1/2/3/5 znacza dla niego to samo co -1; zmienia sie tylko to, ze przy 1/3 sad dodaje/podnosi opcje oblezenia jak w zwyklej mysli.
+- Stan z pamieci nie widzi nocnej zmiany odsieczy - trwa najwyzej do pierwszej mysli po migawce (Hourly od 1. godziny doby), potem normalny sad (moze ODSTAP po 2 myslach jak dotad). Odwrot pod przewazajaca odsiecza moze sie opoznic o te godzine.
+- Licznik _dJudge i _dStates tylko z prawdziwych sadow; StaleState tylko pod _lk; liczniki zerowane w ZeroSiegeDay.
+- W logu: wiecej "trzymane", mniej KO "odejscie z obozu" na poczatku doby przy duzej przewadze; licznik 543 w linii koszt > 0.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).
