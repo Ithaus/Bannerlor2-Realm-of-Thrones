@@ -1,5 +1,37 @@
 # DZIENNIK ZMIAN
 
+## 548: pasek mapy czytelny - kazda pozycja "mam / potrzeba", pelne ulamki; zestaw do musztry 1 na czlowieka - Armoury (MarchHud.cs, Drill.cs, RiddenBy.cs; klucz NOWY DrillMenPerPiece = 1, MCM "Drill Men Per Piece")
+
+**Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 250 (gora: troops 133; dol: Horses 131/146 CZERWONE, Pack 59/117, Weapons 82/43, Armour 82): "nie rozumiem tej tabelki, mam 131 ludzi czemu 146 czerwone, potem 82/43 czyli co, za duzo mam broni czy za malo, i 1 miecz i jeden pancerz na osobe a nie na 3 ludzi ... i te 82 czyli co 82/82 ... zrob aby UX/UI byl czytelny". Log Armoury-2026-11-15_15-14-12: 146 = wszystkie konie wierzchowe (ladunek + zbrojownia + stajnia), czerwien = 1 osoba pieszo (Amanda, Jazda 5); 82/43 = od gracza + nadwyzka ludzi / ceil(129/3); "Armour 82" = 82/43 skrocone bezpiecznikiem szerokosci (16:01:24 "skrocone do licznika 1", gora 690 px); liczniki broni skakaly 83 -> 187 -> 87 z nadwyzka ludzi.
+
+**Przyczyna:** MarchHud: Horses = Frac(r.Ridden, r.AllHorses) - mianownik to konie, nie ludzie, a kolor znaczyl "ktos idzie pieszo"; Weapons/Armour = Frac(HaveW/HaveA, Full) z surowym stanem (licznik > mianownik) i Full = 1 na 3 ludzi (Drill.MenPerPiece = 3); cztery pelne ulamki nie mieszcza sie w szerokosci sprzed 537 (ok. 717 px wobec 690), wiec bezpiecznik skracal do samego licznika.
+
+**Zmiana:**
+- Pasek (dolny rzad) - jedna zasada "mam / potrzeba", pelny ulamek, zwykly kolor gdy pelne, ostrzezenie gdy brakuje:
+  - **Horses** = ludzie na koniach (pary jazdy i puli + bohaterowie na wlasnych koniach) / ludzie w partii (r.Men - ta sama liczba co gorny rzad), np. 132/133; ostrzezenie, gdy ktos idzie pieszo (mounted < Men); na morzu "-". Nowe MarchHud.Mounted(r).
+  - **Pack** bez zmiany liczb (juczne / limit Herding), wlasna podpowiedz (dotad wspolna z Horses).
+  - **Drill** (ikona miecza, ItemId armoury_weapons) zamiast Weapons + Armour: Kit.Ready = min(min(bron, komplet), min(zbroje, komplet)) / komplet - ludzie z bronia i zbroja do musztry / wszyscy (przy 1 na czlowieka komplet = ludzie). Licznik nie przekracza mianownika i nie skacze z nadwyzka. Pozycja armoury_armour zdejmowana z paska (PurgeId, jak dawne Harness). Trzy pozycje = ok. 611 px (zapas ok. 79 px wobec gory 690) - bezpiecznik szerokosci zostaje tylko na ulamki czterocyfrowe (linia "skrocone do licznika" ma pokazywac 0).
+  - Podpowiedzi: pierwszy wiersz zwyklym angielskim ("Men riding / men: 132 of 133 men ride - 1 walk (red)", "Pack animals / allowed: 59 of 117 ...", "Ready to drill / men: 82 of 129 men have a weapon and a piece of armour to drill with (red)"), dalej szczegoly: Horses - kto pieszo i dlaczego (bez konia / bez uprzezy / za niska Jazda z imionami / bohaterowie bez konia), jazda, pula, konie wlasne (dawne 146: pod ludzmi / zapasowe), uprzeze; Drill - bron i zbroje osobno ("83 from you, 104 men's spare; 58 extra to replace worn ones" albo "47 short"), ile jeszcze przyjma, premia (obie polowy), zuzycie obu grup.
+  - Linia logu paska: "Horses x/y (na koniach / ludzie) ... Drill x/y", do tego bohaterowie i pieszo, komplet "(1 na N)". Linia doby MarchPairs "HUD ... Horses" pokazuje nowa liczbe (Harness w linii doby bez zmian). RiddenBy: wiersz "Men riding / men (map bar)".
+- Musztra - komplet 1 na czlowieka:
+  - Klucz `DrillMenPerPiece` (Settings.cs + McmSettings.cs recznie, bez gen_mcm; grupa "Drill", 1..3, domyslnie 1; Jeff nie ma klucza w Armoury.json - zadziala 1). Drill.MenPerPiece = wlasciwosc z klucza (Settings null -> 3). Full(men) = ceil(men / MenPerPiece) - jedno zrodlo dla XP (CtxOf, gracz i AI tym samym wzorem), zuzycia (Wear), Accept, TrophyTip, paska, AutotestFeed.
+  - IntakeSets = 1 przy 1 na czlowieka (limit od gracza = 1 komplet = ludzie, np. 129 na grupe zamiast 86), 2 przy 2-3 (jak dotad). Zapas od gracza nic nie wazy (osobny ItemRoster), stad nie 2 x 129.
+  - Wzor S bez zmian (u uciete do 1) - pelny zapas daje te same +10% na grupe (+15% z perkiem); zmienia sie tylko liczba sztuk do maksimum.
+  - Teksty: komunikat Accept "a full set is N of each - one per man, beside their battle kit"; podpowiedzi MCM Drill Stock i March Pairs Hud przepisane (Settings.cs i McmSettings.cs).
+
+**Ryzyko / co sprawdzic (regula 0):**
+- Regresje: HorsesText czytaja tez MarchPairs (linia doby) i RiddenBy - oba zaktualizowane (ta sama liczba). HarnessText bez zmian. OnePer / IntakeSetsN czyta tylko MarchHud. Full() wolane w CtxOf, Wear, Accept, TrophyTip, HudKit, AutotestFeed, linii doby - wszystkie przez jedna funkcje; CampDrill i DrillVeterans Full nie uzywaja. Zadna stala MenPerPiece/IntakeSets nie byla w wyrazeniu stalym (grep) - zamiana na wlasciwosci bezpieczna.
+- Kolizje: AI nie kupuje zestawu musztry (CountAiStock liczy tylko nadwyzke zbrojowni, zuzycie bierze tylko sztuki z sur.Cand, ktore K1 i tak sprzedalby) - brak petli "kup, zuzyj, kup", koszty AI bez zmian. Zamknieta ekonomia: zlom do kowali, zaplata do sakiewki ludzi (AI 1/3 dla lorda) - bez zmian.
+- Skutki 1 na czlowieka (szacunek z logu 15.11): XP AI "zapas x1.08" spada do ok. x1.03-1.05 (-2.5 do -5% XP musztry AI, jeden wzor dla wszystkich - AI nie sparalizowane); gracz z duza nadwyzka bez zmian (x1.25), przy nadwyzce ~0 ok. x1.165 (-7%), dopoki Jeff nie dorzuci sprzetu. Zuzycie do 3x wieksze (swiat ok. 81 -> do ok. 240 sztuk na dobe; gracz ok. 1.45 sztuki na grupe na pelny dzien cwiczen zamiast 0.48). Lordowie mniej zarobia na sprzedazy nadwyzek, wiecej idzie do kowali jako zlom.
+- Autotest: AutotestFeed dokupuje do 129 zamiast 43 - wiecej zlota z testowego zapisu.
+- Horses: czerwien znaczy teraz "ktos idzie pieszo" (takze bohater bez konia albo brak konia) - partia piesza z malym stadem bedzie stale czerwona (zgodne z "czerwone = brak"); Jeffa uprzedzic.
+- Powrot do 3 w MCM: to, co gracz juz dal ponad nowy limit, zostaje (Accept nie przyjmie wiecej), potem sie zuzywa.
+- Dwie zmiany w jednym DLL (pasek + 1 na czlowieka) - polecenie z workflow; pasek mozna ocenic niezaleznie (przy kluczu = 3 Drill pokaze np. 43/43).
+- Co sprawdzic w logu: "Pasek mapy ... pasek (N) -> Horses 132/133, Pack 59/117, Drill x/129", "skrocone do licznika 0"; "Musztra AI" -> zapas xN (ok. 1.03-1.05) i zuzyto (do ok. 240/dobe); "Musztra (gracz)" -> zapas bron X/129; "Musztra: zapas - przyjeto ... limit od gracza 129".
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA (galaz noc/548-pasek-ux, nie wgrane).
+
 ## 547: oblezenia - oboz trzymany do skutku tylko, gdy liczniejszy od obroncow - Armoury (SiegeWalls2.Hold.HoldsToEnd545; klucz NOWY SiegeHoldOnlyStronger = true)
 
 **Problem:** recenzja 546: bez limitu czasu oboz SLABSZY od obroncow, trzymany przez 545, siedzial pod murami 1.5-2 lata - furaz ze spichlerzy wsi trzyma jego jedzenie ponad progiem m116, kapitulacja z glodu (b) wymaga Ratio471 > 1, OB1 "mury trzymaja", straty obozu maleja wykladniczo. Jeff (15.11) z dwoch wariantow: "tylko A".

@@ -7649,13 +7649,17 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillNeedsArmsPlayer { get; set; } = true;
 
-        [SettingPropertyBool("Drill Stock", HintText = "arms and armour you discard, leave on the game's loot screen or leave behind after collecting Spoils trophies go to your men's drill stock while there is room (two sets of one weapon and one piece of armour per three men) instead of being lost; your men's spare arms in the armoury count too. A full stock makes the drill up to 20% faster, Giving Hands and Paid in Promise up to 30%. The stock belongs to the men: it cannot be taken back, it wears out, and the smiths of the next town buy the scrap of worn pieces - the coin goes to the men's purse. Works only with Drill Law and Donation Xp Off on: the stock replaces the experience the game gave for gear you give away (off = discarded gear is lost as before)", RequireRestart = false)]
+        [SettingPropertyBool("Drill Stock", HintText = "arms and armour you discard, leave on the game's loot screen or leave behind after collecting Spoils trophies go to your men's drill stock while there is room (one full set: one weapon and one piece of armour per man, beside his battle kit - see Drill Men Per Piece) instead of being lost; your men's spare arms in the armoury count too. A full stock makes the drill up to 20% faster, Giving Hands and Paid in Promise up to 30%. The stock belongs to the men: it cannot be taken back, it wears out, and the smiths of the next town buy the scrap of worn pieces - the coin goes to the men's purse. Works only with Drill Law and Donation Xp Off on: the stock replaces the experience the game gave for gear you give away (off = discarded gear is lost as before)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillStock { get; set; } = true;
 
         [SettingPropertyBool("Drill Stock Ai", HintText = "AI lords' men drill with the spare arms and armour of their armoury by the same rule as your men's spare kit (their baggage - loot and Banner Kings supplies - does not count, just as your own packs do not): up to 20-30% faster, the stock wears out and the smiths of the next town buy the scrap - a third to the lord, the rest to the men (off = AI drill without a stock, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillStockAi { get; set; } = true;
+
+        [SettingPropertyInteger("Drill Men Per Piece", 1, 3, "0", HintText = "a full drill stock is one weapon and one piece of armour per this many men, beside their battle kit: 1 = one per man, 3 = the old rule of one per three men. The drill bonus is the same at a full stock - this only sets how many pieces it takes to get there, how many wear out (only pieces in use wear) and how many your men take from you (one full set at 1, two at 2 or 3). The same rule for AI lords' men", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public int DrillMenPerPiece { get; set; } = 1;
 
         [SettingPropertyBool("Drill Penalty Ai", HintText = "AI lords' men do not drill at all on a day they are starving or after a night without sleep (they met the dawn with sleep debt - no drill until the next dawn; training perks included, and no drill gear wears out) - the same penalty as your men's with Drill Law on (with Drill Law off your men drill by the game's rule, and hunger or lack of sleep takes nothing from them); the sleep debt is the same one that costs them speed and morale (Ai Sleep Debt), so without the AI sleep ledger (Ai Camps At Night off, equal camp hours or Ai Sleep Debt off) no lord loses drill for want of sleep - not even your clan's parties and the lords in your army - while you still do. With Drill Law Ai on the penalty applies anyway, as part of the rule (off = AI drill whatever their state, only while Drill Law Ai is off)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
@@ -8737,7 +8741,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int RiderHorseCarryKg { get; set; } = 20;
 
-        [SettingPropertyBool("March Pairs Hud", HintText = "on the map bar (lower row, the bar keeps its old width): Horses - horses ridden by your men / all your riding horses (baggage and troops' armoury), in warning colour when some of your men walk because a horse has no harness that fits it or the pair needs more Riding than they have (details in its tooltip); Pack - pack animals / how many you may lead before the herding penalty (men - livestock - free horses), in warning colour when over; Weapons and Armour - your men's drill kit (what you gave them plus their spare kit) / a full set (one per three men), in warning colour when short, the tooltip tells how it drives drill XP and how fast it wears (shown when Drill Stock, Drill Law and Donation Xp Off are on). An item may show only its first number when the row runs out of room - the full numbers are in its tooltip. A man counts as riding only on a horse with a harness that fits it and that his Riding allows. Display only: party speed uses the same numbers when March Pairs Speed is on, cargo weight and carry capacity when Ridden Harness Weightless is on (off = the map bar as before)", RequireRestart = false)]
+        [SettingPropertyBool("March Pairs Hud", HintText = "on the map bar (lower row, the bar keeps its old width), each item reads have / need: Horses - men riding / men in the party, in warning colour when someone walks (no horse, no harness that fits it, or too little Riding - who and why in its tooltip); Pack - pack animals / how many you may lead before the herding penalty (men - livestock - free horses), in warning colour when over; Drill (sword) - men with a drill weapon and a piece of drill armour / all men (one of each per man, beside their battle kit - Drill Men Per Piece), in warning colour when short, the tooltip shows weapons and armour apart, the drill XP bonus and the wear (shown when Drill Stock, Drill Law and Donation Xp Off are on). Each tooltip says in its first line what the numbers mean. A man counts as riding only on a horse with a harness that fits it and that his Riding allows. Display only: party speed uses the same numbers when March Pairs Speed is on, cargo weight and carry capacity when Ridden Harness Weightless is on (off = the map bar as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MarchPairsHud { get; set; } = true;
 
@@ -15756,6 +15760,7 @@ namespace Armoury
             s.DrillNeedsArmsPlayer = DrillNeedsArmsPlayer;
             s.DrillStock = DrillStock;
             s.DrillStockAi = DrillStockAi;
+            s.DrillMenPerPiece = DrillMenPerPiece;
             s.DrillPenaltyAi = DrillPenaltyAi;
             s.DrillLawAi = DrillLawAi;
             s.DrillLog = DrillLog;

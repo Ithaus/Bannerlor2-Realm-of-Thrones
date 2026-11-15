@@ -61,7 +61,13 @@ namespace Armoury
         private const float RestDay = 1.5f, MarchDay = 0.9f, LeadNorm = 170f, LeadMin = 0.5f, LeadMax = 1.5f;
         private const float StockBonus = 0.10f, PerkMult = 1.5f, WearDays = 200f;
         internal const float RestStep = 0.35f;            // jedna stala dla musztry, ksiegi snu gracza (NightRest.OnHourly) i ksiegi AI T10 R2 (RestMoveLimit)
-        private const int RestBelowHours = 4, MenPerPiece = 3, IntakeSets = 2, AllHours = 0xFFFFFF;
+        private const int RestBelowHours = 4, AllHours = 0xFFFFFF;
+        // 548 (Jeff 15.11: "1 miecz i jeden pancerz na osobe a nie na 3 ludzi"): pelny zapas = 1 sztuka na tylu ludzi (klucz Drill Men Per Piece, domyslnie 1;
+        // 3 = dawna zasada). Wzor S bez zmian (u uciete do 1) - zmienia sie tylko liczba sztuk do maksimum, ta sama dla gracza i AI (jeden wzor).
+        private static int MenPerPiece { get { var s = Settings.Current; return s == null ? 3 : Math.Max(1, Math.Min(3, s.DrillMenPerPiece)); } }
+        // 548: limit przyjecia od gracza w pelnych zapasach - przy 1 na czlowieka jeden zapas (tyle, ile potrzebuja; zapas nic nie wazy - osobny ItemRoster),
+        // przy dawnej zasadzie jak dotad dwa (zapas na wymiane daje nadwyzka ludzi w zbrojowni)
+        private static int IntakeSets { get { return MenPerPiece == 1 ? 1 : 2; } }
         private const int GW = 0, GA = 1;                 // grupy zapasu: bron (z tarczami), zbroje
         // MUSZTRA-j: doby t1 -> t6 przy bazie wzoru x1 (koszty awansu BK TroopUpgradeXp 3.0: 900/1650/2700/3900/5100, projekt rozdz. 2 i 14.3) - tylko do linii
         private const double PromoteDays = 900.0 / 12 + 1650.0 / 14 + 2700.0 / 16 + 3900.0 / 18 + 5100.0 / 20;
@@ -1414,7 +1420,7 @@ namespace Armoury
                 int roomW = Math.Max(0, cap - cur[GW]), roomA = Math.Max(0, cap - cur[GA]);
                 if (men > 0)   // m110-sam: bez zolnierzy (sam / sami bohaterowie) bez napisu - zapas nic nie przyjmuje (cap 0), rzeczy jak w grze
                     Log.Player("Your men took " + taken + " pieces into their drill stock" + (back > 0 ? "; " + back + " pieces they do not need went back to your baggage" : "") + ". They now drill with " + (cur[GW] + surW) + " weapons and " + (cur[GA] + surA)
-                               + " pieces of armour, their spare kit in the armoury included (a full set is " + full + " of each - one per three men). They will take "
+                               + " pieces of armour, their spare kit in the armoury included (a full set is " + full + " of each - " + (MenPerPiece == 1 ? "one per man" : "one per " + MenPerPiece + " men") + ", beside their battle kit). They will take "
                                + roomW + " more weapons and " + roomA + " more pieces of armour from you." + (noRoom > 0 ? " " + noRoom + " pieces " + rest + " - no room." : ""),
                                noRoom > 0 && taken == 0);
                 Log.Info("Musztra: zapas - przyjeto " + taken + " szt. (" + SrcName[Math.Max(0, Math.Min(SrcName.Length - 1, src))] + "), bez miejsca " + noRoom + ", wrocone do taborow " + back
@@ -1453,6 +1459,8 @@ namespace Armoury
             internal float AccW, AccA;                         // ulamek zuzycia do nastepnej sztuki (0..1)
             internal int HaveW { get { return GivenW + SurW; } }
             internal int HaveA { get { return GivenA + SurA; } }
+            /// <summary>548: ludzi (pelnych zestawow) gotowych do musztry - min(bron w uzyciu, zbroje w uzyciu); w uzyciu = min(stan, komplet). Pasek mapy.</summary>
+            internal int Ready { get { return Math.Min(Math.Min(HaveW, Full), Math.Min(HaveA, Full)); } }
             internal int RoomW { get { return Math.Max(0, IntakeSets * Full - GivenW); } }
             internal int RoomA { get { return Math.Max(0, IntakeSets * Full - GivenA); } }
             internal float Bonus(bool weapons)                 // premia S tej grupy (0.10 przy pelnym, x1.5 z perkiem)
