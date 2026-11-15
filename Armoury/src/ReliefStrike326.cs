@@ -167,6 +167,21 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>556 (tylko log): osada odsieczy armii po koncu zbiorki 326c (przewaga / czas) albo null.</summary>
+        internal static Settlement ReleasedTo(Army a)
+        {
+            Settlement st;
+            if (a != null && _released.TryGetValue(a, out st)) return st;
+            return null;
+        }
+
+        /// <summary>556 (tylko log): godziny od zalozenia armii (Army._creationTime - zegar gry) albo -1.</summary>
+        internal static double ArmyHours(Army a)
+        {
+            try { if (a != null && _armyCreated != null) { var ct = _armyCreated(a); if (ct != default(CampaignTime)) return (CampaignTime.Now - ct).ToHours; } } catch { }
+            return -1.0;
+        }
+
         internal static void OnArmyDispersed(Army army)
         {
             try { if (army != null) { _gatherFor.Remove(army); _released.Remove(army); } }

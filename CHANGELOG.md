@@ -1,5 +1,31 @@
 # DZIENNIK ZMIAN
 
+## 556: armia w zbiorce w linii "dlaczego stoi" i linia OB5 "armia wladcy po zbiorce" - TYLKO LOG - Armoury (CanonWarWatch.cs, BesiegedRelief.cs, ReliefStrike326.cs)
+
+**Problem:** Jeff, czat 15.11: "sprawdz czemu tak jest z armia Joffreya". Armoury-2026-11-15_15-14-12.log:10822 (16:29:09): mysl AI Joffreya "1. BesiegeSettlement Maidenpool 51.038 ... 3. DefendSettlement Banefort 2.560", a "dlaczego stoi: SCA: wyczerpane - cele oblezen x0.55". Oceny zapisane w czasie zbiorki armii (gra ustawia DoNotChangeBehavior - AiMilitaryBehavior.cs:496-499; OB5 BesiegedRelief nie podbija w zbiorce); zbiorke zakonczyl 326c o 16:29:08 (linia "koniec zbiorki ... odsiecz Banefort", powod czas 24.4 h), gra zamknieta 30 s pozniej. Po zbiorce OB5 powinien dac obronie Banefort ok. 56 > 51 - brak dowodu, bo nie bylo ani jednej mysli po koncu zbiorki.
+
+**Przyczyna:** linia 264 podawala SCA jako powod postoju, choc w zbiorce gra i tak nie zmienia rozkazu (oceny bez skutku); nie bylo linii, ktora pokaze pierwsza mysl armii wladcy po koncu zbiorki (ocena gry, podbicie OB5, najlepsza inna opcja).
+
+**Zmiana (tylko log, bez zmiany zachowania):**
+- CanonWarWatch: postfiks mysli zapisuje `PartyThinkParams.DoNotChangeBehavior` (ostatnia mysl + liczba mysli doby). Gdy wodz armii mial je w ostatniej mysli, "dlaczego stoi" zaczyna sie od "armia w zbiorce (N h, dolaczonych a/b) - oceny bez skutku" (N = godziny od Army._creationTime; a = wodz + doczepieni, b = partie armii; "(zbiorka w x z y mysli)" gdy nie cala doba; "; zbiorka skonczona (326c, odsiecz X) po ostatniej mysli - oceny dzialaja od nastepnej" gdy 326c juz ja zwolnil), a pozycje "SCA: ..." sa zdejmowane z powodow (stan SCA dalej w czesci "| SCA:").
+- BesiegedRelief (OB5): raz na armie - pierwsza mysl wodza armii wladcy (`WarLeader`: wladca albo zastepca 340) po koncu zbiorki 326c (juz bez DoNotChangeBehavior): "Odsiecz (OB5) armia wladcy po zbiorce (556): dzien D | wodz ... -> odsiecz 326c X | ocena gry obrony G -> po OB5 N (powod, gdy bez podbicia: bramka f12, 326c-D, odsiecz wystarczy, wlasne oblezenie zamku, ocena gry juz wyzsza, glod, brak oceny) | najlepsza inna opcja: zachowanie cel ocena | najwyzsza odsiecz OB5 | wynik: ...".
+- ReliefStrike: dwa odczyty dla logu - `ReleasedTo(Army)` (osada odsieczy po koncu zbiorki) i `ArmyHours(Army)` (godziny od zalozenia armii).
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci (kod): nowe linie po `if (dnc) return;` - zbiorka bez zmian; podbicie, rezerwacje (`In`/`Committed`), liczniki doby, zasieg f12 i armia krola bez zmian (dodane tylko przypisania zmiennych logu i `otherIdx` przy szukaniu najlepszej innej opcji). `WarLeader` wolany tylko dla zwolnionej armii bez linii (pamiec godziny `_warLead` - ten sam wynik co dalej w mysli). `_relLogged` czyszczony w `Reset`; rosnie o 1 armie na zwolnienie (male).
+- CanonWarWatch: tylko tekst linii dobowej; nowe pola `W` zerowane w `ZeroDay`. Wyjatek w nowym bloku -> `Stumble("Muster")`, linia dalej sie pisze.
+- Co czytac w nastepnej sesji: linia "armia wladcy po zbiorce (556)" dla Joffreya - czy obrona Banefort po OB5 > Maidenpool; potem linia 264 Joffreya - "AI: DefendSettlement -> Banefort" albo nadal oblezenie Maidenpool. Jesli "bez podbicia: bramka zasiegu f12" albo "326c-D" - przyczyna w bramce, nie w ocenach.
+- Build: 0 bledow. Nie wgrane, w grze nie testowane.
+
+**Status:** DO SPRAWDZENIA
+
+### Recenzja 556
+
+Diff 556 sprawdzony: podbicia OB5, rezerwacje, liczniki doby, zasieg f12 i armia krola bez zmian (nowy kod po `if (dnc) return;`, `relGame` czytane przed `SetBehaviorScore`, `LogAfterMuster` w try/catch, raz na armie); CanonWarWatch czyta `DoNotChangeBehavior` w postfiksie Last `CampaignEventDispatcher.AiHourlyTick` (po wszystkich zachowaniach, wiec po AiMilitaryBehavior) - odczyt poprawny; linia dobowa, bez spamu; liczniki `DncThinks`/`Dnc` jak dotychczasowe pola `W` (watek glowny mysli, zerowane w `ZeroDay`).
+- Poprawka: `WarLeader` z linii logu ZAPISYWAL pamiec godziny `_warLead` (zastepca 340). Mysli partii gra rozklada na cala godzine, wiec wolanie z logu moglo ustalic zastepce wczesniej niz droga gry (`OnArmyCreated`, wezwanie armii krola), a gdy pozniej w tej godzinie zastepca trafi do niewoli albo straci druzyne - gra uzylaby starego. Log zmienial zachowanie (rzadko, ale wbrew "tylko log"). Teraz `WarLeaderPeek`: ten sam wynik, czyta pamiec godziny, ale nic do niej nie zapisuje; w try/catch.
+- Uwaga bez zmiany: `_relLogged` trzyma rozwiazane armie do `Reset` (kilka na sesje - pomijalne).
+- Build Armoury Release: 0 bledow. Nie wgrane.
+
 ## 557: linia "Straty bitwy (312f)" - bitwa gracza w polu liczyla wystawionych dwa razy (ranni dopisani przez RBM) - Armoury (BattleLosses312.cs PreRbm + Snap; jedna linia wywolania w CommanderWithdraw458.Map.cs ContPre; tylko log, bez nowego klucza)
 
 **Problem:** Jeff, czat 15.11: "napraw linie logu". Log Armoury-2026-11-15_15-14-12 (WGRANIE 250): bitwa 3 (linia 3296, [misja], Tyrion Lannister) "wystawieni 524" = zabici 28 + nieprzytomni 456 + zbiegli z pola 40, a wynik zabici 28 / jency 205 / zbiegli 40 = 273, kontrola = 251; bitwa 9 (linia 10021, [misja], Ysilla Kenning) "wystawieni 322" (nieprzytomni 267), wynik 33 + 105 + 22 + bez odbiorcy 2 = 162. Bitwy AI (1, 2, 4, 5) - kontrola 0. Linia 9988 (458-s) tej samej bitwy 9: "licznik gry WoundedInBattle: przy migawce 105, przy pojmaniu 267 (dopisane po misji 162 - RBM SetRoutedPatch)".

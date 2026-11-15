@@ -49,9 +49,11 @@ namespace Armoury
             public Hero Hero;
             public MobileParty Party;
             public int Thinks, Below, Hours, InTown, SiegeH, BattleH, Field, Siege, Raid, Other;
+            public int DncThinks;   // 556: mysli doby z DoNotChangeBehavior (wodz armii w zbiorce)
+            public bool Dnc;        // 556: ostatnia mysl z DoNotChangeBehavior
             public string Top = "-", LastThink = "-";
             public float Best = -1f, Thr, Obj;
-            public void ZeroDay() { Thinks = Below = Hours = InTown = SiegeH = BattleH = Field = Siege = Raid = Other = 0; Top = "-"; LastThink = "-"; Best = -1f; Thr = 0f; Obj = 0f; }
+            public void ZeroDay() { Thinks = Below = Hours = InTown = SiegeH = BattleH = Field = Siege = Raid = Other = DncThinks = 0; Dnc = false; Top = "-"; LastThink = "-"; Best = -1f; Thr = 0f; Obj = 0f; }
         }
 
         private sealed class KD { public int Field, Siege, Raid; public void Zero() { Field = Siege = Raid = 0; } }
@@ -134,6 +136,9 @@ namespace Armoury
                 }
                 w.Thinks++;
                 w.Obj = __1.CurrentObjectiveValue;
+                // 556: gra (AiMilitaryBehavior.AiHourlyTick) ustawia DoNotChangeBehavior wodzowi armii czekajacej na czlonkow - oceny liczone, rozkaz bez zmian
+                w.Dnc = __1.DoNotChangeBehavior;
+                if (w.Dnc) w.DncThinks++;
                 var sb = new StringBuilder(160);
                 int k = 0;
                 foreach (int idx in new[] { i1, i2, i3 })
@@ -447,6 +452,22 @@ namespace Armoury
             if (exh) why.Add("SCA: wyczerpane - cele oblezen x0.55");
             if (wp || fp) why.Add("SCA: " + (fp ? "ForcePeace" : "chce pokoju") + " - cele oblezen x0.35");
             if (cool) why.Add("SCA: zakaz nowej armii");
+            // 556 (tylko log): wodz armii w zbiorce (ostatnia mysl z DoNotChangeBehavior) - gra nie zmienia rozkazu, wiec mnozniki SCA nie sa przyczyna postoju
+            // (15.11: linia Joffreya podawala "SCA: wyczerpane" przy armii w zbiorce)
+            try
+            {
+                if (mp != null && w.Dnc && army != null && army.LeaderParty == mp)
+                {
+                    double hrs = ReliefStrike.ArmyHours(army);
+                    var rel = ReliefStrike.ReleasedTo(army);
+                    string z = "armia w zbiorce (" + (hrs >= 0.0 ? hrs.ToString("0.0", Inv) : "?") + " h, dolaczonych " + army.LeaderPartyAndAttachedPartiesCount + "/" + army.Parties.Count
+                               + ") - oceny bez skutku" + (w.DncThinks < w.Thinks ? " (zbiorka w " + w.DncThinks + " z " + w.Thinks + " mysli)" : "")
+                               + (rel != null ? "; zbiorka skonczona (326c, odsiecz " + rel.Name + ") po ostatniej mysli - oceny dzialaja od nastepnej" : "");
+                    why.RemoveAll(x => x.StartsWith("SCA:", StringComparison.Ordinal));
+                    why.Insert(0, z);
+                }
+            }
+            catch (Exception e) { Stumble("Muster", e); }
             if (w.Field + w.Siege + w.Raid > 0 || w.SiegeH > 0) why.Clear();
             sb.Append(" | dlaczego stoi: ").Append(why.Count == 0 ? (w.Field + w.Siege + w.Raid > 0 || w.SiegeH > 0 ? "nie stoi (walczyl)" : "-") : string.Join("; ", why.ToArray()));
             sb.Append(" | SCA: ").Append(sca).Append('.');
