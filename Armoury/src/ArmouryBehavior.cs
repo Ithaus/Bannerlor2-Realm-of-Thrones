@@ -2183,7 +2183,7 @@ namespace Armoury
                         if (_lootFlushDue != CampaignTime.Zero && CampaignTime.Now > _lootFlushDue)
                         {
                             _lootFlushDue = CampaignTime.Zero;
-                            if (BattlefieldLaw.SharePending()) BattlefieldLaw.FlushShareToBaggage("ekran lupow nie przyszedl");
+                            if (BattlefieldLaw.SharePending()) BattlefieldLaw.FlushShareOffScreen("ekran lupow nie przyszedl w godzine");   // 576: zbrojownia gracza (klucz), inaczej sakwy
                         }
                     }
                     catch { }
@@ -3817,9 +3817,17 @@ namespace Armoury
                 // (bandyci poddani po walce) sa obszukiwani od reki
                 if (mapEvent.IsHideoutBattle)
                 {
-                    BattlefieldLaw.FlushShareToBaggage("kryjowka zdobyta");
+                    // 576: kryjowka jak kazda bitwa bez ekranu - do zbrojowni gracza na jego liste (klucz LootShareToArmouryNoScreen), inaczej sakwy
+                    BattlefieldLaw.FlushShareOffScreen("kryjowka zdobyta");
                     try { _prisonerBaseline = SnapshotPrisoners(); } catch { }   // jency z walki - bez drugiego obszukania (W3)
                     _lootFlushDue = CampaignTime.Zero;
+                }
+                else if (BattlefieldLaw.SharePending() && BattlefieldLaw.NoLootScreen(mapEvent))
+                {
+                    // 576 (Jeff 16.11): bitwa na ladzie, ktora nie jest polowa (wymuszenie zaopatrzenia, rabunek, szturm, wypad...) - Spoils jej nie obsluguje,
+                    // ekranu nie bedzie: dzialka od razu do zbrojowni gracza, a nie po godzinie do sakw (kolejka bez zapisu - zapis w tej godzinie ja gubil)
+                    BattlefieldLaw.FlushShareOffScreen("ekran lupow nie przyjdzie - bitwa " + mapEvent.EventType);
+                    _lootFlushDue = BattlefieldLaw.SharePending() ? CampaignTime.HoursFromNow(1f) : CampaignTime.Zero;
                 }
                 else if (BattlefieldLaw.SharePending())
                 {

@@ -1548,6 +1548,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SimBattleFullDrop { get; set; } = true;
 
+        [SettingPropertyBool("Loot Share To Armoury No Screen", HintText = "when no loot screen comes after a fight you won (a hideout, forcing a village for supplies or volunteers, a raid, a storm or sally of a siege, or the loot screen simply never came), your share of the spoils goes to your list in the troops' armoury at once, battle-worn as in your bags, with a message - horses and harness still go to your baggage. Off = the share is packed into your baggage, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool LootShareToArmouryNoScreen { get; set; } = true;
+
         [SettingPropertyInteger("Player Loot Share Percent", 0, 132, "0", HintText = "the captain's third: your cut of what YOUR MEN strip from the foes they felled (the rest is theirs, in the army armoury); foes felled by you or your companions are all yours; auto-resolved battles use this share for everything", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public int PlayerLootSharePercent { get; set; } = 33;
@@ -14401,6 +14405,7 @@ namespace Armoury
             s.LootArrivesBattleWorn = LootArrivesBattleWorn;
             s.SimBattleFullDrop = SimBattleFullDrop;
             s.PlayerLootSharePercent = PlayerLootSharePercent;
+            s.LootShareToArmouryNoScreen = LootShareToArmouryNoScreen;
             s.SpoilsSoldierSplitOff = SpoilsSoldierSplitOff;
             s.OwnKillsLootWhole = OwnKillsLootWhole;
             s.LootIsTransfer = LootIsTransfer;

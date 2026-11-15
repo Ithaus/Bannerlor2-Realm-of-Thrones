@@ -547,6 +547,8 @@ namespace Armoury
         public bool BattlefieldLawEnabled = true;          // battles you fight yourself: the dead drop their real gear (DTE), Spoils of War steps aside
         public bool LootArrivesBattleWorn = true;          // loot-screen items from fought battles arrive battle-worn but keep their worth
         public bool SimBattleFullDrop = true;              // auto-resolved battles ignore the hidden per-tier drop multipliers
+        // 576 (Jeff 16.11 "tak zrob"): dzialka bez ekranu lupow do zbrojowni gracza na jego liste - BattlefieldLaw.FlushShareOffScreen
+        public bool LootShareToArmouryNoScreen = true;     // when no loot screen comes after a fight you won (a hideout, forcing a village for supplies or volunteers, a raid, a storm or sally of a siege, or the loot screen simply never came), your share of the spoils goes to your list in the troops' armoury at once, battle-worn as in your bags, with a message - horses and harness still go to your baggage. Off = the share is packed into your baggage, as before
         public int PlayerLootSharePercent = 33;            // the captain's third: your cut of what YOUR MEN strip from the foes they felled (the rest is theirs, in the army armoury); foes felled by you or your companions are all yours; auto-resolved battles use this share for everything
         // m114-lup (Jeff 24.10 17:40: "dostaje tylko zbroje i zero broni... wszystkich zabijam sam, wiec wszystko powinno byc moje"; 17:55: bron byla potem
         // w ekwipunku, ale nie na ekranie lupu): Spoils dzielil liste trofeow drugi raz (EnablePrioritySystem, bez MCM) - przy choc jednym zolnierzu w druzynie

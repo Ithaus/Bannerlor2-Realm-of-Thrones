@@ -183,8 +183,8 @@ namespace Armoury
             if (CampaignTime.Now.ToHours > _deadlineH)
             {
                 int flushed = 0;
-                if (BattlefieldLaw.SharePending()) flushed = BattlefieldLaw.FlushShareToBaggage("okno 380 nie przyszlo");
-                Note("bramka nie przyszla w " + WaitHours.ToString("0") + " h gry (" + (_why.Length > 0 ? _why : "-") + ") - jency zostaja w lochu, dzialka do sakw " + flushed + " szt.");
+                if (BattlefieldLaw.SharePending()) flushed = BattlefieldLaw.FlushShareOffScreen("okno 380 nie przyszlo");   // 576: zbrojownia gracza (klucz), inaczej sakwy
+                Note("bramka nie przyszla w " + WaitHours.ToString("0") + " h gry (" + (_why.Length > 0 ? _why : "-") + ") - jency zostaja w lochu, dzialka poza ekranem (576: zbrojownia gracza albo sakwy) " + flushed + " szt.");
                 Finish("zapas");
                 return;
             }
