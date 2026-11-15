@@ -514,6 +514,9 @@ namespace Armoury
         public bool HideoutDailyStash = true;              // every day a band with a home hideout carries part of its purse back to the den's hoard - outlaws keep their coin at home, so a band beaten in the field carries only its pocket money and a cleared, searched den pays (off = coin is put by only on the rare visits home, as before)
         public float HideoutDailyStashShare = 0.25f;       // with Hideout Daily Stash: share of its purse, after the day's living, a band carries home each day
         public bool HideoutHoardToAiVictor = true;         // a hideout cleared without you: its hoard goes to the victor - the lord's purse, else the party's purse, else the nearest town (off = it stays in the empty den and leaks to the nearest town, as before)
+        public bool HideoutGoodsStash = true;              // 568: every day a band with a home hideout carries part of its plundered trade goods (not food, not beasts, not its own gear) back to the den; whoever clears the den takes them - you when you search it, an AI victor into its baggage or its town (off = goods stay in the packs and go to the fence, as before)
+        public float HideoutGoodsStashShare = 0.25f;       // with Hideout Goods Stash: share of each bale of plundered goods a band carries home each day
+        public int HideoutGoodsStashCap = 6000;            // with Hideout Goods Stash: a den holds goods worth at most this many denars (base value) - beyond it the bands sell to the fence as before (0 = no limit)
         public bool HideoutGoldMessages = true;            // after a hideout fight you are told what coin the bands carried, after the search what the den held - also when there was nothing (off = only the old message when gold is found)
 
         // --- Loot from the field ---

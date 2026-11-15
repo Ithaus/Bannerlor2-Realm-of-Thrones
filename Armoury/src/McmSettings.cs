@@ -1444,6 +1444,18 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutHoardToAiVictor { get; set; } = true;
 
+        [SettingPropertyBool("Hideout Goods Stash", HintText = "every day a band with a home hideout carries part of its plundered trade goods (not food, not beasts, not its own gear) back to the den; whoever clears the den takes them - you when you search it, an AI victor into its baggage or its town (off = goods stay in the packs and go to the fence, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutGoodsStash { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hideout Goods Stash Share", 0.00f, 1.00f, "0.00", HintText = "with Hideout Goods Stash: share of each bale of plundered goods a band carries home each day", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutGoodsStashShare { get; set; } = 0.25f;
+
+        [SettingPropertyInteger("Hideout Goods Stash Cap", 0, 50000, "0", HintText = "with Hideout Goods Stash: a den holds goods worth at most this many denars (base value) - beyond it the bands sell to the fence as before (0 = no limit)", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public int HideoutGoodsStashCap { get; set; } = 6000;
+
         [SettingPropertyBool("Hideout Gold Messages", HintText = "after a hideout fight you are told what coin the bands carried, after the search what the den held - also when there was nothing (off = only the old message when gold is found)", RequireRestart = false)]
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutGoldMessages { get; set; } = true;
@@ -14287,6 +14299,9 @@ namespace Armoury
             s.HideoutDailyStashShare = HideoutDailyStashShare;
             s.HideoutHoardToAiVictor = HideoutHoardToAiVictor;
             s.HideoutGoldMessages = HideoutGoldMessages;
+            s.HideoutGoodsStash = HideoutGoodsStash;
+            s.HideoutGoodsStashShare = HideoutGoodsStashShare;
+            s.HideoutGoodsStashCap = HideoutGoodsStashCap;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;

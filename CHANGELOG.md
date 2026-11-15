@@ -1,5 +1,37 @@
 # DZIENNIK ZMIAN
 
+## 568: lup w kryjowce - bandy odnosza czesc zrabowanego towaru do magazynu kryjowki, zabiera go ten, kto ja oczysci (gracz przy przeszukaniu, zwyciezca AI) - Armoury (HideoutGoods.cs nowy, HideoutPurge.cs, OutlawLaw.cs, Settings.cs, McmSettings.cs, ArmouryBehavior.cs)
+
+**Problem:** Jeff, czat 15.11, po audycie kryjowek: "ABCDE tak rob" - punkt B: "bandy odnosza do kryjowki czesc zrabowanego towaru (dzis tylko zloto - 25% kiesy ponad 3 dni zapasu), ktory zdobywasz po rozbiciu". Dzis bandy odnosza tylko zloto (OutlawLaw.StashDay); towar z rabunkow zostaje w jukach i idzie do pasera. Magazyn kryjowki (Settlement.ItemRoster) jest zawsze pusty, wiec ekran lupu po przeszukaniu (HideoutPurge.BuildLoot) nigdy sie nie pokazuje (w logu zawsze "magazyn kryjowki pusty - lup tylko z band (vanilla)").
+
+**Przyczyna:** nikt nie wklada towaru do magazynu kryjowki. Komentarz w HideoutPurge.OnHideoutBattle ("vanilla odklada tam 25% wartosci lupow band") byl nieprawdziwy: BanditSpawnCampaignBehavior.OnSettlementEntered dopisuje 25% wartosci jukow jako ZLOTO z niczego (blokuje to kurek OutlawLaw.HideoutGoldPostfix), towaru nie zdejmuje. Gra sama magazynu kryjowki nie lupi (DefaultBattleRewardModel.GetLootItemChancesForWinnerParties - pokonana osada: pusta lista; MapEvent.LootDefeatedPartyItems - `party.IsSettlement` -> continue), wiec BuildLoot byl jedyna droga - martwa.
+
+**Zmiana:**
+- **Dola towarowa** (`HideoutGoods.Day`, raz na dobe w `OutlawLaw.Daily` zaraz po doli zlota StashDay, PRZED paserem; nie w srodku dziennego ticku gry - `_goldTick`): kazda banda z kryjowka (`BanditPartyComponent.Hideout` - ta sama regula co dola zlota) przenosi `HideoutGoodsStashShare` (0.25) kazdego stosu zrabowanego TOWARU z jukow do magazynu kryjowki. Towar = `ItemTypeEnum.Goods` bez zywnosci (zapas bandy i nadwyzka dla pasera zostaja), bez stad/koni, bez broni i pancerzy (sprzet bandy i do awansow), bez przedmiotow zadan, NotMerchandise i choragwi. Zaokraglenie losowe (MBRandom.RoundRandomized). Przelew: zdjecie z jukow, dolozenie do magazynu, nieudane dolozenie cofa zdjecie - nic nie powstaje.
+- Poza dola (jak zloto): banda w bitwie, w zadaniu, nieumarli, kryjowka czekajaca na przeszukanie gracza (`HideoutPurge.Holds`). Bez warunku `Hideout.IsInfested` (to liczba band w srodku w danej chwili).
+- **Sufit** `HideoutGoodsStashCap` (6000 zl wartosci bazowej Item.Value, 0 = bez sufitu): pelny magazyn nie przyjmuje wiecej - reszta idzie do pasera jak dotad (bez sufitu towar z niezdobytych kryjowek schodzilby z rynku bez konca).
+- **Gracz:** przy kluczu TAK magazyn schodzi dopiero przy PRZESZUKANIU (`DoSearch` -> `BuildLoot`, jak zloto; odejscie bez przeszukania zostawia towar w kryjowce), ekran lupu jak po bitwie pokazuje OnTick na czystej mapie (bez zmian). Komunikat (EN): "Stacked behind the bedrolls lie bales of plunder the bands had carried home - goods worth about N denars." Klucz NIE - BuildLoot przy bitwie jak dotad.
+- **Zwyciezca AI** (`HideoutPurge.AiCleared`, po skarbcu zlota, ten sam odbiorca i te same warunki - HideoutHoardToAiVictor, Holds): wodz albo partia z kiesa -> juki partii (`lmp.ItemRoster`); milicja / patrol / nieumarli / bez kiesy -> magazyn osady (`town.ItemRoster`). Bez odbiorcy towar zostaje w kryjowce.
+- Poprawione komentarze: OnHideoutBattle (prawdziwe zrodla kasy i magazynu), BuildLoot (stary opis "zelastwo tier 1-3 po kilka sztuk na bande" byl nieprawdziwy).
+- **Log:** linia doby "Lup w kryjowkach (568): dzien N | udzial, sufit | do kryjowek: band, sztuk wart zl, band przy suficie | odbior: gracz Nx (szt., zl), AI Nx | magazyny: kryjowek z towarem (pelnych), sztuk, wart | potkniecia" (przed linia nskarbiec); przy oczyszczeniu przez AI linia "Lup w kryjowkach (568): kryjowka X - magazyn N szt. -> ...".
+- **MCM (grupa The hideout purge, klucze recznie w Settings.cs + McmSettings.cs):** Hideout Goods Stash (TAK), Hideout Goods Stash Share (0.25), Hideout Goods Stash Cap (6000). Klucz NIE = jak dotad. W Armoury.json Jeffa nowych kluczy nie ma - dzialaja domyslne.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Ekonomia zamknieta: towar tylko sie przenosi (juki -> kryjowka -> gracz / juki AI / magazyn osady). Ubytek mozliwy tylko tam, gdzie byl dotad: rzeczy zostawione na ekranie lupu przez gracza znikaja (jak lup z bitwy); zapis gry miedzy przeszukaniem a ekranem lupu (_lootRoster statyczny, pare klatek) - jak dotad.
+- Paser dostaje mniej (25% towaru dziennie do sufitu) - bandy maja mniej zlota z lupu; zloto band (dola, zycie, kieszonkowe) nietkniete. Sprawdzic w linii "Paser:" spadek sprzedanych sztuk i w "Lup w kryjowkach" ile towaru lezy (pelne kryjowki = sufit dziala).
+- Kolejnosc doby: dola zlota -> dola towarowa -> paser -> BandFood (jedzenie nietkniete - zywnosc nie jest Goods dla doli). DothrakiArms.BandToPack biegnie po nas (bron, nie Goods).
+- Ksiega towarow (GoodsLedger): przelew poza ramkami miedzy rosterami swiata - suma sie znosi; kryjowka liczona jako posiadacz (Settlement.All).
+- BK PartySupplies czyta CurrentSettlement.ItemRoster tylko dla lordow w miastach/wsiach - kryjowki nie dotyczy. Nikt w grze/BK/ROT nie czysci magazynu kryjowki (grep ItemRoster.Clear).
+- Kolizje z A/C/D/E (inne wpisy serii): C usuwa nocny towar z niczego (inna sciezka - OnCollectLootItems), D (poscig za skarbem) moze chciec liczyc wartosc magazynu - jest `HideoutGoods.ValueOfRoster`.
+- Zapis: magazyn kryjowki to PartyBase.ItemRoster (SaveableProperty) - przechodzi przez zapis bez naszego kodu; nowy klucz zapisu niepotrzebny.
+
+**Testy:** build 0 bledow. W grze/autoteście: linia "Lup w kryjowkach (568)" codziennie, "do kryjowek: band > 0"; po rozbiciu kryjowki i przeszukaniu - komunikat o towarze i ekran lupu; przy oczyszczeniu przez AI - linia z odbiorca; brak potkniec.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+**Pliki do wgrania (gra zamknieta):**
+- `Armoury/bin/Release/Armoury.dll` -> `Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll`
+
 ## 563: stal valyrianska w sztabach - przetop od 275 (10 sztab na miare), kucie klingi jednorecznej z 10 sztab (perk Legendary Smith + 300), sztaba jako towar; zgodne z 177 (bilans stali) - Armoury (ValyrianBlades.Ingots.cs nowy, ValyrianBlades.cs, SmeltTab.cs, ForgeBill.cs, HistoricalPrices.cs, RareMaterials.cs, UniqueShelf.cs, UniqueSpoils.cs, CastleSteel.cs, PerkTexts.cs, QohorMasters.Own.cs, ArmouryBehavior.cs; ModuleData/arm_items_rare.xml - nowy przedmiot arm_valyrian_steel; nowe klucze ValyrianIngots, ValyrianSmeltSkill, ValyrianForgeSkill, ValyrianLegendarySmithAt300 w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "dodaj valyrianska stal: jesli przetapiam valyrianska stal, to otrzymuje x valyrianskiej stali - jesli do miecza potrzeba 10, a przetopilem ten sam miecz, to dostane 10; valyrianska stal - znajdz lub stworz ikone do handlu; w kuzni przy wykuwaniu mieczy moze byc nad innymi surowcami ...; zeby wytopic valyrianska stal trzeba miec 275 smithing; zmien tez umiejetnosc [perk], ze pozwala wykuwac bron z valyrianskiej stali - daj na poziomie 300; stworz ikone, ze odblokowuje ..." oraz "i jak teraz jest to z valyrianska stala - cos podobno jest w grze, ze mozna wykuc - zeby sie nie gryzlo". Dzis (177) przetop VS w zwyklej kuzni jest zablokowany ("Only the masters of Qohor can work Valyrian steel."), jedyna droga do nowej klingi to Qohor. Bez dowodu z logu - nowa funkcja.

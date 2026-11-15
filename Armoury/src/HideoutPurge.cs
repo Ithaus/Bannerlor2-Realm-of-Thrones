@@ -118,8 +118,10 @@ namespace Armoury
                 if (sett != null) _pendingPos = sett.GatePosition;
                 _pendingName = sett != null && sett.Name != null ? sett.Name.ToString() : "the hideout";
                 _pendingBands = bands;
-                // AUDYT 04.10 (C6): lup to PRAWDZIWA kasa i magazyn kryjowki (vanilla odklada tam 25% wartosci
-                // lupow band - BanditSpawnCampaignBehavior.OnSettlementEntered), nie zloto i zelastwo z niczego.
+                // AUDYT 04.10 (C6): lup to PRAWDZIWA kasa i magazyn kryjowki, nie zloto i zelastwo z niczego.
+                // 568: poprawka komentarza - gra NIE odklada towaru do kryjowki (BanditSpawnCampaignBehavior.OnSettlementEntered dopisywala
+                // 25% wartosci jukow jako ZLOTO z niczego, towaru nie zdejmowala; dosypke blokuje kurek OutlawLaw.HideoutGoldPostfix).
+                // Kasa kryjowki = dola zlota band (OutlawLaw.StashDay), magazyn = dola towarowa band (HideoutGoods.Day, 568) - bez 568 zawsze pusty.
                 // audyt ponowny W5: zloto zdejmowane dopiero przy PRZESZUKANIU (DoSearch) - odejscie bez przeszukania
                 // zostawia je w kryjowce, zamiast kasowac
                 _pendingHideout = sett;
@@ -127,7 +129,7 @@ namespace Armoury
                 try { if (sett != null && sett.SettlementComponent != null) _pendingGold = Math.Max(0, sett.SettlementComponent.Gold); } catch { }
                 _pendingStrikes = 0; _pendingRetryAt = DateTime.MinValue;   // E8/S (246): nowe przeszukanie - licznik potkniec od zera
                 _pending = true;
-                BuildLoot(sett);
+                if (!HideoutGoods.On) BuildLoot(sett);   // 568: z dola towarowa magazyn schodzi dopiero przy PRZESZUKANIU (DoSearch) - jak zloto; klucz off - jak dotad
                 Log.Info("HideoutPurge: zwyciestwo w " + _pendingName + " (" + (sett != null ? sett.StringId : "-") + "), band " + bands + ", lup " + _pendingGold + " zlota czeka na przeszukanie.");
                 // odwet rusza JUZ TERAZ - przy duzej partii przeszukanie trwa
                 // ledwie pare godzin gry i bandy musza wyjsc w droge od razu
@@ -192,14 +194,28 @@ namespace Armoury
                 OutlawLaw.NoteAiTo(who, g);
                 Log.Info("Skarbce kryjowek (nskarbiec): kryjowka " + name + " (" + sett.StringId + ") oczyszczona bez gracza przez " + by
                          + " - skarbiec " + g + " zl -> " + to + ".");
+                // 568: magazyn kryjowki (towar z doli band) do tego samego odbiorcy: wodz / partia - juki partii, osada - jej magazyn
+                if (HideoutGoods.On)
+                {
+                    try
+                    {
+                        var dst = who == OutlawLaw.AiToTown ? town.ItemRoster : lmp.ItemRoster;
+                        long gv;
+                        int gu = HideoutGoods.TakeAll(sett, dst, out gv);
+                        if (gu > 0)
+                            Log.Info("Lup w kryjowkach (568): kryjowka " + name + " (" + sett.StringId + ") - magazyn " + gu + " szt. (wart " + gv + " zl) -> "
+                                     + (who == OutlawLaw.AiToTown ? (town.IsTown ? "miasto " : "osada ") + town.Name : "juki " + by) + ".");
+                    }
+                    catch (Exception e) { HideoutGoods.Stumble("AiCleared", e); }
+                }
             }
             catch (Exception e) { OutlawLaw.HoardStumble("HideoutPurge.AiCleared", e); }
         }
 
         /// <summary>
-        /// Lup przedmiotowy kryjowki: proste zelastwo i lachy bandyckiej hordy -
-        /// tier 1-3, rzeczy z kramow, po kilka sztuk na bande. Do tego czasem
-        /// beczka czegos mocniejszego. Pokazywany ekranem lupow jak po bitwie.
+        /// Lup przedmiotowy kryjowki: caly jej magazyn (Settlement.ItemRoster) - od 568 towar, ktory bandy odniosly
+        /// z rabunkow (HideoutGoods.Day). Przenoszony do _lootRoster, pokazywany ekranem lupow jak po bitwie.
+        /// (568: stary opis "zelastwo tier 1-3 po kilka sztuk na bande" byl nieprawdziwy - magazyn byl zawsze pusty.)
         /// </summary>
         private static void BuildLoot(Settlement sett)
         {
@@ -667,6 +683,21 @@ namespace Armoury
                     _pendingGold = hs != null && hs.SettlementComponent != null ? OutlawLaw.HoardTakeAll(hs, OutlawLaw.HoardOutSearch) : 0;
                 }
                 catch { _pendingGold = 0; }
+                // 568: magazyn kryjowki (towar z doli band) - zdejmowany przy przeszukaniu, ekran lupu pokaze OnTick na czystej mapie
+                if (HideoutGoods.On)
+                {
+                    BuildLoot(_pendingHideout);
+                    try
+                    {
+                        if (_lootRoster != null && _lootRoster.Count > 0)
+                        {
+                            HideoutGoods.NotePlayer(_lootRoster);
+                            Log.Player("Stacked behind the bedrolls lie bales of plunder the bands had carried home - goods worth about "
+                                       + HideoutGoods.ValueOfRoster(_lootRoster) + " denars.");
+                        }
+                    }
+                    catch (Exception e) { HideoutGoods.Stumble("DoSearch", e); }
+                }
                 _pendingHideout = null;
                 if (_pendingGold > 0) Hero.MainHero.ChangeHeroGold(_pendingGold);
                 if (c.HideoutGoldMessages)
