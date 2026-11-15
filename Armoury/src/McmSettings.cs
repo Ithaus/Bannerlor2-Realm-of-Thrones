@@ -7281,7 +7281,7 @@ namespace Armoury
         [SettingPropertyGroup("Hideout spotted")]
         public float HideoutClearedRadius { get; set; } = 25f;
 
-        [SettingPropertyBool("Hideout Never Last Cleared", HintText = "with Hideout Relocate After Clear: a new hideout never takes the spot of the hideout of its culture you cleared last, however long ago (only when that is the one spot of that culture on the map); other cleared spots follow Hideout Cleared Memory Days. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Hideout Never Last Cleared", HintText = "with Hideout Relocate After Clear: a new hideout never takes the spot of the hideout of its culture you cleared last, however long ago (except when it is the only spot of that culture on the map); other cleared spots follow Hideout Cleared Memory Days. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Hideout spotted")]
         public bool HideoutNeverLastCleared { get; set; } = true;
 

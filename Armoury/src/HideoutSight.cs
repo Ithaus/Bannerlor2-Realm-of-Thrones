@@ -50,7 +50,8 @@ namespace Armoury
     /// 5) OSTATNIO ROZBITA KULTURY (wpis 567, klucz HideoutNeverLastCleared, dziala z HideoutRelocateAfterClear): kryjowka nie wraca w ostatnio rozbity punkt
     ///    swojej kultury - bez limitu czasu (pamiec z 3) wygasala po 60 dniach i przy 5 punktach kultury bandy wracaly w to samo miejsce). Zapis: kultura -> id
     ///    ostatnio rozbitego punktu, wpis podmienia dopiero rozbicie innego punktu tej kultury. Pozostale rozbite - pamiec HideoutClearedMemoryDays jak dotad;
-    ///    przy luzowaniu pamieci (stopien 2) wybor najdawniej uzywanej okolicy zamiast najdalszej. Ten sam punkt tylko, gdy to JEDYNY punkt kultury
+    ///    stopien 2 (luzowanie pamieci) bez zmian. Zapis starszy niz 567: wpisy odtwarzane z pamieci rozbitych. Oproznienie po przegranej bitwie napastnika
+    ///    nie ustawia ostatnio rozbitego (tylko pamiec 60 dni). Ten sam punkt tylko, gdy to JEDYNY punkt kultury
     ///    na mapie (linia "aktywacja w ostatnio rozbitym"); gdy to tylko jedyny WOLNY - bez nowej kryjowki, gra sprobuje nastepnej doby. Bandy AI (4) - ten sam zakaz.
     /// Stan (zapis arm_hideout_sight przez SaveText.Sync): znane z plotki, rozbite (id, x, y, doba), ostatnio rozbite kultur, wyniki rzutow na pobyt. Watek glowny (zdarzenia kampanii).
     /// </summary>
@@ -70,6 +71,10 @@ namespace Armoury
         private readonly Dictionary<string, string> _lastCleared = new Dictionary<string, string>();
         // wpis 567: liczba punktow kryjowek kultury na mapie (pula stala w kampanii, bez zapisu)
         private readonly Dictionary<string, int> _cultSpots = new Dictionary<string, int>();
+        // recenzja 567 (3): ile wpisow ostatnio rozbitych odtworzono z pamieci rozbitych przy wczytaniu starego zapisu (tylko log startu)
+        private int _lastMigrated;
+        // recenzja 567 (6): kryjowki, na ktore napastnik przegral bitwe (id -> doba; bez zapisu) - oproznienie po takiej bitwie nie ustawia ostatnio rozbitego
+        private readonly Dictionary<string, double> _lostAt = new Dictionary<string, double>();
 
         // --- pamiec przeliczen (bez zapisu)
         private readonly Dictionary<Settlement, float> _dSet = new Dictionary<Settlement, float>();
@@ -148,8 +153,9 @@ namespace Armoury
 
         private void Unpack(string v)
         {
-            _known.Clear(); _roll.Clear(); _cleared.Clear(); _lastCleared.Clear();
+            _known.Clear(); _roll.Clear(); _cleared.Clear(); _lastCleared.Clear(); _lastMigrated = 0;
             if (string.IsNullOrEmpty(v) || !v.StartsWith("1|")) return;
+            bool sawL = false;
             foreach (var part in v.Split('|'))
             {
                 if (part.StartsWith("k:"))
@@ -177,6 +183,7 @@ namespace Armoury
                 }
                 else if (part.StartsWith("l:"))
                 {
+                    sawL = true;
                     foreach (var e in part.Substring(2).Split(','))
                     {
                         int eq = e.IndexOf('=');
@@ -184,6 +191,27 @@ namespace Armoury
                     }
                 }
             }
+            if (!sawL) MigrateLastCleared();
+        }
+
+        /// <summary>Recenzja 567 (3): zapis sprzed 567 (bez czesci l:) - ostatnio rozbity kultury z pamieci rozbitych (najswiezszy wpis kultury).</summary>
+        private void MigrateLastCleared()
+        {
+            var best = new Dictionary<string, double>();
+            foreach (var c in _cleared)
+            {
+                try
+                {
+                    var st = Settlement.Find(c.Id);
+                    string ck = st != null && st.Culture != null ? st.Culture.StringId ?? "" : "";
+                    if (ck.Length == 0) continue;
+                    double d;
+                    if (best.TryGetValue(ck, out d) && d >= c.Day) continue;
+                    best[ck] = c.Day; _lastCleared[ck] = c.Id;
+                }
+                catch (Exception e) { Stumble("MigrateLastCleared", e); }
+            }
+            _lastMigrated = _lastCleared.Count;
         }
 
         // ------------------------------------------------------------ potkniecia (liczymy, nie gasimy)
@@ -565,16 +593,6 @@ namespace Armoury
             return LastOn && IsLastCleared(st) && CultureSpots(st.Culture) > 1;
         }
 
-        /// <summary>Wpis 567: doba najswiezszego rozbicia w promieniu punktu (pamiec rozbitych) - im mniejsza, tym dawniej uzywana okolica.</summary>
-        private double LastUseNear(Settlement st, float rad)
-        {
-            double best = double.MinValue;
-            Vec2 p = st.GetPosition2D;
-            foreach (var c in _cleared)
-                if (new Vec2(c.X, c.Y).Distance(p) < rad && c.Day > best) best = c.Day;
-            return best;
-        }
-
         private Hideout Pick(Clan faction, Hideout game)
         {
             var s = S;
@@ -615,24 +633,10 @@ namespace Armoury
             if (tierA.Count > 0) { pick = Weighted(tierA); how = "inne miejsce (wolne, z dala od osad i rozbitych)"; tier = 1; _dSwapped++; }
             else if (tierB.Count > 0)
             {
-                if (LastOn)
-                {
-                    // wpis 567: wszystkie wolne punkty w promieniu rozbitych - najdawniej uzywana okolica (najstarsze najswiezsze rozbicie w promieniu), remis - najdalszy
-                    double bu = double.MaxValue; float bd = -1f;
-                    foreach (var h in tierB)
-                    {
-                        double u = LastUseNear(h.Settlement, rad); float d = NearCleared(h.Settlement, out cw);
-                        if (u < bu - 0.01 || (Math.Abs(u - bu) <= 0.01 && d > bd)) { bu = u; bd = d; pick = h; }
-                    }
-                    how = "luzuje pamiec rozbitych - najdawniej uzywana okolica"; tier = 2; _dLoosened++;
-                }
-                else
-                {
-                    // wszystkie wolne punkty w promieniu rozbitych - najdalszy od nich
-                    float bd = -1f;
-                    foreach (var h in tierB) { float d = NearCleared(h.Settlement, out cw); if (d > bd) { bd = d; pick = h; } }
-                    how = "luzuje pamiec rozbitych - najdalszy od nich"; tier = 2; _dLoosened++;
-                }
+                // wszystkie wolne punkty w promieniu rozbitych - najdalszy od nich (recenzja 567 (5): wybor bez zmian wzgledem bazy)
+                float bd = -1f;
+                foreach (var h in tierB) { float d = NearCleared(h.Settlement, out cw); if (d > bd) { bd = d; pick = h; } }
+                how = "luzuje pamiec rozbitych - najdalszy od nich"; tier = 2; _dLoosened++;
             }
             else
             {
@@ -649,10 +653,12 @@ namespace Armoury
             {
                 // jedyne wolne punkty kultury leza przy rozbitej (np. kingswood 3/3 zajete, wolna tylko rozbita) - bez nowej kryjowki, gra sprobuje nastepnej doby
                 _dNone++;
+                if (lastOut > 0) _dLastSkip++;   // recenzja 567 (4): ostatnio rozbity tez wykluczony - liczy sie w "w tym ostatnio rozbity"
                 float dg = NearCleared(game.Settlement, out cw);
                 Log.Info(P + "aktywacja brak (" + (culture != null ? culture.StringId : "?") + ") | wybor gry " + game.Settlement.StringId + " przy rozbitej " + (cw ?? "-") + " "
                          + dg.ToString("0.0", Inv) + ", innego wolnego punktu brak (wolnych " + cand.Count + ", przy rozbitych " + hardOut + ") - bez nowej kryjowki, gra sprobuje znowu"
-                         + " | stopien 4 | promien " + rad.ToString("0.#", Inv) + " (twardy " + hard.ToString("0.#", Inv) + "), rozbitych w pamieci " + _cleared.Count);
+                         + " | stopien 4 | promien " + rad.ToString("0.#", Inv) + " (twardy " + hard.ToString("0.#", Inv) + "), rozbitych w pamieci " + _cleared.Count
+                         + (lastOut > 0 ? " | stopien 5 takze: ostatnio rozbity kultury wykluczony (" + lastOut + ")" : ""));
                 return null;
             }
             if (pick == null && lastOut > 0)
@@ -732,7 +738,8 @@ namespace Armoury
                 var st = ev != null ? ev.MapEventSettlement : null;
                 if (st == null || !st.IsHideout) return;
                 bool attackerWon = winner == BattleSideEnum.Attacker || end == HideoutEventComponent.HideoutBattleEndState.Victory;
-                if (attackerWon) MarkCleared(st, "bitwa");
+                if (attackerWon) { _lostAt.Remove(st.StringId ?? ""); MarkCleared(st, "bitwa", true); }
+                else _lostAt[st.StringId ?? ""] = Today;   // recenzja 567 (6)
             }
             catch (Exception e) { Stumble("OnBattle", e); }
         }
@@ -746,12 +753,18 @@ namespace Armoury
                 // recenzja 21.10: chwilowo pusta kryjowka (bandy wyszly) stoi w tym samym miejscu - wiedza z plotki zostaje ("juz wiesz, gdzie szukac");
                 // znika dopiero przy rozbiciu (MarkCleared). Wynik rzutu na pobyt - od nowa.
                 _roll.Remove(id);
-                if (st.LastThreatTime.ElapsedDaysUntilNow <= 2f) MarkCleared(st, "oproznienie po walce");
+                if (st.LastThreatTime.ElapsedDaysUntilNow <= 2f)
+                {
+                    // recenzja 567 (6): bandy wyszly po przegranej napastnika - pamiec rozbitych jak dotad, ale bez stalego zakazu ostatnio rozbitego
+                    double ld; bool lost = _lostAt.TryGetValue(id, out ld) && Today - ld <= 2.0;
+                    _lostAt.Remove(id);
+                    MarkCleared(st, lost ? "oproznienie po przegranej napastnika" : "oproznienie po walce", !lost);
+                }
             }
             catch (Exception e) { Stumble("OnDeactivated", e); }
         }
 
-        private void MarkCleared(Settlement st, string how)
+        private void MarkCleared(Settlement st, string how, bool setLast)
         {
             string id = st.StringId ?? "";
             double now = Today;
@@ -762,13 +775,13 @@ namespace Armoury
             // wpis 567: ostatnio rozbity punkt kultury (zapisywany zawsze; klucz HideoutNeverLastCleared decyduje tylko o zakazie)
             string ck = st.Culture != null ? st.Culture.StringId ?? "" : "";
             string prev = null;
-            if (ck.Length > 0) { _lastCleared.TryGetValue(ck, out prev); _lastCleared[ck] = id; }
+            if (ck.Length > 0 && setLast) { _lastCleared.TryGetValue(ck, out prev); _lastCleared[ck] = id; }
             _dCleared++;
             PruneCleared();
             Log.Info(P + "rozbita " + id + " (" + how + ") | pozycja " + p.X.ToString("0.0", Inv) + ", " + p.Y.ToString("0.0", Inv) + " | rozbitych w pamieci " + _cleared.Count
                      + " (" + S.HideoutClearedMemoryDays + " dni, promien " + S.HideoutClearedRadius.ToString("0.#", Inv) + ")"
-                     + " | ostatnio rozbity kultury " + (ck.Length > 0 ? ck : "?") + ": " + id + " (poprzednio " + (prev ?? "-") + ", punktow kultury " + CultureSpots(st.Culture)
-                     + ", zakaz bez limitu " + (LastOn ? "TAK" : "NIE") + ")");
+                     + (setLast ? " | ostatnio rozbity kultury " + (ck.Length > 0 ? ck : "?") + ": " + id + " (poprzednio " + (prev ?? "-") + ", punktow kultury " + CultureSpots(st.Culture)
+                        + ", zakaz bez limitu " + (LastOn ? "TAK" : "NIE") + ")" : " | ostatnio rozbity kultury bez zmian (przegrana napastnika)"));
         }
 
         private void OnHourly()
@@ -878,7 +891,7 @@ namespace Armoury
             Log.Info(P + "start sesji | klucze: Hideout Scouting Chance " + (s.HideoutScoutingChance ? "TAK" : "NIE") + ", Hideout Rumour Reveals " + (s.HideoutRumourReveals ? "TAK" : "NIE")
                      + ", Hideout Away From Settlements " + (s.HideoutAwayFromSettlements ? "TAK" : "NIE") + ", Hideout Relocate After Clear " + (s.HideoutRelocateAfterClear ? "TAK" : "NIE")
                      + ", Hideout Guide Bandit Ai " + (s.HideoutGuideBanditAi ? "TAK" : "NIE") + ", Hideout Never Last Cleared " + (s.HideoutNeverLastCleared ? "TAK" : "NIE")
-                     + " (ostatnio rozbite kultur " + _lastCleared.Count + ")"
+                     + " (ostatnio rozbite kultur " + _lastCleared.Count + (_lastMigrated > 0 ? ", odtworzone ze starego zapisu " + _lastMigrated : "") + ")"
                      + " | krzywa: Zwiad <= " + s.HideoutScoutingMin + " -> 0%, " + s.HideoutScoutingMin + ".." + s.HideoutScoutingFull + " liniowo, >= " + s.HideoutScoutingFull + " -> 100% (5: "
                      + Pct(5) + ", 30: " + Pct(30) + ", 100: " + Pct(100) + ", 200: " + Pct(200) + ") | Zwiad teraz " + sc + " (" + who + ") = " + Pct(sc)
                      + " | pula " + pool + ", z dala od osad " + far + ", wykluczonych przez odleglosc " + (pool - far) + " (osada < " + s.HideoutMinDistSettlement.ToString("0.#", Inv)
