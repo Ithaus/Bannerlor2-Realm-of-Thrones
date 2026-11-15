@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 247 (540 opisy perkow, 542 bez kapitulacji z czasu, 543 oboz o polnocy, 544 Banefort do korony, 545 oblegaja do skutku), bez autotestu
+
+- Armoury.dll 62663705 = noc/scal-perki 9ee5110a (246 + 540 + 542 + 543 + 544 + 545; scalenie sprawdzone recenzja). Kopie: .bak-2026-11-15-przed-wgranie247, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie247 i -przed). Nowe klucze (domyslne TAK, nie ma ich w Armoury.json): PerkTextsRewrite, SiegeYieldOnlyStarving, SiegeSimRepelLongPause, SiegeNoMinDaysGate, SiegeCampHoldsToEnd.
+- Do sprawdzenia w logu: 'Opisy perkow (540): podmienione 60 z 60 | RBM tarcze TAK'; 'Banefort (544)' - start, potem ZWROT w pierwszej godzinie na mapie; linia 'Czas oblezen (471 doba)' z 542/545; brak 'KAPITULACJA z terminu'; 334e 'koszt' - 'bez migawki z dzis N razy' (543). W toku: 541 pasek mapy (szerokosc, bron/zbroja musztry, ulamki, ikony).
+
 ## STAN 15.11 - WGRANIE 246 (539 napis godzin kuzni = godziny paska), bez autotestu
 
 - Armoury.dll 298d52b6 = noc/scal-perki 34ff302c (245 + 539). Kopie: .bak-2026-11-15-przed-wgranie246, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie246 i -przed).
