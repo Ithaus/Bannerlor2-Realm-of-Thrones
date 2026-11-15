@@ -95,6 +95,8 @@ namespace CrashScribe
             "val_steel_sword_7", "val_steel_sword_8", "val_steel_sword_blue", "val_steel_sword_red"
         };
         private static HashSet<string> _vs = new HashSet<string>(VsIds, StringComparer.Ordinal);
+        // recenzja 563: Armoury ValyrianBlades.IsId na zywo - miecze wykute w trakcie sesji (sztaby 563, Qohor 177-2) nie sa w _vs ze startu sesji
+        private static Func<string, bool> _armIsId;
         private static string _vsSource = "kopia CS (29)";
         private static readonly string[] GlassWords = { "dragonglass", "obsidian" };
 
@@ -262,6 +264,14 @@ namespace CrashScribe
             return false;
         }
 
+        /// <summary>Recenzja 563: czy Armoury (na zywo) uznaje id za stal valyrianska; bez Armoury albo przy bledzie - false (zostaje _vs).</summary>
+        private static bool ArmIsId(string id)
+        {
+            var f = _armIsId;
+            if (f == null) return false;
+            try { return f(id); } catch { return false; }
+        }
+
         /// <summary>0 zwykla, 1 stal valyrianska, 2 smocze szklo (id przedmiotu albo kawalka klingi z WeaponDesign).</summary>
         internal static int ItemClass(ItemObject it)
         {
@@ -272,7 +282,7 @@ namespace CrashScribe
             try
             {
                 var id = it.StringId ?? "";
-                if (_vs.Contains(id)) c = 1;
+                if (_vs.Contains(id) || ArmIsId(id)) c = 1;
                 else if (HasGlassWord(id)) c = 2;
                 else
                 {
@@ -991,6 +1001,12 @@ namespace CrashScribe
                     if (asm.GetName().Name != "Armoury") continue;
                     var t = asm.GetType("Armoury.ValyrianBlades");
                     if (t == null) break;
+                    try
+                    {
+                        var mi = AccessTools.Method(t, "IsId", new[] { typeof(string) });
+                        _armIsId = mi != null && mi.IsStatic && mi.ReturnType == typeof(bool) ? (Func<string, bool>)Delegate.CreateDelegate(typeof(Func<string, bool>), mi) : null;
+                    }
+                    catch { _armIsId = null; }
                     var p = AccessTools.Property(t, "AllIds");
                     var src = p != null ? p.GetValue(null, null) as IEnumerable<string> : null;
                     if (src == null) return "Armoury ValyrianBlades bez AllIds - kopia CS (" + VsIds.Length + ")";
@@ -1007,6 +1023,7 @@ namespace CrashScribe
             }
             catch { }
             _vs = new HashSet<string>(VsIds, StringComparer.Ordinal);
+            _armIsId = null;
             return "Armoury bez ValyrianBlades (177 nie scalone) - kopia CS (" + VsIds.Length + ")";
         }
 

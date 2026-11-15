@@ -287,7 +287,10 @@ namespace Armoury
             item.IsReady = true;
             MBObjectManager.Instance.RegisterObject(item);
             // gra: projekt do _craftedItemDictionary (zapis i odtworzenie po wczytaniu); nasz handler: isCraftingOrderItem = true - bez "wykonczenia"
-            CampaignEventDispatcher.Instance.OnNewItemCrafted(item, null, true);
+            // recenzja 563: droga Qohoru (klinga juz w rejestrze jako wlasna) - OnCraftedVs ma wyjsc po cichu, nie pisac ERROR "BILANS"
+            ValyrianBlades.QohorBuilding = true;
+            try { CampaignEventDispatcher.Instance.OnNewItemCrafted(item, null, true); }
+            finally { ValyrianBlades.QohorBuilding = false; }
             return item;
         }
 

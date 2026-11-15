@@ -42,6 +42,22 @@
 
 **Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane, nie testowane w grze).
 
+### Recenzja 563
+
+Recenzja kodu (bfa4cff4) - 4 usterki potwierdzone w kodzie i poprawione, bilans sztab bez zmian:
+- **(1) Falszywy ERROR "BILANS: kucie VS w trybie zlecenia" przy kazdym mieczu wlasnego projektu z Qohoru** - `QohorMasters.Own.BuildOwn` wola `OnNewItemCrafted(item, null, true)`, a klinga jest VS. Poprawka: flaga `ValyrianBlades.QohorBuilding` (try/finally wokol zdarzenia); `OnCraftedVs` przy `isOrder` i tej fladze wychodzi po cichu. Prawdziwe kucie VS w trybie zlecenia nadal daje ERROR.
+- **(2) Miecz VS wykuty w trakcie sesji (sztaby 563, Qohor 177-2) nie ranil Innych (175c) do wczytania** - CrashScribe `OthersSteel` bral liste `AllIds` raz na sesje. Poprawka: `OthersSteel.ItemClass` pyta dodatkowo na zywo `Armoury.ValyrianBlades.IsId` (delegat z odbicia, ustawiany w `VsListCheck`; bez Armoury - null, zostaje lista). Nowy `crafted_item_N` jest klasyfikowany po `AddOwn`, wiec cache `_itemCls` dostaje od razu 1.
+- **(3) Spustoszenie miasta palilo sztaby** - `CitySack.Goods` (szacunek i plan) uznawal za unikat tylko `UniqueSpoils.Is`; sztaby szly do "rest" i przy `KDevastate` nadmiar plonal (UBYTEK, rejestr sztab za wysoki). Poprawka: `u = UniqueSpoils.Is(it) || ValyrianBlades.IsIngot(it)` w obu miejscach - sztaby ida do wodza armii jak unikaty.
+- **(4) Przetop po straznika sprawdzal wszystkie sztuki wzoru zamiast wybranej pozycji** - `SmeltPrefix`: 2 sztuki tego samego wzoru z roznymi modyfikatorami, straznik zamienia akurat wybrana - liczba > 0, `DoSmelting` robi ujemny stos i daje sztaby za klinge, ktora zostaje. Poprawka: `ElementCount(r, equipmentElement)` (`FindIndexOfElement` + `GetElementNumber`, sprawdzone w dekompilacji `ItemRoster`).
+
+**Sprostowanie wpisu:** decyzja (4) jest bledna - ROT dopisuje klingi VS takze do `OneHandedSword` (valsteelblade_1/2, valyrian_short_blade, val_red/blue_blade) i do `TwoHandedSword` (valsteelblade_2) - `ROT-Content/ModuleData/crafting_templates.xslt`. Za 10 sztab mozna wiec wykuc takze miecz dwureczny z klinga VS; `DesignMeasures` daje 1 miare (89.7 cm x skala < 105), bilans sie zgadza. Bramka "wielki miecz = 2 miary / 20 sztab" w kuzni praktycznie nie zadziala.
+
+**Ryzyko / co sprawdzic (recenzja):** (a) zmiana `ValyrianGreatswordMinCm` w MCM po pierwszym spisie 563 zmienia `Measures` wielkich mieczy - baza rozjedzie sie ze startem w zapisie i bedzie staly ERROR "BILANS"; nie ruszac tego klucza w trwajacej kampanii. (b) Cofniecie 563: NIE usuwac `arm_items_rare.xml` z `arm_valyrian_steel`, jesli w zapisie sa juz sztaby (brak przedmiotu przy wczytaniu). (c) Delegat IsId czyta HashSet `_own` z misji; zapis (`AddOwn`) jest tylko na mapie, wiec bez rownoleglego zapisu. (d) Linia startu CrashScribe "OSTRZEZENIE ... ROZNA od kopii CS" przy wlasnych mieczach - bez zmian (bylo przed recenzja). W tescie: zlecenie Qohoru bez ERROR "BILANS"; miecz z 10 sztab w bitwie z Innymi - pelne obrazenia bez wczytywania; spustoszenie miasta ze sztabami na polce - sztaby u wodza, brak UBYTKU.
+
+**Pliki recenzji do wgrania:** `Armoury/bin/Release/Armoury.dll` (ValyrianBlades.cs, ValyrianBlades.Ingots.cs, QohorMasters.Own.cs, CitySack.Goods.cs) i `CrashScribe/bin/Release/CrashScribe.dll` (OthersSteel.cs) -> `Modules\CrashScribe\bin\Win64_Shipping_Client\CrashScribe.dll`; plus pliki z listy wpisu wyzej.
+
+**Status recenzji:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane).
+
 ## 561: jednorozce nikomu, konie umarlych tylko Innym - czystka polek, taborow, zbrojowni DTE, puli weteranow i bohaterow; szablony Skagosu na konie gorskie; IsPlainMount bez nich - Armoury (DeadMounts561.cs nowy, Stables.cs, Buildings338Studs.cs, HorseFate.cs, ArmsBook.cs, LegendaryLaw.cs, SubModuleMain.cs; nowy klucz NoMagicMountsForLiving w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11, zrzut targu Winterfell ("Ivory Unicorn" 1 za 19219, "Wight Horse" 2 za 856 na sprzedaz): "dlaczego mozna kupic ivory horses i wight - martwe konie; wywal z mozliwosci zakupu; na martwych koniach moga jezdzic tylko martwi; a kucyki jednorozce nie da sie kupic, to zwierzeta magiczne - wywal je z armii ludzi; a konie zmarlych tylko moga byc w armii zmarlych i tez wywal z kazdej armii martwe konie i kucyki tez wywal z kazdej armii; skad ten kucyk jednorozec".

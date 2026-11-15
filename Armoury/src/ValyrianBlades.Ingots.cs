@@ -525,6 +525,9 @@ namespace Armoury
 
         /// <summary>ArmouryBehavior.OnNewItemCrafted (na poczatku, przed zabraniem na wykonczenie): wykuty projekt z klinga VS - 10 sztab z taboru, R_I w dol,
         /// nowy miecz w rejestrze jako wlasny projekt 1 miary. Cena miary dopiero po XP i badaniach gry (postfiks CreateCraftedWeaponInFreeBuildMode).</summary>
+        /// <summary>Recenzja 563: true na czas OnNewItemCrafted z QohorMasters.BuildOwn (zlecenie mistrzow Qohoru, nie kucie ze sztab).</summary>
+        internal static bool QohorBuilding;
+
         internal static void OnCraftedVs(ItemObject item, bool isOrder)
         {
             try
@@ -532,6 +535,7 @@ namespace Armoury
                 if (item == null || !IngotsOn || _reg == null || !UsesVs(item.WeaponDesign)) return;
                 if (isOrder)
                 {
+                    if (QohorBuilding) return;   // recenzja 563: miecz wlasnego projektu z Qohoru - rejestruje go QohorMasters, nie sztaby
                     Log.Error("ValyrianBlades.OnCraftedVs", new InvalidOperationException("BILANS: kucie VS w trybie zlecenia mimo bramki - " + item.StringId + " bez rejestracji"));
                     return;
                 }

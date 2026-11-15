@@ -1054,7 +1054,9 @@ namespace Armoury
                     return false;
                 }
                 if (r == null || _reg == null) return false;   // bez rejestru nie ma bilansu - nie przetapiamy
-                if (GuardNow(item.StringId) && r.GetItemNumber(item) <= 0)
+                // recenzja 563: liczy sie WYBRANA pozycja (wzor + modyfikator), nie wszystkie sztuki wzoru - straznik mogl zamienic akurat ja,
+                // a DoSmelting zdjalby wtedy sztuke z nieistniejacej pozycji (ujemny stos) i dal sztaby za klinge, ktora zostaje w spisie
+                if (GuardNow(item.StringId) && ElementCount(r, equipmentElement) <= 0)
                 {
                     Log.Player("This blade was a forgery - there is no Valyrian steel in it.", true);
                     Log.Info("ValyrianBlades: przetop " + item.StringId + " - klinga gracza byla kopia z niczego (straznik zamienil ja przed przetopem), przetop odwolany (563).");
@@ -1064,6 +1066,13 @@ namespace Armoury
                 return true;
             }
             catch (Exception e) { Stumble563("SmeltPrefix", e); return !Is(equipmentElement.Item); }   // VS przy bledzie - bez przetopu (bez bilansu)
+        }
+
+        /// <summary>Recenzja 563: liczba sztuk dokladnie tej pozycji taboru (wzor + modyfikator); brak pozycji - 0.</summary>
+        private static int ElementCount(ItemRoster r, EquipmentElement el)
+        {
+            int i = r.FindIndexOfElement(el);
+            return i >= 0 ? r.GetElementNumber(i) : 0;
         }
 
         /// <summary>Postfiks DoSmelting (Priority.Last): sztuk ubylo z taboru (niezaleznie od tego, ktory prefiks wykonal przetop). 563 (ValyrianIngots):
