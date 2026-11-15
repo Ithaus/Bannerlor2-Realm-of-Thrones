@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 252 (553 ulga Jazdy dla bohatera bez konia), bez autotestu
+
+- Armoury.dll 0a6485c1 = noc/scal-perki e07e29a3 (251 + 553). Kopie: .bak-2026-11-15-przed-wgranie252, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie252 i -przed).
+- Do sprawdzenia: Amanda (Jazda 5) jedzie; pasek Horses 133/133 bez czerwieni, gdy brak innych braków.
+
 ## STAN 15.11 - WGRANIE 251 (548 pasek czytelny ma/trzeba, musztra 1 komplet na czlowieka), bez autotestu
 
 - Armoury.dll adb93bd5 = noc/scal-perki 5cd9c77d (250 + 548). Kopie: .bak-2026-11-15-przed-wgranie251, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie251 i -przed). Klucz NOWY DrillMenPerPiece = 1; IntakeSets 1. Pozycje paska: Horses (jadacy/ludzie), Pack, Drill (bron+zbroja razem, zolnierze bez bohaterow).
