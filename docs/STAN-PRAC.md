@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 260 (559 kusze: pulap energii beltu 190 J, 469 z prawdziwa waga beltu), bez autotestu
+
+- Armoury.dll 0bbad706 = noc/scal-perki d90f8613 (259 + 559). Kopie: .bak-2026-11-15-przed-wgranie260, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie260 i -przed). Klucz NOWY CrossbowBoltEnergyCap = 190.
+- Do sprawdzenia: linia startu 'pulap energii beltu (559)' wpiete; 'Ogien w zasiegu (469)' przyciete > 0 (jesli 0 - AI ma lekkie belty 0.04 kg). Decyzja Jeffa: 559-b (cena/zakup kusz wedlug przycietej energii); osobno: AI kupuje belty repeater_heavy_bolts do ciezkich kusz (poszlaka).
+
 ## STAN 15.11 - WGRANIE 259 (560 musztra: druzyna z samych towarzyszy cwiczy, dowodcy partii AI cwicza; gracz nigdy), bez autotestu
 
 - Armoury.dll 9f281746 = noc/scal-perki 03eb01f1 (258 + 560). Kopie: .bak-2026-11-15-przed-wgranie259, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie259 i -przed).
