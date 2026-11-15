@@ -216,7 +216,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s != null) Row(l, "Baggage pace", (int)Math.Ceiling(r.Men * Math.Max(0f, s.MarchPackAllowance)) + " pack animals allowed while all men ride");
                 if (r.SkillLowEn.Count > 0) Row(l, "Riding too low", string.Join(", ", r.SkillLowEn));
-                Row(l, " ", "A man rides only a horse with a harness that fits it and his Riding allows. Counted from the baggage and the troops' armoury; "
+                Row(l, " ", "A man rides only a horse with a harness that fits it and his Riding allows (footmen need no Riding for a pair that asks up to " + (s != null ? s.FootmenRidingWaiver : 0) + "). Counted from the baggage and the troops' armoury; "
                             + (MarchPairs.SpeedOn ? "party speed uses these numbers" : "party speed does not use these numbers (March Pairs Speed is off)")
                             + (MarchPairs.WeightOn ? "; harness on ridden horses does not weigh on the baggage." : "; cargo weight does not use them (Ridden Harness Weightless is off)."));   // 537 E2, E3
             }

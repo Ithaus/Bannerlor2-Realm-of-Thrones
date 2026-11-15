@@ -8756,6 +8756,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool StableRidersFirst { get; set; } = true;
 
+        [SettingPropertyInteger("Footmen Riding Waiver", 0, 100, "0", HintText = "your footmen ride a horse only on the march and fight on foot, so a horse and a harness that need up to this much Riding no longer need it from a footman; above it his own Riding counts as before. Cavalry, wounded riders and heroes keep the Riding the item asks for. You and your clan's parties (0 = as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int FootmenRidingWaiver { get; set; } = 20;
+
         [SettingPropertyBool("Ridden By View", HintText = "the hover panel of a riding horse or a horse harness in your inventory shows who rides it on the march ('Ridden by', the other half of the pair, pieces paired but not ridden, pieces with no fitting partner) - in the stash also for the footmen's pairs from the troops' armoury; Review the army - Horses and harness ends with a 'Who rides what' page. The same pairs as Horses on the map bar. Display only: nothing is moved (off = no such lines)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool RiddenByView { get; set; } = true;
@@ -15999,6 +16003,7 @@ namespace Armoury
             s.RiddenByView = RiddenByView;
             s.FootmenMountsStable = FootmenMountsStable;
             s.StableRidersFirst = StableRidersFirst;
+            s.FootmenRidingWaiver = FootmenRidingWaiver;
             s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;

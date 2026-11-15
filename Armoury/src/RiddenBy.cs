@@ -162,7 +162,7 @@ namespace Armoury
             if (!On || r == null || !r.Ok) return null;
             Interlocked.Increment(ref _pages);
             var sb = new StringBuilder(1200);
-            sb.Append("Who rides what - a man rides only on a pair: a horse, a harness that fits it, and Riding enough for both. The same pairs as Horses on the map bar.");
+            sb.Append("Who rides what - a man rides only on a pair: a horse, a harness that fits it, and Riding enough for both (a footman needs none for a pair that asks up to " + (Settings.Current != null ? Settings.Current.FootmenRidingWaiver : 0) + " - he rides only on the march). The same pairs as Horses on the map bar.");
             if (r.AtSea) { sb.Append("\n\nAt sea nobody rides; the pairs count again on land."); return sb.ToString(); }
             int foot = Math.Max(0, r.Men - r.Ridden - r.HeroMounted);
             sb.Append("\n\nMen mounted ").Append(r.Ridden + r.HeroMounted).Append(" of ").Append(r.Men).Append(": ").Append(r.CavPairs).Append(" cavalry, ")

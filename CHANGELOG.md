@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 538: piechur na koniu tylko w marszu - wymog Jazdy konia i uprzezy do 20 go nie dotyczy - Armoury (MarchPairs.Eff/Assign/Take, MarchHud, RiddenBy; klucz NOWY FootmenRidingWaiver = 20)
+
+**Problem:** Jeff, czat 15.11 (po WGRANIU 244): "riding skill sa niepotrzebne dla piechoty ktore wymagaja riding skill do 20 ... to samo dla uprzezy ... anulejmy wymagania bo inaczej nie ma sensu, piechota nie jedzi na nich w bitwie tylko sie wolno przemieszcza". Rekrut z Jazda 0-19 szedl pieszo obok konia z uprzeza o wymogu 10-20.
+
+**Przyczyna:** MarchPairs.Assign (537 E2) wymagal od kazdego czlowieka Jazda >= max(Difficulty konia, Difficulty uprzezy), takze od piechura, ktory jedzie tylko w marszu.
+
+**Zmiana:**
+- MarchPairs.Eff: dla KFoot Jazda do doboru = max(Jazda, FootmenRidingWaiver); jezdzcy bez pary, ranni jezdzcy i bohaterowie bez ulgi. Nowy klucz MCM "Footmen Riding Waiver" (0-100, domyslnie 20, 0 = jak dotad; w Armoury.json Jeffa go nie ma).
+- Recenzja (2 niezalezne przeglady): sortowanie po Eff dawalo rekrutowi z ulga pierwszenstwo przed jezdzcem bez pary/rannym jezdzcem - 6d (StableRidersFirst) przestawalo oddawac pary do zbrojowni i jazda walczylaby pieszo. Assign w dwoch krokach: najpierw nie-piechota (jezdzcy bez pary, potem ranni jezdzcy, potem bohaterowie; w rodzaju malejaco wedlug Jazdy), kazdy najtrudniejszy blok wymogu w zasiegu, w bloku kolejnosc MakePairs (stajnia, ladunek, zbrojownia; ciezsza uprzaz najpierw), w dwoch przejsciach: pary ze stajni/ladunku, potem pary calkiem ze zbrojowni (6d liczy tylko lokalne); potem piechota rosnaco wedlug Eff (remis - Jazda) na najlatwiejszych pozostalych. Liczniki wydzielone do Take(). Galaz awaryjna bez podgladu (potkniecie TakeSubs) zdejmuje konie jazdy od najtrudniejszych. Trzy przeglady (2 + 2 weryfikacje).
+- Klucze pamieci MainKey i ClanRec zawieraja prog (zmiana w MCM dziala od razu, rod nie czeka do nastepnej doby).
+- Teksty: podpowiedz paska (MarchHud) i strona "Who rides what" (RiddenBy) mowia o progu dla piechoty. gen_mcm.py RANGES: FootmenRidingWaiver (0, 100) - generator nie zmieni zakresu.
+
+**Ryzyko / co sprawdzic:**
+- Wiecej piechurow jedzie w marszu -> wyzsza predkosc kolumny (MarchPairsSpeed), mniej "Riding too low"; stajnia piechoty i waga par (E3/E6) ida za tymi samymi parami.
+- Bitwa bez zmian: Eff prywatny w MarchPairs; KitPreview, DTE, QuartermasterLaw, SkillsDecide, DragonUnmount czytaja surowa Jazde.
+- Wlasny dobor jazdy bez podgladu DTE (tylko KCavWalk) bierze teraz najtrudniejsze pary najpierw - liczba ta sama, zdejmowanie z puli po tmp.RiddenBy.
+- Swiadomy koszt: jezdziec bez pary bierze lokalna pare przed para zbrojowni, nawet gdy trudna para zbrojowni zostalaby nieuzyta, a piechur z ulga mialby wtedy o jedna pare mniej (pierwszenstwo jazdy do bitwy wazniejsze).
+- W logu: linia doby "Pary marszowe" - mniej pieszo z powodu Jazdy; pasek Horses wiecej jadacych.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 537: konie i uprzeze (projekt KONIE-UPRZEZE)
 
 Projekt: `docs/projekty/KONIE-UPRZEZE.md` (15.11, wersja 2). Jeff, czat 15.11: "Zaprojektuj to." i zaraz potem "od razu wszystko wdrazaj." Decyzje D1-D13 wedlug propozycji z tabeli 8 projektu, z wyjatkiem D1: Jeff chce fizycznej stajni ("konie uzywane przez piechote sa w stash, sa tam przenoszone aby nie mieszaly sie z konmi nieuzywanymi i uprzezami nieuzywanymi") - wiec E5 (widok wirtualny) i E6 (stajnia fizyczna) oba. Zasieg: gracz i jego rod (D3). Galaz noc/537-konie-uprzeze, etapy po kolei.

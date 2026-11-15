@@ -4,6 +4,7 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    'FootmenRidingWaiver': (0, 100, "0"),   # 538: reczny zakres jak w McmSettings.cs
     # 436-p: smierc czy rana (421) i w symulacji (436) - zakresy jak w recznym McmSettings.cs (regula ogolna dalaby 421 0..1.40 / 0..2.40 / 0..0.60 / 0..2.00,
     # a 436 0..2.00 z dozwolonym 0 - w symulacji nikt by nie ginal)
     'BlowDeathBluntFactor': (0.0, 1.0, "0.00"),

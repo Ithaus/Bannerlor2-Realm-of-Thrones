@@ -63,7 +63,7 @@ namespace Armoury
         internal struct HLot { public EquipmentElement E; public int N; }
         /// <summary>E2: konie pod piechota z par (szybkosc z modyfikatorem, liczba) - HorsePace liczy z nich "Horse quality: spare horses" i sufit kolumny.</summary>
         internal struct QLot { public float Q; public int N; }
-        private sealed class ManLot { public CharacterObject Ch; public int Riding; public int N; public byte Kind; public int Got, Skill; }
+        private sealed class ManLot { public CharacterObject Ch; public int Riding, Eff; public int N; public byte Kind; public int Got, Skill; }
 
         internal sealed class Rec
         {
@@ -255,35 +255,86 @@ namespace Armoury
             }
         }
 
+        private static int FirstRank(byte k) { return k == KCavWalk ? 0 : k == KWoundedRider ? 1 : 2; }
+
+        /// <summary>t par z grupy pp dla czlowieka m - liczniki rekordu (wydzielone z Assign, 538).</summary>
+        private static void Take(PairLot pp, int t, ManLot m, Rec r)
+        {
+            r.Ride += t;
+            if (pp.N > 0) r.AddRideQ((float)(pp.Q / pp.N), t);   // E2: srednia szybkosc koni tej grupy par
+            if (pp.HSrc == SCargo) r.RideCargoHorse += t;
+            else if (pp.HSrc == SStable) r.RideStableHorse += t;   // E6: kon ze stajni (poza NumberOfMounts gry)
+            if (pp.UIt != null) r.AddRideHarness(pp.UIt, pp.UMd, t);   // E3: uprzaz z ladunku na koniu pod czlowiekiem
+            try { TakeSubs(pp, t, m.Ch, m.Kind, r); } catch (Exception e) { Stumble("Assign.RiddenBy", e); }   // E5: tylko widok
+        }
+
         private static void AddMan(List<ManLot> l, CharacterObject ch, int n, byte kind)
         {
             if (ch == null || n <= 0) return;
             foreach (var x in l) if (x.Ch == ch && x.Kind == kind) { x.N += n; return; }
-            l.Add(new ManLot { Ch = ch, Riding = Riding(ch), N = n, Kind = kind });
+            int rd = Riding(ch);
+            l.Add(new ManLot { Ch = ch, Riding = rd, Eff = Eff(rd, kind), N = n, Kind = kind });
+        }
+
+        /// <summary>538 (Jeff 15.11): piechur jedzie na koniu tylko w marszu, w bitwie walczy pieszo - wymog Jazdy konia i uprzezy do
+        /// FootmenRidingWaiver (20) go nie dotyczy. Jazda "do doboru" = max(Jazda, prog); jezdzcy, ranni jezdzcy i bohaterowie bez zmian.</summary>
+        private static int Eff(int riding, byte kind)
+        {
+            if (kind != KFoot) return riding;
+            var s = Settings.Current; int w = s != null ? s.FootmenRidingWaiver : 0;
+            return w > riding ? w : riding;
         }
 
         /// <summary>Krok 3 rozdz. 1.2: ludzie rosnaco wedlug Jazdy, pary rosnaco wedlug wymogu; kazdy bierze najlatwiejsza pare, ktora umie poprowadzic.</summary>
         private static void Assign(List<ManLot> men, List<PairLot> pairs, Rec r)
         {
-            men.Sort((a, b) => a.Riding.CompareTo(b.Riding));
+            // 538 (recenzja): jezdzcy bez pary, ranni jezdzcy i bohaterowie maja pierwszenstwo przed piechota z ulga Jazdy (inaczej rekrut z ulga
+            // zabieralby jezdzcowi pare, 6d nie oddawaloby jej do zbrojowni i jazda walczylaby pieszo). Krok 1: oni malejaco wedlug Jazdy, kazdy
+            // najtrudniejsza pare, ktora umie poprowadzic (latwe zostaja dla piechoty). Krok 2: piechota rosnaco wedlug Eff, najlatwiejsze pary.
             var pl = new int[pairs.Count];
             for (int i = 0; i < pairs.Count; i++) { pl[i] = pairs[i].N; foreach (var s in pairs[i].Subs) s.Left = s.N; }   // E5: sztuki grupy od nowa
+            var first = new List<ManLot>(); var foot = new List<ManLot>();
+            foreach (var m in men) (m.Kind == KFoot ? foot : first).Add(m);
+            // jezdziec bez pary przed rannym jezdzcem (6d oddaje zbrojowni tylko pary KCavWalk), bohater na koncu; w rodzaju malejaco wedlug Jazdy.
+            // Przy "najtrudniejsza para w zasiegu" liczba jadacych nie zalezy od kolejnosci ludzi (wymogi progowe).
+            first.Sort((a, b) => a.Kind != b.Kind ? FirstRank(a.Kind).CompareTo(FirstRank(b.Kind)) : b.Eff.CompareTo(a.Eff));
+            foreach (var m in first)
+            {
+                int want = m.N;
+                // dwa przejscia: najpierw pary ze stajni/ladunku (6d liczy tylko je; wolne pary zbrojowni odejmuje osobno), potem pary calkiem ze zbrojowni
+                for (int pass = 0; pass < 2 && want > 0; pass++)
+                {
+                    int top = pairs.Count - 1;
+                    while (top >= 0 && pairs[top].Req > m.Eff) top--;   // najtrudniejszy blok wymogu w zasiegu tego czlowieka
+                    while (top >= 0 && want > 0)
+                    {
+                        int lo = top; while (lo > 0 && pairs[lo - 1].Req == pairs[top].Req) lo--;
+                        // w bloku jednego wymogu kolejnosc MakePairs (stajnia, ladunek, zbrojownia; ciezsza uprzaz najpierw)
+                        for (int q = lo; q <= top && want > 0; q++)
+                        {
+                            if (pl[q] <= 0) continue;
+                            bool arm = pairs[q].HSrc == SArm && pairs[q].USrc == SArm;
+                            if (arm != (pass == 1)) continue;
+                            int t = Math.Min(want, pl[q]);
+                            want -= t; pl[q] -= t; m.Got += t;
+                            Take(pairs[q], t, m, r);
+                        }
+                        top = lo - 1;
+                    }
+                }
+            }
+            foot.Sort((a, b) => a.Eff != b.Eff ? a.Eff.CompareTo(b.Eff) : a.Riding.CompareTo(b.Riding));   // 538: jazda do doboru
             int p = 0;
-            foreach (var m in men)
+            foreach (var m in foot)
             {
                 int want = m.N;
                 while (want > 0 && p < pairs.Count)
                 {
                     if (pl[p] <= 0) { p++; continue; }
-                    if (pairs[p].Req > m.Riding) break;   // ta i dalsze pary za trudne dla tego czlowieka
+                    if (pairs[p].Req > m.Eff) break;   // ta i dalsze pary za trudne dla tego czlowieka
                     int t = Math.Min(want, pl[p]);
                     want -= t; pl[p] -= t; m.Got += t;
-                    r.Ride += t;
-                    if (pairs[p].N > 0) r.AddRideQ((float)(pairs[p].Q / pairs[p].N), t);   // E2: srednia szybkosc koni tej grupy par
-                    if (pairs[p].HSrc == SCargo) r.RideCargoHorse += t;
-                    else if (pairs[p].HSrc == SStable) r.RideStableHorse += t;   // E6: kon ze stajni (poza NumberOfMounts gry)
-                    if (pairs[p].UIt != null) r.AddRideHarness(pairs[p].UIt, pairs[p].UMd, t);   // E3: uprzaz z ladunku na koniu pod czlowiekiem
-                    try { TakeSubs(pairs[p], t, m.Ch, m.Kind, r); } catch (Exception e) { Stumble("Assign.RiddenBy", e); }   // E5: tylko widok
+                    Take(pairs[p], t, m, r);
                 }
             }
             // E5: pary niewykorzystane po sztukach (pod jencow albo za trudne) - widok "Ridden by"
@@ -302,7 +353,7 @@ namespace Armoury
             if (skill > 0)
             {
                 var byDesc = new List<ManLot>(men);
-                byDesc.Sort((a, b) => b.Riding.CompareTo(a.Riding));
+                byDesc.Sort((a, b) => b.Eff != a.Eff ? b.Eff.CompareTo(a.Eff) : b.Riding.CompareTo(a.Riding));
                 int s = skill;
                 foreach (var m in byDesc) { if (s <= 0) break; int w = m.N - m.Got; if (w <= 0) continue; int t = Math.Min(s, w); m.Skill = t; s -= t; }
                 foreach (var m in byDesc)
@@ -508,7 +559,9 @@ namespace Armoury
                     }
                     else
                     {
+                        // 538: jazda bierze najtrudniejsze pary w zasiegu - zdejmujemy od konca list (ah/au rosnaco po wymogu po MakePairs)
                         int usedH = tmp.Ride, usedU = tmp.Ride;
+                        ah.Reverse(); au.Reverse();
                         foreach (var x in ah) { int t = Math.Min(usedH, x.N); usedH -= t; int f = x.N - t; if (f > 0) { r.AFreeHorses += f; AddLot(horses, x.It, f, SArm); } }
                         foreach (var x in au) { int t = Math.Min(usedU, x.N); usedU -= t; int f = x.N - t; if (f > 0) { r.AFreeHarness += f; AddLot(harness, x.It, f, SArm); } }
                     }
@@ -562,7 +615,8 @@ namespace Armoury
             var ir = mp.ItemRoster;
             return (arm != null ? arm.VersionNo : -1) + "|" + mp.MemberRoster.VersionNo + "|" + (mp.PrisonRoster != null ? mp.PrisonRoster.VersionNo : -1)
                    + "|" + (ir != null ? ir.VersionNo : -1) + "|" + (int)CampaignTime.Now.ToDays + "|" + (mp.IsCurrentlyAtSea ? 1 : 0) + (SaddleLaw.On ? 1 : 0)
-                   + "|" + FootStable.Version;   // E6: stajnia piechoty
+                   + "|" + FootStable.Version   // E6: stajnia piechoty
+                   + "|" + (Settings.Current != null ? Settings.Current.FootmenRidingWaiver : 0);   // 538: prog ulgi Jazdy piechoty (MCM)
         }
 
         /// <summary>Recenzja 537 (3): konie i uprzeze ZBROJOWNI DTE pod piechota, jezdzcami bez pary i bohaterami (pary D11, zrodlo SArm,
@@ -714,6 +768,7 @@ namespace Armoury
                 key = x.MemberRoster.VersionNo;
                 key = key * 397 + (x.ItemRoster != null ? x.ItemRoster.VersionNo : -1);
                 key = key * 397 + (x.PrisonRoster != null ? x.PrisonRoster.VersionNo : -1);   // E3: jency na parach (luzaki pod jukami)
+                key = key * 397 + (Settings.Current != null ? Settings.Current.FootmenRidingWaiver : 0);   // 538: prog ulgi z MCM
                 key = key * 397 + (int)CampaignTime.Now.ToDays;   // Jazda bohaterow i ludzi (awans zmienia wersje skladu, nauka - nie)
             }
             CRec c;
