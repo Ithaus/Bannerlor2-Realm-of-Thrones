@@ -20,6 +20,13 @@
 
 **Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; NIE wgrane).
 
+### Recenzja 562c (galaz noc/562c-premia-fix -> noc/562c-premia)
+
+Recenzja bez bledow: premia = pokrycie sztuk (KitM.Cover / Kit.Cover, max 1 jak dawne ReadyW/Kit), gracz i AI ta sama sciezka CtxOf, podpowiedz z tego samego MeasurePlayer; oponcza poza MArm -> Need[KCape] = 0, zaden pobor jej nie bierze, Used[KCape] = min(Have, CapeOpt), nadmiar wraca przez ReturnExcess, sztuki zbrojownia + zapas bez zmian; pasek/podpowiedz bez oponczy, opisy MCM tylko tekst. Sprawdzone w kodzie (DrillKit.cs 151/231/731/1016/1053).
+- Przyjete: nieaktualny komentarz Drill.cs:69 ("rodzajami K1H..KCape") -> "K1H..KLeg (562c: oponcza KCape to dodatek)". Tylko komentarz.
+- Bez zmian (swiadome): KindLog oponczy w formacie "w uzyciu/w zapasie" zamiast "(+N)"; szybsze awanse AI przy czesciowej rezerwacji - skutek zasady Jeffa "1. ok", opisany w Ryzyku.
+- Build 0 bledow. Status bez zmian: DO SPRAWDZENIA (NIE wgrane).
+
 ## 562b: musztra - pasek Drill pokazuje postep w sztukach (%), podpowiedz mowi, czego brakuje najbardziej i dlaczego pobor nic nie bierze - Armoury (DrillKit.cs, MarchHud.cs)
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 262: Horses 165/165, Pack 80/139, Drill 0/164 czerwone - "mam rzeczy w armoury, ale wojsko nie pobiera - jak mam cos kliknac?". Log Armoury-2026-11-15_19-36-27.log, linia 953: migracja 562 - zapas 299 -> 255 szt., do zbrojowni 53, wzieto z nadwyzki 9 (wlocznie 14 -> 23/26), kontrola ZGODNE. Pokrycie rodzajow: 1H 88/88, 2H 3/3, wlocznie 23/26, tarcze 0/88, luki 0/73, strzaly 0/73, oszczepy 0/7, korpus 61/164, helmy 38/164, nogi 31/164, oponcze 0/164 = 244/1013 sztuk (24%).

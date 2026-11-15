@@ -66,7 +66,7 @@ namespace Armoury
         // 548 (Jeff 15.11: "1 miecz i jeden pancerz na osobe a nie na 3 ludzi"): pelny zapas = 1 sztuka na tylu ludzi (klucz Drill Men Per Piece, domyslnie 1, bez ustawien tez 1 - recenzja 548;
         // 3 = dawna zasada). Wzor S bez zmian (u uciete do 1) - zmienia sie tylko liczba sztuk do maksimum, ta sama dla gracza i AI (jeden wzor).
         private static int MenPerPiece { get { var s = Settings.Current; return s == null ? 1 : Math.Max(1, Math.Min(3, s.DrillMenPerPiece)); } }
-        // 562: limit przyjecia od gracza = braki rodzajow zestawu (DrillKit.cs - Accept); grupy GW/GA zastapione rodzajami K1H..KCape
+        // 562: limit przyjecia od gracza = braki rodzajow zestawu (DrillKit.cs - Accept); grupy GW/GA zastapione rodzajami K1H..KLeg (562c: oponcza KCape to dodatek - poza zestawem i limitem przyjecia)
         // MUSZTRA-j: doby t1 -> t6 przy bazie wzoru x1 (koszty awansu BK TroopUpgradeXp 3.0: 900/1650/2700/3900/5100, projekt rozdz. 2 i 14.3) - tylko do linii
         private const double PromoteDays = 900.0 / 12 + 1650.0 / 14 + 2700.0 / 16 + 3900.0 / 18 + 5100.0 / 20;
         internal const int SrcDiscard = 0, SrcLoot = 1, SrcTrophies = 2, SrcAutotest = 3;
