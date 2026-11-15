@@ -7281,6 +7281,10 @@ namespace Armoury
         [SettingPropertyGroup("Hideout spotted")]
         public float HideoutClearedRadius { get; set; } = 25f;
 
+        [SettingPropertyBool("Hideout Never Last Cleared", HintText = "with Hideout Relocate After Clear: a new hideout never takes the spot of the hideout of its culture you cleared last, however long ago (except when it is the only spot of that culture on the map); other cleared spots follow Hideout Cleared Memory Days. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Hideout spotted")]
+        public bool HideoutNeverLastCleared { get; set; } = true;
+
         [SettingPropertyBool("Hideout Guide Bandit Ai", HintText = "with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Hideout spotted")]
         public bool HideoutGuideBanditAi { get; set; } = true;
@@ -15746,6 +15750,7 @@ namespace Armoury
             s.HideoutRelocateAfterClear = HideoutRelocateAfterClear;
             s.HideoutClearedMemoryDays = HideoutClearedMemoryDays;
             s.HideoutClearedRadius = HideoutClearedRadius;
+            s.HideoutNeverLastCleared = HideoutNeverLastCleared;
             s.HideoutGuideBanditAi = HideoutGuideBanditAi;
             s.HouseLeviesEnabled = HouseLeviesEnabled;
             s.HouseRecruitShare = HouseRecruitShare;

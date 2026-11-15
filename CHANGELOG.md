@@ -1,5 +1,45 @@
 # DZIENNIK ZMIAN
 
+## 567: kryjowka nigdy nie wraca w ostatnio rozbite miejsce swojej kultury (bez limitu czasu) - Armoury (HideoutSight.cs; nowy klucz HideoutNeverLastCleared w Settings.cs + McmSettings.cs recznie)
+
+**Problem:** Jeff, czat 15.11, po audycie kryjowek - propozycja A ("kryjowka nigdy nie wraca w ostatnio rozbite miejsce swojej kultury, bez limitu czasu"), odpowiedz "ABCDE tak rob". Dzis pamiec rozbitych trzyma punkt 60 dni (`HideoutClearedMemoryDays`, `PruneCleared`), potem bandy wracaja w to samo miejsce; Rycerze-Rozbojnicy maja w praktyce 5 punktow, wiec powrot jest czesty. Bez dowodu z logu - zmiana zasady.
+
+**Przyczyna:** `HideoutSight.Pick` i migawka band AI (`HourScan` -> `_aiBlock`) patrza tylko na pamiec rozbitych z limitem dni; po jej wygasnieciu ostatnio rozbity punkt jest zwyklym kandydatem (takze wybor gry `SelectANonInfestedHideoutOfSameCultureByWeight`).
+
+**Zmiana:**
+- Nowy stan `_lastCleared`: kultura (StringId kultury punktu) -> id ostatnio rozbitej kryjowki. Ustawiany w `MarkCleared` (bitwa wygrana przez napastnika, oproznienie po walce) zawsze, bez wzgledu na klucz; podmienia go dopiero rozbicie innego punktu tej kultury. Zapis w tym samym kluczu `arm_hideout_sight` (SaveText.Sync), nowa czesc `|l:kultura=id,...` - stary zapis bez niej = pusta mapa, stary DLL czesc pomija.
+- Klucz `HideoutNeverLastCleared` (TAK, dziala tylko z `HideoutRelocateAfterClear`): `LastBlocked(st)` = ostatnio rozbity punkt kultury i kultura ma na mapie wiecej niz 1 punkt. W `Pick`: wybor gry w takim punkcie nigdy nie zostaje; punkt wypada z kandydatow (licznik lastOut). Gdy nic innego nie zostaje -> bez nowej kryjowki (null, gra probuje nastepnej doby), linia "aktywacja brak (...) | ... jedyny wolny punkt to ostatnio rozbity kultury X ... | stopien 5". Gdy to JEDYNY punkt kultury na mapie - dopuszczony, linia "aktywacja w ostatnio rozbitym X (kultura) | jedyny punkt kultury na mapie (1)".
+- Pozostale rozbite - pamiec 60 dni i promien jak dotad (twardy zakaz pol promienia bez zmian). Stopien 2 (wszystkie wolne punkty w promieniu rozbitych): przy kluczu TAK wybor najdawniej uzywanej okolicy (najmniejsza doba najswiezszego rozbicia w promieniu), remis - najdalszy od rozbitych; klucz NIE - stary wybor najdalszego. (COFNIETE w recenzji 567 pkt 5 - stopien 2 jak w bazie, patrz nizej.)
+- Bandy AI: ostatnio rozbity punkt kultury w migawce zakazanych `_aiBlock` (CalculateVisitHideoutScoresForBanditParty, gra i BK). `LogOutside` ("aktywacja poza wyborem" / "aktywacja BK") liczy go jako niezgodny i dopisuje "OSTATNIO ROZBITY punkt kultury". Herszt BK (InfestHieout) - nadal tylko linia, punktu nie zmieniamy (jak w 3/4).
+- Logi: "rozbita X (...) | ... | ostatnio rozbity kultury K: X (poprzednio Y, punktow kultury N, zakaz bez limitu TAK)"; start sesji "Hideout Never Last Cleared TAK (ostatnio rozbite kultur N)"; doba "brak miejsca B (w tym ostatnio rozbity L), jedyny punkt kultury J" i "ostatnio rozbitych kultur N".
+- MCM (grupa Hideout spotted): "Hideout Never Last Cleared" (TAK). W Armoury.json Jeffa klucza nie ma - dziala domyslne.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Klucz NIE (albo Relocate NIE) = stare zachowanie: `LastBlocked` false, stopien 2 po staremu; `_lastCleared` tylko sie zapisuje.
+- Kultura z 2-3 punktami, z ktorych pozostale sa zajete: nowa kryjowka nie powstaje, dopoki inny punkt kultury sie nie zwolni (rozbicie innego punktu podmienia wpis i zwalnia stary). Patrzec w logu na "stopien 5" - czy jakas kultura nie stoi dlugo bez kryjowek.
+- Kultura = `Settlement.Culture` punktu kryjowki (nie klan band) - ta sama, ktorej gra uzywa w SelectANonInfestedHideoutOfSameCultureByWeight; jesli ROT ma kilka klanow band jednej kultury, zakaz jest wspolny.
+- `_cultSpots` liczone raz na kampanie z `Hideout.All` (pula stala). Brak nowych wyjatkow poza istniejacymi try/catch (PickPost, HourScan, OnBattle, OnDeactivated - potkniecia liczone).
+- Nie dotyka HideoutPurge/OutlawLaw (B-E osobno). Brak zmian na mapie poza wyborem punktu (jak dotad).
+
+**Testy:** autotest: linia startu z "Hideout Never Last Cleared TAK"; po rozbiciu kryjowki linia "ostatnio rozbity kultury"; przez kilkadziesiat dob brak aktywacji tego punktu ("aktywacja X" / "aktywacja poza wyborem X" z "zgodna z zasada TAK"); zapis i wczytanie - linia startu pokazuje N > 0.
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane).
+
+**Pliki do wgrania (gra zamknieta):**
+- `Armoury/bin/Release/Armoury.dll` -> `Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll`
+
+### Recenzja 567
+
+Recenzja (a89acdb7, baza 5665310c): 3 uwagi do poprawy, 3 drobne. Kazda sprawdzona w kodzie; zastosowane 1, 3, 4, 5, 6; 2 - bez zmiany kodu (swiadomie).
+- **1 PRZYJETE** - opis MCM mowil odwrotnie niz kod (`LastBlocked`: zakaz gdy kultura ma > 1 punkt). Tekst w McmSettings.cs (HintText) i Settings.cs: "(except when it is the only spot of that culture on the map)".
+- **2 ODRZUCONE jako zmiana kodu (prawdziwe, zostaje swiadomie)** - `BKBanditBehavior.CreateBanditHero` bierze `Hideout.All.FirstOrDefault` kultury klanu, stawia herszta przy tym punkcie i wola `InfestHieout`; odmowa w `GateBkInfest` zostawilaby herszta BK bez kryjowki, a podmiana punktu rozdzielilaby herszta i bandy. Zakaz "nigdy" NIE obejmuje herszta BK (raz w tygodniu, 2.5%, klan bez herszta); widac to w logu: "aktywacja BK ... OSTATNIO ROZBITY punkt kultury".
+- **3 PRZYJETE** - zapis sprzed 567 (bez czesci `l:`): `Unpack` -> `MigrateLastCleared` bierze dla kazdej kultury najswiezszy wpis z pamieci rozbitych (`Settlement.Find(id).Culture`, try/catch na wpis, potkniecia liczone). Linia startu: "ostatnio rozbite kultur N, odtworzone ze starego zapisu M". Zapis z pusta czescia `l:` - bez migracji.
+- **4 PRZYJETE** - linia "stopien 4", gdy jednoczesnie wykluczony ostatnio rozbity: dopisek "| stopien 5 takze: ostatnio rozbity kultury wykluczony (N)" i licznik `_dLastSkip` ("w tym ostatnio rozbity"). Szukanie po "stopien 5" lapie teraz oba przypadki.
+- **5 PRZYJETE (cofniete)** - nowy wybor w stopniu 2 ("najdawniej uzywana okolica") wykraczal poza A (zasada "nie dodawaj przy okazji"); wrocil stary wybor najdalszego od rozbitych, `LastUseNear` usuniete.
+- **6 PRZYJETE** - oproznienie po przegranej napastnika: `OnBattle` przy przegranej zapisuje kryjowke w `_lostAt` (bez zapisu, okno 2 doby); `OnDeactivated` w takim przypadku dopisuje punkt tylko do pamieci rozbitych (60 dni, jak przed 567), bez stalego zakazu ostatnio rozbitego (log "oproznienie po przegranej napastnika ... ostatnio rozbity kultury bez zmian"). Wygrana kasuje wpis `_lostAt`. Zwykle oproznienie po walce bez bitwy przegranej - jak w 567.
+
+**Ryzyko / co sprawdzic (recenzja):** migracja tylko przy wczytaniu zapisu bez `l:` (stary DLL zapisuje bez `l:`, wiec po powrocie do starego DLL i ponownym wczytaniu migracja zrobi sie znowu - bez szkody). `_lostAt` bez zapisu - wczytanie miedzy przegrana a odejsciem band = stare zachowanie 567 (staly zakaz). Klucz NIE - `_lastCleared` zapisywany jak dotad, bez zakazu; stopien 2 identyczny z baza. Build Release 0 bledow (Armoury.dll md5 1c64f5a59e959aeedcc228cbfe709e5c). Nie wgrane.
+
 ## 571: musztra bierze braki zestawu takze z NIENOSZONYCH sztuk gracza w zbrojowni (lista gracza), po nadwyzce ludzi, nigdy tego, co wyda nastepna bitwa; zwrot wraca na liste gracza - Armoury (DrillKit.cs, Drill.cs, MenPurse.cs, MarchHud.cs; nowy klucz DrillTakesPlayerStash w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11 (zrzut Stash pelnego helmow - Cervelliere over Laced Coif 22, Damaged Leather Cap 71 ... - i podpowiedz paska "Missing most 134 leg armour, 130 helmets, 98 body armour, 88 bows"): "missing most helmets, tymczasem w stash ma helmow - czy ona dobrze czyta co jest dostepne w armoury?". Dowod w logu `Armoury-2026-11-15_20-33-55.log`: :9457 "porzadek w skarbcu - 30 szt. na liste gracza, 47 szt. na stan wojska"; :9459 "nienoszone sztuki gracza w schowku 2290 ... widoczne: gracza 2321, zapas ludzi 239"; :9435/:9491 HeadArmor "wklady nienoszone 325/371 zostaja gracza ... zapas ludzi 43", :10417 "zapas ludzi 18"; :9538 "papier HeadArmor: potrzeba 168 ... polka 583". BodyArmor: gracza nienoszone 539, ludzi 16; LegArmor: gracza 307, ludzi 48; Bow: gracza 69, ludzi 0.
