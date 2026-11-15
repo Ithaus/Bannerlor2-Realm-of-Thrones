@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 542: oblezenia - zamek nie poddaje sie z samego uplywu czasu; po limicie oboz odchodzi; dluga przerwa po odparciu szturmu symulowanego - Armoury (SiegeWalls.Time471.cs (a)/(e), SiegeWalls.cs Repel; klucze NOWE SiegeYieldOnlyStarving = true, SiegeSimRepelLongPause = true)
+
+**Problem:** Jeff, czat 15.11: "zaloga, ktora ma pelny spichlerz i wygrywa kazdy szturm, nie ma powodu sie poddac - szczegolnie ze wygrywaja wojne, bo war exhaustion i wynik wojny jest po stronie Lannisterow". Log Armoury-2026-11-15_04-07-23: Banefort (ROT_castle20, maly zamek, mury 1) - jedzenie zalogi 144 dob (9434 / -65.5/d), 4 szturmy odparte (dzien 109016, 109018, 109021, 109025; przerwy 1.7-4.3 doby), a dzien 109026 "termin minal: zegar 27 >= R 26.4 ... 471b: KAPITULACJA z terminu" - po 31.1 dob zamek przeszedl do Polnocy (Ondrew Locke, battania) bez glodu i bez przegranego szturmu. W logach 15.11: 5 kapitulacji "droga a - termin R minal".
+
+**Przyczyna:** 471b(a) (SiegeWalls.Time471.cs Time471Daily): zegar >= R, odsiecz nie stoi, oboz liczniejszy -> Yield471 - sam uplyw czasu wystarczal, jedzenie i wynik szturmow sie nie liczyly (R bierze je tylko jako skladniki q). (e) limit przy obozie liczniejszym tez dawal Yield471. Przerwa po odparciu szturmu symulowanego 1-5 dob (Pause371: dlugie 7-14 tylko przy straconym taranie / wiezy), wiec oboz probowal co 2-4 doby.
+
+**Zmiana:**
+- Nowy klucz MCM "Siege Yield Only Starving" (grupa 471, domyslnie TAK): (a) nie daje kapitulacji - zegar i R zostaja do linii i bramki szturmu; linia "termin minal" mowi "termin minal - bez kapitulacji (542)". Twierdza poddaje sie tylko z glodu (b, StarveYield471 bez zmian) albo pada w szturmie (gra).
+- (e) limit: zawsze Lift471 (oboz odchodzi, rozejm 30 dob jak dotad), droga "e-odejscie-542" przy obozie liczniejszym. Wyjatek: obroncy glodza i (b) moze przyjsc (StarveWait542: glod GL wlaczony, zapas 0, odsiecz nie stoi, oboz liczniejszy - te same warunki co Gate471) - oboz czeka, najwyzej 30 dob po limicie (StarveWaitMax542), potem odchodzi; linia "Czas oblezenia (542) limit minal, oboz czeka na glod".
+- Nowy klucz MCM "Siege Sim Repel Long Pause" (grupa 371, domyslnie TAK): odparty szturm symulowany (Repel z finish, nie gracz) - przerwa liczona jak przy odbudowie machin (SiegeRepelRebuildMinDays-MaxDays 7-14, te same czynniki morale / ludzie / oplacalnosc i 307c). Misje (gracz w obronie, 387, 387f) bez zmian. Linia OB2 ma dopisek "szturm symulowany - dluga przerwa (542)".
+- Linia doby "Czas oblezen (471 doba)": "542 TAK (... odejscia zamiast kapitulacji po limicie N, czekaja po limicie na glod M)".
+- Klucze NIE = 471b(a)/(e) i przerwa 371 co do bitu jak przed. Klucze dopisane recznie (Settings.cs, McmSettings.cs, bez gen_mcm.py); w Armoury.json Jeffa ich nie ma - wezma domyslne TAK.
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci: R czyta tylko Time471 (linie, (a)); 334e TimeLeft liczy czas z budowy machin i OB1, nie z R - spojny; OB5/326c-D czyta RepelPauseLeftDays (Until), wiec dluzsza przerwa sama wchodzi do ocen odsieczy; 307c HoldEnd = min(Until + 3 x Mid, odparcie + RebuildMax) - okno nadal konczy sie najdalej 14 dob po odparciu; GrowPause z sufitem RebuildMax; Gate471 (c) bez zmian; SiegeRansom / 374 bez zmian; m116 (glod obozu) dalej zwija oblezenie. Oblezenie nie trwa wiecznie: limit (e) konczy kazde (najdalej limit + 30 dob przy glodzie obroncow).
+- 467: po SiegeAssaultPartyStrikesRepels (2) odparciach idzie cala armia - przy przerwach 7-14 to ok. 2-4 tygodnie wiecej; zdobycia szturmem powinny zostac.
+- Skutek: mniej zmian wlascicieli z oblezen AI, wiecej odejsc po limicie (maly zamek 60 dob, duzy 135, miasto / twierdza 225 przy 1.5). Sprawdzic w logu: brak "droga a - termin R minal", linie "odejscie po limicie | powod: 542", liczba zdobyc szturmem i z glodu, czy wojny nie stoja w miejscu.
+- Dluzsza przerwa = dluzej oboz je - wiecej odstapien z glodu obozu (m116) i furazu 471b-3.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).

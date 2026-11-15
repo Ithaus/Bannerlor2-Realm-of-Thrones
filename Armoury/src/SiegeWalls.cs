@@ -735,11 +735,13 @@ namespace Armoury
             var pz = PauseOf(ev, true);
             double grow = 1.0; int prior = pz != null ? pz.Repels : 0;
             // 371: przerwa 1-5 dob (machiny staly) albo 7-14 (taran / wieza do odbudowy) zamiast 7 x ... w [3, 28]
-            bool b371 = BreakOn, lost = false; string engTxt = "-"; double lo = 0, hi = 0, bd = b;
+            bool b371 = BreakOn, lost = false, sim542 = false; string engTxt = "-"; double lo = 0, hi = 0, bd = b;
             if (b371)
             {
                 lost = EnginesLost(a, out engTxt);
-                T = Pause371(fM, fL, fO, lost, prior, out grow, out lo, out hi, out bd);
+                // 542 (Jeff 15.11): szturm symulowany (bez misji, nie gracz) odparty - dluga przerwa jak przy odbudowie taranu / wiezy (7-14); misje bez zmian
+                sim542 = finish && !player && SimLongPause542;
+                T = Pause371(fM, fL, fO, lost || sim542, prior, out grow, out lo, out hi, out bd);
             }
             else T = SiegeWalls2.GrowPause(T, prior, b * 4.0, out grow);         // 307c (2): kazde wczesniejsze odparcie w tym oblezeniu wydluza przerwe (najwyzej 4 x podstawa)
             // 387d: odwrot gracza przed zalamaniem - czesc pelnej przerwy (scale < 1); to nie odparcie: licznik odparc i chwila odparcia bez zmian,
@@ -769,7 +771,7 @@ namespace Armoury
                       .Append(F(a.Loss * 100.0, "0.0")).Append('%')
                       .Append(" | godzin szturmu ").Append(F((Now - a.Start) * 24.0, "0")).Append(MoralePart(me, a)).Append(" | bitwa ").Append(me.IsSiegeOutside ? "z murow (OB3)" : "szturm")
                       .Append(" | przerwa ").Append(F(T, "0.0")).Append(" dob do dnia ").Append(F(Now + T, "0.00"))
-                      .Append(b371 ? " (371: machiny " + engTxt + (lost ? " - do odbudowy" : " - staly") + ", granice " + F(lo, "0.0") + "-" + F(hi, "0.0") + "; podstawa " + F(bd, "0.0") : " (podstawa " + F(b, "0.0"))
+                      .Append(b371 ? " (371: machiny " + engTxt + (lost ? " - do odbudowy" : " - staly") + (sim542 ? ", szturm symulowany - dluga przerwa (542)" : "") + ", granice " + F(lo, "0.0") + "-" + F(hi, "0.0") + "; podstawa " + F(bd, "0.0") : " (podstawa " + F(b, "0.0"))
                       .Append(" x morale ").Append(F(morale, "0")).Append(" -> ").Append(F(fM, "0.00"))
                       .Append(" x ludzie ").Append(left).Append('/').Append(dmen).Append(" = ").Append(F(ratio, "0.00")).Append(" -> ").Append(F(fL, "0.00"))
                       .Append(" x oplacalnosc ").Append(F(val, "0")).Append(" / zold ").Append(wage).Append("/d = ").Append(worth >= 9999 ? "-" : F(worth, "0")).Append(" dob -> ").Append(F(fO, "0.00"))

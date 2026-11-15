@@ -36,6 +36,8 @@ namespace Armoury
     ///      (MB/Unblock konczy w Veto, wiec tez jej podlega);
     ///  (d) odstapienie - bez zmian (glod obozu m116, odsiecz OB5/334e);
     ///  (e) limit: wiek >= SiegeTimeLimitFactor x gorna granica - oboz liczniejszy i odsiecz nie stoi: Yield471, inaczej Lift471 (RemoveAllSiegeParties + rozejm 30 dob, droga 384).
+    /// 542 (Jeff 15.11, klucz SiegeYieldOnlyStarving): (a) wylaczone - zegar i R tylko do linii i bramki; (e) zawsze Lift471 (rozejm 30 dob), chyba ze obroncy glodza
+    /// i (b) przyjdzie (StarveWait542, najwyzej StarveWaitMax542 = 30 dob po limicie). Klucz NIE = (a)/(e) jak wyzej.
     /// Yield471 (D4, kapitulacja z honorami): partie lordow obroncow wychodza, zaloga do swoich (BookHoldings.YieldOut), potem KingdomManager.SiegeCompleted -
     /// droga 374 "slowo dotrzymane" bez relacji gracza. Szturmem zdobyte - niewola jak w grze (bez zmian).
     /// U2: zegar i R licza sie przed LogOn (akcje takze bez logu). U8: zegar i doby z odsiecza w zapisie (dopisek "T|" do arm_siege_walls; brak = zegar od wieku).
@@ -59,6 +61,11 @@ namespace Armoury
         internal static bool TimeOn { get { var s = Settings.Current; return s != null && s.SiegeTimeByFactors; } }
         private static bool PlayerHoldingsOn { get { var s = Settings.Current; return s != null && s.SiegeTimeRulesPlayerHoldings; } }   // 471b-5 (D5)
         private static double LimitK { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeTimeLimitFactor) ? 1.5 : Clamp(s.SiegeTimeLimitFactor, 1.0, 3.0); } }
+        // 542 (Jeff 15.11 "zaloga, ktora ma pelny spichlerz i wygrywa kazdy szturm, nie ma powodu sie poddac"): klucz SiegeYieldOnlyStarving - (a) bez kapitulacji
+        // z samego terminu (zegar R zostaje do linii), (e) zawsze odejscie (Lift471), chyba ze obroncy glodza i (b) przyjdzie; NIE = 471b(a)/(e) co do bitu jak przed
+        private static bool OnlyStarve542 { get { var s = Settings.Current; return s != null && s.SiegeYieldOnlyStarving; } }
+        private const int StarveWaitMax542 = 30;   // 542: najwyzej tyle dob po limicie czekania na (b) przy glodzie obroncow - potem odejscie (oblezenie nie trwa wiecznie)
+        private static int _d542Wait, _d542Lift;
         internal const int LiftTruceDays = 30;   // 471b-4 (e): oboz slabszy niz obroncy odchodzi po limicie - rozejm tej osady dla jego frakcji i rodow (droga 384)
         private static string _yield471;          // okno SiegeCompleted kapitulacji 471b (BesiegedRelief: wynik "ZDOBYTE" bez bitwy)
         private static int _d471Yield, _d471Lift, _d471Gate, _d471Refused, _d471Starve;
@@ -73,6 +80,7 @@ namespace Armoury
             public bool Started;                              // 471b-4: pierwsza doba juz byla (rekord moze powstac wczesniej w bramce szturmu)
             public bool StartDone;                            // 471b-p2: linia startu i R0 (pierwsza doba w regule)
             public int GateDay = -1;                          // 471b-p3: doba ostatniego wstrzymania bramka (licznik i TryBreach raz na dobe)
+            public bool Wait542;                              // 542: linia "limit minal, oboz czeka na glod" juz byla
         }
         private static readonly Dictionary<SiegeEvent, T471> _t471 = new Dictionary<SiegeEvent, T471>();
         private static int _d471Start, _d471End, _d471Out;
@@ -309,7 +317,8 @@ namespace Armoury
                                 + " | kategoria " + CatName[r.Cat] + " (mury " + r.Lvl + "), cel " + CatLo[r.Cat] + "-" + CatHi[r.Cat] + " dob, limit " + F(lim, "0")
                                 + " | wodz " + Hn(lp) + " | wiek " + F(age, "0.0") + " dob"
                                 + " | termin obrony R " + F(R, "0.0") + " dob (q " + F(q, "0.00") + " -> s " + F(sq, "0.00") + ") | " + txt + " | " + SiegeCamp471.StartText(ev)
-                                + " | 471b: " + (acts == null ? "regula DZIALA (szturm od " + CatLo[r.Cat] + " doby" + (r.Cat == 0 ? "" : ", potem tylko przez wyrwe") + ", kapitulacja z terminu / glodu, limit)" : "bez akcji (" + acts + ") - tylko przewidywanie") + ".");
+                                + " | 471b: " + (acts == null ? "regula DZIALA (szturm od " + CatLo[r.Cat] + " doby" + (r.Cat == 0 ? "" : ", potem tylko przez wyrwe")
+                                    + (OnlyStarve542 ? ", kapitulacja tylko z glodu (542 - termin R bez kapitulacji), limit - odejscie)" : ", kapitulacja z terminu / glodu, limit)") : "bez akcji (" + acts + ") - tylko przewidywanie") + ".");
                         }
                         if (r.Clock >= R)
                         {
@@ -319,13 +328,29 @@ namespace Armoury
                                 r.Over = true;
                                 if (log) Log.Info("Czas oblezenia (471) termin minal: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + CatName[r.Cat] + ")" + (r.PlayerClan ? " [osada klanu gracza - D5]" : "")
                                     + " | zegar " + F(r.Clock, "0") + " >= R " + F(R, "0.0") + " (wiek " + F(age, "0.0") + ") | " + txt
-                                    + " | 471b: " + (acts != null ? "bez akcji (" + acts + ")" : pz ? "odsiecz w drodze - czeka" : ratio > 1.0 ? "KAPITULACJA z terminu" : "oboz nie liczniejszy od obroncow - czeka (limit)") + ".");
+                                    + " | 471b: " + (acts != null ? "bez akcji (" + acts + ")" : OnlyStarve542 ? "termin minal - bez kapitulacji (542): zaloga poddaje sie tylko z glodu (b), po limicie " + F(lim, "0") + " dob oboz odchodzi"
+                                        : pz ? "odsiecz w drodze - czeka" : ratio > 1.0 ? "KAPITULACJA z terminu" : "oboz nie liczniejszy od obroncow - czeka (limit)") + ".");
                             }
                         }
                         if (age >= lim) { overLim++; r.OverLimit = true; }
                         if (acts == null)
                         {
-                            if (age >= lim) todo.Add(new KeyValuePair<SiegeEvent, string>(ev, ratio > 1.0 && !pz ? "e" : pz ? "e-odejscie-odsiecz" : "e-odejscie"));   // 471b-p4 (recenzja B6): odsiecz w drodze - zaloga nie kapituluje, oboz odchodzi
+                            if (OnlyStarve542)
+                            {
+                                // 542: (a) bez kapitulacji z terminu; (e) limit - oboz odchodzi, chyba ze obroncy glodza i (b) przyjdzie (te same warunki co bramka Gate471),
+                                // najwyzej StarveWaitMax542 dob po limicie
+                                if (age >= lim)
+                                {
+                                    string sw = StarveWait542(ev, st, ratio);
+                                    if (sw != null && age < lim + StarveWaitMax542)
+                                    {
+                                        _d542Wait++;
+                                        if (!r.Wait542) { r.Wait542 = true; if (log) Log.Info("Czas oblezenia (542) limit minal, oboz czeka na glod: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + CatName[r.Cat] + ") | wiek " + F(age, "0.0") + " >= limit " + F(lim, "0") + " | " + sw + " | najdalej do wieku " + F(lim + StarveWaitMax542, "0") + " dob, potem odejscie."); }
+                                    }
+                                    else todo.Add(new KeyValuePair<SiegeEvent, string>(ev, pz ? "e-odejscie-odsiecz" : ratio > 1.0 ? "e-odejscie-542" : "e-odejscie"));
+                                }
+                            }
+                            else if (age >= lim) todo.Add(new KeyValuePair<SiegeEvent, string>(ev, ratio > 1.0 && !pz ? "e" : pz ? "e-odejscie-odsiecz" : "e-odejscie"));   // 471b-p4 (recenzja B6): odsiecz w drodze - zaloga nie kapituluje, oboz odchodzi
                             else if (r.Clock >= R && !pz && ratio > 1.0) todo.Add(new KeyValuePair<SiegeEvent, string>(ev, "a"));
                         }
                         if (sbList.Length < 3000) sbList.Append(sbList.Length > 0 ? "; " : "").Append(st.StringId).Append(' ').Append(CatName[r.Cat]).Append(' ').Append(F(age, "0")).Append('/').Append(F(R, "0")).Append(" dob").Append(pz ? " (odsiecz)" : "");
@@ -340,7 +365,8 @@ namespace Armoury
                         var ev = kv.Key;
                         if (ev.BesiegedSettlement == null || ev.BesiegedSettlement.SiegeEvent != ev) continue;
                         string info;
-                        if (kv.Value == "e-odejscie" || kv.Value == "e-odejscie-odsiecz") Lift471(ev, kv.Value == "e-odejscie" ? "oboz nie liczniejszy" : "odsiecz w drodze", out info);
+                        if (kv.Value == "e-odejscie-542") { if (Lift471(ev, "542: zaloga ma jedzenie i odpiera szturmy - bez kapitulacji, oboz odchodzi", out info)) _d542Lift++; }
+                        else if (kv.Value == "e-odejscie" || kv.Value == "e-odejscie-odsiecz") Lift471(ev, kv.Value == "e-odejscie" ? "oboz nie liczniejszy" : "odsiecz w drodze", out info);
                         else Yield471(ev, kv.Value == "a" ? "a - termin R minal" : "e - limit " + F(LimitK, "0.0") + " x gorna granica", out info);
                     }
                     catch (Exception e) { Stumble("Time471.Act", e); }
@@ -350,10 +376,25 @@ namespace Armoury
                         + "), poza regula " + outside + " | po terminie R " + over + ", ponad limitem " + overLim + ", zegar stoi (odsiecz) " + paused + ", odsiecz daleka/slaba/limit 30 dob (R3) " + _d471PauseCut
                         + " | dzis: start " + _d471Start + ", koniec " + _d471End + ", poza regula " + _d471Out
                         + " | 471b: kapitulacje " + _d471Yield + " (z glodu " + _d471Starve + "), odejscia po limicie " + _d471Lift + ", wstrzymane " + _d471Refused + ", oblezen trzymanych bramka (raz na dobe) " + _d471Gate
+                        + " | 542 " + (OnlyStarve542 ? "TAK (bez kapitulacji z terminu; odejscia zamiast kapitulacji po limicie " + _d542Lift + ", czekaja po limicie na glod " + _d542Wait + ")" : "NIE (kapitulacja z terminu jak dotad)")
                         + " | wiek/R: " + (sbList.Length == 0 ? "-" : sbList.ToString()) + ".");
             }
             catch (Exception e) { Stumble("Time471Daily", e); }
-            finally { _d471Start = _d471End = _d471Out = _d471Yield = _d471Lift = _d471Gate = _d471Refused = _d471Starve = _d471PauseCut = 0; }
+            finally { _d471Start = _d471End = _d471Out = _d471Yield = _d471Lift = _d471Gate = _d471Refused = _d471Starve = _d471PauseCut = _d542Wait = _d542Lift = 0; }
+        }
+
+        /// <summary>542 (e): obroncy glodza i kapitulacja z glodu (b) moze przyjsc - te same warunki co bramka Gate471 i StarveYield471 (glod GL wlaczony, zapas 0,
+        /// odsiecz nie stoi, oboz liczniejszy). Opis do linii albo null (oboz odchodzi). Nie rzuca (wyjatek = null).</summary>
+        private static string StarveWait542(SiegeEvent ev, Settlement st, double ratio)
+        {
+            try
+            {
+                if (!SiegeWalls2.StarveOn || st.Town == null || st.Town.FoodStocks > 0f || ratio <= 1.0) return null;
+                double bes, rel = ReliefStrength(st, null, out bes);
+                if (rel > 0 && bes > 0 && rel >= 0.5 * bes) return null;
+                return "obroncy glodza (zapas 0), oboz / obroncy " + F(ratio, "0.0") + ":1, odsiecz " + F(rel, "0") + " / " + F(bes, "0") + " - kapitulacja z glodu (b) po tygodniu laski GL";
+            }
+            catch (Exception e) { Stumble("StarveWait542", e); return null; }
         }
 
         // ------------------------------------------------------------ 471b-4: drogi konca
