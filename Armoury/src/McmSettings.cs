@@ -13825,6 +13825,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeCampHoldsToEnd { get; set; } = true;
 
+        [SettingPropertyBool("Siege Hold Only Stronger", HintText = "With Siege Camp Holds To The End: an AI host keeps its siege past the first ten days only while it has more healthy men than the defenders (garrison, militia and lords on the walls); a weaker host is no longer held and decides like in the plain game. Off = every host is held to the end", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeHoldOnlyStronger { get; set; } = true;
+
         [SettingPropertyBool("Siege No Time Limit", HintText = "With Siege Time By Factors: a siege of the lords of the world has no time limit - it ends only when the place falls (assault or breach), the garrison yields after a week of hunger, the besiegers run out of food, a stronger relief army comes, their own stronghold needs defending, or peace or a truce ends the war; Siege Time Limit Factor is then not used. Off = a siege that drags past Siege Time Limit Factor times the upper bound of its term ends (the besiegers leave for 30 days, or the place yields), as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeNoTimeLimit { get; set; } = true;
@@ -17290,6 +17294,7 @@ namespace Armoury
             s.SiegeYieldOnlyStarving = SiegeYieldOnlyStarving;
             s.SiegeNoMinDaysGate = SiegeNoMinDaysGate;
             s.SiegeCampHoldsToEnd = SiegeCampHoldsToEnd;
+            s.SiegeHoldOnlyStronger = SiegeHoldOnlyStronger;
             s.SiegeNoTimeLimit = SiegeNoTimeLimit;
             s.SiegeAbandonGrace = SiegeAbandonGrace;
             s.SiegeAbandonStartMeasure = SiegeAbandonStartMeasure;

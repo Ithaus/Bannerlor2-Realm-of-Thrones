@@ -39,10 +39,19 @@ namespace Armoury
         private static readonly HashSet<SiegeEvent> _over545 = new HashSet<SiegeEvent>();    // 545: oblezenia trzymane dzis ponad dawny prog
         internal static int HoldOver545Sieges { get { return _over545.Count; } }
         internal static int FreshHoursLog545 { get { return (int)FreshHours; } }   // recenzja 545 (3): prog do linii doby (240 h albo 48 h)
-        internal static void ZeroHold545() { HoldOver545 = 0; _over545.Clear(); }
+        internal static void ZeroHold545() { HoldOver545 = 0; _over545.Clear(); _dWeak547 = 0; }
+        internal static int _dWeak547;   // 547: odmowy trzymania ponad dawny prog - oboz nie liczniejszy od obroncow (doba)
         private static bool HoldsToEnd545(SiegeEvent ev)
         {
-            try { return HoldToEnd545Key && SiegeWalls.TimeOn && SiegeWalls.Acts471(ev) == null; }
+            try
+            {
+                if (!(HoldToEnd545Key && SiegeWalls.TimeOn && SiegeWalls.Acts471(ev) == null)) return false;
+                // 547 (Jeff 15.11 "tylko A"): bez limitu (546) slabszy oboz siedzial pod murami 1.5-2 lata (furaz z wsi, (b) wymaga przewagi, OB1 "mury trzymaja").
+                // Trzymamy ponad dawny prog tylko oboz liczniejszy od obroncow (ludzie zdrowi, z milicja - Ratio471); slabszy - decyduje mysl gry (zwykle odejscie, bez rozejmu)
+                var s = Settings.Current;
+                if (s != null && s.SiegeHoldOnlyStronger && ev.BesiegedSettlement != null && SiegeWalls.Ratio471(ev, ev.BesiegedSettlement) <= 1.0) { _dWeak547++; return false; }
+                return true;
+            }
             catch (Exception e) { Stumble3("HoldsToEnd545", e); return false; }
         }
         private static double RetryShortDays { get { return LongOn ? 10.0 : 1.0; } }   // oblezenie krotsze niz doba (478-S3: 10 dob) ...

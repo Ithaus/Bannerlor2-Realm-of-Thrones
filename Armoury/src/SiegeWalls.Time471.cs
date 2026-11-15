@@ -402,6 +402,7 @@ namespace Armoury
                         + " | 542 " + (OnlyStarve542 ? "TAK (bez kapitulacji z terminu; odejscia zamiast kapitulacji po limicie " + _d542Lift + ", czekaja po limicie na glod " + _d542Wait + ")" : "NIE (kapitulacja z terminu jak dotad)")
                         + " | 545: szturmow przed dawna bramka " + _d545Gate + " (klucz " + (NoMinDays545 ? "TAK" : "NIE") + "), trzyman obozu ponad " + SiegeWalls2.FreshHoursLog545 + " h " + SiegeWalls2.HoldOver545 + " druzyno-h (oblezen " + SiegeWalls2.HoldOver545Sieges
                         + ", klucz " + (SiegeWalls2.HoldToEnd545Key ? "TAK" : "NIE") + ")"
+                        + " | 547: slabszy oboz bez trzymania " + SiegeWalls2._dWeak547 + " druzyno-h (klucz " + (Settings.Current != null && Settings.Current.SiegeHoldOnlyStronger ? "TAK" : "NIE") + ")"
                         + " | 546: " + (noLim ? "limit wylaczony, oblezen ponad dawny limit " + _d546Over + ", " : "klucz NIE (limit " + F(LimitK, "0.0") + " x gorna granica, ponad nim - patrz 'ponad limitem'), ") + "najdluzsze " + F(_d546Max, "0") + " dob"   // recenzja 546 (4): przy NIE bez licznika 0 obok "ponad limitem N"
                         + " | wiek/R: " + (sbList.Length == 0 ? "-" : sbList.ToString()) + ".");
             }
@@ -432,7 +433,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ 471b-4: drogi konca
         /// <summary>Ludzie zdrowi obozu / obroncow (strona gry, z milicja); 999 - mury puste.</summary>
-        private static double Ratio471(SiegeEvent ev, Settlement st)
+        internal static double Ratio471(SiegeEvent ev, Settlement st)
         {
             long att = 0, def = 0;
             var camp = ev.BesiegerCamp;

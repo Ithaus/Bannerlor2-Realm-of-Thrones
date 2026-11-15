@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 547: oblezenia - oboz trzymany do skutku tylko, gdy liczniejszy od obroncow - Armoury (SiegeWalls2.Hold.HoldsToEnd545; klucz NOWY SiegeHoldOnlyStronger = true)
+
+**Problem:** recenzja 546: bez limitu czasu oboz SLABSZY od obroncow, trzymany przez 545, siedzial pod murami 1.5-2 lata - furaz ze spichlerzy wsi trzyma jego jedzenie ponad progiem m116, kapitulacja z glodu (b) wymaga Ratio471 > 1, OB1 "mury trzymaja", straty obozu maleja wykladniczo. Jeff (15.11) z dwoch wariantow: "tylko A".
+
+**Przyczyna:** HoldsToEnd545 nie patrzyl na stosunek sil.
+
+**Zmiana:** HoldsToEnd545 przy kluczu SiegeHoldOnlyStronger (TAK) zwraca false, gdy Ratio471 (ludzie zdrowi obozu / obroncow z milicja i druzynami strony obrony) <= 1 - wtedy po dawnym progu (240 h) decyduje mysl gry, zwykle odejscie bez rozejmu. Pierwsze 240 h trzymania bez zmian. Ratio471 internal. Linia doby 471: "547: slabszy oboz bez trzymania N razy". Klucz NIE = 546 co do bitu (poza linia logu).
+
+**Ryzyko / co sprawdzic:**
+- Oboz, ktory po odparciach spadl ponizej zalogi, odchodzi po 240 h (jak przed 545) - mniej wiecznych oblezen; silniejszy trzyma dalej do prawdziwych wyjsc.
+- Koszt: Ratio471 liczy rostery przy mysli obozu po progu - kilka partii na godzine.
+- Recenzja 547: licznik w linii to druzyno-godziny (nie oblezenia); odejscie slabszego obozu NIE pewne - decyduje mysl gry (w logu po "slabszy oboz bez trzymania" szukac KO "odejscie z obozu"); po odejsciu po 240 h brak zakazu powrotu (cykl 10-dobowych oblezen mozliwy, jak przed 545); Ratio471 liczy zdrowych - zaraz po odpartym szturmie ranni obnizaja stosunek.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 546: oblezenia bez limitu czasu - droga (e) 471b wylaczona (bez odejscia i kapitulacji z samego wieku) - Armoury (SiegeWalls.Time471.cs Time471Daily / Time471End, SiegeWalls2.Hold.cs komentarz 545; klucz NOWY SiegeNoTimeLimit = true, MCM "Siege No Time Limit")
 
 **Problem:** Jeff, czat 15.11, po wyjasnieniu limitu 471 (e) (SiegeTimeLimitFactor 1.5 x gorna granica kategorii = maly zamek 60 dob, duzy zamek 135, miasto / wielka twierdza 225; po 542 oboz odchodzi z rozejmem 30 dob - Lift471 - a czeka najwyzej 30 dob dluzej tylko przy glodzie obroncow): "limit jest niepotrzebny, wywal go". Cel: zadnego sztucznego konca z czasu - oblezenie konczy tylko prawdziwa przyczyna.
