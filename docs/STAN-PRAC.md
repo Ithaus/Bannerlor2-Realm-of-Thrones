@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 267 (574 umiejetnosci w zestawie musztry, 575 najtansze + codzienna wymiana na tansze + lepsze wraca przed bitwa; decyzja Jeffa: wariant A - obie pule razem), bez autotestu
+
+- Armoury.dll 2e453560 = noc/scal-perki 3f71147f (266 + 574 + 575 po recenzjach; 65c0f6e8 tylko CHANGELOG). Kopie: .bak-2026-11-15-przed-wgranie267, Backup C: i D:. Nowe klucze DrillKitSkillCheck, DrillKitCheapestSwap (domyslnie true).
+- Do sprawdzenia: linia Musztra - licznik 'za trudne', rozklad zapasu T1..T6, 'wymieniono na tansze N (... z listy gracza X; bilans 1:1)', 'oddane pod bitwe M', kontrola zbrojownia+zapas ZGODNE; 1H u jazdy i piechoty 'wzieto' > 0; pasek Drill (Refill: cheapest usable pieces first, swapped for cheaper).
+
 ## STAN 15.11 - WGRANIE 266 (573 kapitulanci bez walki obszukani - 33% gracz / reszta ludzie, po recenzji), bez autotestu
 
 - Armoury.dll 99da3733 = noc/scal-perki 94353c5b (265 + 573; zbudowane w osobnym worktree w573, bo 574/575 trwaja w nscal). Kopie: .bak-2026-11-15-przed-wgranie266, Backup C: i D: (2026-11-15-wgranie266 i -przed). Nowy klucz SurrenderCaptivesStripped (domyslnie true).
