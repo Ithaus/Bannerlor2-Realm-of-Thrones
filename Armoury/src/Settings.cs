@@ -2813,6 +2813,7 @@ namespace Armoury
         public bool HideoutRelocateAfterClear = true;      // after a hideout is cleared, the next bandit hideout does not appear in the same place or close to it - you have to search again. Off = as in the game
         public int HideoutClearedMemoryDays = 60;          // with Hideout Relocate After Clear: for how many days a cleared hideout keeps new hideouts away from its area
         public float HideoutClearedRadius = 25f;           // with Hideout Relocate After Clear: how far (map units) from a recently cleared hideout no new hideout appears
+        public bool HideoutNeverLastCleared = true;        // with Hideout Relocate After Clear: a new hideout never takes the spot of the hideout of its culture you cleared last, however long ago (only when that is the one spot of that culture on the map); other cleared spots follow Hideout Cleared Memory Days. Off = as before
         public bool HideoutGuideBanditAi = true;           // with Hideout Away From Settlements or Hideout Relocate After Clear: roaming bandit bands keep to the same rules - they do not settle an empty hideout next to a town, castle, village or small map village, nor one near a hideout cleared lately. Off = bands settle any empty hideout as in the game
 
         // --- House levies ---

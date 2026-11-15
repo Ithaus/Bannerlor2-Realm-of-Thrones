@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 567: kryjowka nigdy nie wraca w ostatnio rozbite miejsce swojej kultury (bez limitu czasu) - Armoury (HideoutSight.cs; nowy klucz HideoutNeverLastCleared w Settings.cs + McmSettings.cs recznie)
+
+**Problem:** Jeff, czat 15.11, po audycie kryjowek - propozycja A ("kryjowka nigdy nie wraca w ostatnio rozbite miejsce swojej kultury, bez limitu czasu"), odpowiedz "ABCDE tak rob". Dzis pamiec rozbitych trzyma punkt 60 dni (`HideoutClearedMemoryDays`, `PruneCleared`), potem bandy wracaja w to samo miejsce; Rycerze-Rozbojnicy maja w praktyce 5 punktow, wiec powrot jest czesty. Bez dowodu z logu - zmiana zasady.
+
+**Przyczyna:** `HideoutSight.Pick` i migawka band AI (`HourScan` -> `_aiBlock`) patrza tylko na pamiec rozbitych z limitem dni; po jej wygasnieciu ostatnio rozbity punkt jest zwyklym kandydatem (takze wybor gry `SelectANonInfestedHideoutOfSameCultureByWeight`).
+
+**Zmiana:**
+- Nowy stan `_lastCleared`: kultura (StringId kultury punktu) -> id ostatnio rozbitej kryjowki. Ustawiany w `MarkCleared` (bitwa wygrana przez napastnika, oproznienie po walce) zawsze, bez wzgledu na klucz; podmienia go dopiero rozbicie innego punktu tej kultury. Zapis w tym samym kluczu `arm_hideout_sight` (SaveText.Sync), nowa czesc `|l:kultura=id,...` - stary zapis bez niej = pusta mapa, stary DLL czesc pomija.
+- Klucz `HideoutNeverLastCleared` (TAK, dziala tylko z `HideoutRelocateAfterClear`): `LastBlocked(st)` = ostatnio rozbity punkt kultury i kultura ma na mapie wiecej niz 1 punkt. W `Pick`: wybor gry w takim punkcie nigdy nie zostaje; punkt wypada z kandydatow (licznik lastOut). Gdy nic innego nie zostaje -> bez nowej kryjowki (null, gra probuje nastepnej doby), linia "aktywacja brak (...) | ... jedyny wolny punkt to ostatnio rozbity kultury X ... | stopien 5". Gdy to JEDYNY punkt kultury na mapie - dopuszczony, linia "aktywacja w ostatnio rozbitym X (kultura) | jedyny punkt kultury na mapie (1)".
+- Pozostale rozbite - pamiec 60 dni i promien jak dotad (twardy zakaz pol promienia bez zmian). Stopien 2 (wszystkie wolne punkty w promieniu rozbitych): przy kluczu TAK wybor najdawniej uzywanej okolicy (najmniejsza doba najswiezszego rozbicia w promieniu), remis - najdalszy od rozbitych; klucz NIE - stary wybor najdalszego.
+- Bandy AI: ostatnio rozbity punkt kultury w migawce zakazanych `_aiBlock` (CalculateVisitHideoutScoresForBanditParty, gra i BK). `LogOutside` ("aktywacja poza wyborem" / "aktywacja BK") liczy go jako niezgodny i dopisuje "OSTATNIO ROZBITY punkt kultury". Herszt BK (InfestHieout) - nadal tylko linia, punktu nie zmieniamy (jak w 3/4).
+- Logi: "rozbita X (...) | ... | ostatnio rozbity kultury K: X (poprzednio Y, punktow kultury N, zakaz bez limitu TAK)"; start sesji "Hideout Never Last Cleared TAK (ostatnio rozbite kultur N)"; doba "brak miejsca B (w tym ostatnio rozbity L), jedyny punkt kultury J" i "ostatnio rozbitych kultur N".
+- MCM (grupa Hideout spotted): "Hideout Never Last Cleared" (TAK). W Armoury.json Jeffa klucza nie ma - dziala domyslne.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Klucz NIE (albo Relocate NIE) = stare zachowanie: `LastBlocked` false, stopien 2 po staremu; `_lastCleared` tylko sie zapisuje.
+- Kultura z 2-3 punktami, z ktorych pozostale sa zajete: nowa kryjowka nie powstaje, dopoki inny punkt kultury sie nie zwolni (rozbicie innego punktu podmienia wpis i zwalnia stary). Patrzec w logu na "stopien 5" - czy jakas kultura nie stoi dlugo bez kryjowek.
+- Kultura = `Settlement.Culture` punktu kryjowki (nie klan band) - ta sama, ktorej gra uzywa w SelectANonInfestedHideoutOfSameCultureByWeight; jesli ROT ma kilka klanow band jednej kultury, zakaz jest wspolny.
+- `_cultSpots` liczone raz na kampanie z `Hideout.All` (pula stala). Brak nowych wyjatkow poza istniejacymi try/catch (PickPost, HourScan, OnBattle, OnDeactivated - potkniecia liczone).
+- Nie dotyka HideoutPurge/OutlawLaw (B-E osobno). Brak zmian na mapie poza wyborem punktu (jak dotad).
+
+**Testy:** autotest: linia startu z "Hideout Never Last Cleared TAK"; po rozbiciu kryjowki linia "ostatnio rozbity kultury"; przez kilkadziesiat dob brak aktywacji tego punktu ("aktywacja X" / "aktywacja poza wyborem X" z "zgodna z zasada TAK"); zapis i wczytanie - linia startu pokazuje N > 0.
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane).
+
+**Pliki do wgrania (gra zamknieta):**
+- `Armoury/bin/Release/Armoury.dll` -> `Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll`
+
 ## 563: stal valyrianska w sztabach - przetop od 275 (10 sztab na miare), kucie klingi jednorecznej z 10 sztab (perk Legendary Smith + 300), sztaba jako towar; zgodne z 177 (bilans stali) - Armoury (ValyrianBlades.Ingots.cs nowy, ValyrianBlades.cs, SmeltTab.cs, ForgeBill.cs, HistoricalPrices.cs, RareMaterials.cs, UniqueShelf.cs, UniqueSpoils.cs, CastleSteel.cs, PerkTexts.cs, QohorMasters.Own.cs, ArmouryBehavior.cs; ModuleData/arm_items_rare.xml - nowy przedmiot arm_valyrian_steel; nowe klucze ValyrianIngots, ValyrianSmeltSkill, ValyrianForgeSkill, ValyrianLegendarySmithAt300 w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "dodaj valyrianska stal: jesli przetapiam valyrianska stal, to otrzymuje x valyrianskiej stali - jesli do miecza potrzeba 10, a przetopilem ten sam miecz, to dostane 10; valyrianska stal - znajdz lub stworz ikone do handlu; w kuzni przy wykuwaniu mieczy moze byc nad innymi surowcami ...; zeby wytopic valyrianska stal trzeba miec 275 smithing; zmien tez umiejetnosc [perk], ze pozwala wykuwac bron z valyrianskiej stali - daj na poziomie 300; stworz ikone, ze odblokowuje ..." oraz "i jak teraz jest to z valyrianska stala - cos podobno jest w grze, ze mozna wykuc - zeby sie nie gryzlo". Dzis (177) przetop VS w zwyklej kuzni jest zablokowany ("Only the masters of Qohor can work Valyrian steel."), jedyna droga do nowej klingi to Qohor. Bez dowodu z logu - nowa funkcja.
