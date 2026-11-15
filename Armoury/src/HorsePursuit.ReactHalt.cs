@@ -71,6 +71,12 @@ namespace Armoury
         internal static int HaltFireRel { get { return LRel[LFire]; } }
         internal static int HaltRoleRel441 { get { return LRel[LRole]; } }   // 441-p: postoje 283 zwolnione przez role jazdy Armoury
 
+        /// <summary>552 (CloseRanks B1, glowny watek): szyk stoi teraz na postoju R4 283 - ReactHalt sam ustawia mu FacingOrder (Face), 552 go nie obraca.</summary>
+        internal static bool HaltHolds(Formation f)
+        {
+            return f != null && Halts.ContainsKey(f);
+        }
+
         /// <summary>441-p (recenzja 441, jeden wlasciciel): Doctrine.C441SetRole PRZED Take - trwajacy postoj 283 szyku zwolniony, poki wagi sa jeszcze nasze
         /// (Release oddaje zapisane wagi zachowan gry i RBM). Glowny watek. false = szyk nie stal.</summary>
         internal static bool ReleaseHaltForRole441(Formation f)
@@ -319,7 +325,13 @@ namespace Armoury
             if (d.LengthSquared < 1f) return;
             d = d.Normalized();
             if (h.Faced && Vec2.DotProduct(d, h.FaceDir) >= FaceTurnCos) return;
-            if (!h.Faced) { h.Facing0 = h.F.FacingOrder; h.Faced = true; }
+            if (!h.Faced)
+            {
+                // recenzja 552 (4): przy trwajacym zwrocie 552 facing szyku to nasz LookAtDirection - R4 zapisuje facing zachowania sprzed zwrotu
+                FacingOrder p552;
+                h.Facing0 = CloseRanks.Face552Prior(h.F, out p552) ? p552 : h.F.FacingOrder;
+                h.Faced = true;
+            }
             h.FaceDir = d;
             h.F.SetFacingOrder(FacingOrder.FacingOrderLookAtDirection(d));
             _lFace++;

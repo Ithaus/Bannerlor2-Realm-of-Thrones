@@ -905,6 +905,14 @@ namespace Armoury
             return idx >= 0 && ReferenceEquals(_who[idx], f) && _rush313[idx];
         }
 
+        /// <summary>552c (CloseRanks, glowny watek): szyk biegnie teraz pod ostrzalem bez tarcz (291 C, nie 313b) - bieg albo zwrot tarcz, nigdy oba.</summary>
+        internal static bool RunningBare(Formation f)
+        {
+            if (!_on || f == null) return false;
+            int idx = Idx(f);
+            return idx >= 0 && ReferenceEquals(_who[idx], f) && _rushNow[idx] && !_rush313[idx];
+        }
+
         /// <summary>438 (Doctrine.O438Tick, glowny watek): ile szykow jest teraz w biegu pod ostrzalem (291 C i 313b); rbm - w tym szyki z tarczami w biegu 313b
         /// druzyn puszczonych planem ataku RBM (1.1). 438-p (recenzja 438): bez biegu 291 C - ten nie zalezy od OutshotRush.Live (biegl tak samo przed 438),
         /// wiec nie jest skutkiem 1.1. Tylko odczyt tablic z ostatniego Eval.</summary>

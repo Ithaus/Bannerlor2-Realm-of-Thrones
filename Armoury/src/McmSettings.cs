@@ -2350,6 +2350,10 @@ namespace Armoury
         [SettingPropertyGroup("Shields under fire")]
         public int ShieldsUpFormationShots { get; set; } = 3;
 
+        [SettingPropertyInteger("Shields Up Harass Shots", 0, 10, "0", HintText = "with AI Shields Up Under Fire: a formation also counts as under fire when this many arrows, bolts or javelins hit its men or land close to them within 12 seconds - so a lone archer or horse archer picking at it is noticed, not only massed volleys. 0 = only the count above, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public int ShieldsUpHarassShots { get; set; } = 2;
+
         [SettingPropertyBool("Shields Up Your Men Too", HintText = "with AI Shields Up Under Fire: your own soldiers follow the same rule (your orders to formations are never changed)", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool ShieldsUpYourMenToo { get; set; } = true;
@@ -2361,6 +2365,18 @@ namespace Armoury
         [SettingPropertyBool("Ai Formations Under Fire", HintText = "with AI Shields Up Under Fire: an AI infantry formation that comes under arrows, bolts or javelins before it closes with the enemy changes its order to live through it - a shield wall when at least six in ten of its men hold a shield, open order when fewer do (but not with enemy horse within 90 m) - and leaves the choice to RBM again once it is in close combat or the shooting stops; the order changes at most once in 10 seconds. Field battles only; formations under your command are never touched. Needs RBM. Off = RBM picks the order alone, as before", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool AiFormationsUnderFire { get; set; } = true;
+
+        [SettingPropertyBool("Formations Face The Shooter", HintText = "with AI Formations Under Fire: an AI infantry formation that stands under arrows, bolts or javelins coming from its side or from behind turns its front toward the shooter, so its men with shields stand between him and the rest - but not while enemy foot or horse is close in another direction, while it is moving or charging, or in close combat. A lone harasser circling it turns it at most once in 6 seconds. When the shooting stops it faces where its orders say again. Formations under your command are never touched. Off = it keeps facing the enemy army, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool FormationsFaceTheShooter { get; set; } = true;
+
+        [SettingPropertyBool("Shields To The Front Rank", HintText = "with AI Formations Under Fire: in a shield wall the game stops moving men with shields to the front; with this on, an AI infantry formation under fire swaps men without a shield in its front rank with shield men standing behind them, a few at a time, so the wall facing the arrows is made of shields. Not with enemy horse close (spearmen without shields brace in front then), never heroes or standard bearers. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool ShieldsToTheFrontRank { get; set; } = true;
+
+        [SettingPropertyBool("Shields Toward Shooter On March", HintText = "with AI Formations Under Fire: AI infantry marching under arrows, bolts or javelins from one side turn their bodies and shields toward the shooter while keeping their place in the formation and its course; men without shields are left as they are. Not while the formation runs at the enemy, charges, or is in close combat; formations under your command are never touched. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool ShieldsTowardShooterOnMarch { get; set; } = true;
 
         [SettingPropertyBool("Cavalry Under Fire Log", HintText = "log only, no change to the battle: once per field battle Armoury.log gets a line on how AI cavalry formations behave while arrows and bolts fall on them - which RBM or game behaviour holds them, their movement order, the mod's own pace limits, how near the closest enemy is and how often their riders are hit while the formation does not charge. Off = no such line", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
@@ -14455,9 +14471,13 @@ namespace Armoury
             s.AiShieldsUpUnderFire = AiShieldsUpUnderFire;
             s.ShieldsUpHoldSeconds = ShieldsUpHoldSeconds;
             s.ShieldsUpFormationShots = ShieldsUpFormationShots;
+            s.ShieldsUpHarassShots = ShieldsUpHarassShots;
             s.ShieldsUpYourMenToo = ShieldsUpYourMenToo;
             s.PikesKeptAgainstHorse = PikesKeptAgainstHorse;
             s.AiFormationsUnderFire = AiFormationsUnderFire;
+            s.FormationsFaceTheShooter = FormationsFaceTheShooter;
+            s.ShieldsToTheFrontRank = ShieldsToTheFrontRank;
+            s.ShieldsTowardShooterOnMarch = ShieldsTowardShooterOnMarch;
             s.CavalryUnderFireLog = CavalryUnderFireLog;
             s.RidersShieldsUpUnderFire = RidersShieldsUpUnderFire;
             s.RidersRunDownShooters = RidersRunDownShooters;
