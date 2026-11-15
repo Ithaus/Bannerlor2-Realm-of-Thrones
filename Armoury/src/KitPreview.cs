@@ -138,6 +138,7 @@ namespace Armoury
         internal static void Reset()
         {
             _last = null; ClearMission(); _stumbles = 0; _stumbleAt.Clear(); _wc = null; _same = null;
+            _weigh = null; _weighKey = null; _weighRuns = 0;   // 537 E4
             _screen = null; _screenRoster = null; _prevMount = null; _prevName = null; _prevArmH = _prevArmS = -1; PartyScreenKit.Reset();   // 202
             DteMapBar533.Reset();   // 533: podpowiedz paska DTE bez obiektow UI i wyniku starej kampanii
         }
@@ -298,6 +299,50 @@ namespace Armoury
             r.Key = key;
             _screen = r; _screenRoster = roster; fresh = true;
             return r;
+        }
+
+        // 537 E4: podglad "na ludziach" do wagi zbrojowni i do Escrow (jedna lista - D12 a): sklad partii z RANNYMI liczonymi jak zdrowi (D4: kit rannych
+        // nie wazy - ranny ma go przy sobie albo na wozie), bez przyczyn i sakw. Osobna pamiec - okno armii, pasek DTE i bitwa (_last, tylko zdrowi) bez zmian.
+        private static Result _weigh;
+        private static string _weighKey;
+        private static int _weighRuns;
+        internal static int WeighRuns { get { return _weighRuns; } }
+
+        /// <summary>537 E4: podglad na ludziach z rannymi (D4). null - podglad niedostepny z powodu stalego (Gate: bez DTE, Own Kit Only wylaczone, otwarta
+        /// zbrojownia, misja; CrashScribe sprzed 133a - jak ForArmoury); Result z Ok == false - potkniecie (wolajacy trzyma poprzednia liste). Pamiec po wersji
+        /// zbrojowni, skladu, dniu i przelacznikach (klucz po liczeniu - normalizacja DTE moze podbic wersje). Tylko watek glowny.</summary>
+        internal static Result ForWeight()
+        {
+            var mp = MobileParty.MainParty;
+            if (Gate(mp) != null || !CsQuiet) return null;
+            string key = WeighKey(mp);
+            if (_weigh != null && _weighKey == key) return _weigh;
+            Result r;
+            try
+            {
+                var all = TroopRoster.CreateDummyTroopRoster();
+                var src = mp.MemberRoster;
+                for (int i = 0; i < src.Count; i++)
+                {
+                    var el = src.GetElementCopyAtIndex(i);
+                    if (el.Character == null || el.Character.IsHero || el.Number <= 0) continue;
+                    all.AddToCounts(el.Character, el.Number);   // bez rannych w kopii - ranni ida do przydzialu jak zdrowi (D4)
+                }
+                r = Compute(mp, null, true, false, all);
+                r.Ok = r.Why == null;
+                _weighRuns++;
+            }
+            catch (Exception e) { Stumble("ForWeight", e); r = new Result { Why = "The hand-out could not be worked out now - the log has the details." }; }
+            try { r.Key = WeighKey(mp); } catch { r.Key = key; }
+            if (r.Ok) { _weigh = r; _weighKey = r.Key; }
+            return r;
+        }
+
+        private static string WeighKey(MobileParty mp)
+        {
+            var arm = QuartermasterLaw.DteArmory();
+            return (arm != null ? arm.VersionNo : -1) + "|" + mp.MemberRoster.VersionNo + "|" + (int)CampaignTime.Now.ToDays
+                   + "|" + (SaddleLaw.On ? 1 : 0) + (GearFit.CultureOn ? 1 : 0) + (GearFit.FloorOn ? 1 : 0) + (GearFit.FloorOverSkillOn ? 1 : 0) + (GearFit.FloorForeignOn ? 1 : 0);
         }
 
         /// <summary>202: typ druzyny gracza zaczal jezdzic na koniu (albo z uprzeza) z zapasu ludzi w zbrojowni - jezdzcow typu przybylo, a koni (uprzezy)

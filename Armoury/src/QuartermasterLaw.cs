@@ -1323,6 +1323,8 @@ namespace Armoury
         internal static bool Active;
         private static readonly List<KeyValuePair<EquipmentElement, int>> _held =
             new List<KeyValuePair<EquipmentElement, int>>();
+        /// <summary>537 E4: sztuki schowane na czas okna (poza Armory) - waga zbrojowni dolicza je przy otwartym ekranie. Tylko odczyt, watek glowny.</summary>
+        internal static List<KeyValuePair<EquipmentElement, int>> Held { get { return _held; } }
         // sesja ekranu zbrojowni trwa (miedzy OpenArmoryScreen a zamknieciem);
         // pasy bezpieczenstwa nie rozliczaja wymian, poki ekran wisi
         private static bool _screenOpen;
@@ -1457,12 +1459,23 @@ namespace Armoury
                 var usedLeft = new Dictionary<string, int>();
                 var ownLeft = new Dictionary<string, int>();
                 int visOwn = 0, visSpare = 0, listedKit = 0;
+                // 537 E4 (D12 a, klucz ArmouryHasWeight): "noszone" z podgladu DTE (StashWeight.WornForEscrow - ta sama lista co waga zbrojowni: schowane jako
+                // noszone nie wazy), nie z papieru FitFor; czesc gracza bez zmian (nigdy noszona). null - klucz wylaczony albo bez podgladu: papier jak dotad
+                int wornPv = 0, wornPaper = 0;
+                var wornKp = split != null ? StashWeight.WornForEscrow(armory, split, out wornPv) : null;
                 if (split != null)
                     foreach (var kv in split)
                     {
-                        usedLeft[kv.Key] = kv.Value[0]; ownLeft[kv.Key] = kv.Value[1]; _free[kv.Key] = kv.Value[1]; _kitKeys.Add(kv.Key);
-                        visOwn += kv.Value[1]; visSpare += Math.Max(0, kv.Value[2] - kv.Value[0] - kv.Value[1]);
+                        int used = kv.Value[0];
+                        wornPaper += used;
+                        if (wornKp != null) { int u; wornKp.TryGetValue(kv.Key, out u); used = Math.Min(u, Math.Max(0, kv.Value[2] - kv.Value[1])); }
+                        usedLeft[kv.Key] = used; ownLeft[kv.Key] = kv.Value[1]; _free[kv.Key] = kv.Value[1]; _kitKeys.Add(kv.Key);
+                        visOwn += kv.Value[1]; visSpare += Math.Max(0, kv.Value[2] - used - kv.Value[1]);
                     }
+                if (split != null)
+                    Log.Info("Kwatermistrz (537 E4): noszone do schowania - " + (wornKp != null ? "podglad DTE " + wornPv + " szt. (papier FitFor " + wornPaper + ")"
+                                                                                          : "papier FitFor " + wornPaper + " szt. (" + (StashWeight.On ? "podglad niedostepny" : "klucz Armoury Has Weight wylaczony") + ")")
+                             + (onlyYours ? "; widok tylko Twoje - chowane wszystko ponad Twoja czesc" : "") + ".");
                 var allowance = new Dictionary<string, int>();
                 // ZB-2 (klucz ArmouryListSpareHorsesWhenKept): przy widoku "tylko Twoje" i bez sprzedazy koni (PlayerMenSellSpareHorses wylaczone) konie zapasu ludzi
                 // zostaja na liscie (jak przy widoku pelnym: chowamy tylko noszone, zapas do kupienia od ludzi) - inaczej nikt ich nie widzi i nikt nie sprzedaje

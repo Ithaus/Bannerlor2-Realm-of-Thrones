@@ -299,6 +299,8 @@ namespace Armoury
             var s = Settings.Current;
             riders = s != null && s.FodderFromHorseState ? horses : heads;
             need += riders * f.Horse;
+            // 537 E6: konie stajni piechoty gracza (Footmen's mounts) sa poza ladunkiem - jedza jak konie z ladunku (ta sama stawka), licza sie do stada
+            try { int sh; need += FootStable.FeedOf(party, f.Horse, f.Warhorse, out sh); herd += sh; } catch { }
             var ir = party.ItemRoster;
             if (ir != null)
                 for (int i = 0; i < ir.Count; i++)

@@ -8732,7 +8732,35 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int RiderHorseCarryKg { get; set; } = 20;
 
-        [SettingPropertyBool("Harness On Spare Horses", HintText = "every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside): that harness no longer weighs on the baggage, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
+        [SettingPropertyBool("March Pairs Hud", HintText = "on the map bar: Horses (top row) - horses ridden by your men / all your riding horses (baggage and troops' armoury); Harness (lower row) - harness worn by those horses / all your riding horses; Pack (lower row) - pack animals / how many you may lead before the herding penalty (men - livestock - free horses), shown in warning colour when over. A man counts as riding only on a horse with a harness that fits it and that his Riding allows. Display only: party speed uses the same numbers when March Pairs Speed is on, cargo weight and carry capacity when Ridden Harness Weightless is on (off = the map bar as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool MarchPairsHud { get; set; } = true;
+
+        [SettingPropertyBool("March Pairs Speed", HintText = "party speed counts a man as mounted only on a pair - a horse and a harness that fits it and that his Riding allows, the same numbers as Horses on the map bar. 'Riders without harness' takes the game's Cavalry bonus back from soldiers left without such a pair (with Troops Fight With Own Kit Only); 'Footmen on horses: no harness or skill' (or 'armoury pairs') puts the game's Footmen on horses on the footmen's pairs; 'Herding: horses without riders' adds every horse nobody rides to the herd; Horse quality: spare horses and the marching column use the horses in these pairs. You and your clan's parties (off = as before: every spare horse carries a footman)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool MarchPairsSpeed { get; set; } = true;
+
+        [SettingPropertyBool("Ridden Harness Weightless", HintText = "a horse harness from your baggage that sits on a horse ridden by one of your footmen (a pair: a horse, a harness that fits it and a man whose Riding allows both - the same pairs as Horses on the map bar) no longer weighs on the baggage ('Harness on ridden horses' in the cargo weight); a harness with no horse, on a horse nobody rides, or that does not fit, weighs as before. Carry capacity follows the same pairs: a spare horse in such a pair (under a footman or a prisoner) takes saddlebags (Saddled spare horses), a spare horse with no pair carries packs (Spare Horse Carry Kg), and Ridden horses (saddlebags) counts your cavalry's pairs, heroes on their own horses and footmen on horses from the troops' armoury. The old 'Harness worn by spare horses' capacity no longer counts. On land only; you and your clan's parties (off = as before, with Harness On Spare Horses)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool RiddenHarnessWeightless { get; set; } = true;
+
+        [SettingPropertyBool("Armoury Has Weight", HintText = "the troops' armoury (the stash of Dynamic Troop Equipment) weighs on your baggage like cargo - what you move from the baggage to the stash no longer leaves your carry capacity. What your men wear and ride for the next battle (the same hand-out as Review the army; the wounded count as wearing their kit) does not weigh, and is what the quartermaster hides when you open the stash. Shown in cargo weight as Troops' armoury (unused): yours and men's - the men's own spare gear weighs too. Without Troops Fight With Own Kit Only the whole stash weighs. Your party only - lords' armouries still weigh nothing (off = as before: the stash weighs nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ArmouryHasWeight { get; set; } = true;
+
+        [SettingPropertyBool("Footmen Mounts Stable", HintText = "your footmen's horses and harness - every horse and harness from your baggage in a pair ridden by a footman (the same pairs as Horses on the map bar) - stand apart from the baggage in Footmen's mounts (town menu and your camp menu): the baggage keeps only free horses and harness to sell, load or give away. They are moved only at safe moments - after you close an inventory or trade screen, at dawn, after a battle, when your men change - never while a screen is open; close Footmen's mounts and what you took out stays out until then. They weigh nothing, eat like the herd, give the same carry capacity (Footmen's mounts) and the same party speed as in the baggage; before the party screen and before the loot of a lost battle they go back to the baggage, so upgrades use them and a defeat loses them like the baggage. At sea they wait in the baggage. Needs March Pairs Speed, Ridden Harness Weightless and Troops Fight With Own Kit Only; your party only (off = they go back to the baggage at the next safe moment)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool FootmenMountsStable { get; set; } = true;
+
+        [SettingPropertyBool("Stable Riders First", HintText = "a pair from Footmen's mounts that a cavalryman of yours rides on the march only because the troops' armoury has no horse or harness for him goes to the troops' armoury as your own piece, so he rides it into the next battle (with Troops Fight With Own Kit Only). Nothing comes back from the armoury to the footmen (off = the pair stays with the footmen)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool StableRidersFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ridden By View", HintText = "the hover panel of a riding horse or a horse harness in your inventory shows who rides it on the march ('Ridden by', the other half of the pair, pieces paired but not ridden, pieces with no fitting partner) - in the stash also for the footmen's pairs from the troops' armoury; Review the army - Horses and harness ends with a 'Who rides what' page. The same pairs as Horses on the map bar. Display only: nothing is moved (off = no such lines)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool RiddenByView { get; set; } = true;
+
+        [SettingPropertyBool("Harness On Spare Horses", HintText = "the old rule, used only while Ridden Harness Weightless is off: every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside) and that harness adds its weight to your carry capacity, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HarnessOnSpareHorses { get; set; } = true;
 
@@ -15964,6 +15992,13 @@ namespace Armoury
             s.DteConvoyPacksStayWithConvoy = DteConvoyPacksStayWithConvoy;
             s.DteConvoyNoFreePacks = DteConvoyNoFreePacks;
             s.RiderHorseCarryKg = RiderHorseCarryKg;
+            s.MarchPairsHud = MarchPairsHud;
+            s.MarchPairsSpeed = MarchPairsSpeed;
+            s.RiddenHarnessWeightless = RiddenHarnessWeightless;
+            s.ArmouryHasWeight = ArmouryHasWeight;
+            s.RiddenByView = RiddenByView;
+            s.FootmenMountsStable = FootmenMountsStable;
+            s.StableRidersFirst = StableRidersFirst;
             s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;

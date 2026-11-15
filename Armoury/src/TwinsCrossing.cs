@@ -360,7 +360,7 @@ namespace Armoury
         private static int Animals(MobileParty mp)
         {
             var ir = mp.ItemRoster;
-            return mp.Party.NumberOfMenWithHorse + ir.NumberOfMounts + ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals;
+            return mp.Party.NumberOfMenWithHorse + ir.NumberOfMounts + FootStable.MountsOf(mp) + ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals;   // 537 E6: + konie stajni piechoty
         }
 
         // ------------------------------------------------------------ B3: myto (klucz TwinsToll)

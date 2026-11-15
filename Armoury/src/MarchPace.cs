@@ -65,10 +65,12 @@ namespace Armoury
         /// Obie reguly tylko podnosza sufit. Mokro (HorsePace.WetOf, pytane tylko gdy regula dziala): zysk ponad stary sufit -30% jak premie 311d, kary bez ciecia.
         /// rideFoot / walkers / dbl - podzial ludzi do Explain (to samo).</summary>
         private static float Cap(Settings c, MobileParty mp, bool v2, int men, int foot, int mounts, int train, int prisoners, float mulRider, float mulFoot,
-                                 out int kind, out int n, out int dbl, out int rideFoot, out int walkers)
+                                 out int kind, out int n, out int dbl, out int rideFoot, out int walkers, int rideCap = -1)
         {
             // luzaki najpierw pod piechote, reszta pod jencow
-            int ridingFoot = Math.Min(foot, mounts);
+            // 537 E2: rideCap >= 0 - kolumna z par (MarchPairs.ColumnOf): pieszy jedzie tylko na parze, ktora umie poprowadzic; mounts = pary jadace + niewykorzystane
+            // (pod jencow, D2) + luzaki doczepionych; bez rideCap - jak dotad (kazdy luzak niesie piechura)
+            int ridingFoot = Math.Min(foot, rideCap >= 0 ? Math.Min(rideCap, mounts) : mounts);
             int mountsLeft = mounts - ridingFoot;
             walkers = (foot - ridingFoot) + Math.Max(0, prisoners - mountsLeft);
             dbl = 0;
@@ -81,7 +83,7 @@ namespace Armoury
             {
                 if (canDbl)
                 {
-                    int rf = Math.Min(foot, mounts - prisoners);
+                    int rf = Math.Min(foot, rideCap >= 0 ? Math.Min(rideCap, mounts - prisoners) : mounts - prisoners);
                     int fw = foot - rf;
                     if (fw > 0 && fw <= room) { dbl = fw; ridingFoot = rf; walkers = 0; }
                 }
@@ -162,6 +164,10 @@ namespace Armoury
             public int Riders;                                       // 311d2: ludzie z koniem pod siodlem (Men - Foot) - podstawa stosunku jazdy na drugiego
             public float CapOld;                                     // 311d2: sufit na mapie bez regul 311d2 (linia doby "przed / po")
             public bool RidePace;                                    // 311d2: piechurzy na luzakach jada tempem jazdy (FootmenOnSpareHorsesRidePace i RidingFoot > 0)
+            public bool Pairs;                                       // 537 E2: kolumna z par (MarchPairs.ColumnOf): Foot - pula piechoty, Horses - pary (+ luzaki doczepionych)
+            public int RideCap = -1;                                 // 537 E2: ilu pieszych moze jechac (pary, ktore umieja poprowadzic); -1 - kazdy luzak niesie piechura
+            /// <summary>537 E2: ilu pieszych moze jechac na m luzakach / parach (ta sama regula co Cap).</summary>
+            internal int RideMax(int m) { return RideCap >= 0 ? Math.Min(RideCap, m) : m; }
         }
 
         /// <summary>
@@ -178,12 +184,17 @@ namespace Armoury
             var r = new Column();
             CountColumn(mp, out r.Men, out r.Foot, out r.Mounts, out r.Train, out r.Prisoners, out r.Armory);
             if (r.Men <= 0) return null;
-            r.Walk = HorsePace.WalkOf(mp); r.Foot += r.Walk;            // 311d krok 3: ten sam rekord co ColumnPostfix
+            r.Walk = HorsePace.WalkOf(mp);                              // 311d krok 3: ten sam rekord co ColumnPostfix
             HorsePace.CapMul(mp, out r.MulRider, out r.MulFoot);      // 311d krok 2
             r.K0 = c.SpareHorsesCarryFootmen;
             r.Horses = r.K0 ? r.Mounts + r.Armory : r.Mounts;
+            // 537 E2: kolumna z par (ten sam ColumnOf co ColumnPostfix); gracz - jezdzcy bez konia sa w puli piechoty (bez osobnego "Walk")
+            int footP = r.Foot, horsesP = r.Horses, rc;
+            r.Pairs = MarchPairs.ColumnOf(mp, r.K0, r.Walk, ref footP, ref horsesP, out rc);
+            if (r.Pairs) { r.Foot = footP; r.Horses = horsesP; r.RideCap = rc; if (mp.IsMainParty) r.Walk = 0; }
+            else r.Foot += r.Walk;
             bool v2 = !HorsePace.Dry;   // 311d2: jak ColumnPostfix (probka "bez 311d" w linii doby - bez regul 311d2)
-            r.CapRaw = Cap(c, mp, v2, r.Men, r.Foot, r.Horses, r.Train, r.Prisoners, r.MulRider, r.MulFoot, out r.Kind, out r.N, out r.Double, out r.RidingFoot, out r.Walkers);
+            r.CapRaw = Cap(c, mp, v2, r.Men, r.Foot, r.Horses, r.Train, r.Prisoners, r.MulRider, r.MulFoot, out r.Kind, out r.N, out r.Double, out r.RidingFoot, out r.Walkers, r.RideCap);
             int pace = Math.Max(5, Math.Min(100, c.WorldPacePercent));
             r.Scale = pace / 100f;
             r.Cap = r.CapRaw * r.Scale;
@@ -193,7 +204,7 @@ namespace Armoury
             r.RidePace = v2 && c.FootmenOnSpareHorsesRidePace && r.RidingFoot > 0;
             int k9, n9, d9, rf9, w9;
             r.CapOld = (v2 && (c.FootmenOnSpareHorsesRidePace || c.RideDoubleFewFootmen)
-                        ? Cap(c, mp, false, r.Men, r.Foot, r.Horses, r.Train, r.Prisoners, r.MulRider, r.MulFoot, out k9, out n9, out d9, out rf9, out w9)
+                        ? Cap(c, mp, false, r.Men, r.Foot, r.Horses, r.Train, r.Prisoners, r.MulRider, r.MulFoot, out k9, out n9, out d9, out rf9, out w9, r.RideCap)
                         : r.CapRaw) * r.Scale;
             r.Allowance = (int)Math.Ceiling(r.Men * Math.Max(0f, c.MarchPackAllowance));
             r.Alone = mp == MobileParty.MainParty && r.Men == 1 && r.Prisoners == 0;
@@ -212,6 +223,7 @@ namespace Armoury
             try
             {
                 HorsePace.Apply(__0, ref __result);   // 311d: konie a tempo (wlasne klucze i wlasny SpeedDepth) - wspolczynniki PRZED sufitem kolumny
+                MarchPairs.ApplySpeed(__0, ref __result);   // 537 E2: pary kon + uprzaz (gracz i rod): Riders without harness, Footmen on horses, Herding - PRZED sufitem kolumny
                 ColumnPostfix(__0, ref __result);
             }
             finally { HorsePace.End(); }
@@ -243,7 +255,7 @@ namespace Armoury
                 int men, foot, mounts, train, prisoners, armory;
                 CountColumn(mp, out men, out foot, out mounts, out train, out prisoners, out armory);
                 if (men <= 0) return;
-                foot += HorsePace.WalkOf(mp);   // 311d krok 3 (RidersWithoutHorseWalk): jezdziec bez konia idzie pieszo
+                int walk = HorsePace.WalkOf(mp);   // 311d krok 3 (RidersWithoutHorseWalk): jezdziec bez konia idzie pieszo
                 float mulR, mulF;
                 HorsePace.CapMul(mp, out mulR, out mulF);   // 311d krok 2 (HorseQualitySpeed): 1/1 przy wylaczonym kluczu
 
@@ -252,7 +264,10 @@ namespace Armoury
                 bool k0 = c.SpareHorsesCarryFootmen;
                 int kind, n, dbl, rfx, wx;
                 bool v2 = !HorsePace.Dry;   // 311d2: reguly 311d2 (piechur na luzaku tempem jazdy, na drugiego) - poza probka "bez 311d" linii doby
-                float cap = Cap(c, mp, v2, men, foot, k0 ? mounts + armory : mounts, train, prisoners, mulR, mulF, out kind, out n, out dbl, out rfx, out wx);
+                // 537 E2 (MarchPairsSpeed): kolumna z par - piesi = pula piechoty, luzaki = pary (MarchPairs.ColumnOf, ten sam co Explain); bez par - jak dotad
+                int footK = foot, horsesK = k0 ? mounts + armory : mounts, rideCap;
+                if (!MarchPairs.ColumnOf(mp, k0, walk, ref footK, ref horsesK, out rideCap)) { footK = foot + walk; rideCap = -1; }
+                float cap = Cap(c, mp, v2, men, footK, horsesK, train, prisoners, mulR, mulF, out kind, out n, out dbl, out rfx, out wx, rideCap);
                 // sufity kolumny zyja w jednostkach mapy - przy zwolnionym
                 // swiecie (WorldPacePercent) skaluja sie tym samym mnoznikiem
                 int pace = Math.Max(5, Math.Min(100, c.WorldPacePercent));
@@ -261,14 +276,16 @@ namespace Armoury
                 {
                     // sufit tempa AI bez K0 (bez wolnych koni zbrojowni) na sucho w tym samym wywolaniu - prog linii: z K0 nigdy nizszy
                     int k2, n2, d2, r2, w2;
-                    float cap0 = armory > 0 ? Cap(c, mp, v2, men, foot, mounts, train, prisoners, mulR, mulF, out k2, out n2, out d2, out r2, out w2) : cap;
+                    int foot0 = foot, horses0 = mounts, rc0;
+                    if (!MarchPairs.ColumnOf(mp, false, walk, ref foot0, ref horses0, out rc0)) { foot0 = foot + walk; rc0 = -1; }
+                    float cap0 = armory > 0 ? Cap(c, mp, v2, men, foot0, horses0, train, prisoners, mulR, mulF, out k2, out n2, out d2, out r2, out w2, rc0) : cap;
                     HorseState.NoteCap(cap0 * scale, cap * scale);
                 }
                 if (mulR != 1f || mulF != 1f)
                 {
                     // 311d: sufit bez jakosci koni na sucho w tym samym wywolaniu (linia "Konie a tempo (HQ)")
                     int k3, n3, d3, r3, w3;
-                    HorsePace.NoteCap(Cap(c, mp, v2, men, foot, k0 ? mounts + armory : mounts, train, prisoners, 1f, 1f, out k3, out n3, out d3, out r3, out w3) * scale, cap * scale);
+                    HorsePace.NoteCap(Cap(c, mp, v2, men, footK, horsesK, train, prisoners, 1f, 1f, out k3, out n3, out d3, out r3, out w3, rideCap) * scale, cap * scale);
                 }
                 cap *= scale;
                 if (cap <= 0.25f) return;
@@ -315,7 +332,7 @@ namespace Armoury
                 var c = Settings.Current;
                 // SW-DROGI: ta sama latka niesie premie drogi (MapRoads.SpeedRoad) - wpinana takze przy wylaczonej kolumnie, gdy MapRoadSpeedBonus wlaczony
                 // (kolumna sprawdza wtedy swoj klucz w ColumnPostfix i wychodzi); oba klucze wylaczone = jak przed zmiana
-                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus && !c.SeaStormSlowsShips && !c.CampCartEnabled && !HorsePace.AnyOn(c))) { Log.Info("MarchPace: wylaczony."); return; }   // 311d: latka niesie tez konie a tempo (HorsePace)   // m97-oboz: latka niesie tez kare wozu   // p6-sztormy: latka niesie tez kare burzy na morzu
+                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus && !c.SeaStormSlowsShips && !c.CampCartEnabled && !HorsePace.AnyOn(c) && !c.MarchPairsSpeed)) { Log.Info("MarchPace: wylaczony."); return; }   // 311d: latka niesie tez konie a tempo (HorsePace)   // m97-oboz: latka niesie tez kare wozu   // p6-sztormy: latka niesie tez kare burzy na morzu
 
                 var post = new HarmonyMethod(typeof(MarchPace).GetMethod("SpeedPostfix",
                     BindingFlags.Public | BindingFlags.Static)) { priority = Priority.Last };

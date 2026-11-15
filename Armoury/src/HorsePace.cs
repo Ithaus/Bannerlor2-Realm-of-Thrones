@@ -534,20 +534,35 @@ namespace Armoury
                 var r = GetFast(mp);
                 if (r == null) return;
                 float n = r.Men;
-                bool any = r.Extra > 0 || r.Walk > 0 || (s.HorseQualitySpeed && (r.Riders > 0 || r.SpareF > 0));
+                // 537 E2 (MarchPairsSpeed): luzaki pod piechota = konie w parach (MarchPairs); u gracza krok 1 i krok 3 zastapione wpisami MarchPairs
+                // ("Footmen on horses: ..." z Unhorsed w puli i "Riders without harness") - ten sam czlowiek nie dostaje +0.15 ani -0.3 dwa razy
+                var pr = MarchPairs.SpeedRec(mp);
+                bool pm = pr != null && mp.IsMainParty;
+                int extra = pm ? 0 : r.Extra, walk = pm ? 0 : r.Walk;
+                int spareN = r.SpareF; double spareD = r.SpareFD;
+                if (pr != null) spareN = PairsSpare(pr, Params(s), out spareD);
+                bool any = extra > 0 || walk > 0 || (s.HorseQualitySpeed && (r.Riders > 0 || spareN > 0));
                 if (!any) return;
                 float wm = WetMul(mp);
                 // jak gra: mokro tnie 30% wpisu, perk NomadicTraditions doklada procent wpisu bez mokra (dpsm: modifier * PrimaryBonus)
-                if (r.Extra > 0) result.AddFactor(0.15f * r.Extra / n * (wm + r.Nomad), r.ExtraFree ? TxArm : TxArmWalk);
+                if (extra > 0) result.AddFactor(0.15f * extra / n * (wm + r.Nomad), r.ExtraFree ? TxArm : TxArmWalk);
                 if (s.HorseQualitySpeed)
                 {
                     if (r.Riders > 0 && Math.Abs(r.RidersD) > 1e-6) result.AddFactor((float)(r.RidersD / n) * wm, TxRiders);
-                    if (r.SpareF > 0 && Math.Abs(r.SpareFD) > 1e-6) result.AddFactor((float)(r.SpareFD / n) * wm, TxSpare);
+                    if (spareN > 0 && Math.Abs(spareD) > 1e-6) result.AddFactor((float)(spareD / n) * wm, TxSpare);
                 }
-                if (r.Walk > 0) result.AddFactor(-0.3f * r.Walk / n * wm, TxWalk);
+                if (walk > 0) result.AddFactor(-0.3f * walk / n * wm, TxWalk);
             }
             catch (Exception e) { Stumble("Apply", e); }
             finally { if (t != 0) { _ticks += Stopwatch.GetTimestamp() - t; _sampled++; } }
+        }
+
+        /// <summary>537 E2: konie pod piechota z par (MarchPairs.Rec.RideQ) - liczba i suma d (ten sam wzor D co luzaki).</summary>
+        private static int PairsSpare(MarchPairs.Rec pr, P p, out double sd)
+        {
+            sd = 0; int n = 0;
+            foreach (var q in pr.RideQ) { sd += q.N * D(q.Q, p); n += q.N; }
+            return n;
         }
 
         /// <summary>Jezdzcy bez konia idacy pieszo (krok 3) - MarchPace.CountColumn dolicza do piechoty (Cap i Explain).</summary>
@@ -570,9 +585,13 @@ namespace Armoury
             {
                 var r = GetFast(mp);
                 if (r == null) return;
-                float wm = (r.Riders > 0 || r.SpareC > 0) ? WetMul(mp) : 1f;
+                // 537 E2: sufit piechoty na luzakach z koni w parach (MarchPairs), nie z najlepszych luzakow
+                int spareC = r.SpareC; double spareCD = r.SpareCD;
+                var pr = MarchPairs.SpeedRec(mp);
+                if (pr != null) spareC = PairsSpare(pr, Params(s), out spareCD);
+                float wm = (r.Riders > 0 || spareC > 0) ? WetMul(mp) : 1f;
                 if (r.Riders > 0) rider = 1f + (float)(r.RidersD / r.Riders) * wm;
-                if (r.SpareC > 0) foot = 1f + (float)(r.SpareCD / r.SpareC) * wm;
+                if (spareC > 0) foot = 1f + (float)(spareCD / spareC) * wm;
             }
             catch (Exception e) { Stumble("CapMul", e); rider = 1f; foot = 1f; }
         }

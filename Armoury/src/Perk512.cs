@@ -351,7 +351,7 @@ namespace Armoury
         private static float Share(PartyBase p)
         {
             if (p == null) return 0f;
-            return p.NumberOfHealthyMembers * 20f + p.NumberOfMounts * 20f + p.NumberOfPackAnimals * 100f;
+            return p.NumberOfHealthyMembers * 20f + (p.NumberOfMounts + FootStable.MountsOf(p.MobileParty)) * 20f + p.NumberOfPackAnimals * 100f;   // 537 E6: + konie stajni (wpis udzwigu Footmen's mounts)
         }
 
         // ------------------------------------------------------------ D. 33 Breeder (zamiast latki ROT)

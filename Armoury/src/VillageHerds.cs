@@ -232,7 +232,7 @@ namespace Armoury
         {
             if (mp.MemberRoster != null) men += mp.MemberRoster.TotalManCount;
             var ir = mp.ItemRoster;
-            if (ir != null) { herd += ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals; mounts += ir.NumberOfMounts; }
+            if (ir != null) { herd += ir.NumberOfPackAnimals + ir.NumberOfLivestockAnimals; mounts += ir.NumberOfMounts + FootStable.MountsOf(mp); }   // 537 E6: + konie stajni piechoty
             if (mp.Party != null) foot += mp.Party.NumberOfMenWithoutHorse;
         }
 
