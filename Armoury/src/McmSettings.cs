@@ -2362,6 +2362,10 @@ namespace Armoury
         [SettingPropertyGroup("Shields under fire")]
         public bool ShieldsToTheFrontRank { get; set; } = true;
 
+        [SettingPropertyBool("Shields Toward Shooter On March", HintText = "with AI Formations Under Fire: AI infantry marching under arrows, bolts or javelins from one side turn their bodies and shields toward the shooter while keeping their place in the formation and its course; men without shields are left as they are. Not while the formation runs at the enemy, charges, or is in close combat; formations under your command are never touched. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool ShieldsTowardShooterOnMarch { get; set; } = true;
+
         [SettingPropertyBool("Cavalry Under Fire Log", HintText = "log only, no change to the battle: once per field battle Armoury.log gets a line on how AI cavalry formations behave while arrows and bolts fall on them - which RBM or game behaviour holds them, their movement order, the mod's own pace limits, how near the closest enemy is and how often their riders are hit while the formation does not charge. Off = no such line", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool CavalryUnderFireLog { get; set; } = true;
@@ -14450,6 +14454,7 @@ namespace Armoury
             s.AiFormationsUnderFire = AiFormationsUnderFire;
             s.FormationsFaceTheShooter = FormationsFaceTheShooter;
             s.ShieldsToTheFrontRank = ShieldsToTheFrontRank;
+            s.ShieldsTowardShooterOnMarch = ShieldsTowardShooterOnMarch;
             s.CavalryUnderFireLog = CavalryUnderFireLog;
             s.RidersShieldsUpUnderFire = RidersShieldsUpUnderFire;
             s.RidersRunDownShooters = RidersRunDownShooters;

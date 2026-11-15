@@ -204,7 +204,7 @@ namespace Armoury
         {
             _kFace = c != null && c.FormationsFaceTheShooter;
             _kFront = c != null && c.ShieldsToTheFrontRank;
-            _kMarch = false;   // 552c (tarcze w marszu) - osobne wgranie (klucz ShieldsTowardShooterOnMarch w 552c)
+            _kMarch = c != null && c.ShieldsTowardShooterOnMarch;   // 552c
             if (_key && _live && _kFace) EnsureFace552();
             if (_key && _live && _kMarch) EnsureMarch552();
             _f552 = _on && (_kFace || _kFront || _kMarch);

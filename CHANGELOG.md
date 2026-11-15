@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 552: szyk AI pod ostrzalem - sygnal widzi samotnego strzelca (552a), czolo do strzelca i tarcze na czolo (552b) - Armoury (ShieldsUp.cs, CloseRanks.cs + CloseRanks.Front552.cs; klucze NOWE ShieldsUpHarassShots = 2, FormationsFaceTheShooter, ShieldsToTheFrontRank)
+## 552: szyk AI pod ostrzalem - sygnal widzi samotnego strzelca (552a), czolo do strzelca i tarcze na czolo (552b), tarcze w strone strzelca w marszu (552c) - Armoury (ShieldsUp.cs, CloseRanks.cs + CloseRanks.Front552.cs; klucze NOWE ShieldsUpHarassShots = 2, FormationsFaceTheShooter, ShieldsToTheFrontRank, ShieldsTowardShooterOnMarch)
 
 **Problem:** Jeff, czat 15.11, w bitwie: "potem strzelam do szyku - ludzie z tarczami stoja z tylu, bez tarcz z przodu; widza ze do nich strzelam, to zamiast ustawic ludzi z tarczami z przodu i zrobic shield wall, to stoja jak kretyni i sie nie chronia; potem strzelam do wojska jak idzie, porusza sie, to musi sie odwrocic do mnie tarczami bo chca zachowac zycie, skierowac tarczownikow na kierunek mojego ostrzalu, a ida jak zombie i olewaja to, nawet nie biegna, po prostu ida". Specyfikacja 552 (raport z logu): Jeff trafial co 3-5 s, S4 (140) wymaga 3 zdarzen w 5 s, a miara gry UnderRangedAttackRatio dawala ok. 0.03 przy progu 0.33 - CloseRanks mial fire=false, decyzja konczyla sie na YQuiet; 146/310, 291 C i 140 dla calego szyku nie ruszyly.
 
@@ -28,7 +28,7 @@
 - B3 tarcze na czolo: S4, wrog pieszy dalej niz 40 m, bez konnicy, nie Charge, LineFormation (nie kolumna). Zamiany tylko przy Interval <= 0 (ShieldWall/Square - gra nie sortuje, LineFormation.SwitchFrontUnitTypesToFrontRows); w Line/Loose tylko pomiar. Kolejnosc: ten sam rzad (bez tarczy w r-1, tarcza w r), potem szereg 0 z rzedami +-1/+-2 (tarcza w szeregu 1-2). 8 zamian na pass (4, gdy odchylenie szyku po 3 s wzroslo ponad 2x). Kontrola po zamianie: szereg bez zmiany = odmowa (RBM OverrideLineFormation / gra). Nie ruszamy: bohaterow, kapitana, gracza, chorazych (HorsePursuit.Banner), paniki, odwrotu (IsRunningAway, 143), nieustawionych. Straz sztandaru 550 - znacznik do uzgodnienia przy scaleniu (w tej galezi go nie ma).
 - Pomiar: OnHit - trafienia w szykach z B3 wedlug szeregu 0 / dalej; czolo z tarcza przy wejsciu i po 3 s; odchylenie (DeviationOfPositionsExcludeFarAgents).
 - Linia "Front do strzelca (552)" raz na bitwe zaraz po linii 146 (nekanie z 552a, B2 wejscia/kat/konce/pominiete/postfiks, B3 passy/zamiany/odmowy/czolo/odchylenie/trafienia wedlug szeregu, C2, potkniecia) + do 20 linii biezacych "552 zwrot | T/F zachowanie szyk | kat | strzelec | tarcze w rece" i "552 koniec | ... | powod".
-- Klucz marszu (552c) w tym commicie na sztywno NIE (latka marszu nie wchodzi).
+- W commicie 552b klucz marszu byl na sztywno NIE (latka marszu nie wchodzila) - 552b da sie wgrac osobno z tego commitu.
 
 **Ryzyko / co sprawdzic (552b):**
 - Jeden wlasciciel FacingOrder: R4 283 (ReactHalt Face/Release) i 457 - wykluczone przez HaltHolds/HeldReserve; 459 i oblezenia poza zakresem (nie-AI / nie bitwa polowa); 446 wykluczony (Drop552 przy czworoboku zwalnia slot).
@@ -40,7 +40,20 @@
 - Koszt: B3 do 8 zamian i dwa przejscia siatki na szyk co 0.5 s; OtherThreat po szykach wroga tylko przy wejsciu/trwaniu.
 - 140 EnforceShieldUsage liczy kierunek tarczy od szeregu - po zwrocie i zamianach gra poprawia go sama (UpdateFormationOrders).
 
-**Status:** DO SPRAWDZENIA (wgrania osobno - CLAUDE.md p. 2: najpierw 552a, test, potem 552b; nic nie wgrane; build 0 bledow, w grze nie sprawdzone)
+**Zmiana (552c, osobny commit - tarcze w strone strzelca w marszu; klucz NOWY ShieldsTowardShooterOnMarch = TAK, MCM "Shields Toward Shooter On March"):**
+- Prefiks Agent.SetFormationFrameEnabled(WorldPosition, Vec2 direction, Vec2, float factor) (DeclaredMethod, kontrola GetPatchInfo; latka tylko przy kluczu, raz na proces). Jedyny wolajacy: TrySetFormationFrame (HumanAIComponent.ParallelUpdateFormationMovement - watki robocze; ForceUpdateCachedAndFormationValues). RBM ma postfiks na ParallelUpdateFormationMovement, na tej metodzie nic.
+- Pass (glowny watek) ustawia slot marszu (MForm/MAng/MOn, osobny od B2): S4, przed zwarciem, bez konnicy, szyk idzie (srodek > 1 m w 2 s), nie Charge, nie bieg 291 C (nowy odczyt MarchToContact.RunningBare) ani 313b (Rush313), ShooterDir z rozrzutem >= 0.6, strzelec 50-130 st. od czola (ponizej - oslania czolo, powyzej - z tylu: R4/313b jak dotad).
+- Prefiks: czlowiek AI z tarcza (HasShieldCached) w szyku ze slotem - kierunek ramki = kierunek do strzelca, wspolczynnik wymuszenia kierunku co najmniej 0.75; pozycja i predkosc ramki bez zmian. Bez alokacji/logu/Settings/MovementOrder, liczniki Interlocked.
+- Pomiar w linii 552: szyki, wywolania i nadpisania prefiksu wobec "oczekiwane" (ludzie z tarcza w rece x passy), kat patrzenia do strzelca u probki do 8 ludzi przy wejsciu i 2 s po, predkosc przed/po.
+
+**Ryzyko / co sprawdzic (552c):**
+- Kryterium: sredni kat "po" ponizej 35 st. = dziala. Jesli silnik w ruchu ignoruje kierunek ramki (kat zostaje przy kierunku marszu) - klucz NIE domyslnie i wpis COFNIETE; obrot bloku w marszu (C1) nie wchodzi bez decyzji Jeffa.
+- Jesli predkosc "po" spada ponad 30% - zawezic do szeregu 0 i skrajnych rzedow.
+- Bieg albo zwrot, nigdy oba (RunningBare / Rush313). AiBreath bez zmian.
+- Prefiks na metodzie wolanej co ok. 0.5 s na czlowieka: przy pustych slotach wyjscie na jednym volatile (_mAny).
+- 552d (bieg pod ostrzalem): bez nowej reguly. Decyzje dla Jeffa (nic nie zmienione): D2 - prog muru 146/310 WallFrom 0.6 -> "tarcz w rece starcza na pierwszy szereg" (dotyka 291 C i 313b); D3 - czy szyk z tarczami pod nekaniem ma biec (obnizenie bramki 313b, np. 1 zabity albo 4 trafienia w 20 s). Po bitwie przeczytac segment E linii "Bitwa (291)", czemu 313b nie wszedl.
+
+**Status:** DO SPRAWDZENIA (wgrania osobno - CLAUDE.md p. 2: commit 552a, test, commit 552b, test, commit 552c z pomiarem kata; nic nie wgrane; build 0 bledow, w grze nie sprawdzone. Test Jeffa: samotny luk/kusza 30-60 m z boku i z tylu stojacego szyku AI (Defend), potem idacego; autotest regresji: bitwa armii n308 + armoury-bitwa-armie.flag, -Speed 20 - 0 potkniec 552, bez wzrostu 'nasz szyk zmieniony inna sciezka', linie 291 i 144 bez zalamania)
 
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
