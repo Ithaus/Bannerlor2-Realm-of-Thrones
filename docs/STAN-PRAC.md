@@ -3,7 +3,7 @@
 ## STAN 15.11 - WGRANIE 253 (549 cios w plecy x2 + 25% przebicia, 550 AI przy sztandarze), bez autotestu
 
 - Armoury.dll 8aa66f43 = noc/scal-perki 13e1e18d (252 + 549 + 550). Kopie: .bak-2026-11-15-przed-wgranie253, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie253 i -przed).
-- Do sprawdzenia: 'cios z tylu (549): wpiete 2/2', po bitwie 'Cios z tylu (549): koniec misji' potkniecia 0; 550: Nekanie (283) - piechota wyslana przy sztandarze, biegacz (158) porzuca przy wrogu, straz. Pytanie do Jeffa: 549 tez w turniejach/arenie? W toku: 552 ostrzal, 554 srebro, 555 zaloga Banefortu, 556 Joffrey (analiza), 557 log strat, 558 towarzysze cwicza, 551 kusze (historia).
+- Do sprawdzenia: 'cios z tylu (549): wpiete 2/2', po bitwie 'Cios z tylu (549): koniec misji' potkniecia 0; 550: Nekanie (283) - piechota wyslana przy sztandarze, biegacz (158) porzuca przy wrogu, straz. Jeff 15.11: 549 zostaje takze w turniejach i na arenie. W toku: 552 ostrzal, 554 srebro, 555 zaloga Banefortu, 556 Joffrey (analiza), 557 log strat, 558 towarzysze cwicza, 551 kusze (historia).
 
 ## STAN 15.11 - WGRANIE 252 (553 ulga Jazdy dla bohatera bez konia), bez autotestu
 
