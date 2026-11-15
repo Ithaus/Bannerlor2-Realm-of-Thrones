@@ -402,6 +402,9 @@ namespace Armoury
             // bohaterowie: wlasny kon poza pula; bez konia - do puli piechoty z wlasna Jazda
             // szeregowi: kon we wzorcu (IsMounted - ta sama miara co NumberOfMenWithHorse gry) - jazda; reszta - piechota (z rannymi, D9)
             var cavHealthy = new Dictionary<CharacterObject, int>();
+            // recenzja 537: bez TroopsFightWithOwnKitOnly gra liczy KAZDEGO jezdzca wzorca (z rannymi - PartyBase.RecalculateNumberOfMenWithHorses) jako
+            // jazde (Compute: CavO = cavG) - wtedy ranny jezdziec i jezdziec bez pary nie biora par z puli piechoty (ten sam czlowiek nie jest i jazda, i piechurem)
+            bool cavRule = main && GarrisonKit.OwnKitOn;
             for (int i = 0; i < mr.Count; i++)
             {
                 var el = mr.GetElementCopyAtIndex(i);
@@ -421,7 +424,7 @@ namespace Armoury
                 if (!rider) { AddMan(men, ch, el.Number, KFoot); continue; }
                 int wnd = Math.Min(el.Number, Math.Max(0, el.WoundedNumber));
                 int ok = el.Number - wnd;
-                if (main) { r.CavWounded += wnd; AddMan(men, ch, wnd, KWoundedRider); if (ok > 0) cavHealthy[ch] = ok; }
+                if (main) { r.CavWounded += wnd; if (cavRule) AddMan(men, ch, wnd, KWoundedRider); if (ok > 0) cavHealthy[ch] = ok; }
                 else r.CavMen += el.Number;   // partia rodu: jazda wedlug gry (bez podgladu DTE)
             }
 
@@ -444,9 +447,11 @@ namespace Armoury
                 // E1: przy CrashScribe sprzed 133a podglad pisze szum - jak ForArmoury / meldunek QM: bez podgladu (wlasny dobor ze zbrojowni)
                 bool quiet = false;
                 try { quiet = KitPreview.CsQuiet; } catch (Exception e) { Stumble("CsQuiet", e); }
+                // recenzja 537 (1): dawne "if (quiet && pv == null) ... else" nadpisywalo dobry podglad z LastIfSame wynikiem Ok=false - pasek mapy liczyl jazde
+                // wlasnym doborem, linia doby podgladem; teraz else tylko przy CrashScribe sprzed 133a
                 if (quiet && light) { try { pv = LastIfSame(mp); } catch (Exception e) { Stumble("KitPreview.Last", e); pv = null; } }
-                if (quiet && pv == null) { try { pv = KitPreview.Get(false); } catch (Exception e) { Stumble("KitPreview", e); pv = null; } }
-                else pv = new KitPreview.Result { Why = "CrashScribe sprzed 133a - podglad pomijany" };
+                if (!quiet) pv = new KitPreview.Result { Why = "CrashScribe sprzed 133a - podglad pomijany" };
+                else if (pv == null) { try { pv = KitPreview.Get(false); } catch (Exception e) { Stumble("KitPreview", e); pv = null; } }
                 if (pv != null && pv.Ok)
                 {
                     r.Preview = true;
@@ -461,7 +466,7 @@ namespace Armoury
                         if (t.Harnessed > 0 || walkers > 0) r.CavBy.Add(new CavLot { Ch = t.Troop, Pairs = t.Harnessed, NoHarness = noHar, NoHorse = t.NoHorse + t.NoSaddle });   // E5
                         int healthy; cavHealthy.TryGetValue(t.Troop, out healthy);
                         walkers = Math.Min(walkers, healthy);   // tylko jezdzcy wzorca (piechur z podgladu nie jest jezdzcem bez pary)
-                        AddMan(men, t.Troop, walkers, KCavWalk);
+                        if (cavRule) AddMan(men, t.Troop, walkers, KCavWalk);
                     }
                     // wolne sztuki zbrojowni po jezdzie (D11): zbrojownia minus to, na czym jazda wyjedzie
                     foreach (var kv in aH) { int u; pv.Rode.TryGetValue(kv.Key, out u); int f = kv.Value - u; if (f > 0) { r.AFreeHorses += f; AddLot(horses, kv.Key, f, SArm); } }
@@ -480,14 +485,33 @@ namespace Armoury
                     var tmp = new Rec();
                     Assign(cm, cp, tmp);
                     r.CavPairs = tmp.Ride;
-                    foreach (var m in cm) AddMan(men, m.Ch, m.N - m.Got, KCavWalk);
+                    if (cavRule) foreach (var m in cm) AddMan(men, m.Ch, m.N - m.Got, KCavWalk);
                     // E5: jazda z wlasnego doboru - pary po sztukach (kon i uprzaz ze zbrojowni) i typy
                     foreach (var x in tmp.RiddenBy) { x.Kind = KindCav; r.RiddenBy.Add(x); }
                     foreach (var m in cm) if (m.N > 0) r.CavBy.Add(new CavLot { Ch = m.Ch, Pairs = m.Got, NoHarness = 0, NoHorse = m.N - m.Got });
-                    // zuzyte pary jazdy zdejmujemy z puli zbrojowni: najlatwiejsze pary poszly do jazdy, wiec do piechoty idzie reszta wedlug liczby
-                    int usedH = tmp.Ride, usedU = tmp.Ride;
-                    foreach (var x in ah) { int t = Math.Min(usedH, x.N); usedH -= t; int f = x.N - t; if (f > 0) { r.AFreeHorses += f; AddLot(horses, x.It, f, SArm); } }
-                    foreach (var x in au) { int t = Math.Min(usedU, x.N); usedU -= t; int f = x.N - t; if (f > 0) { r.AFreeHarness += f; AddLot(harness, x.It, f, SArm); } }
+                    // zuzyte pary jazdy zdejmujemy z puli zbrojowni DOKLADNIE po sztukach, na ktorych jazda jedzie (tmp.RiddenBy - jak pv.Rode/pv.Saddles w galezi
+                    // z podgladem). Recenzja 537 (2): dawne "pierwsze N z listy" bralo uprzeze w kolejnosci slownika (MakePairs sortuje tylko kopie uprzezy),
+                    // wiec do puli piechoty szla uprzaz spod jezdzca. Gdy sztuki widoku nie skladaja sie na tmp.Ride (potkniecie TakeSubs) - dawna regula liczby.
+                    var uH = new Dictionary<ItemObject, int>(); var uU = new Dictionary<ItemObject, int>();
+                    int subN = 0;
+                    foreach (var x in tmp.RiddenBy)
+                    {
+                        if (x.N <= 0) continue;
+                        subN += x.N;
+                        if (x.HIt != null) { int v; uH.TryGetValue(x.HIt, out v); uH[x.HIt] = v + x.N; }
+                        if (x.UIt != null) { int v; uU.TryGetValue(x.UIt, out v); uU[x.UIt] = v + x.N; }
+                    }
+                    if (subN == tmp.Ride)
+                    {
+                        foreach (var kv in aH) { int u; uH.TryGetValue(kv.Key, out u); int f = kv.Value - u; if (f > 0) { r.AFreeHorses += f; AddLot(horses, kv.Key, f, SArm); } }
+                        foreach (var kv in aU) { int u; uU.TryGetValue(kv.Key, out u); int f = kv.Value - u; if (f > 0) { r.AFreeHarness += f; AddLot(harness, kv.Key, f, SArm); } }
+                    }
+                    else
+                    {
+                        int usedH = tmp.Ride, usedU = tmp.Ride;
+                        foreach (var x in ah) { int t = Math.Min(usedH, x.N); usedH -= t; int f = x.N - t; if (f > 0) { r.AFreeHorses += f; AddLot(horses, x.It, f, SArm); } }
+                        foreach (var x in au) { int t = Math.Min(usedU, x.N); usedU -= t; int f = x.N - t; if (f > 0) { r.AFreeHarness += f; AddLot(harness, x.It, f, SArm); } }
+                    }
                 }
             }
 
@@ -539,6 +563,30 @@ namespace Armoury
             return (arm != null ? arm.VersionNo : -1) + "|" + mp.MemberRoster.VersionNo + "|" + (mp.PrisonRoster != null ? mp.PrisonRoster.VersionNo : -1)
                    + "|" + (ir != null ? ir.VersionNo : -1) + "|" + (int)CampaignTime.Now.ToDays + "|" + (mp.IsCurrentlyAtSea ? 1 : 0) + (SaddleLaw.On ? 1 : 0)
                    + "|" + FootStable.Version;   // E6: stajnia piechoty
+        }
+
+        /// <summary>Recenzja 537 (3): konie i uprzeze ZBROJOWNI DTE pod piechota, jezdzcami bez pary i bohaterami (pary D11, zrodlo SArm,
+        /// bez KindCav i rannych jezdzcow - ci sa juz w Rode/Saddles podgladu wagi ForWeight) wedlug przedmiotu - StashWeight dopisuje je do listy "na ludziach" (waga i Escrow), zeby uprzaz
+        /// pod piechurem ze zbrojowni nie wazyla, a ta sama z ladunku nie (E3). sig - podpis do klucza pamieci StashWeight. null - brak rekordu albo klucze
+        /// MarchPairsSpeed i RiddenHarnessWeightless NIE (wtedy par nie ma w predkosci ani udzwigu). Watek glowny (Main(false) - pamiec najwyzej raz na 1 s).</summary>
+        internal static Dictionary<ItemObject, int> FootArmouryWorn(out string sig)
+        {
+            sig = "-";
+            if (!Needed) return null;
+            var r = Main(false);
+            if (r == null || !r.Ok || r.AtSea) return null;
+            var d = new Dictionary<ItemObject, int>();
+            int h = 0, u = 0;
+            foreach (var x in r.RiddenBy)
+            {
+                if (x == null || x.N <= 0 || x.Kind == KindCav || x.Kind == KindWoundedRider) continue;   // ranny jezdziec: ForWeight daje mu kit jak zdrowemu (D4) - juz w Rode/Saddles
+                if (x.HSrc == SArm && x.HIt != null) { int v; d.TryGetValue(x.HIt, out v); d[x.HIt] = v + x.N; h += x.N; }
+                if (x.USrc == SArm && x.UIt != null) { int v; d.TryGetValue(x.UIt, out v); d[x.UIt] = v + x.N; u += x.N; }
+            }
+            long acc = 0;
+            foreach (var kv in d) acc += (long)System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(kv.Key) * 1000003L + kv.Value;   // podpis tresci (bez kolejnosci)
+            sig = h + ":" + u + ":" + acc;
+            return d;
         }
 
         /// <summary>E1: rekord par gracza z pamieci. Liczony od nowa najwyzej raz na 1 s i tylko po zmianie klucza, albo co 10 s (sprzet bohaterow,

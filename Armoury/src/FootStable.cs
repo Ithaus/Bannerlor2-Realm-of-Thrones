@@ -82,8 +82,11 @@ namespace Armoury
         private static TextObject TxCap { get { return _txCap ?? (_txCap = new TextObject("{=!}Footmen's mounts")); } }
         private static TextObject TxName { get { return _txName ?? (_txName = new TextObject("{=!}Footmen's mounts")); } }
 
-        /// <summary>6a-6c: klucz FootmenMountsStable (NOWY). Stajnia dziala tylko razem z MarchPairsSpeed - bez niego gra liczylaby konie stajni jako brak koni.</summary>
-        internal static bool On { get { var s = Settings.Current; return s != null && s.FootmenMountsStable && s.MarchPairsSpeed; } }
+        /// <summary>6a-6c: klucz FootmenMountsStable (NOWY). Stajnia dziala tylko razem z MarchPairsSpeed - bez niego gra liczylaby konie stajni jako brak koni.
+        /// Recenzja 537 (4): takze z RiddenHarnessWeightless i TroopsFightWithOwnKitOnly - bez nich uprzaz w stajni nie wazylaby wcale (dawna regula wazy
+        /// uprzaz par), a kon stajni mialby 20 kg zamiast 20 + juki (CapRiders -1, RidersOld wedlug wzorca) - udzwig zalezalby od tego, gdzie stoi kon.
+        /// Przy wylaczonym ktoryms kluczu stajnia oddaje wszystko do ladunku w nastepnej bezpiecznej chwili (ROff).</summary>
+        internal static bool On { get { var s = Settings.Current; return s != null && s.FootmenMountsStable && s.MarchPairsSpeed && s.RiddenHarnessWeightless && s.TroopsFightWithOwnKitOnly; } }
         /// <summary>6d: klucz StableRidersFirst (NOWY).</summary>
         private static bool RidersFirst { get { var s = Settings.Current; return s != null && s.StableRidersFirst; } }
 
@@ -233,7 +236,7 @@ namespace Armoury
             try
             {
                 Log.Info(P + "start sesji | klucze FootmenMountsStable " + Yes(Settings.Current != null && Settings.Current.FootmenMountsStable) + " (dziala: " + Yes(On)
-                         + " - wymaga MarchPairsSpeed), StableRidersFirst " + Yes(RidersFirst) + " | opcja \"Footmen's mounts\" w menu miasta " + Yes(town)
+                         + " - wymaga MarchPairsSpeed, RiddenHarnessWeightless i TroopsFightWithOwnKitOnly), StableRidersFirst " + Yes(RidersFirst) + " | opcja \"Footmen's mounts\" w menu miasta " + Yes(town)
                          + ", obozu arm_camp_wait " + Yes(camp) + " | latki: " + _hooks + " | koniec bitwy " + Yes(ev) + " | stajnia: konie " + _snap.Mounts
                          + ", uprzeze " + _snap.Harness + ", inne " + _snap.Other + (_unresolved.Count > 0 ? ", wpisow bez przedmiotu " + _unresolved.Count : "") + ".");
             }
@@ -664,7 +667,7 @@ namespace Armoury
                 var s = Settings.Current;
                 var sb = new StringBuilder(600);
                 sb.Append(P).Append("dzien ").Append((int)CampaignTime.Now.ToDays - 1)
-                  .Append(" | klucze FootmenMountsStable ").Append(Yes(s != null && s.FootmenMountsStable)).Append(" (dziala ").Append(Yes(On)).Append(" - z MarchPairsSpeed)")
+                  .Append(" | klucze FootmenMountsStable ").Append(Yes(s != null && s.FootmenMountsStable)).Append(" (dziala ").Append(Yes(On)).Append(" - z MarchPairsSpeed, RiddenHarnessWeightless i TroopsFightWithOwnKitOnly)")
                   .Append(", StableRidersFirst ").Append(Yes(RidersFirst))
                   .Append(" | stajnia: konie ").Append(sn.Mounts).Append(", uprzeze ").Append(sn.Harness).Append(", inne ").Append(sn.Other).Append(" (rodzajow ").Append(sn.It.Length).Append(')');
                 if (_unresolved.Count > 0) sb.Append(", wpisow zapisu bez przedmiotu ").Append(_unresolved.Count);

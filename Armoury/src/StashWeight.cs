@@ -20,6 +20,7 @@ namespace Armoury
     ///  - JEDNA lista "na ludziach" (D12 a): podglad DTE KitPreview.ForWeight (ten sam rozdzielacz co bitwa, ranni liczeni jak zdrowi - D4: kit rannych nie
     ///    wazy); konie z Rode, uprzeze z Saddles (po strazach wystawienia), reszta z Given. Ta sama lista (WornKeys) idzie do Escrow (co chowac jako noszone)
     ///    i do wagi - sztuka schowana jako noszona nie wazy, widoczna wazy;
+    ///    recenzja 537: na liscie tez konie i uprzeze zbrojowni pod piechota z par MarchPairs (D11, FootArmouryWorn) - jak uprzaz z ladunku pod piechurem (E3);
     ///  - sztuki gracza (czesc gracza z podzialu porzadku, bez podzialu - ksiega per id) nigdy nie sa "na ludziach" (widoczne na liscie gracza, waza);
     ///  - waga przez model (GetItemEffectiveWeight z flaga morza wolajacego), sztuka po sztuce z modyfikatorem (dokladnie, bez "najlzejszej sztuki");
     ///  - bez podgladu (Own Kit Only wylaczone, bez DTE, CrashScribe sprzed 133a) - cala zbrojownia wazy jak ladunek (bezpieczny kierunek);
@@ -60,7 +61,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _pub = null; _perItem = null; _lastPv = null; _mKey = null; _pvWhy = "nie liczony"; _mainTid = -1; _at = Environment.TickCount - 20000;
+            _pub = null; _perItem = null; _perBase = null; _mergedBase = null; _footSig = "-"; _footPieces = 0; _lastPv = null; _mKey = null; _pvWhy = "nie liczony"; _mainTid = -1; _at = Environment.TickCount - 20000;
             _told = false; _toldLoaded = false; _startLogged = false;
             _inval = 0; _refresh = 0; _pvMs = 0;
             Interlocked.Exchange(ref _calls, 0); Interlocked.Exchange(ref _live, 0); Interlocked.Exchange(ref _cached, 0);
@@ -94,6 +95,24 @@ namespace Armoury
             foreach (var kv in r.Saddles) { if (kv.Key == null || kv.Value <= 0) continue; int v; d.TryGetValue(kv.Key, out v); d[kv.Key] = v + kv.Value; }
             return d;
         }
+
+        /// <summary>Recenzja 537 (3): lista z podgladu (base) + konie i uprzeze zbrojowni pod piechota z par MarchPairs (D11 - "taka para tez jest na ludziach").
+        /// Nowy slownik tylko po zmianie podgladu albo podpisu par (klucz pamieci Refresh po RuntimeHelpers.GetHashCode). Watek glowny.</summary>
+        private static void MergeFoot()
+        {
+            if (_perBase == null) { _perItem = null; return; }
+            string sig;
+            Dictionary<ItemObject, int> foot = null;
+            try { foot = MarchPairs.FootArmouryWorn(out sig); } catch (Exception e) { Stumble("FootArmouryWorn", e); sig = "blad"; foot = null; }
+            if (_perItem != null && ReferenceEquals(_mergedBase, _perBase) && sig == _footSig) return;
+            var d = new Dictionary<ItemObject, int>(_perBase);
+            int n = 0;
+            if (foot != null) foreach (var kv in foot) { if (kv.Key == null || kv.Value <= 0) continue; int v; d.TryGetValue(kv.Key, out v); d[kv.Key] = v + kv.Value; n += kv.Value; }
+            _perItem = d; _mergedBase = _perBase; _footSig = sig; _footPieces = n;
+        }
+        private static Dictionary<ItemObject, int> _perBase, _mergedBase;
+        private static string _footSig = "-";
+        private static int _footPieces;
 
         private sealed class KeyLot { public string Key; public EquipmentElement E; public int N, Own, Worn, Used; public float Pm; }
 
@@ -147,8 +166,9 @@ namespace Armoury
             {
                 if (!On || armory == null) return null;
                 var pv = KitPreview.ForWeight();
-                if (pv == null) { _perItem = null; _pvWhy = "brak (Gate / CrashScribe)"; return null; }
-                if (pv.Ok) { if (!ReferenceEquals(pv, _lastPv)) { _perItem = PerItem(pv); _lastPv = pv; _pvMs = (int)pv.Ms; } _pvWhy = "TAK (" + _pvMs + " ms)"; }
+                if (pv == null) { _perItem = null; _perBase = null; _lastPv = null; _pvWhy = "brak (Gate / CrashScribe)"; return null; }
+                if (pv.Ok) { if (!ReferenceEquals(pv, _lastPv)) { _perBase = PerItem(pv); _lastPv = pv; _pvMs = (int)pv.Ms; } _pvWhy = "TAK (" + _pvMs + " ms)"; }
+                MergeFoot();   // recenzja 537 (3): pary piechoty ze zbrojowni tez na ludziach - Escrow chowa je jak noszone
                 if (_perItem == null) return null;
                 var stock = new List<KeyValuePair<EquipmentElement, int>>();
                 for (int i = 0; i < armory.Count; i++) { var el = armory.GetElementCopyAtIndex(i); if (el.Amount > 0) stock.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, el.Amount)); }
@@ -223,7 +243,7 @@ namespace Armoury
                 _mainTid = Thread.CurrentThread.ManagedThreadId;
                 if (!On)
                 {
-                    if (_pub != null) { _pub = null; _perItem = null; MarchPairs.InvalidateWeight(mp); _inval++; }
+                    if (_pub != null) { _pub = null; _perItem = null; _perBase = null; MarchPairs.InvalidateWeight(mp); _inval++; }
                     return;
                 }
                 if (QuartermasterEscrow.Active || TaleWorlds.MountAndBlade.Mission.Current != null) return;
@@ -232,9 +252,10 @@ namespace Armoury
                 _at = now;
                 _refresh++;
                 var pv = KitPreview.ForWeight();
-                if (pv == null) { _perItem = null; _pvWhy = "brak (Gate / CrashScribe - cala zbrojownia wazy)"; }
-                else if (pv.Ok) { if (!ReferenceEquals(pv, _lastPv)) { _perItem = PerItem(pv); _lastPv = pv; _pvMs = (int)pv.Ms; } _pvWhy = "TAK (" + _pvMs + " ms)"; }
-                else _pvWhy = "potkniecie - poprzednia lista";   // _perItem bez zmiany
+                if (pv == null) { _perItem = null; _perBase = null; _lastPv = null; _pvWhy = "brak (Gate / CrashScribe - cala zbrojownia wazy)"; }
+                else if (pv.Ok) { if (!ReferenceEquals(pv, _lastPv)) { _perBase = PerItem(pv); _lastPv = pv; _pvMs = (int)pv.Ms; } _pvWhy = "TAK (" + _pvMs + " ms)"; }
+                else _pvWhy = "potkniecie - poprzednia lista";   // _perBase bez zmiany
+                MergeFoot();   // recenzja 537 (3): + konie i uprzeze zbrojowni pod piechota (pary D11) - nowy slownik tylko po zmianie, wiec klucz nizej sie zmienia
                 // bez liczenia, gdy nic sie nie zmienilo (wersja zbrojowni, lista na ludziach, podzial porzadku, morze) - najwyzej co 10 s (ksiega gracza bez wersji)
                 var arm = QuartermasterLaw.DteArmory();
                 var split = QuartermasterLaw.LastSplit;
@@ -292,7 +313,8 @@ namespace Armoury
                     sb.Append(" | ").Append(w != null ? Brief(w) : "brak liczenia (zbrojownia otwarta albo DTE nieobecne)");
                     if (pub != null && w != null && (Math.Abs(pub.Unused - w.Unused) > 0.5f))
                         sb.Append(" | ROZNICA z ostatnim wynikiem paska ").Append(pub.Unused.ToString("0.0", Inv)).Append(" kg");
-                    sb.Append(" | lista na ludziach: podglad ").Append(_pvWhy).Append(", liczony ").Append(KitPreview.WeighRuns).Append(" razy od wczytania (ranni jak zdrowi - D4)");
+                    sb.Append(" | lista na ludziach: podglad ").Append(_pvWhy).Append(", liczony ").Append(KitPreview.WeighRuns).Append(" razy od wczytania (ranni jak zdrowi - D4)")
+                      .Append(", w tym pary piechoty ze zbrojowni (D11) ").Append(_footPieces).Append(" szt.");
                     try
                     {
                         var c = Campaign.Current; var m = c.Models != null ? c.Models.InventoryCapacityModel : null;
