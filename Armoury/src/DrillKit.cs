@@ -22,6 +22,8 @@ namespace Armoury
     ///  - Gracz: braki zestawu ludzie biora SAMI ze swojej nadwyzki w zbrojowni DTE (plan K1 z podgladem bitwy - KeepGiven: nigdy sprzet, ktory nastepna
     ///    bitwa wydaje); sztuka schodzi ze stanu zbrojowni do zapasu musztry (_stock). Nadmiar (smierc, awans, zmiana roli) wraca do zbrojowni, brak bitwy
     ///    tez (zestaw bitewny ma pierwszenstwo). Codziennie, po zmianie skladu, przy starcie bitwy (sam zwrot) i w miescie przed sprzedaza (sam zwrot).
+    ///  - 571 (klucz DrillTakesPlayerStash): czego nadwyzka ludzi nie da, ludzie biora z NIENOSZONYCH sztuk gracza w zbrojowni (lista gracza), najgorsze najpierw,
+    ///    nigdy tego, co wyda nastepna bitwa; zwrot takiej sztuki wraca na liste gracza (opis przy TakeBook).
     ///  - AI: ta sama regula, ale zapasem jest rezerwacja w slowniku zbrojowni DTE (sztuki zostaja w zbrojowni - DTE i tak wydaje cala w bitwie), liczona
     ///    od nowa raz na dobe; sprzedaz nadwyzek AI (MenPurse.SellArmorySurplus) omija zarezerwowane.
     ///  - S = 1 + 0.10 x uB x kB + 0.10 x uZ x kZ, u = pokrycie sztuk polowy (562c: suma min(Cov, Need) / suma Need rodzajow broni / zbroi - ta sama miara,
@@ -417,8 +419,7 @@ namespace Armoury
             int n = 0;
             foreach (var el in els)
             {
-                _stock.AddToCounts(el.EquipmentElement, -el.Amount);
-                arm.AddToCounts(el.EquipmentElement, el.Amount);
+                BackToArmory(arm, el.EquipmentElement, el.Amount);   // 571: czesc gracza na liste gracza
                 n += el.Amount;
             }
             return n;
@@ -478,6 +479,7 @@ namespace Armoury
                         int x = Math.Min(el.Amount, (int)(four / 5) + (rem > 0 && MBRandom.RandomInt(5) < rem ? 1 : 0));
                         if (x <= 0) continue;
                         _stock.AddToCounts(el.EquipmentElement, -x);
+                        _pBookGone += BookOut(el.EquipmentElement, x);   // 571: czesc gracza wychodzi pierwsza (stracona jak kazda sztuka zapasu)
                         lost += x;
                     }
                     _pLost += lost;
@@ -493,7 +495,8 @@ namespace Armoury
         private static int ClsPole(int v) { bool f1 = (v & F1H) != 0, f2 = (v & F2H) != 0; return f1 && f2 ? 3 : (f1 ? 2 : (f2 ? 1 : 0)); }   // 0 bez, 1 tylko 2H, 2 tylko 1H, 3 oba
 
         /// <summary>a) Nadmiar: dla rodzaju t Have - Used - ceil(Used x SurplusKeepPercent / 100) do zbrojowni, najlepsze najpierw, tylko z wolnych klas przydzialu
-        /// (pokrycie sie nie zmienia); sztuki spoza rodzajow (stare rekawice) zawsze. Do czesci ludzi - K1 je potem sprzeda jak kazda nadwyzke.</summary>
+        /// (pokrycie sie nie zmienia); sztuki spoza rodzajow (stare rekawice) zawsze. Do czesci ludzi - K1 je potem sprzeda jak kazda nadwyzke; 571: sztuki
+        /// wziete z listy gracza (_fromBook) wracaja na liste gracza (BackToArmory).</summary>
         private static int ReturnExcess(KitM m, ItemRoster arm)
         {
             var s = Settings.Current;
@@ -528,8 +531,7 @@ namespace Armoury
                     _pBack += give;
                 }
                 if (give <= 0) continue;
-                _stock.AddToCounts(el.EquipmentElement, -give);
-                arm.AddToCounts(el.EquipmentElement, give);
+                BackToArmory(arm, el.EquipmentElement, give);   // 571: czesc gracza na liste gracza, reszta na stan wojska
                 n += give;
             }
             return n;
@@ -561,8 +563,7 @@ namespace Armoury
                     {
                         if (left <= 0) break;
                         int give = Math.Min(left, el.Amount);
-                        _stock.AddToCounts(el.EquipmentElement, -give);
-                        arm.AddToCounts(el.EquipmentElement, give);
+                        BackToArmory(arm, el.EquipmentElement, give);   // 571: czesc gracza na liste gracza (bitwa i tak wyda ja z calej zbrojowni)
                         left -= give; n += give;
                     }
                 }
@@ -589,6 +590,10 @@ namespace Armoury
         {
             var plans = new Dictionary<int, List<SwapMath.Piece>>();
             int took = 0;
+            // 571: po nadwyzce ludzi - nienoszone sztuki gracza (tylko z podgladem bitwy: bez niego nie wiadomo, czego bitwa nie wyda)
+            var keep = BookOn ? MenPurse.KeepFor(pv) : null;
+            bool book = keep != null;
+            var bookPlans = book ? new Dictionary<int, List<SwapMath.Piece>>() : null;
             foreach (int k in TakeOrder)
             {
                 int want = m.Short(k);
@@ -615,9 +620,117 @@ namespace Armoury
                         if (want <= 0) break;
                     }
                 }
+                if (want > 0 && book) took += TakeBook(k, want, arm, keep, bookPlans);   // 571: reszta braku z listy gracza
             }
             _pTaken += took;
             return took;
+        }
+
+        // ------------------------------------------------------------ 571: musztra z listy gracza
+        // 571 (Jeff 15.11, zbrojownia pelna helmow gracza, podpowiedz "Missing most ... 130 helmets"; log 15.11 20:53: HeadArmor "wklady nienoszone 371 zostaja gracza",
+        // "zapas ludzi" 43 -> 18, papier potrzeba 168): TakePlayer bral tylko z nadwyzki LUDZI (PlayerSurplusPlan - Sell z MenFree ponad komplet + 10%), a sztuki
+        // gracza (ksiega wkladow) lezaly nietkniete. Teraz (klucz DrillTakesPlayerStash) po nadwyzce ludzi brak bierze sie z NIENOSZONYCH sztuk gracza
+        // (MenPurse.PlayerBookPlan), najgorsze najpierw (WorseFirst), bez sztuk wykluczonych z bitwy, bez wyrobow gracza i unikatow (Eligible), bez id z rozkazem
+        // ksiegi musztry, i nigdy tego, co wyda nastepna bitwa: na przedmiot zostaje w zbrojowni co najmniej KeepFor (Given + sztuki zapelniajace braki podgladu)
+        // - liczone na zywym stanie zbrojowni (po poborze z nadwyzki ludzi). Bez podgladu bitwy - z listy gracza nic.
+        // Wlasnosc: sztuka schodzi z listy gracza (StockWithdrawKey - ksiega per id i rozbicie) do zapasu musztry, a _fromBook pamieta, ile sztuk tego egzemplarza
+        // w zapasie to sztuki gracza. Jedna zasada wyjscia z zapasu: czesc gracza wychodzi PIERWSZA - zwrot do zbrojowni (nadmiar, braki bitwy, zapas wylaczony,
+        // pojmanie z C4) wraca ja na LISTE GRACZA (StockDepositKey), nie na stan wojska, wiec K1 jej nie sprzeda ludziom; zuzycie i strata przy pojmaniu (bez C4)
+        // zdejmuja ja z pamieci (sztuka zuzyta / stracona - jak kazda sztuka zapasu). Zamknieta ekonomia: ani sztuka, ani moneta nie powstaje (sam ruch
+        // zbrojownia <-> zapas i etykieta wlasnosci).
+        private static readonly Dictionary<string, int> _fromBook = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static int _pTakenBook, _pBookBack, _pBookGone;
+
+        private static bool BookOn { get { var s = Settings.Current; return s != null && s.DrillTakesPlayerStash; } }
+
+        /// <summary>571: n sztuk egzemplarza el wychodzi z zapasu - ile z nich to czesc gracza (zdjeta z pamieci; czesc gracza wychodzi pierwsza).</summary>
+        private static int BookOut(EquipmentElement el, int n)
+        {
+            if (n <= 0 || _fromBook.Count == 0 || el.Item == null) return 0;
+            string key = QuartermasterLaw.KeyOf(el);
+            int v; if (!_fromBook.TryGetValue(key, out v) || v <= 0) return 0;
+            int x = Math.Min(v, n);
+            if (v - x > 0) _fromBook[key] = v - x; else _fromBook.Remove(key);
+            return x;
+        }
+
+        /// <summary>571: n sztuk egzemplarza el z zapasu do zbrojowni - czesc gracza wraca na liste gracza (ksiega), reszta na stan wojska (jak dotad).</summary>
+        private static void BackToArmory(ItemRoster arm, EquipmentElement el, int n)
+        {
+            _stock.AddToCounts(el, -n);
+            arm.AddToCounts(el, n);
+            int own = BookOut(el, n);
+            if (own > 0) { ArmouryBehavior.StockDepositKey(el, own); _pBookBack += own; }
+        }
+
+        private static int ArmCount(ItemRoster arm, ItemObject it)
+        {
+            int n = 0;
+            for (int i = 0; i < arm.Count; i++) { var el = arm.GetElementCopyAtIndex(i); if (el.Amount > 0 && ReferenceEquals(el.EquipmentElement.Item, it)) n += el.Amount; }
+            return n;
+        }
+
+        /// <summary>571: brak rodzaju k (want sztuk) z nienoszonych sztuk gracza (plan PlayerBookPlan na typ, pamiec planow na rozliczenie). Zwraca liczbe wzietych.</summary>
+        private static int TakeBook(int k, int want, ItemRoster arm, Dictionary<ItemObject, int> keep, Dictionary<int, List<SwapMath.Piece>> plans)
+        {
+            int took = 0;
+            foreach (var t in TakeTypes(k))
+            {
+                if (want <= 0) break;
+                List<SwapMath.Piece> pl;
+                if (!plans.TryGetValue((int)t, out pl)) plans[(int)t] = pl = MenPurse.PlayerBookPlan(arm, t);
+                if (pl == null) continue;
+                foreach (var p in pl)
+                {
+                    if (p.Sell <= 0) continue;
+                    var el = QuartermasterLaw.ElOf(p);
+                    var it = el.Item;
+                    if (it == null || !Eligible(it) || (k == K2H && t == ItemObject.ItemTypeEnum.Polearm && (KindInfo(it) & F2H) == 0)) continue;
+                    if (MusterBook.IsPinnedItem(it.StringId)) continue;
+                    int idx = arm.FindIndexOfElement(el);
+                    int inArm = idx >= 0 ? arm.GetElementCopyAtIndex(idx).Amount : 0;
+                    int kp; keep.TryGetValue(it, out kp);
+                    int free = ArmCount(arm, it) - kp;   // nastepna bitwa ma pierwszenstwo: na przedmiot zostaje co najmniej KeepFor
+                    int x = Math.Min(Math.Min(Math.Min(p.Sell, want), inArm), free);
+                    if (x <= 0) continue;
+                    arm.AddToCounts(el, -x);
+                    _stock.AddToCounts(el, x);
+                    ArmouryBehavior.StockWithdrawKey(el, x);
+                    string key = QuartermasterLaw.KeyOf(el);
+                    int v; _fromBook.TryGetValue(key, out v); _fromBook[key] = v + x;
+                    p.Sell -= x; want -= x; took += x;
+                    if (want <= 0) break;
+                }
+            }
+            _pTakenBook += took;
+            return took;
+        }
+
+        /// <summary>571: ile sztuk zapasu to sztuki gracza (pamiec _fromBook) - do linii doby.</summary>
+        private static int BookPieces() { int n = 0; foreach (var v in _fromBook.Values) n += v; return n; }
+
+        /// <summary>571: pamiec czesci gracza przycieta do stanu zapasu (wczytanie, kontrola) - klucz bez sztuk w zapasie znika. Zwraca przyciete sztuki.</summary>
+        private static int ClipBook()
+        {
+            if (_fromBook.Count == 0) return 0;
+            var have = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < _stock.Count; i++)
+            {
+                var el = _stock.GetElementCopyAtIndex(i);
+                if (el.Amount <= 0 || el.EquipmentElement.Item == null) continue;
+                string key = QuartermasterLaw.KeyOf(el.EquipmentElement);
+                int v; have.TryGetValue(key, out v); have[key] = v + el.Amount;
+            }
+            int cut = 0;
+            foreach (var key in new List<string>(_fromBook.Keys))
+            {
+                int h; have.TryGetValue(key, out h);
+                int v = _fromBook[key];
+                if (v <= h) continue;
+                cut += v - Math.Max(0, h);
+                if (h > 0) _fromBook[key] = h; else _fromBook.Remove(key);
+            }
+            return cut;
         }
 
         /// <summary>Start bitwy z graczem: gdy sklad (rekruci tej godziny) albo zbrojownia zmienily sie od ostatniego rozliczenia - sam zwrot (nadmiar, braki bitwy).</summary>
@@ -774,6 +887,7 @@ namespace Armoury
                 if (best < 0) continue;
                 var pick = _stock.GetElementCopyAtIndex(best).EquipmentElement;
                 _stock.AddToCounts(pick, -1);
+                _pBookGone += BookOut(pick, 1);   // 571: zuzyta sztuka - czesc gracza wychodzi pierwsza
                 Scrap(pick.Item, a, true);
                 return true;
             }
@@ -999,6 +1113,7 @@ namespace Armoury
             internal readonly int[] Need = new int[NK], Cov = new int[NK], WornToday = new int[NK], RoleMen = new int[NR];
             internal readonly float[] Acc = new float[NK];     // ulamek zuzycia do nastepnej sztuki rodzaju (0..1)
             internal int Taken, Back, BackBattle, LastTook;
+            internal int TakenBook, BookBack;                  // 571: z tego z listy gracza / wrocone na liste gracza
             internal int CapeUse;                              // 562c: oponcze-dodatek z zapasu w uzyciu (KitM.Used[KCape])
             internal int CovSum(int lo, int hi) { int n = 0; for (int i = lo; i <= hi; i++) n += Math.Min(Cov[i], Need[i]); return n; }   // 562b: pokryte sztuki rodzajow lo..hi
             internal int NeedSum(int lo, int hi) { int n = 0; for (int i = lo; i <= hi; i++) n += Need[i]; return n; }
@@ -1024,6 +1139,7 @@ namespace Armoury
         internal static float BonusPerSet { get { return StockBonus; } }
         internal static float BonusPerkMult { get { return PerkMult; } }
         internal static int OnePer { get { return MenPerPiece; } }
+        internal static bool HudBookOn { get { return BookOn; } }   // 571: klucz Drill Takes Player Stash (podpowiedz paska)
         internal static string KindName(int k) { return KindEn[k]; }
         internal static float LifeDays(int k) { return WearDays * LifeX[k]; }
 
@@ -1059,6 +1175,7 @@ namespace Armoury
                 if (acc != null) Array.Copy(acc.WK, k.Acc, NK); else Array.Clear(k.Acc, 0, NK);
                 k.LastTook = _lastTook;
                 k.Taken = _pTaken; k.Back = _pBack + _pBackOther + _pBackOff; k.BackBattle = _pBackBattle;
+                k.TakenBook = _pTakenBook; k.BookBack = _pBookBack;   // 571
                 k.PerkW = main.HasPerk(DefaultPerks.Steward.GivingHands);
                 k.PerkA = main.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
                 k.Ok = _hudHave;

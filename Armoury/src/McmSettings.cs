@@ -7701,6 +7701,10 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillStock { get; set; } = true;
 
+        [SettingPropertyBool("Drill Takes Player Stash", HintText = "your men also take what their drill kit lacks from YOUR pieces in the troops' armoury (the stash list) that nobody wears - after their own spare kit, worst pieces first, and never what the next battle hands out; a piece taken this way leaves your list and is used up at drill, and if the kit no longer needs it, it comes back to your list, not to the men's stock (off = the men take only their own spare kit, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillTakesPlayerStash { get; set; } = true;
+
         [SettingPropertyBool("Drill Stock Ai", HintText = "AI lords' men drill with the same full drill kit for their role as your men, set aside each day from the spare arms and armour of their armoury (their baggage - loot and Banner Kings supplies - does not count, just as your own packs do not); the set-aside pieces stay in the armoury, the merchants do not get them, and in battle the men use the whole armoury as before: up to 20-30% faster, the kit wears out and the smiths of the next town buy the scrap - a third to the lord, the rest to the men (off = AI drill without a kit, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillStockAi { get; set; } = true;
@@ -15847,6 +15851,7 @@ namespace Armoury
             s.DrillLaw = DrillLaw;
             s.DrillNeedsArmsPlayer = DrillNeedsArmsPlayer;
             s.DrillStock = DrillStock;
+            s.DrillTakesPlayerStash = DrillTakesPlayerStash;
             s.DrillStockAi = DrillStockAi;
             s.DrillMenPerPiece = DrillMenPerPiece;
             s.DrillPenaltyAi = DrillPenaltyAi;
