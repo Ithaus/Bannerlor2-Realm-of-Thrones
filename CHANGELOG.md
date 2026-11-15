@@ -17,6 +17,14 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 544
+
+- **PRZYJETE 1 (licznik niewoli):** `_firstPrisonerDay` nie zerowal sie po uwolnieniu Quentena - druga niewola ponad 15 dob od pierwszej dawala od razu zapas (domena krola zamiast House Banefort). Teraz `Rightful` przy glowie na wolnosci ustawia `_firstPrisonerDay = -1`.
+- **PRZYJETE 2 (tylko skutek kapitulacji):** naprawa zabieralaby Banefort kazdemu rodowi spoza korony (np. Zelaznym po normalnym oblezeniu albo po wczytaniu starszego zapisu). Teraz warunek: pan w krolestwie Polnocy ("battania"); inny pan - `Done(..., "inny-pan")` bez zmian. ODRZUCONE zawezenie do `clan_battania_1`: lenno po zdobyciu moze pojsc glosowaniem do innego rodu Polnocy, a to dalej skutek tej samej kapitulacji.
+- **PRZYJETE 3 (wyjatki "z rzedu"):** `_errors = 0` takze w `Wait` (kazdy przebieg bez wyjatku zeruje licznik), wiec 3 pojedyncze wyjatki rozrzucone po godzinach czekania nie porzucaja naprawy.
+- **DO DECYZJI JEFFA (bez zmian w kodzie):** zapas po 15 dobach niewoli glowy rodu - zamek do domeny krola na stale. Jesli Jeff chce, by zawsze wracal do House Banefort, wystarczy czekac do skutku (usunac zapas).
+- Build Armoury 0 bledow. W grze nie sprawdzone. Status bez zmian: DO SPRAWDZENIA.
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).

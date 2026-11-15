@@ -14,7 +14,7 @@ namespace Armoury
     /// KIEDY: raz na kampanie, flaga w zapisie "arm_544_banefort" ("" czeka, "done:..." zrobione, "new" - nowa kampania: nic do naprawy). Proba co godzine gry
     /// (HourlyTickEvent - mapa, nie wnetrze menu), tylko gdy gracz stoi na mapie (BookHoldings.PlayerOnMapFor: nie w osadzie, menu, spotkaniu, bitwie, oblezeniu,
     /// armii, rozmowie, niewoli; nigdy GameMenu.SwitchToMenu). Warunki niespelnione - nic, linia "czeka" raz na dobe i ponowna proba (takze po nastepnym wczytaniu).
-    /// WARUNKI: korona = krolestwo "vlandia" (House Baratheon of King's Landing) zywe; Banefort (ROT_castle20) u rodu spoza korony (Polnoc albo inne krolestwo);
+    /// WARUNKI: korona = krolestwo "vlandia" (House Baratheon of King's Landing) zywe; Banefort (ROT_castle20) u rodu Polnocy (krolestwo "battania"; inny pan - koniec bez zmian, recenzja 544);
     /// pan nie jest rodem gracza (wtedy koniec bez zmian - decyzja gracza). Odbiorca: House Banefort (ROTclan_59) - zywy, z zywa glowa, w koronie, nie najemnik,
     /// nie rod gracza; glowa w niewoli (poza lochem Banefortu) - czekamy do 15 dob, potem jak brak rodu; brak rodu - rod panujacy korony (domena krola, jak 326b).
     /// JAK: BookHoldings.TransferFor (ta sama droga co 326b i f19-kanon-b): oblezenie / bitwa w osadzie, zalodze, wsiach i przy bramie - czekamy; bohaterowie bez
@@ -29,7 +29,7 @@ namespace Armoury
     internal static class Banefort544
     {
         internal const string Tag = "Banefort (544): ";
-        private const string StId = "ROT_castle20", ClanId = "ROTclan_59", CrownId = "vlandia";
+        private const string StId = "ROT_castle20", ClanId = "ROTclan_59", CrownId = "vlandia", NorthId = "battania";
         private const int PrisonerWaitDays = 15;
         private const int MaxErrors = 3;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -84,6 +84,7 @@ namespace Armoury
 
         private static void Wait(int day, string why)
         {
+            _errors = 0;   // recenzja 544: przebieg bez wyjatku zeruje licznik ("z rzedu")
             if (day == _waitDay && why == _waitText) return;
             if (day == _waitDay && why != null && _waitText != null && why.StartsWith("gracz", StringComparison.Ordinal) && _waitText.StartsWith("gracz", StringComparison.Ordinal)) return;
             _waitDay = day; _waitText = why;
@@ -110,6 +111,7 @@ namespace Armoury
                 why = "glowa rodu " + Nm(l) + " w niewoli ponad " + PrisonerWaitDays + " dob";
                 return null;
             }
+            _firstPrisonerDay = -1;   // recenzja 544: glowa na wolnosci - nowa niewola liczy 15 dob od nowa
             return c;
         }
 
@@ -131,6 +133,10 @@ namespace Armoury
                 if (owner == null) { Wait(day, "Banefort bez pana"); return; }
                 if (owner.Kingdom == crown) { Done(day, "juz-w-koronie", "Banefort juz w koronie (pan " + Nm(owner) + ") - bez zmian"); return; }
                 if (owner == Clan.PlayerClan) { Done(day, "gracz", "Banefort nalezy do rodu gracza - nie zabieram (decyzja gracza)"); return; }
+                // recenzja 544: naprawiamy tylko skutek kapitulacji z dnia 109026 - pan z Polnocy (dowolny rod krolestwa "battania": lenno moglo
+                // pojsc glosowaniem do innego rodu Polnocy). Inny pan (np. zdobyl normalnym oblezeniem ktos trzeci) - zdobycz uczciwa, bez zmian.
+                if (owner.Kingdom == null || owner.Kingdom.StringId != NorthId)
+                { Done(day, "inny-pan", "Banefort u " + Nm(owner) + " (" + (owner.Kingdom != null ? Nm(owner.Kingdom) : "-") + "), nie u Polnocy - to nie skutek kapitulacji 471b, bez zmian"); return; }
                 string why;
                 if (!BookHoldings.PlayerOnMapFor(out why)) { Wait(day, why); return; }
 
