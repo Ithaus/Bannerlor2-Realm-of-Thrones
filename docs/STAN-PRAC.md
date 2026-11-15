@@ -3,7 +3,7 @@
 ## STAN 15.11 - WGRANIE 260 (559 kusze: pulap energii beltu 190 J, 469 z prawdziwa waga beltu), bez autotestu
 
 - Armoury.dll 0bbad706 = noc/scal-perki d90f8613 (259 + 559). Kopie: .bak-2026-11-15-przed-wgranie260, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie260 i -przed). Klucz NOWY CrossbowBoltEnergyCap = 190.
-- Do sprawdzenia: linia startu 'pulap energii beltu (559)' wpiete; 'Ogien w zasiegu (469)' przyciete > 0 (jesli 0 - AI ma lekkie belty 0.04 kg). Decyzja Jeffa: 559-b (cena/zakup kusz wedlug przycietej energii); osobno: AI kupuje belty repeater_heavy_bolts do ciezkich kusz (poszlaka).
+- Do sprawdzenia: linia startu 'pulap energii beltu (559)' wpiete; 'Ogien w zasiegu (469)' przyciete > 0 (jesli 0 - AI ma lekkie belty 0.04 kg). Jeff 15.11: 559-b NIE (ceny i zakupy kusz zostaja wedlug funtow); osobno: AI kupuje belty repeater_heavy_bolts do ciezkich kusz (poszlaka).
 
 ## STAN 15.11 - WGRANIE 259 (560 musztra: druzyna z samych towarzyszy cwiczy, dowodcy partii AI cwicza; gracz nigdy), bez autotestu
 
