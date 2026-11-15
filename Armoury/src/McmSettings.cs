@@ -8724,7 +8724,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int RiderHorseCarryKg { get; set; } = 20;
 
-        [SettingPropertyBool("March Pairs Hud", HintText = "on the map bar: Horses (top row) - horses ridden by your men / all your riding horses (baggage and troops' armoury); Harness (lower row) - harness worn by those horses / all your riding horses; Pack (lower row) - pack animals / how many you may lead before the herding penalty (men - livestock - free horses), shown in warning colour when over. A man counts as riding only on a horse with a harness that fits it and that his Riding allows. Display only: party speed uses the same numbers when March Pairs Speed is on, cargo weight does not use them yet (off = the map bar as before)", RequireRestart = false)]
+        [SettingPropertyBool("March Pairs Hud", HintText = "on the map bar: Horses (top row) - horses ridden by your men / all your riding horses (baggage and troops' armoury); Harness (lower row) - harness worn by those horses / all your riding horses; Pack (lower row) - pack animals / how many you may lead before the herding penalty (men - livestock - free horses), shown in warning colour when over. A man counts as riding only on a horse with a harness that fits it and that his Riding allows. Display only: party speed uses the same numbers when March Pairs Speed is on, cargo weight and carry capacity when Ridden Harness Weightless is on (off = the map bar as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MarchPairsHud { get; set; } = true;
 
@@ -8732,7 +8732,11 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MarchPairsSpeed { get; set; } = true;
 
-        [SettingPropertyBool("Harness On Spare Horses", HintText = "every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside): that harness no longer weighs on the baggage, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
+        [SettingPropertyBool("Ridden Harness Weightless", HintText = "a horse harness from your baggage that sits on a horse ridden by one of your footmen (a pair: a horse, a harness that fits it and a man whose Riding allows both - the same pairs as Horses on the map bar) no longer weighs on the baggage ('Harness on ridden horses' in the cargo weight); a harness with no horse, on a horse nobody rides, or that does not fit, weighs as before. Carry capacity follows the same pairs: a spare horse in such a pair (under a footman or a prisoner) takes saddlebags (Saddled spare horses), a spare horse with no pair carries packs (Spare Horse Carry Kg), and Ridden horses (saddlebags) counts your cavalry's pairs, heroes on their own horses and footmen on horses from the troops' armoury. The old 'Harness worn by spare horses' capacity no longer counts. On land only; you and your clan's parties (off = as before, with Harness On Spare Horses)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool RiddenHarnessWeightless { get; set; } = true;
+
+        [SettingPropertyBool("Harness On Spare Horses", HintText = "the old rule, used only while Ridden Harness Weightless is off: every spare horse in your baggage wears one horse harness from it (heaviest first, pack saddles aside) and that harness adds its weight to your carry capacity, and a saddled spare horse carrying one of your men on the march takes saddlebags like a rider's horse (Rider Horse Carry Kg) - you and your clan's parties. Off = every harness in the baggage is cargo, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HarnessOnSpareHorses { get; set; } = true;
 
@@ -15964,6 +15968,7 @@ namespace Armoury
             s.RiderHorseCarryKg = RiderHorseCarryKg;
             s.MarchPairsHud = MarchPairsHud;
             s.MarchPairsSpeed = MarchPairsSpeed;
+            s.RiddenHarnessWeightless = RiddenHarnessWeightless;
             s.HarnessOnSpareHorses = HarnessOnSpareHorses;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;

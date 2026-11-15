@@ -32,6 +32,8 @@ namespace Armoury
     /// Potkniecia liczone (wyjatek = brak linii dla tej partii), bez wylacznika.
     /// E2 (klucz MarchPairsSpeed): predkosc gracza i rodu z tego samego rekordu - ApplySpeed (wpisy roznicy wobec gry), ColumnOf (kolumna MarchPace),
     /// RideQ (HorsePace: "Horse quality: spare horses" z koni w parach). Opis przy sekcji E2 nizej.
+    /// E3 (klucz RiddenHarnessWeightless): waga uprzezy z ladunku na koniach pod piechota (WeightPostfix - "Harness on ridden horses") i udzwig z par
+    /// (PackMarket: UnderPacks, "Saddled spare horses", "Ridden horses" gracza - CargoUnderMen / CapRiders). Opis przy sekcji E3 nizej.
     /// </summary>
     internal static class MarchPairs
     {
@@ -41,7 +43,10 @@ namespace Armoury
 
         // E2: Md i Q (szybkosc konia z modyfikatorem, HorsePace.Q) - jakosc koni w parach piechoty ("Horse quality: spare horses")
         private sealed class Lot { public ItemObject It; public ItemModifier Md; public float Q; public int Req; public int N; public byte Src; }
-        private sealed class PairLot { public int Req; public int N; public byte HSrc, USrc; public double Q; }   // Q - suma szybkosci koni pary (E2)
+        // Q - suma szybkosci koni pary (E2); E3: UIt/UMd - uprzaz z LADUNKU w tej grupie par (zwolnienie wagi), UW - waga sztuki do kolejnosci (ciezsza najpierw)
+        private sealed class PairLot { public int Req; public int N; public byte HSrc, USrc; public double Q; public ItemObject UIt; public ItemModifier UMd; public float UW; }
+        /// <summary>E3: uprzaz z ladunku na koniu pod piechurem (para przydzielona w Assign) - sztuka i liczba; waga liczona przez model przy wpisie wagi.</summary>
+        internal struct HLot { public EquipmentElement E; public int N; }
         /// <summary>E2: konie pod piechota z par (szybkosc z modyfikatorem, liczba) - HorsePace liczy z nich "Horse quality: spare horses" i sufit kolumny.</summary>
         internal struct QLot { public float Q; public int N; }
         private sealed class ManLot { public CharacterObject Ch; public int Riding; public int N; public byte Kind; public int Got, Skill; }
@@ -75,6 +80,19 @@ namespace Armoury
                 for (int i = 0; i < RideQ.Count; i++) if (Math.Abs(RideQ[i].Q - q) < 0.001f) { var x = RideQ[i]; x.N += n; RideQ[i] = x; return; }
                 RideQ.Add(new QLot { Q = q, N = n });
             }
+            /// <summary>E3: uprzeze z ladunku na koniach pod piechota (pary jadace) - wpis wagi "Harness on ridden horses"; rekord po opublikowaniu tylko czytany.</summary>
+            public readonly List<HLot> RideHarness = new List<HLot>();
+            /// <summary>E3: pary niewykorzystane z koniem z ladunku (pod jencow - D2) i waga uprzezy par jadacych w chwili liczenia (linia doby, podpis).</summary>
+            public int UnusedCargoHorse; public float RideHarnessKg;
+            internal void AddRideHarness(ItemObject it, ItemModifier md, int n)
+            {
+                if (it == null || n <= 0) return;
+                for (int i = 0; i < RideHarness.Count; i++)
+                    if (RideHarness[i].E.Item == it && RideHarness[i].E.ItemModifier == md) { var x = RideHarness[i]; x.N += n; RideHarness[i] = x; return; }
+                RideHarness.Add(new HLot { E = new EquipmentElement(it, md), N = n });
+            }
+            /// <summary>E3: jency na parach z koniem z ladunku (D2 - jeniec tez potrzebuje pary; najpierw pary z koniem z ladunku).</summary>
+            public int PrisCargo { get { return AtSea ? 0 : Math.Min(Math.Max(0, Prisoners), Math.Max(0, UnusedCargoHorse)); } }
             /// <summary>E1: koni pod ludzmi (pary jazdy + pary puli); na morzu 0 - nikt nie jedzie (rozdz. 1.3). Ta sama liczba w linii doby i w HUD.</summary>
             public int Ridden { get { return AtSea ? 0 : CavPairs + Ride; } }
             /// <summary>E1: wszystkie konie wierzchowe - ladunek + zbrojownia DTE (mianownik HUD, D10 a).</summary>
@@ -95,6 +113,8 @@ namespace Armoury
             // E2: pamiec rodu, ostatnie liczenie gracza, liczniki odswiezen predkosci
             _clan = new ConcurrentDictionary<MobileParty, CRec>();
             _lastCalc = null; _invalidations = 0; _clanBuilds = 0; _applyCalls = 0;
+            // E3: liczniki wpisu wagi (pola pamieci gry - stan sprawdzenia zostaje, to cecha wersji gry)
+            _weightInval = 0; _wCalls = 0; _wHits = 0; _wLastMain = 0f;
         }
 
         /// <summary>E2: watki tiku tez tu trafiaja (model predkosci partii rodu) - liczniki Interlocked, miejsca pod blokada.</summary>
@@ -167,18 +187,25 @@ namespace Armoury
                         if (u.N <= 0 || !SaddleLaw.Fits(u.It, ho.It)) continue;
                         int t = Math.Min(left[i], u.N);
                         left[i] -= t; u.N -= t;
-                        AddPair(res, Math.Max(ho.Req, u.Req), t, ho.Src, u.Src, t * (double)ho.Q);
+                        AddPair(res, Math.Max(ho.Req, u.Req), t, ho.Src, u.Src, t * (double)ho.Q, u);
                     }
                 }
             }
-            res.Sort((a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : a.HSrc.CompareTo(b.HSrc));
+            // E3: przy tym samym wymogu i zrodle konia - ciezsza uprzaz z ladunku najpierw pod czlowieka (jak dawne HarnessOne "najciezsze najpierw");
+            // liczba jadacych bez zmian (kolejnosc wymogu ta sama)
+            res.Sort((a, b) => a.Req != b.Req ? a.Req.CompareTo(b.Req) : a.HSrc != b.HSrc ? a.HSrc.CompareTo(b.HSrc) : b.UW.CompareTo(a.UW));
             return res;
         }
 
-        private static void AddPair(List<PairLot> l, int req, int n, byte hs, byte us, double q)
+        /// <summary>E3: uprzaz z ladunku trzymana osobno wedlug sztuki i modyfikatora (wpis wagi); uprzaz ze zbrojowni DTE - bez sztuki (nie lezy w ladunku).</summary>
+        private static void AddPair(List<PairLot> l, int req, int n, byte hs, byte us, double q, Lot u)
         {
-            foreach (var x in l) if (x.Req == req && x.HSrc == hs && x.USrc == us) { x.N += n; x.Q += q; return; }
-            l.Add(new PairLot { Req = req, N = n, HSrc = hs, USrc = us, Q = q });
+            ItemObject uit = us == SCargo && u != null ? u.It : null;
+            ItemModifier umd = uit != null ? u.Md : null;
+            float uw = 0f;
+            if (uit != null) { try { uw = uit.Weight; } catch { uw = 0f; } }
+            foreach (var x in l) if (x.Req == req && x.HSrc == hs && x.USrc == us && x.UIt == uit && x.UMd == umd) { x.N += n; x.Q += q; return; }
+            l.Add(new PairLot { Req = req, N = n, HSrc = hs, USrc = us, Q = q, UIt = uit, UMd = umd, UW = uw });
         }
 
         private static void AddMan(List<ManLot> l, CharacterObject ch, int n, byte kind)
@@ -207,11 +234,12 @@ namespace Armoury
                     r.Ride += t;
                     if (pairs[p].N > 0) r.AddRideQ((float)(pairs[p].Q / pairs[p].N), t);   // E2: srednia szybkosc koni tej grupy par
                     if (pairs[p].HSrc == SCargo) r.RideCargoHorse += t;
+                    if (pairs[p].UIt != null) r.AddRideHarness(pairs[p].UIt, pairs[p].UMd, t);   // E3: uprzaz z ladunku na koniu pod czlowiekiem
                 }
             }
-            int unused = 0, umin = -1;
-            for (int i = 0; i < pairs.Count; i++) if (pl[i] > 0) { unused += pl[i]; if (umin < 0 || pairs[i].Req < umin) umin = pairs[i].Req; }
-            r.UnusedPairs = unused; r.UnusedReqMin = umin;
+            int unused = 0, umin = -1, ucargo = 0;
+            for (int i = 0; i < pairs.Count; i++) if (pl[i] > 0) { unused += pl[i]; if (pairs[i].HSrc == SCargo) ucargo += pl[i]; if (umin < 0 || pairs[i].Req < umin) umin = pairs[i].Req; }
+            r.UnusedPairs = unused; r.UnusedReqMin = umin; r.UnusedCargoHorse = ucargo;
             // pieszo z powodu Jazdy: tyle, ile zostalo par (najlepsi z idacych pieszo - najblizej wymogu); reszta to brak konia albo uprzezy
             int walk = 0; foreach (var m in men) walk += m.N - m.Got;
             int skill = Math.Min(walk, unused);
@@ -281,8 +309,9 @@ namespace Armoury
                     }
                     switch (HarnessKind(it))
                     {
-                        case 1: r.CHarFam += el.Amount; AddLot(harness, it, el.Amount, SCargo); break;
-                        case 2: r.CHarSaddle += el.Amount; AddLot(harness, it, el.Amount, SCargo); break;
+                        // E3: uprzaz z ladunku z modyfikatorem (zwolnienie wagi tej samej sztuki, ktora lezy w ladunku)
+                        case 1: r.CHarFam += el.Amount; AddLot(harness, it, el.EquipmentElement.ItemModifier, el.Amount, SCargo); break;
+                        case 2: r.CHarSaddle += el.Amount; AddLot(harness, it, el.EquipmentElement.ItemModifier, el.Amount, SCargo); break;
                         case 3: r.CHarOther += el.Amount; break;
                         case 4: r.CPackSaddle += el.Amount; break;
                     }
@@ -407,6 +436,7 @@ namespace Armoury
             }
             r.GameHerdF = Herding(r.Men, r.GameHerd);
             r.OurHerdF = Herding(r.Men, r.OurHerd);
+            try { r.RideHarnessKg = r.AtSea ? 0f : HarnessKg(mp, r); } catch (Exception e) { Stumble("Of.HarnessKg", e); r.RideHarnessKg = 0f; }   // E3
             r.Ok = true;
             return r;
         }
@@ -457,9 +487,10 @@ namespace Armoury
                 try { _mainKey = MainKey(mp); } catch { _mainKey = key; }
                 // E2: zmiana liczb predkosci (jazda, pary piechoty, stado, jakosc koni) - gra liczy predkosc od nowa przy nastepnym wolaniu (pamiec predkosci
                 // gry trzyma wynik do zmiany wersji partii, a nasz rekord przychodzi do 1 s pozniej); watek glowny, tylko przy zmianie
+                // E3: to samo dla wagi i udzwigu (uprzeze par jadacych, jezdzcy, luzaki pod jukami) - pamiec wagi gry trzymana do zmiany wersji partii
                 var old = _main;
                 _main = r; _mainCount++;
-                if (SpeedOn && (old == null || SpeedSig(old) != SpeedSig(r))) Invalidate(mp);
+                if ((SpeedOn || WeightOn) && (old == null || SpeedSig(old) != SpeedSig(r))) Invalidate(mp);
                 return r;
             }
             catch (Exception e) { Stumble("Main", e); return _main; }
@@ -526,7 +557,15 @@ namespace Armoury
         /// partia rodu - pamiec po kluczu wersji (liczona tu). Dowolny watek.</summary>
         internal static Rec SpeedRec(MobileParty mp)
         {
-            if (!SpeedOn || mp == null || mp.MemberRoster == null || mp.Party == null || mp.IsCurrentlyAtSea) return null;
+            if (!SpeedOn) return null;
+            return PairsRec(mp);
+        }
+
+        /// <summary>E3: rekord par bez wzgledu na klucz predkosci (waga i udzwig - klucz RiddenHarnessWeightless). Ten sam zasieg i ta sama pamiec co SpeedRec.
+        /// Dowolny watek.</summary>
+        internal static Rec PairsRec(MobileParty mp)
+        {
+            if (mp == null || mp.MemberRoster == null || mp.Party == null || mp.IsCurrentlyAtSea) return null;
             if (mp.IsMainParty) { var r = _main; return r != null && r.Ok && !r.AtSea ? r : null; }
             if (!mp.IsActive || !InClan(mp)) return null;
             return ClanRec(mp);
@@ -539,6 +578,7 @@ namespace Armoury
             {
                 key = x.MemberRoster.VersionNo;
                 key = key * 397 + (x.ItemRoster != null ? x.ItemRoster.VersionNo : -1);
+                key = key * 397 + (x.PrisonRoster != null ? x.PrisonRoster.VersionNo : -1);   // E3: jency na parach (luzaki pod jukami)
                 key = key * 397 + (int)CampaignTime.Now.ToDays;   // Jazda bohaterow i ludzi (awans zmienia wersje skladu, nauka - nie)
             }
             CRec c;
@@ -561,6 +601,9 @@ namespace Armoury
                 h = h * 397 + r.HeroMounted; h = h * 397 + r.Ride; h = h * 397 + r.RideCargoHorse; h = h * 397 + r.CMounts;
                 h = h * 397 + r.UnusedPairs; h = h * 397 + r.PoolMen; h = h * 397 + (r.AtSea ? 1 : 0);
                 foreach (var q in r.RideQ) { h = h * 397 + (int)(q.Q * 10f); h = h * 397 + q.N; }
+                // E3: waga i udzwig - uprzeze par jadacych, pary pod jencami, prawo wagi (przelaczenie klucza tez liczy wage od nowa)
+                h = h * 397 + (int)(r.RideHarnessKg * 10f); h = h * 397 + r.UnusedCargoHorse; h = h * 397 + r.Prisoners;
+                h = h * 397 + (WeightOn ? 1 : 0) + (SpeedOn ? 2 : 0);
                 return h;
             }
         }
@@ -569,6 +612,21 @@ namespace Armoury
         /// Watek glowny, tylko przy zmianie liczb. Bez pola - linia doby mowi BRAK (predkosc dojdzie przy nastepnej zmianie wersji partii).</summary>
         private static void Invalidate(MobileParty mp)
         {
+            // E3: pamiec wagi gry (MobileParty._partyWeightLastCheckVersionNo = -1: TotalWeightCarried liczy wage od nowa; NIE wersja partii - bez kaskady
+            // VersionNo). Predkosc bierze wage z tej pamieci, wiec po wadze takze predkosc od nowa (pole wyzej).
+            if (_weightState != 2)
+            {
+                try
+                {
+                    if (_weightVer == null)
+                    {
+                        if (AccessTools.DeclaredField(typeof(MobileParty), "_partyWeightLastCheckVersionNo") == null) _weightState = 2;
+                        else { _weightVer = AccessTools.FieldRefAccess<MobileParty, int>("_partyWeightLastCheckVersionNo"); _weightState = 1; }
+                    }
+                    if (_weightVer != null) { _weightVer(mp) = -1; _weightInval++; }
+                }
+                catch (Exception e) { Stumble("Invalidate.waga", e); }
+            }
             if (_pureState == 2) return;
             try
             {
@@ -688,6 +746,140 @@ namespace Armoury
             catch (Exception e) { Stumble("ColumnOf", e); rideCap = -1; return false; }
         }
 
+        // ---------------------------------------------------------------- E3: waga uprzezy par i udzwig z par (projekt rozdz. 2 i 2.1; gracz i partie jego rodu - D3)
+        // - "Harness on ridden horses" (postfiks DefaultInventoryCapacityModel.CalculateTotalWeightCarried, DeclaredMethod): minus waga uprzezy z LADUNKU, ktore sa
+        //   w parach jadacych pod piechota (rekord: RideHarness). Waga przez model (GetItemEffectiveWeight - NavalDLC owija model), sztuka po sztuce z modyfikatorem,
+        //   najwyzej tyle, ile tej sztuki jest teraz w ladunku (rekord gracza do 1 s starszy - w razie watpliwosci za ciezko, nigdy ponizej ladunku). Na morzu nic.
+        // - udzwig (PackMarket): dawny dopisek "Harness worn by spare horses" NIE liczy sie przy tym kluczu (inaczej uprzaz dwa razy); "Saddled spare horses
+        //   (saddlebags)" = konie z ladunku w parach pod piechota i jencami; luzaki pod jukami (UnderPacks) = konie ladunku bez pary pod czlowiekiem;
+        //   "Ridden horses (saddlebags)" gracza = pary jazdy + bohaterowie na wlasnym koniu + piechota na koniach zbrojowni (kazdy kon raz, wedlug roli - tabela 2.1).
+        // Pamiec: rekord gracza (Main) i rodu (ClanRec) jak E2; zmiana podpisu -> Invalidate (pamiec wagi i predkosci gry, bez VersionNo).
+        private static int _weightState;   // 0 nie sprawdzane, 1 pole jest, 2 brak pola
+        private static AccessTools.FieldRef<MobileParty, int> _weightVer;
+        private static int _weightInval;
+        private static long _wCalls, _wHits;
+        private static volatile float _wLastMain;   // ostatni wpis wagi gracza (kg, linia doby)
+        private static TextObject _txHarnessKg;
+        private static TextObject TxHarnessKg { get { return _txHarnessKg ?? (_txHarnessKg = new TextObject("{=!}Harness on ridden horses")); } }
+
+        /// <summary>E3: klucz RiddenHarnessWeightless (NOWY).</summary>
+        internal static bool WeightOn { get { var s = Settings.Current; return s != null && s.RiddenHarnessWeightless; } }
+
+        /// <summary>E3: rekord gracza potrzebny (pasek mapy odswieza go takze bez pozycji HUD).</summary>
+        internal static bool Needed { get { return SpeedOn || WeightOn; } }
+
+        /// <summary>E3: waga (kg, przez model) uprzezy z ladunku na koniach pod piechota - najwyzej tyle sztuk, ile jest teraz w ladunku. Dowolny watek (tylko odczyt).</summary>
+        internal static float HarnessKg(MobileParty mp, Rec r)
+        {
+            if (mp == null || r == null || r.AtSea || r.RideHarness.Count == 0) return 0f;
+            var ir = mp.ItemRoster;
+            var c = Campaign.Current;
+            var model = c != null && c.Models != null ? c.Models.InventoryCapacityModel : null;
+            if (ir == null || model == null) return 0f;
+            float kg = 0f;
+            for (int i = 0; i < r.RideHarness.Count; i++)
+            {
+                var h = r.RideHarness[i];
+                if (h.N <= 0 || h.E.Item == null) continue;
+                int at = ir.FindIndexOfElement(h.E);
+                int have = at >= 0 ? ir.GetElementNumber(at) : 0;
+                int n = Math.Min(h.N, have);
+                if (n <= 0) continue;
+                TextObject d;
+                float w = model.GetItemEffectiveWeight(h.E, mp, false, out d);
+                if (w > 0f) kg += w * n;
+            }
+            return kg;
+        }
+
+        /// <summary>E3: konie z LADUNKU pod czlowiekiem w parach (piechota + jency - D2) - najwyzej luzaki gry. -1: bez par (klucz NIE, morze, poza zasiegiem).
+        /// PackMarket: luzaki pod jukami = mounts - ta liczba; "Saddled spare horses (saddlebags)" = ta liczba. Dowolny watek.</summary>
+        internal static int CargoUnderMen(MobileParty mp, int mounts)
+        {
+            if (!WeightOn) return -1;
+            var r = PairsRec(mp);
+            if (r == null || r.AtSea) return -1;
+            return Math.Min(Math.Max(0, mounts), Math.Max(0, r.RideCargoHorse + r.PrisCargo));
+        }
+
+        /// <summary>E3: jezdzcy gracza do "Ridden horses (saddlebags)": pary jazdy + bohaterowie na wlasnym koniu + piechota na koniach ze zbrojowni (kon poza
+        /// NumberOfMounts - gra nie daje za niego 20 kg). -1: dawna regula PackMarket.Riders (rod, klucz NIE, bez TroopsFightWithOwnKitOnly - jazda wedlug gry).</summary>
+        internal static int CapRiders(MobileParty mp)
+        {
+            if (!WeightOn || mp == null || !mp.IsMainParty || !GarrisonKit.OwnKitOn) return -1;
+            var r = PairsRec(mp);
+            if (r == null || r.AtSea) return -1;
+            return Math.Max(0, r.CavPairs + r.HeroMounted + Math.Max(0, r.Ride - r.RideCargoHorse));
+        }
+
+        /// <summary>E3: postfiks DefaultInventoryCapacityModel.CalculateTotalWeightCarried - wpis "Harness on ridden horses" (minus waga uprzezy par jadacych z ladunku).
+        /// Na morzu nic. Dowolny watek: gracz - rekord z pamieci; rod - pamiec po kluczu wersji (liczona tu, tania - bez podgladu DTE).</summary>
+        public static void WeightPostfix(MobileParty __0, bool __1, ref ExplainedNumber __result)
+        {
+            try
+            {
+                if (__0 == null || __1 || !WeightOn) return;
+                Interlocked.Increment(ref _wCalls);
+                var r = PairsRec(__0);
+                if (r == null || r.AtSea) return;
+                float kg = HarnessKg(__0, r);
+                if (__0.IsMainParty) _wLastMain = kg;
+                if (kg <= 0f) return;
+                __result.Add(-kg, TxHarnessKg);
+                Interlocked.Increment(ref _wHits);
+            }
+            catch (Exception e) { Stumble("WeightPostfix", e); }
+        }
+
+        /// <summary>E3: czesc linii doby (gracz): wpis wagi, udzwig z par, porownanie z dawnym dopiskiem uprzezy.</summary>
+        private static void WeightLine(StringBuilder sb, MobileParty mp, Rec r)
+        {
+            sb.Append(" | E3 waga i udzwig z par (klucz RiddenHarnessWeightless ").Append(WeightOn ? "TAK" : "NIE").Append(')');
+            if (!WeightOn) { sb.Append(" - waga i udzwig jak przed E3 (Harness On Spare Horses ").Append(Settings.Current != null && Settings.Current.HarnessOnSpareHorses ? "TAK" : "NIE").Append(')'); return; }
+            var pr = PairsRec(mp);
+            if (pr == null) { sb.Append(": brak rekordu").Append(r != null && r.AtSea ? " (na morzu - waga uprzezy liczy sie cala)" : ""); return; }
+            int n = 0; foreach (var h in pr.RideHarness) n += h.N;
+            float now = HarnessKg(mp, pr);
+            sb.Append(": uprzeze z ladunku na koniach pod piechota ").Append(n).Append(" szt. (rodzajow ").Append(pr.RideHarness.Count).Append(") = ")
+              .Append(now.ToString("0.0", Inv)).Append(" kg teraz (w rekordzie ").Append(pr.RideHarnessKg.ToString("0.0", Inv)).Append(", ostatni wpis wagi ")
+              .Append(_wLastMain.ToString("0.0", Inv)).Append(')');
+            int mounts = mp.ItemRoster != null ? mp.ItemRoster.NumberOfMounts : 0;
+            int under = CargoUnderMen(mp, mounts);
+            sb.Append(" | konie ladunku pod ludzmi z para ").Append(under).Append(" (piechota ").Append(Math.Min(pr.RideCargoHorse, mounts)).Append(", jency ").Append(pr.PrisCargo)
+              .Append(") z luzakow gry ").Append(mounts).Append(" -> pod jukami ").Append(Math.Max(0, mounts - Math.Max(0, under)));
+            int cr = CapRiders(mp);
+            sb.Append(" | Ridden horses (saddlebags): ").Append(cr >= 0 ? cr + " (jazda " + pr.CavPairs + ", bohaterowie " + pr.HeroMounted + ", piechota na koniach zbrojowni " + Math.Max(0, pr.Ride - pr.RideCargoHorse) + ")"
+                                                                       : "dawna regula (wzorzec) " + PackMarket.RidersOld(mp) + (GarrisonKit.OwnKitOn ? "" : " - TroopsFightWithOwnKitOnly NIE"))
+              .Append(" (dawniej wedlug wzorca ").Append(PackMarket.RidersOld(mp)).Append(')');
+            try
+            {
+                var c = Campaign.Current;
+                var m = c != null && c.Models != null ? c.Models.InventoryCapacityModel : null;
+                if (m != null)
+                    sb.Append(" | waga gracza ").Append(m.CalculateTotalWeightCarried(mp, mp.IsCurrentlyAtSea).ResultNumber.ToString("0", Inv))
+                      .Append(" (pamiec gry ").Append(mp.TotalWeightCarried.ToString("0", Inv)).Append(") / udzwig ")
+                      .Append(m.CalculateInventoryCapacity(mp, mp.IsCurrentlyAtSea).ResultNumber.ToString("0", Inv))
+                      .Append(" | dawny dopisek udzwigu Harness worn by spare horses (usuniety): bylby +").Append(PackMarket.OldHarnessOwnKg(mp).ToString("0", Inv)).Append(" kg");
+            }
+            catch (Exception e) { Stumble("WeightLine.model", e); }
+            sb.Append(" | wpis wagi: wywolan ").Append(Interlocked.Read(ref _wCalls)).Append(", z wpisem ").Append(Interlocked.Read(ref _wHits))
+              .Append(", odswiezen pamieci wagi gry ").Append(_weightInval).Append(" (pole ").Append(_weightState == 1 ? "TAK" : _weightState == 2 ? "BRAK" : "nie uzyte").Append(')');
+        }
+
+        /// <summary>E3: dopisek partii rodu do linii doby - wpis wagi i konie ladunku pod ludzmi.</summary>
+        private static string WeightClan(MobileParty x)
+        {
+            if (!WeightOn) return "";
+            try
+            {
+                var r = PairsRec(x);
+                if (r == null) return ", E3: brak (morze albo poza zasiegiem)";
+                int mounts = x.ItemRoster != null ? x.ItemRoster.NumberOfMounts : 0;
+                return ", E3: uprzeze par " + HarnessKg(x, r).ToString("0.0", Inv) + " kg mniej, luzaki pod ludzmi " + CargoUnderMen(x, mounts) + "/" + mounts;
+            }
+            catch (Exception e) { Stumble("WeightClan", e); return ", E3: blad"; }
+        }
+
         /// <summary>E2: dopisek partii rodu do linii doby - wpisy predkosci z rekordu do predkosci (ten sam co model).</summary>
         private static string SpeedClan(MobileParty x)
         {
@@ -785,6 +977,7 @@ namespace Armoury
                       .Append(" | pamiec rekordu: liczen od startu sesji ").Append(_mainCount).Append(", ostatnie ").Append(r.Ms.ToString("0.0", Inv)).Append(" ms")
                       .Append(" | ").Append(MarchHud.State());
                     try { SpeedLine(sb, mp, r); } catch (Exception e) { Stumble("SpeedLine", e); }   // E2
+                    try { WeightLine(sb, mp, r); } catch (Exception e) { Stumble("WeightLine", e); }   // E3
                     // HorsePace dla porownania (krok 1 i 3 - E2 zastapi wpis "riders without horses")
                     try
                     {
@@ -813,7 +1006,7 @@ namespace Armoury
                                 clan.Add("'" + (x.Name != null ? x.Name.ToString() : x.StringId) + "' ludzie " + q.Men + ", piesi gry " + q.GameFoot + ", konie ladunku " + q.CMounts
                                          + " (gra " + q.GameMounts + "), uprzeze " + (q.CHarFam + q.CHarSaddle) + ", par " + q.PoolPairs + ", jedzie " + q.Ride + "/num10 " + q.GameNum10
                                          + " (za niska Jazda " + q.WalkSkill + "), stado " + q.OurHerd + "/gra " + q.GameHerd
-                                         + SpeedClan(x));
+                                         + SpeedClan(x) + WeightClan(x));
                             }
                             catch (Exception e) { Stumble("Of(rod)", e); }
                         }

@@ -313,6 +313,10 @@ namespace Armoury
         /// <summary>Konie partii ponad piechote i jencow: luzaki + wolne konie zbrojowni (K0) - piesi - jency (moze byc ujemne).</summary>
         private static int Free(MobileParty mp, bool k0, int mounts)
         {
+            // 537 E3 (klucz RiddenHarnessWeightless, gracz i rod): kon z ladunku w parze pod piechurem albo jencem nie niesie jukow, kon bez pary niesie
+            // (wolne konie zbrojowni sa juz w parach MarchPairs - D11); poza zasiegiem par - dawna regula
+            int pu = MarchPairs.CargoUnderMen(mp, mounts);
+            if (pu >= 0) return mounts - pu;
             int foot = mp.Party != null ? mp.Party.NumberOfMenWithoutHorse : 0;
             int pris = mp.PrisonRoster != null ? mp.PrisonRoster.TotalManCount : 0;
             int arm = k0 ? HorseState.FreeOf(mp) : 0;
@@ -359,7 +363,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || __0 == null || __1 || s.RiderHorseCarryKg <= 0) return;
-                int n = Riders(__0);
+                int n = Riders(__0);   // 537 E3: gracz - konie pod ludzmi z par poza ladunkiem (MarchPairs.CapRiders), reszta jak dotad
                 if (__6)
                 {
                     var att = __0.AttachedParties;
@@ -381,14 +385,18 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.HarnessOnSpareHorses || __0 == null || __1) return;
+                if (s == null || __0 == null || __1) return;
+                // 537 E3: przy RiddenHarnessWeightless uprzaz par jadacych nie wazy (wpis wagi MarchPairs) - dopisek "Harness worn by spare horses" NIE liczy sie
+                // (inaczej uprzaz dwa razy); "Saddled spare horses" z par. Klucz NIE - dawna regula przy HarnessOnSpareHorses.
+                bool pairs = s.RiddenHarnessWeightless;
+                if (!pairs && !s.HarnessOnSpareHorses) return;
                 float own = 0f;
                 int bags = 0;
-                HarnessOne(__0, s, ref own, ref bags);
+                HarnessOne(__0, s, ref own, ref bags, pairs);
                 if (__6)
                 {
                     var att = __0.AttachedParties;
-                    if (att != null) for (int i = 0; i < att.Count; i++) { var ap = att[i]; if (ap != null && ap != __0) HarnessOne(ap, s, ref own, ref bags); }
+                    if (att != null) for (int i = 0; i < att.Count; i++) { var ap = att[i]; if (ap != null && ap != __0) HarnessOne(ap, s, ref own, ref bags, pairs); }
                 }
                 if (own > 0f) __result.Add(own, _txtHarnessOwn);
                 if (bags > 0 && s.RiderHorseCarryKg > 0) __result.Add((float)bags * s.RiderHorseCarryKg, _txtHarnessBags);
@@ -396,7 +404,7 @@ namespace Armoury
             catch { }
         }
 
-        private static void HarnessOne(MobileParty mp, Settings s, ref float own, ref int bags)
+        private static void HarnessOne(MobileParty mp, Settings s, ref float own, ref int bags, bool pairs)
         {
             if (mp != MobileParty.MainParty && !(mp.ActualClan != null && mp.ActualClan == Clan.PlayerClan)) return;
             var pb = mp.Party;
@@ -404,6 +412,14 @@ namespace Armoury
             if (pb == null || roster == null) return;
             int mounts = pb.NumberOfMounts;
             if (mounts <= 0) return;
+            if (pairs)
+            {
+                // 537 E3: konie z ladunku w parach pod piechurem albo jencem niosa juki jak kon jezdzca; bez dopisku wagi uprzezy (zasieg par: gracz i rod,
+                // bez karawan i taborow - tam uprzaz to towar)
+                int pu = MarchPairs.CargoUnderMen(mp, mounts);
+                if (pu > 0) bags += pu;
+                return;
+            }
             var buf = _hBuf ?? (_hBuf = new List<KeyValuePair<float, int>>());
             buf.Clear();
             for (int i = 0; i < roster.Count; i++)
@@ -428,8 +444,27 @@ namespace Armoury
             bags += Math.Min(fitted, Math.Max(0, mounts - under));
         }
 
-        /// <summary>Jezdzcy partii: ludzie (z rannymi), ktorych ekwipunek bojowy ma konia (nie smoka).</summary>
+        /// <summary>537 E3: dawny dopisek "Harness worn by spare horses" partii (do linii doby - porownanie; nie dopisywany przy RiddenHarnessWeightless).</summary>
+        internal static float OldHarnessOwnKg(MobileParty mp)
+        {
+            var s = Settings.Current;
+            if (s == null || mp == null) return 0f;
+            float own = 0f; int bags = 0;
+            try { HarnessOne(mp, s, ref own, ref bags, false); } catch { own = 0f; }
+            return own;
+        }
+
+        /// <summary>Jezdzcy partii do udzwigu "Ridden horses (saddlebags)". 537 E3: gracz przy RiddenHarnessWeightless i TroopsFightWithOwnKitOnly - konie pod
+        /// ludzmi poza ladunkiem z par (MarchPairs.CapRiders: pary jazdy, bohaterowie na wlasnym koniu, piechota na koniach zbrojowni); inaczej RidersOld.</summary>
         internal static int Riders(MobileParty mp)
+        {
+            int pr = -1;
+            try { pr = MarchPairs.CapRiders(mp); } catch { pr = -1; }
+            return pr >= 0 ? pr : RidersOld(mp);
+        }
+
+        /// <summary>Jezdzcy partii: ludzie (z rannymi), ktorych ekwipunek bojowy ma konia (nie smoka) - dawna regula (wzorzec).</summary>
+        internal static int RidersOld(MobileParty mp)
         {
             var r = mp != null ? mp.MemberRoster : null;
             if (r == null) return 0;
@@ -480,6 +515,15 @@ namespace Armoury
                 }
             }
             catch (Exception e) { parts.Add("blad wpiecia udzwigu " + e.GetType().Name); Log.Error("PackMarket.ApplyAll(udzwig)", e); }
+            // 537 E3: wpis wagi "Harness on ridden horses" (MarchPairs.WeightPostfix) - DeclaredMethod na klasie deklarujacej (pulapka 15.10), jawne Priority
+            // (obok MoneyWeight "Coin" - oba tylko dopisuja pozycje, kolejnosc bez znaczenia); NavalDLC wola model domyslny (BaseModel)
+            try
+            {
+                var tw = AccessTools.DeclaredMethod(typeof(DefaultInventoryCapacityModel), "CalculateTotalWeightCarried");
+                if (tw == null) parts.Add("BRAK DefaultInventoryCapacityModel.CalculateTotalWeightCarried - uprzeze par waza (537 E3)");
+                else { h.Patch(tw, postfix: new HarmonyMethod(typeof(MarchPairs), nameof(MarchPairs.WeightPostfix)) { priority = Priority.LowerThanNormal }); parts.Add("waga uprzezy par wpieta (537 E3, CalculateTotalWeightCarried LowerThanNormal)"); }
+            }
+            catch (Exception e) { parts.Add("blad wpiecia wagi uprzezy par " + e.GetType().Name); Log.Error("PackMarket.ApplyAll(waga par)", e); }
             _hooks = string.Join(", ", parts.ToArray());
             var s = Settings.Current;
             Log.Info("PackMarket (E6/K5, 213): " + _hooks + "; klucze PackAnimalsFromMarket (teraz " + (On ? "TAK" : "NIE") + "), SpareHorseCarryKg (teraz "
