@@ -55,6 +55,20 @@
 
 **Status:** DO SPRAWDZENIA (wgrania osobno - CLAUDE.md p. 2: commit 552a, test, commit 552b, test, commit 552c z pomiarem kata; nic nie wgrane; build 0 bledow, w grze nie sprawdzone. Test Jeffa: samotny luk/kusza 30-60 m z boku i z tylu stojacego szyku AI (Defend), potem idacego; autotest regresji: bitwa armii n308 + armoury-bitwa-armie.flag, -Speed 20 - 0 potkniec 552, bez wzrostu 'nasz szyk zmieniony inna sciezka', linie 291 i 144 bez zalamania)
 
+### Recenzja 552 (galaz noc/552-ostrzal-fix -> noc/552-ostrzal)
+
+Sprawdzone w kodzie 552 i w dekompilacji gry (dek/twmb). Zmiany tylko w CloseRanks.Front552.cs (B2) i jednej linii HorsePursuit.ReactHalt.cs (R4).
+
+- (1) PRZYJETE: "stoi / idzie" szyku liczone ze sredniej (CachedAveragePosition), nie z mediany - Formation.CacheAverageAndMedianPositionAndVelocity: mediana = GetMedianAgent (czlowiek najblizej sredniej), przeskakuje miedzy rzedami przy progu 1 m (artefakt 333e). Kierunek strzelca (ShooterDir) liczony od tego samego srodka.
+- (2) PRZYJETE: przerwa po koncu zwrotu (S552.FaceEndAt) - ponowne wejscie B2 najwczesniej po FaceGap; grace "ruch" przy zwrocie tez FaceGap. FaceGap = 0.25 s na metr szerokosci szyku, najmniej 6 s (dawny ReTurnGap), najwyzej 12 s (36 m - 9 s). Dawny TurnGrace 4 s usuniety (najmniej 6 s).
+- (3) PRZYJETE czesciowo: konny strzelec krazacy - przerwa miedzy kolejnymi zwrotami tez FaceGap (szeroki szyk trzyma kierunek dluzej). Prog kata 30 st. bez zmian (jedna regula zamiast dwoch); po tescie patrzec na licznik "zmian kierunku".
+- (4) PRZYJETE (potwierdzone: BehaviorStop, BehaviorCharge, BehaviorRetreat nie ustawiaja facingu; BehaviorReserve, BehaviorPullBack tylko w OnBehaviorActivatedAux): SetFace przy pierwszym zwrocie zapisuje FacingOrder szyku (S552.Facing0 + FPrior na slot), EndFace go oddaje (szyk AI, bez gracza). Nie oddaje, gdy koniec z powodu trzymania przez 446 / R4 / 457 (facing nalezy do wlasciciela) - Drop552 (446) tez nie. R4 (ReactHalt.Face) przy trwajacym zwrocie 552 zapisuje jako Facing0 facing sprzed zwrotu (CloseRanks.Face552Prior), wiec przy zwolnieniu R4 nie przywraca naszego LookAtDirection. FacingOrder to struct, odczyt Formation.FacingOrder jak dotad w ReactHalt (pulapka 12.11 dotyczy MovementOrder, nie FacingOrder).
+- (5) NIE ZMIENIONE (do sprawdzenia w logu): 552 nie jest wgrane, w logach Armoury-2026-11-15 brak linii 552. CavNear to ta sama miara co 146 (szyk z przewaga CavalryUnitRatio w 90 m). Po tescie: linia 552 "pominiete: konnica" i "koniec ... konnica" przy strzelaniu z konia.
+- (6) PRZYJETE: zagrozenie z innej strony (OtherThreat) przy trwajacym zwrocie sprawdzane w kazdym passie - bez swiezego kierunku strzelca wzgledem zapisanego FaceDir.
+- (7) PRZYJETE (potwierdzone: Mission.cs:3611 team.Tick -> Formation.Tick -> FormationAI.Tick -> TickOccasionally): opis watkow poprawiony - postfiks B2 na glownym watku, prefiks C2 na watkach roboczych.
+
+Ryzyko / co sprawdzic: oddanie facingu przy koncu B2 w zachowaniach ustawiajacych facing co tick (Defend, Advance itd.) jest nadpisane przy nastepnym ticku - bez zmiany. Szyk, ktory w czasie zwrotu przeszedl pod R4, dostaje przy koncu R4 facing sprzed 552 (wczesniej: nasz kierunek do konca). Wiecej czasu do wykrycia "ruch" (do 12 s przy bardzo szerokim szyku) - szyk ruszajacy do natarcia moze dluzej patrzec na strzelca; konczy go tez beh == 1 (szarza) i zwarcie. C2 i B3 bez zmian (C2 korzysta z tego samego `moving`, teraz ze sredniej). Build Release 0 bledow. NIE WGRANE, w grze nie sprawdzone.
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".

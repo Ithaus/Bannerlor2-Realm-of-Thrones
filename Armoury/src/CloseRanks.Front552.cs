@@ -24,7 +24,11 @@ namespace Armoury
     ///    Nie rusza bohaterow, kapitana, gracza, chorazych, paniki, odwrotu 143 (straz sztandaru 550 - do uzgodnienia przy scaleniu).
     ///  C2 (klucz ShieldsTowardShooterOnMarch): szyk idacy (nie bieg 291 C / 313b, nie szarza), strzelec 50-130 st. od czola - ludzie z tarcza patrza
     ///    na strzelca (prefiks Agent.SetFormationFrameEnabled: kierunek ramki i wspolczynnik >= 0.75), miejsce i kurs szyku bez zmian.
-    /// Watki: pass na glownym watku pisze sloty; postfiks i prefiks (watki robocze) tylko czytaja (Volatile), bez alokacji, logu i Settings; liczniki Interlocked.
+    /// Watki: pass na glownym watku pisze sloty; postfiks B2 (FormationAI.TickOccasionally z Team.Tick -> Formation.Tick - glowny watek) i prefiks C2
+    /// (HumanAIComponent.ParallelUpdateFormationMovement - watki robocze) tylko czytaja (Volatile), bez alokacji, logu i Settings; liczniki Interlocked.
+    /// Recenzja 552: srodek z CachedAveragePosition (nie mediana - artefakt 333e), grace ruchu i przerwa zwrotu / ponownego wejscia rosna z szerokoscia
+    /// szyku (FaceGap), koniec B2 oddaje FacingOrder sprzed zwrotu (BehaviorStop/Reserve/PullBack/Charge/Retreat facingu co tick nie ustawiaja), R4 bierze
+    /// ten zapisany facing (Face552Prior), zagrozenie z innej strony sprawdzane takze bez swiezego kierunku strzelca (FaceDir).
     /// Potkniecia: RoutHold.Stumble miejsce "szyk" (CloseRanks.Front552), licznik na szyk - od 5 szyk pominiety do konca bitwy; funkcji nie gasimy.
     /// </summary>
     internal static partial class CloseRanks
@@ -33,7 +37,7 @@ namespace Armoury
         private const int Slots552 = 16 * 10;                 // druzyna x szyk (jak Doctrine.T442Idx)
         private const float StillMove = 1f, StillSpan = 2f;   // szyk stoi: srodek < 1 m w 2 s (4 passy)
         private const float MinSpread = 0.6f, TurnFrom = 50f, ReTurnCos = 0.8660254f /* 30 st. */, ReTurnGap = 6f, FaceSafeGap = 120f, OtherFrom = 60f;
-        private const float QuietEnd = 3f, TurnGrace = 4f, BackFrom = 135f, ShieldGap = 40f, MeasureAfter = 3f, MarchMeasure = 2f, MarchMax = 130f;
+        private const float QuietEnd = 3f, BackFrom = 135f, ShieldGap = 40f, MeasureAfter = 3f, MarchMeasure = 2f, MarchMax = 130f;
         private const int SwapsPerPass = 8, SwapsSlow = 4, StumbleCap = 5, LiveLines = 20, Sample = 8;
         private const byte EQuiet = 0, EContact = 1, EHorse = 2, EMove = 3, EPlayer = 4, EThreat = 5, EOther = 6, EKinds = 7;
         private static readonly string[] EndName = { "cisza", "zwarcie", "konnica", "ruch", "gracz", "zagrozenie", "inne (446/R4/rezerwa/klucz)" };
@@ -42,6 +46,7 @@ namespace Armoury
         private static readonly Formation[] FForm = new Formation[Slots552], MForm = new Formation[Slots552];
         private static readonly float[] FAng = new float[Slots552], MAng = new float[Slots552];
         private static readonly bool[] FOn = new bool[Slots552], MOn = new bool[Slots552];
+        private static readonly FacingOrder[] FPrior = new FacingOrder[Slots552];   // recenzja 552 (4): facing sprzed zwrotu - tylko glowny watek
         private static volatile bool _fAny, _mAny;
         private static bool _kFace, _kFront, _kMarch, _f552;
 
@@ -76,6 +81,8 @@ namespace Armoury
             public bool Face;            // B2 slot wlaczony
             public Vec2 FaceDir;
             public float FaceAt, FaceStart, QuietSince = -1f;
+            public float FaceEndAt = -1000f;   // recenzja 552 (2): ostatni EndFace - przerwa przed ponownym wejsciem
+            public FacingOrder Facing0;        // recenzja 552 (4): FacingOrder szyku sprzed pierwszego zwrotu
             public bool Front;           // B3 epizod
             public float FrontAt;
             public bool FrontMeasured, Slow;
@@ -158,7 +165,7 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>B2: po FormationAI.TickOccasionally (tick druzyn - takze watek roboczy): szyk z wlaczonym slotem patrzy na strzelca (zachowanie gry / RBM
+        /// <summary>B2: po FormationAI.TickOccasionally (Team.Tick -> Formation.Tick -> FormationAI.Tick - glowny watek): szyk z wlaczonym slotem patrzy na strzelca (zachowanie gry / RBM
         /// ustawilo swoj FacingOrder chwile wczesniej w tym samym wywolaniu - nadpisujemy go, szyk nie migocze). Bez alokacji i logu.</summary>
         public static void FacePost(Formation ____formation)
         {
@@ -230,6 +237,7 @@ namespace Armoury
             Interlocked.Exchange(ref _pfCalls, 0); Interlocked.Exchange(ref _pfOver, 0); Interlocked.Exchange(ref _pfErr, 0);
             Interlocked.Exchange(ref _pmCalls, 0); Interlocked.Exchange(ref _pmOver, 0); Interlocked.Exchange(ref _pmErr, 0);
             Array.Clear(_grid, 0, _grid.Length);
+            Array.Clear(FPrior, 0, FPrior.Length);
         }
 
         /// <summary>OnHit (pod Gate): trafienie w szyku z epizodem B3 - szereg 0 / dalej.</summary>
@@ -244,7 +252,7 @@ namespace Armoury
         private static void Drop552(Formation f, St st)
         {
             if (st == null || st.S == null) return;
-            EndFace(f, st.S, EOther, null);
+            EndFace(f, st.S, EOther, null, false);   // 446 trzyma szyk - facing jego
             EndMarch(f, st.S);
             st.S.Front = false;
         }
@@ -265,7 +273,7 @@ namespace Armoury
                 if (s.Stum >= StumbleCap)
                 {
                     _stumForms552++;
-                    try { EndFace(f, s, EOther, null); EndMarch(f, s); s.Front = false; } catch { }
+                    try { EndFace(f, s, EOther, null, true); EndMarch(f, s); s.Front = false; } catch { }
                 }
             }
         }
@@ -286,9 +294,9 @@ namespace Armoury
         private static void Core552(Mission m, Team t, Formation f, S552 s, bool inf, bool fire, bool contact, float gap, int beh, bool horse, int men, int hand)
         {
             float now = _now;
-            Vec2 c;
-            var mp = f.CachedMedianPosition;
-            c = mp.IsValid ? mp.AsVec2 : f.CachedAveragePosition;
+            // recenzja 552 (1): srednia, nie mediana - mediana (czlowiek najblizej sredniej) przeskakuje miedzy rzedami (ok. 1.1 m w Line) i dawala
+            // falszywe "idzie" / "stoi" przy progu 1 m (ten sam artefakt co 333e)
+            Vec2 c = f.CachedAveragePosition;
             // pierscien srodka (4 passy = 2 s)
             s.P[s.PI] = c; s.PT[s.PI] = now;
             s.PI = (s.PI + 1) % 5;
@@ -308,7 +316,7 @@ namespace Armoury
             bool scope = _on && !_ended && inf && f.IsAIControlled && !f.IsPlayerTroopInFormation;
             if (!scope)
             {
-                if (s.Face) EndFace(f, s, f.IsAIControlled && !f.IsPlayerTroopInFormation ? EOther : EPlayer, null);
+                if (s.Face) EndFace(f, s, f.IsAIControlled && !f.IsPlayerTroopInFormation ? EOther : EPlayer, null, true);
                 EndMarch(f, s);
                 s.Front = false;
                 return;
@@ -324,6 +332,8 @@ namespace Armoury
             int n = 0;
             bool hasDir = fire && ShieldsUp.ShooterDir(f, c, now, out dir, out spread, out n, out dist);
             float ratio = men > 0 ? (float)hand / men : 0f;
+            // recenzja 552 (2/3): obrot szerokiego szyku trwa dluzej i przesuwa srodek - grace ruchu oraz przerwa zwrotu / ponownego wejscia rosna z szerokoscia
+            float faceGap = FaceGap(f);
 
             // ---------------- B1/B2 czolo do strzelca
             if (_kFace && _pFace)
@@ -335,11 +345,11 @@ namespace Armoury
                     if (held) why = EOther;
                     else if (contact) why = EContact;
                     else if (cav) why = EHorse;
-                    else if (beh == 1 || (moving && now - s.FaceAt > TurnGrace)) why = EMove;
+                    else if (beh == 1 || (moving && now - s.FaceAt > faceGap)) why = EMove;
                     else if (!fire && s.QuietSince >= 0f && now - s.QuietSince >= QuietEnd) why = EQuiet;
-                    else if (hasDir && OtherThreat(m, f, c, dir)) why = EThreat;
-                    if (why != 255) EndFace(f, s, why, null);
-                    else if (hasDir && spread >= MinSpread && Vec2.DotProduct(dir, s.FaceDir) < ReTurnCos && now - s.FaceAt >= ReTurnGap)
+                    else if (OtherThreat(m, f, c, hasDir ? dir : s.FaceDir)) why = EThreat;   // recenzja 552 (6): takze bez swiezego kierunku
+                    if (why != 255) EndFace(f, s, why, null, !held);   // przy 446/R4/457 facing nalezy do wlasciciela (R4 bierze Face552Prior)
+                    else if (hasDir && spread >= MinSpread && Vec2.DotProduct(dir, s.FaceDir) < ReTurnCos && now - s.FaceAt >= faceGap)
                     {
                         float ang = AngDeg(f.Direction, dir);
                         SetFace(f, s, dir, now);
@@ -347,7 +357,7 @@ namespace Armoury
                         if (ang > BackFrom) _fBack++;
                     }
                 }
-                else if (fire && !contact && beh != 1 && still && hasDir)
+                else if (fire && !contact && beh != 1 && still && hasDir && now - s.FaceEndAt >= faceGap)
                 {
                     float ang = AngDeg(f.Direction, dir);
                     if (ang >= TurnFrom)
@@ -374,7 +384,7 @@ namespace Armoury
                     }
                 }
             }
-            else if (s.Face) EndFace(f, s, EOther, null);
+            else if (s.Face) EndFace(f, s, EOther, null, true);
 
             // ---------------- B3 tarcze na czolo
             bool front = _kFront && fire && gap > ShieldGap && !cav && beh != 1 && !Doctrine.Q446Holds(f);
@@ -446,6 +456,7 @@ namespace Armoury
         {
             int i = Idx552(f);
             if (i < 0) return;
+            if (!s.Face) { s.Facing0 = f.FacingOrder; FPrior[i] = s.Facing0; }   // recenzja 552 (4): facing zachowania sprzed zwrotu
             Volatile.Write(ref FAng[i], (float)Math.Atan2(dir.y, dir.x));
             Volatile.Write(ref FForm[i], f);
             Volatile.Write(ref FOn[i], true);
@@ -456,12 +467,17 @@ namespace Armoury
             f.SetFacingOrder(FacingOrder.FacingOrderLookAtDirection(dir));   // od razu, bez czekania na tick zachowania
         }
 
-        private static void EndFace(Formation f, S552 s, byte why, string extra)
+        private static void EndFace(Formation f, S552 s, byte why, string extra, bool restore)
         {
             if (!s.Face) return;
             s.Face = false;
+            s.FaceEndAt = _now;
             int i = Idx552(f);
             if (i >= 0 && ReferenceEquals(FForm[i], f)) { Volatile.Write(ref FOn[i], false); Volatile.Write(ref FForm[i], null); }
+            // recenzja 552 (4): BehaviorStop/Reserve/PullBack/Charge/Retreat nie ustawiaja facingu w TickOccasionally - bez oddania szyk zostawal obrocony na
+            // dawnego strzelca do konca; zachowania, ktore ustawiaja facing co tick, i tak nadpisza go przy nastepnym ticku. Bez oddania, gdy szyk trzyma
+            // 446 / R4 / 457 (facing nalezy do wlasciciela; R4 zapisal Face552Prior) albo szyk nie jest juz AI (gracz).
+            if (restore && f.CountOfUnits > 0 && f.IsAIControlled && !f.IsPlayerTroopInFormation) f.SetFacingOrder(s.Facing0);
             if (why < EKinds) FEnd[why]++;
             float sec = _now - s.FaceStart;
             if (sec >= 0f) { _fSecSum += sec; _fSecN++; }
@@ -470,7 +486,28 @@ namespace Armoury
                 _lines552++;
                 Log.Info("552 koniec | " + Tag(f) + " | po " + sec.ToString("0.0", Inv) + " s | " + (why < EKinds ? EndName[why] : "?") + (extra ?? ""));
             }
-            // facing wraca sam przy nastepnym TickOccasionally zachowania (bez naszego przywracania)
+        }
+
+        /// <summary>Recenzja 552 (2/3): grace ruchu przy zwrocie oraz przerwa miedzy zwrotami i przed ponownym wejsciem - 6 s, przy szerokim szyku
+        /// 0.25 s na metr szerokosci (36 m - 9 s), najwyzej 12 s (skrzydla linii ida przy 90 st. ok. 0.7 szerokosci).</summary>
+        private static float FaceGap(Formation f)
+        {
+            float w = 0f;
+            try { w = f.Width; } catch { w = 0f; }
+            float g = w * 0.25f;
+            if (g > 12f) g = 12f;
+            return g > ReTurnGap ? g : ReTurnGap;
+        }
+
+        /// <summary>Recenzja 552 (4), dla R4 (HorsePursuit.ReactHalt.Face, glowny watek): szyk ma trwajacy zwrot 552 - facing zachowania sprzed zwrotu,
+        /// zeby postoj R4 nie zapisal naszego LookAtDirection jako swojego Facing0.</summary>
+        internal static bool Face552Prior(Formation f, out FacingOrder prior)
+        {
+            prior = default(FacingOrder);
+            int i = Idx552(f);
+            if (i < 0 || !FOn[i] || !ReferenceEquals(FForm[i], f)) return false;
+            prior = FPrior[i];
+            return true;
         }
 
         private static void EndMarch(Formation f, S552 s)

@@ -325,7 +325,13 @@ namespace Armoury
             if (d.LengthSquared < 1f) return;
             d = d.Normalized();
             if (h.Faced && Vec2.DotProduct(d, h.FaceDir) >= FaceTurnCos) return;
-            if (!h.Faced) { h.Facing0 = h.F.FacingOrder; h.Faced = true; }
+            if (!h.Faced)
+            {
+                // recenzja 552 (4): przy trwajacym zwrocie 552 facing szyku to nasz LookAtDirection - R4 zapisuje facing zachowania sprzed zwrotu
+                FacingOrder p552;
+                h.Facing0 = CloseRanks.Face552Prior(h.F, out p552) ? p552 : h.F.FacingOrder;
+                h.Faced = true;
+            }
             h.FaceDir = d;
             h.F.SetFacingOrder(FacingOrder.FacingOrderLookAtDirection(d));
             _lFace++;
