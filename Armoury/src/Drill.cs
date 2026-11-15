@@ -212,7 +212,7 @@ namespace Armoury
             _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0; _maskSegSeen = false;
             _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length); _profReads = 0;   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
-            _kindOf.Clear(); _roleOf.Clear(); _aiKit.Clear(); _settleSig = 0; _migrPending = false; _importLegacy = 0; _kgOk = false; _kgVer = int.MinValue;   // 562: jak _ore
+            _kindOf.Clear(); _roleOf.Clear(); _aiKit.Clear(); _settleSig = 0; _settleArmVer = int.MinValue; _migrPending = false; _importLegacy = 0; _kgOk = false; _kgVer = int.MinValue;   // 562: jak _ore
             HudKitReset();       // 541: pamiec paska mapy
             CampDrill.Reset();   // m97-szkolenie
             VetReset();          // 319b
@@ -222,7 +222,7 @@ namespace Armoury
         {
             Array.Clear(_in, 0, _in.Length); _noRoom = _backBag = _pNoMetal = _pSoldU = _pSoldGold = 0; _pOreAdd = 0f;
             // 562: liczniki zestawu (ruch zbrojownia - zapas, zuzycie wedlug rodzaju, rezerwacja AI)
-            _pTaken = _pBack = _pBackOther = _pBackBattle = _settleN = _settlePv = _settleBad = _pvNone = _pWornN = 0; _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
+            _pTaken = _pBack = _pBackOther = _pBackBattle = _pBackOff = _pLost = _settleN = _settlePv = _settleBad = _pvNone = _pWornN = 0; _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
             Array.Clear(_pWorn, 0, NK); Array.Clear(_aWorn, 0, NK); _aKitParties = _aKitPieces = _aiKept = _aiNoKitSale = 0;
             _cParties = _cMen = _cRest = _cOff = 0; _cXp = _cL = 0;
             _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;
@@ -1708,19 +1708,20 @@ namespace Armoury
             try
             {
                 _dailyN++;
+                ReleaseIfOff();   // recenzja 562 (2): zapas wylaczony - caly do zbrojowni ludzi (Daily biegnie zawsze, Hourly tylko przy czynnej musztrze; nie rzuca)
                 if (_dailyN >= 2 && !_fed) { try { AutotestFeed(); } catch (Exception e) { Stumble("AutotestFeed", e); } }
                 int w, a; GivenCounts(out w, out a);
                 int given = w + a;
                 int inToday = _in[0] + _in[1] + _in[2] + _in[3];
                 string bal;
-                int backAll = _pBack + _pBackOther + _pBackBattle;
+                int backAll = _pBack + _pBackOther + _pBackBattle + _pBackOff + _pLost;   // recenzja 562: zwrot przy wylaczonym zapasie / pojmaniu i strata przy pojmaniu
                 if (_givenYday < 0) bal = "bilans zapasu musztry od jutra (dzis " + given + ")";
                 else
                 {
                     // 562: zapas zmienia sie przyjeciem od gracza, ruchem ze zbrojowni (wziete, zwrocone) i zuzyciem - nic poza tym
                     int expect = _givenYday + inToday + _pTaken - backAll - _pWornN;
                     bal = "bilans zapasu musztry " + (expect == given ? "ZGODNY" : "NIEZGODNY") + " (wczoraj " + _givenYday + " + przyjete " + inToday + " + wziete ze zbrojowni " + _pTaken
-                          + " - zwrocone " + backAll + " - zuzyte " + _pWornN + " = dzis " + given + (expect == given ? "" : ", oczekiwane " + expect) + ")";
+                          + " - zwrocone i stracone " + backAll + " - zuzyte " + _pWornN + " = dzis " + given + (expect == given ? "" : ", oczekiwane " + expect) + ")";
                 }
                 _givenYday = given;
                 if (s.DrillLog)
@@ -1789,7 +1790,7 @@ namespace Armoury
               .Append("; rozliczenia 562: ").Append(_settleN).Append(" (doba ").Append(_settleBy[WhyDaily]).Append(", sklad ").Append(_settleBy[WhyRoster]).Append(", bitwa ").Append(_settleBy[WhyBattle])
               .Append(", miasto ").Append(_settleBy[WhyTown]).Append("; ").Append((_settleTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", CultureInfo.InvariantCulture)).Append(" ms, podgladow bitwy ")
               .Append(_settlePv).Append(_pvNone > 0 ? ", bez podgladu " + _pvNone : "").Append("), wzieto ze zbrojowni ").Append(_pTaken).Append(", zwrocono ponad komplet ").Append(_pBack)
-              .Append(", spoza zestawu ").Append(_pBackOther).Append(", pod braki bitwy ").Append(_pBackBattle).Append(", kontrola sztuk zbrojownia + zapas ").Append(_settleBad == 0 ? "ZGODNE" : "NIEZGODNE x" + _settleBad)
+              .Append(", spoza zestawu ").Append(_pBackOther).Append(", pod braki bitwy ").Append(_pBackBattle).Append(", przy wylaczonym zapasie / pojmaniu ").Append(_pBackOff).Append(", stracone przy pojmaniu ").Append(_pLost).Append(", kontrola sztuk zbrojownia + zapas ").Append(_settleBad == 0 ? "ZGODNE" : "NIEZGODNE x" + _settleBad)
               .Append(", waga zapasu ").Append(F1(StockKg(MobileParty.MainParty, MobileParty.MainParty != null && MobileParty.MainParty.IsCurrentlyAtSea, true))).Append(" kg")
               .Append("; zuzyto ").Append(_pWornN).Append(" (").Append(IntLog(_pWorn))
               .Append("; bez metalu ").Append(_pNoMetal).Append("), zlom +").Append(F2(_pOreAdd)).Append(" rudy, czeka ").Append(F2(ore)).Append(", sprzedano ").Append(_pSoldU)

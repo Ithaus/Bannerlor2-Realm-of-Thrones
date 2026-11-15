@@ -41,6 +41,8 @@ namespace Armoury
     ///    mianownika i nie skacze z nadwyzka ludzi (187/43 w logu 15.11). Cztery pelne ulamki nie mieszcza sie w szerokosci sprzed 537 (ok. 717 px wobec 690),
     ///    trzy - tak (ok. 611 px); bezpiecznik szerokosci zostaje tylko na wypadek ulamkow czterocyfrowych (linia doby: "skrocone do licznika" ma byc 0).
     ///  - podpowiedzi: pierwszy wiersz mowi zwyklym angielskim, co znacza liczby, dalej szczegoly.
+    /// 562: pozycja Drill = ludzie z pelnym zestawem do swojej roli / ludzie (Drill.HudKit, DrillKit.cs); opisy Weapons / Armour i "1 na 3 ludzi" z 541
+    /// wyzej sa historyczne.
     /// </summary>
     internal static class MarchHud
     {

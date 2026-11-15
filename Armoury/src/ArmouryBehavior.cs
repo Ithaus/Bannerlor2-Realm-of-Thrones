@@ -2047,6 +2047,8 @@ namespace Armoury
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, CaptiveArmory.OnPrisonerTaken);   // C4 (Jeff 14.10): pojmany gracz - zbrojownia DTE do zdobywcy, jak u lorda AI
             // f5-bitwa (recenzja 18.10): pojmany gracz - zestaw bitwy autotestu zdjety PRZED CaptiveArmory (rejestracja PO nim = wolanie przed nim); tylko autotest
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, AutotestBattleKit.OnPrisonerTaken);
+            // recenzja 562 (1): pojmany gracz - zapas musztry ma los zbrojowni (rejestracja PO CaptiveArmory = wolanie przed nim; regula w Drill.OnPrisonerTaken)
+            CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, delegate (PartyBase cp, Hero h) { try { Drill.OnPrisonerTaken(cp, h); } catch (Exception e) { Log.Error("Drill.OnPrisonerTaken", e); } });
             CrownRents.RegisterEvents(this);    // 180 (C3): bitwy, rabunki i szturmy z wrogiem o kazdej porze doby - pomiar sluzby (tylko liczniki do ticku)
             WarFront.RegisterEvents(this);      // N5-E: te same zdarzenia z miejscem - warownie przy froncie (budowle cywilne z dala od frontu)
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)

@@ -207,7 +207,8 @@ namespace Armoury
 
         private static int Grab(ref int need, ref int pool) { int x = Math.Max(0, Math.Min(need, pool)); need -= x; pool -= x; return x; }
 
-        /// <summary>Pokrycie rodzajow (Cov) i zuzycie sztuk typow (Used) z zastepstwami w stalej kolejnosci: drzewce do wloczni (najpierw bez uzycia 1H),
+        /// <summary>Pokrycie rodzajow (Cov) i zuzycie sztuk typow (Used) z zastepstwami w stalej kolejnosci: drzewce do wloczni (najpierw bez uzycia bialego,
+        /// potem zbedne dla 1H / 2H, potem reszta),
         /// bron 1H, dwureczne bez 1H do 2H; brak 1H - dwureczne z 1H, potem drzewce z 1H; brak 2H - reszta dwurecznych, potem drzewce z 2H; reszta 1:1.</summary>
         private static void Allocate(KitM m)
         {
@@ -216,7 +217,18 @@ namespace Armoury
                 if (k != K1H && k != K2H && k != KPole) { m.Cov[k] = Math.Min(m.Need[k], m.Have[k]); m.Used[k] = m.Cov[k]; }
             int p0 = Math.Max(0, m.Have[KPole] - m.Pc1 - m.Pc2 - m.Pcb), p2 = m.Pc2, p1 = m.Pc1, pb = m.Pcb;
             int need = m.Need[KPole];
-            int c = Grab(ref need, ref p0) + Grab(ref need, ref p2) + Grab(ref need, ref p1) + Grab(ref need, ref pb);
+            // recenzja 562 (4): wlocznia najpierw z drzewc bez uzycia bialego, potem z tych, ktorych 1H / 2H nie potrzebuja (reszta po wlasnym typie
+            // i dwurecznych), dopiero na koncu z reszty
+            int r1 = Math.Max(0, m.Need[K1H] - m.Have[K1H]);
+            int t1Left = Math.Max(0, m.T1 - r1);
+            r1 = Math.Max(0, r1 - m.T1);
+            int r2 = Math.Max(0, m.Need[K2H] - Math.Max(0, m.Have[K2H] - m.T1) - t1Left);
+            int s2 = Math.Max(0, p2 - r2), s1 = Math.Max(0, p1 - r1), sb = Math.Max(0, pb - Math.Max(0, r1 - p1) - Math.Max(0, r2 - p2));
+            int c = Grab(ref need, ref p0);
+            int g = Grab(ref need, ref s2); p2 -= g; c += g;
+            g = Grab(ref need, ref s1); p1 -= g; c += g;
+            g = Grab(ref need, ref sb); pb -= g; c += g;
+            c += Grab(ref need, ref p2) + Grab(ref need, ref p1) + Grab(ref need, ref pb);
             m.Cov[KPole] = c; m.Used[KPole] = c;
             int one = m.Need[K1H], h1 = m.Have[K1H];
             c = Grab(ref one, ref h1); m.Cov[K1H] = c; m.Used[K1H] = c;
@@ -321,9 +333,9 @@ namespace Armoury
         // ------------------------------------------------------------ gracz: rozliczenie zapasu ze zbrojownia
         internal const int WhyDaily = 0, WhyRoster = 1, WhyBattle = 2, WhyTown = 3;
         private static readonly string[] WhyPl = { "doba", "sklad", "bitwa", "miasto" };
-        private static int _settleSig;
+        private static int _settleSig, _settleArmVer = int.MinValue;   // recenzja 562 (3): wersja zbrojowni DTE po ostatnim rozliczeniu
         private static bool _hudDirty = true, _migrPending;
-        private static int _pTaken, _pBack, _pBackOther, _pBackBattle, _settleN, _settlePv, _settleBad, _pvNone, _pWornN;
+        private static int _pTaken, _pBack, _pBackOther, _pBackBattle, _pBackOff, _pLost, _settleN, _settlePv, _settleBad, _pvNone, _pWornN;
         private static long _settleTicks;
         private static readonly int[] _settleBy = new int[4];
         private static readonly int[] _pWorn = new int[NK], _aWorn = new int[NK];
@@ -335,7 +347,8 @@ namespace Armoury
         internal static void SettlePlayer(int why)
         {
             var main = MobileParty.MainParty;
-            if (!StockOn || main == null || QuartermasterEscrow.Active || TaleWorlds.MountAndBlade.Mission.Current != null) return;
+            if (!StockOn) { ReleaseIfOff(); return; }   // recenzja 562 (2): zapas wylaczony - caly do zbrojowni ludzi (rozliczenie z Need = 0)
+            if (main == null || QuartermasterEscrow.Active || TaleWorlds.MountAndBlade.Mission.Current != null) return;
             var arm = QuartermasterLaw.DteArmory();
             if (arm == null) return;
             int kept = MenPurse.KeptGiven;
@@ -355,6 +368,7 @@ namespace Armoury
                 int took = 0;
                 if (why == WhyDaily || why == WhyRoster) took = TakePlayer(MeasurePlayer(), arm, pv);
                 _settleSig = m.Sig;
+                _settleArmVer = arm.VersionNo;
                 _settleN++; _settleBy[Math.Max(0, Math.Min(3, why))]++;
                 int after = Pieces(arm) + Pieces(_stock);
                 if (after != before) _settleBad++;
@@ -378,6 +392,86 @@ namespace Armoury
             int n = 0;
             for (int i = 0; i < _stock.Count; i++) { var el = _stock.GetElementCopyAtIndex(i); if (el.Amount > 0 && KindOf(el.EquipmentElement.Item) < 0) n += el.Amount; }
             return n;
+        }
+
+        /// <summary>Caly zapas do zbrojowni DTE (ta sama para AddToCounts co ReturnExcess). Zwraca liczbe sztuk.</summary>
+        private static int MoveAll(ItemRoster arm)
+        {
+            var els = new List<ItemRosterElement>();
+            for (int i = 0; i < _stock.Count; i++) { var el = _stock.GetElementCopyAtIndex(i); if (el.Amount > 0 && el.EquipmentElement.Item != null) els.Add(el); }
+            int n = 0;
+            foreach (var el in els)
+            {
+                _stock.AddToCounts(el.EquipmentElement, -el.Amount);
+                arm.AddToCounts(el.EquipmentElement, el.Amount);
+                n += el.Amount;
+            }
+            return n;
+        }
+
+        /// <summary>Recenzja 562 (2): zapas wylaczony (DrillStock, DrillLaw albo DonationXpOff) - nic go nie rozlicza, wiec caly wraca do zbrojowni ludzi, jak
+        /// rozliczenie z Need = 0 (a waga - StockKg - przy wylaczonym zapasie 0). Bez DTE, w misji i przy otwartej zbrojowni - czeka do nastepnego wolania
+        /// (Drill.Daily, wjazd do miasta). Nie rzuca.</summary>
+        internal static void ReleaseIfOff()
+        {
+            try
+            {
+                if (StockOn || _stock.Count == 0) return;
+                var main = MobileParty.MainParty;
+                if (main == null || QuartermasterEscrow.Active || TaleWorlds.MountAndBlade.Mission.Current != null) return;
+                var arm = QuartermasterLaw.DteArmory();
+                if (arm == null) return;
+                int before = Pieces(arm) + Pieces(_stock);
+                int n = MoveAll(arm);
+                if (n <= 0) return;
+                _pBackOff += n; _hudDirty = true;
+                try { MarchPairs.InvalidateWeight(main); } catch { }
+                int after = Pieces(arm) + Pieces(_stock);
+                if (after != before) _settleBad++;
+                Log.Info("Musztra 562: zapas wylaczony - caly zapas (" + n + " szt.) wrocil do zbrojowni ludzi, kontrola sztuk " + (after == before ? "ZGODNE" : "NIEZGODNE (" + before + " -> " + after + ")") + ".");
+            }
+            catch (Exception e) { Stumble("ReleaseIfOff", e); }
+        }
+
+        /// <summary>Recenzja 562 (1): HeroPrisonerTaken gracza (sluchacz zarejestrowany PO CaptiveArmory - biegnie przed nim). Zapas ma los zbrojowni, niezaleznie
+        /// od kolejnosci sluchacza DTE: C4 (PlayerArmoryLikeAiLord) - caly zapas do zbrojowni, CaptiveArmory oddaje go zdobywcy razem z nia; bez C4 - regula DTE
+        /// ApplyCapturedArmoryLoss wprost na zapasie (4/5 kazdej pozycji przepada, ulamek losowo), bez przenoszenia (DTE nie liczy go drugi raz). Bez DTE - nic
+        /// (zbrojownia tez nic nie traci). Nie rzuca.</summary>
+        internal static void OnPrisonerTaken(PartyBase capturer, Hero prisoner)
+        {
+            try
+            {
+                if (prisoner == null || prisoner != Hero.MainHero || _stock.Count == 0) return;
+                var arm = QuartermasterLaw.DteArmory();
+                if (arm == null) return;
+                int all = Pieces(_stock);
+                if (CaptiveArmory.On)
+                {
+                    int n = MoveAll(arm);
+                    _pBackOff += n;
+                    Log.Info("Musztra 562: pojmanie gracza - zapas musztry (" + n + " szt.) do zbrojowni przed oddaniem jej zdobywcy (C4).");
+                }
+                else
+                {
+                    var els = new List<ItemRosterElement>();
+                    for (int i = 0; i < _stock.Count; i++) { var el = _stock.GetElementCopyAtIndex(i); if (el.Amount > 0) els.Add(el); }
+                    int lost = 0;
+                    foreach (var el in els)
+                    {
+                        long four = (long)el.Amount * 4L;
+                        int rem = (int)(four % 5);
+                        int x = Math.Min(el.Amount, (int)(four / 5) + (rem > 0 && MBRandom.RandomInt(5) < rem ? 1 : 0));
+                        if (x <= 0) continue;
+                        _stock.AddToCounts(el.EquipmentElement, -x);
+                        lost += x;
+                    }
+                    _pLost += lost;
+                    Log.Info("Musztra 562: pojmanie gracza - zapas musztry traci " + lost + " z " + all + " szt. (regula DTE: 4/5 jak zbrojownia), zostaje " + Pieces(_stock) + ".");
+                }
+                _hudDirty = true;
+                try { MarchPairs.InvalidateWeight(MobileParty.MainParty); } catch { }
+            }
+            catch (Exception e) { Stumble("OnPrisonerTaken", e); }
         }
 
         private static int Cls2H(int v) { return (v & F1H) != 0 ? 1 : 0; }                                            // 0 bez 1H, 1 z 1H
@@ -511,7 +605,7 @@ namespace Armoury
             return took;
         }
 
-        /// <summary>Start bitwy z graczem: gdy sklad zmienil sie od ostatniego rozliczenia (rekruci tej godziny) - sam zwrot (nadmiar, braki bitwy).</summary>
+        /// <summary>Start bitwy z graczem: gdy sklad (rekruci tej godziny) albo zbrojownia zmienily sie od ostatniego rozliczenia - sam zwrot (nadmiar, braki bitwy).</summary>
         internal static void OnMapEventStarted(MapEvent me)
         {
             try
@@ -521,7 +615,9 @@ namespace Armoury
                 bool mine = main.MapEvent == me;
                 if (!mine && me.InvolvedParties != null) foreach (var p in me.InvolvedParties) if (p == main.Party) { mine = true; break; }
                 if (!mine) return;
-                if (PlayerSig() != _settleSig) SettlePlayer(WhyBattle);
+                var arm = QuartermasterLaw.DteArmory();
+                // recenzja 562 (3): takze zmiana zbrojowni bez zmiany skladu (sztuki wyjete albo sprzedane, zlom DTE) - podglad bitwy moze miec nowe braki
+                if (PlayerSig() != _settleSig || (arm != null && arm.VersionNo != _settleArmVer)) SettlePlayer(WhyBattle);
             }
             catch (Exception e) { Stumble("OnMapEventStarted", e); }
         }
@@ -706,7 +802,7 @@ namespace Armoury
         {
             try
             {
-                if (_stock.Count == 0) return 0f;
+                if (_stock.Count == 0 || !StockOn) return 0f;   // recenzja 562 (2): wylaczony zapas nie wazy (jak przed 562; ReleaseIfOff oddaje go zbrojowni)
                 if (!live) return _kgOk && _kgSea == atSea ? _kgV : 0f;
                 int ver = _stock.VersionNo;
                 if (_kgOk && ver == _kgVer && _kgSea == atSea) return _kgV;
@@ -908,7 +1004,7 @@ namespace Armoury
         internal static float LifeDays(int k) { return WearDays * LifeX[k]; }
 
         private static readonly Kit _hudKit = new Kit();
-        private static int _hudStockVer = int.MinValue, _hudRosVer = int.MinValue, _hudHeroes = -1, _hudDay = int.MinValue, _hudAt = Environment.TickCount - 60000, _hudN;
+        private static int _hudStockVer = int.MinValue, _hudRosVer = int.MinValue, _hudHeroes = -1, _hudCfg = -1, _hudDay = int.MinValue, _hudAt = Environment.TickCount - 60000, _hudN;
         private static bool _hudHave;
 
         /// <summary>Odczyt dla paska mapy (watek glowny, co 0.2 s): miara zestawu liczona od nowa tylko po zmianie klucza (zapas, sklad, bohaterowie, dzien,
@@ -923,7 +1019,8 @@ namespace Armoury
                 var ros = main.MemberRoster;
                 int sv = _stock.VersionNo, rv = ros != null ? ros.VersionNo : -1, hn = ros != null ? ros.TotalHeroes : 0, day = (int)CampaignTime.Now.ToDays;
                 int now = Environment.TickCount;
-                bool changed = _hudDirty || !_hudHave || sv != _hudStockVer || rv != _hudRosVer || hn != _hudHeroes || day != _hudDay;
+                int cfg = MenPerPiece * 2 + (HeroesOn(Settings.Current, true) ? 1 : 0);   // recenzja 562 (6): MCM Drill Men Per Piece / Drill Heroes
+                bool changed = _hudDirty || !_hudHave || sv != _hudStockVer || rv != _hudRosVer || hn != _hudHeroes || day != _hudDay || cfg != _hudCfg;
                 if (changed && (!_hudHave || unchecked(now - _hudAt) >= 1000))
                 {
                     _hudAt = now; _hudN++; _hudDirty = false;
@@ -931,12 +1028,12 @@ namespace Armoury
                     k.Men = m.Men; k.Heroes = m.Heroes; k.Ready = m.Ready; k.ReadyW = m.ReadyW; k.ReadyA = m.ReadyA; k.ReadyM = m.ReadyM; k.NeedM = m.NeedM;
                     k.ReadyR = m.ReadyR; k.NeedR = m.NeedR; k.Stock = m.Pieces; k.Other = m.Other;
                     Array.Copy(m.Need, k.Need, NK); Array.Copy(m.Cov, k.Cov, NK); Array.Copy(m.RoleMen, k.RoleMen, NR);
-                    _hudStockVer = sv; _hudRosVer = rv; _hudHeroes = hn; _hudDay = day; _hudHave = true;
+                    _hudStockVer = sv; _hudRosVer = rv; _hudHeroes = hn; _hudDay = day; _hudCfg = cfg; _hudHave = true;
                 }
                 Array.Copy(_pWorn, k.WornToday, NK);
                 var acc = AccOf(main, false);
                 if (acc != null) Array.Copy(acc.WK, k.Acc, NK); else Array.Clear(k.Acc, 0, NK);
-                k.Taken = _pTaken; k.Back = _pBack + _pBackOther; k.BackBattle = _pBackBattle;
+                k.Taken = _pTaken; k.Back = _pBack + _pBackOther + _pBackOff; k.BackBattle = _pBackBattle;
                 k.PerkW = main.HasPerk(DefaultPerks.Steward.GivingHands);
                 k.PerkA = main.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
                 k.Ok = _hudHave;
@@ -951,7 +1048,7 @@ namespace Armoury
         /// <summary>Nowa kampania - pamiec paska od zera.</summary>
         private static void HudKitReset()
         {
-            _hudStockVer = _hudRosVer = _hudDay = int.MinValue; _hudHeroes = -1; _hudAt = Environment.TickCount - 60000; _hudN = 0; _hudHave = false; _hudDirty = true; _hudKit.Ok = false;
+            _hudStockVer = _hudRosVer = _hudDay = int.MinValue; _hudHeroes = _hudCfg = -1; _hudAt = Environment.TickCount - 60000; _hudN = 0; _hudHave = false; _hudDirty = true; _hudKit.Ok = false;
         }
 
         // ------------------------------------------------------------ autotest: zasilenie zapasu (krytyka 7)

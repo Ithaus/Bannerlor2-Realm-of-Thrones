@@ -38,6 +38,23 @@
 
 **Status:** DO SPRAWDZENIA (zbudowane 0 bledow, niewgrane).
 
+### Recenzja 562 (galaz noc/562-komplet-cwiczebny-fix -> noc/562-komplet-cwiczebny)
+
+Przyjete (sprawdzone w kodzie):
+- **(1) Pojmanie gracza - zapas omijal strate zbrojowni.** DTE `ArmyArmoryBehavior.OnHeroPrisonerTaken` -> `ApplyCapturedArmoryLoss` (4/5 kazdej pozycji), a C4 `CaptiveArmory` oddaje cala zbrojownie zdobywcy; `_stock` lezy poza zbrojownia, a potem `ReturnExcess` (Need = 0) oddawal go do zbrojowni juz po stracie. Nowy `Drill.OnPrisonerTaken` (sluchacz HeroPrisonerTaken zarejestrowany PO CaptiveArmory i AutotestBattleKit, wiec biegnie przed nimi): przy C4 caly zapas do zbrojowni (CaptiveArmory oddaje go zdobywcy razem z nia), bez C4 - regula DTE wprost na zapasie (4/5 pozycji, ulamek losowo `MBRandom.RandomInt(5)`), bez przenoszenia - wynik nie zalezy od kolejnosci sluchacza DTE (MbEvent wola od ostatnio dodanego, kolejnosc modulow DTE/Armoury nieustalona). Bez DTE - nic.
+- **(2) Wylaczony zapas zamrazal sztuki i dalej wazyl.** `ReleaseIfOff`: przy `StockOn == false` caly `_stock` wraca do zbrojowni (Drill.Daily - biegnie zawsze, Hourly jest pod `Active`; oraz `SettlePlayer`, np. wjazd do miasta); bez DTE / w misji / przy otwartej zbrojowni czeka. `StockKg` zwraca 0 przy wylaczonym zapasie.
+- **(3) Start bitwy tylko po zmianie skladu.** `SettlePlayer` zapamietuje `arm.VersionNo` (`_settleArmVer`); `OnMapEventStarted` rozlicza takze przy innej wersji zbrojowni (sztuki wyjete/sprzedane, zlom DTE). Koszt: najwyzej jedno rozliczenie (1-2 podglady bitwy) na bitwe gracza.
+- **(4) Kolejnosc drzewc w `Allocate`.** Wlocznia bierze: drzewca bez uzycia bialego, potem drzewca zbedne dla 1H / 2H (reszta potrzeby po wlasnym typie i dwurecznych: s2, s1, sb), dopiero na koncu reszte (p2, p1, pb jak dotad). Przyklad recenzji: wlocznia 1H idzie do jezdzca, pika do 2H - bez drugiej piki ze zbrojowni.
+- **(6) Pasek nie widzial zmiany MCM** Drill Men Per Piece / Drill Heroes - klucz `cfg` w `HudKit` (zerowany w `HudKitReset`).
+- Kosmetyka: MarchHud.cs - dopisek 562 pod starym opisem 541 (Weapons/Armour, "1 na 3 ludzi" - historyczne).
+- Bilans dnia: nowe liczniki `_pBackOff` (zwrot przy wylaczonym zapasie i przy pojmaniu z C4) i `_pLost` (strata przy pojmaniu bez C4) wchodza do "zwrocone i stracone" i do linii gracza; `_settleArmVer` zerowany w `Reset`.
+
+Odrzucone / bez zmian w kodzie:
+- (5) Rezerwacja AI `_aiKit` poza zapisem - skutek tylko do pierwszego dziennego ticku partii po wczytaniu, jest licznik "sprzedaz bez rezerwacji"; zapis slownika na setki partii to nowy format zapisu bez potrzeby. Zostaje.
+- (7) Discard a waga - informacja dla Jeffa (sztuka przyjeta do zestawu wazy jako "Drill kit"; gdy zestaw pelny, Discard niszczy jak w czystej grze). Skutek decyzji 3 (zestaw wazy), bez zmiany.
+
+**Ryzyko / co sprawdzic:** linia "Musztra (gracz)" - "bilans zapasu musztry ZGODNY" i "kontrola sztuk ZGODNE" takze po pojmaniu i po wylaczeniu klucza; przy pojmaniu linia "Musztra 562: pojmanie gracza - ..." przed linia C4 "Zbrojownia gracza po pojmaniu"; po wylaczeniu DrillStock linia "zapas wylaczony - caly zapas (N szt.) wrocil do zbrojowni" w najblizszej dobie; "rozliczenia 562 ... bitwa" moze rosnac (rozliczenie przy kazdej bitwie po zmianie zbrojowni) - ms na rozliczenie jak dotad. Regresja: `Allocate` zmienia tylko kolejnosc drzewc do wloczni (gdy brak drzewc z jednym rodzajem uzycia - wynik identyczny). Zbudowane 0 bledow, niewgrane.
+
 ## 559: kusze - pulap energii beltu 190 J (latka na predkosc RBM), zasieg 469 z tym samym pulapem, waga bolt_a w linii startu - Armoury (XbowCap559.cs nowy, FireRange469.cs, NightHooks.cs; nowy klucz CrossbowBoltEnergyCap w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "tak popraw kusze" - odpowiedz na propozycje po kwerendzie historycznej (Williams, Payne-Gallwey, Tod): (1) belty NIE ignoruja pancerza (551 odrzucone); (2) ciezkie kusze w dol do ok. 190 J, zeby zadna kusza reczna nie przekraczala historycznego sufitu ok. 200 J - wzor RBM (Utilities.cs:269-277, 0.994 J na funt) daje kuszy 330 lb z beltem bolt_a (0.15 kg) ok. 244 J, 120 lb = 103 J (zostaje); (3) kod 469 mial zakladac belt 0.06 kg (FireRange469.cs:67 BoltW), a bolt_a wazy 0.15 kg - AI za daleko.
