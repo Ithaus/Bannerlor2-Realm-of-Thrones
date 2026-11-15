@@ -596,7 +596,7 @@ namespace Armoury
                             + " - once a day and when the troops change - only pieces the next battle's hand-out leaves unused; "
                             + "those pieces leave the armoury" + (bookOn ? " (yours leave your list, and come back to it when the kit no longer needs them)" : "") + ". Nothing to click. Taken today " + k.Taken
                             + (bookOn && k.TakenBook > 0 ? " (" + k.TakenBook + " of them yours)" : "") + ", given back for battle " + k.BackBattle + ", back to the armoury (not needed) " + k.Back
-                            + (k.BookBack > 0 ? " (" + k.BookBack + " back to your list)" : "") + "."
+                            + (k.BookBack > 0 ? "; of all pieces given back today " + k.BookBack + " went back to your list" : "") + "."   // 571 (recenzja): _pBookBack liczy kazdy zwrot (takze na bitwe), nie tylko "not needed"
                             + (k.LastTook == 0 && most.Length > 0 ? (bookOn ? " Last check found nothing to take: what lies in the troops' armoury is their battle kit and its reserve, and your pieces the next battle hands out - the drill touches none of them."
                                                                             : " Last check found nothing to take: what lies in the troops' armoury is their battle kit and its reserve, which the drill does not touch.") : ""));
                 int sh = 0; for (int i = 0; i < Drill.NK; i++) sh += k.Short(i);

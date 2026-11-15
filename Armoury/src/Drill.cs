@@ -225,7 +225,8 @@ namespace Armoury
             Array.Clear(_in, 0, _in.Length); _noRoom = _backBag = _pNoMetal = _pSoldU = _pSoldGold = 0; _pOreAdd = 0f;
             // 562: liczniki zestawu (ruch zbrojownia - zapas, zuzycie wedlug rodzaju, rezerwacja AI)
             _pTaken = _pBack = _pBackOther = _pBackBattle = _pBackOff = _pLost = _settleN = _settlePv = _settleBad = _pvNone = _pWornN = 0;
-            _pTakenBook = _pBookBack = _pBookGone = 0;   // 571 _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
+            _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
+            _pTakenBook = _pBookBack = _pBookGone = 0;   // 571
             Array.Clear(_pWorn, 0, NK); Array.Clear(_aWorn, 0, NK); _aKitParties = _aKitPieces = _aiKept = _aiNoKitSale = 0;
             _cParties = _cMen = _cRest = _cOff = 0; _cXp = _cL = 0;
             _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;

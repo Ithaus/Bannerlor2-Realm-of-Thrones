@@ -479,7 +479,7 @@ namespace Armoury
                         int x = Math.Min(el.Amount, (int)(four / 5) + (rem > 0 && MBRandom.RandomInt(5) < rem ? 1 : 0));
                         if (x <= 0) continue;
                         _stock.AddToCounts(el.EquipmentElement, -x);
-                        _pBookGone += BookOut(el.EquipmentElement, x);   // 571: czesc gracza wychodzi pierwsza (stracona jak kazda sztuka zapasu)
+                        _pBookGone += BookLose(el.EquipmentElement);   // 571 (recenzja): strata - czesc gracza traci sie OSTATNIA, jak ReconcileStock w zbrojowni
                         lost += x;
                     }
                     _pLost += lost;
@@ -634,9 +634,9 @@ namespace Armoury
         // ksiegi musztry, i nigdy tego, co wyda nastepna bitwa: na przedmiot zostaje w zbrojowni co najmniej KeepFor (Given + sztuki zapelniajace braki podgladu)
         // - liczone na zywym stanie zbrojowni (po poborze z nadwyzki ludzi). Bez podgladu bitwy - z listy gracza nic.
         // Wlasnosc: sztuka schodzi z listy gracza (StockWithdrawKey - ksiega per id i rozbicie) do zapasu musztry, a _fromBook pamieta, ile sztuk tego egzemplarza
-        // w zapasie to sztuki gracza. Jedna zasada wyjscia z zapasu: czesc gracza wychodzi PIERWSZA - zwrot do zbrojowni (nadmiar, braki bitwy, zapas wylaczony,
-        // pojmanie z C4) wraca ja na LISTE GRACZA (StockDepositKey), nie na stan wojska, wiec K1 jej nie sprzeda ludziom; zuzycie i strata przy pojmaniu (bez C4)
-        // zdejmuja ja z pamieci (sztuka zuzyta / stracona - jak kazda sztuka zapasu). Zamknieta ekonomia: ani sztuka, ani moneta nie powstaje (sam ruch
+        // w zapasie to sztuki gracza. Zwrot do zbrojowni (nadmiar, braki bitwy, zapas wylaczony, pojmanie z C4): czesc gracza wychodzi PIERWSZA
+        // i wraca na LISTE GRACZA (StockDepositKey), nie na stan wojska, wiec K1 jej nie sprzeda ludziom. Zuzycie i strata przy pojmaniu (bez C4): czesc gracza
+        // traci sie OSTATNIA (BookLose - pamiec przycieta do reszty zapasu, jak ReconcileStock dla ksiegi w zbrojowni; recenzja 571). Zamknieta ekonomia: ani sztuka, ani moneta nie powstaje (sam ruch
         // zbrojownia <-> zapas i etykieta wlasnosci).
         private static readonly Dictionary<string, int> _fromBook = new Dictionary<string, int>(StringComparer.Ordinal);
         private static int _pTakenBook, _pBookBack, _pBookGone;
@@ -652,6 +652,21 @@ namespace Armoury
             int x = Math.Min(v, n);
             if (v - x > 0) _fromBook[key] = v - x; else _fromBook.Remove(key);
             return x;
+        }
+
+        /// <summary>571 (recenzja): sztuki egzemplarza el ZNIKNELY z zapasu (strata przy pojmaniu bez C4, zuzycie) - czesc gracza traci sie OSTATNIA:
+        /// pamiec przycieta do tego, co zostalo w zapasie (ta sama regula co ReconcileStock dla ksiegi gracza w zbrojowni). Wolac PO zdjeciu z _stock.
+        /// Zwraca sztuki gracza, ktore przepadly.</summary>
+        private static int BookLose(EquipmentElement el)
+        {
+            if (_fromBook.Count == 0 || el.Item == null) return 0;
+            string key = QuartermasterLaw.KeyOf(el);
+            int v; if (!_fromBook.TryGetValue(key, out v) || v <= 0) return 0;
+            int idx = _stock.FindIndexOfElement(el);
+            int h = idx >= 0 ? Math.Max(0, _stock.GetElementCopyAtIndex(idx).Amount) : 0;
+            if (v <= h) return 0;
+            if (h > 0) _fromBook[key] = h; else _fromBook.Remove(key);
+            return v - h;
         }
 
         /// <summary>571: n sztuk egzemplarza el z zapasu do zbrojowni - czesc gracza wraca na liste gracza (ksiega), reszta na stan wojska (jak dotad).</summary>
@@ -887,7 +902,7 @@ namespace Armoury
                 if (best < 0) continue;
                 var pick = _stock.GetElementCopyAtIndex(best).EquipmentElement;
                 _stock.AddToCounts(pick, -1);
-                _pBookGone += BookOut(pick, 1);   // 571: zuzyta sztuka - czesc gracza wychodzi pierwsza
+                _pBookGone += BookLose(pick);   // 571 (recenzja): zuzycie - czesc gracza ostatnia (jak strata i ReconcileStock)
                 Scrap(pick.Item, a, true);
                 return true;
             }
