@@ -45,6 +45,9 @@ namespace Armoury
 
         internal static void Reset() { _state = ""; _firstPrisonerDay = -1; _errors = 0; _waitDay = -1; _waitText = null; _errLogged = false; }
 
+        /// <summary>555: zwrot jeszcze czeka (flaga pusta) - dar zalogi 555 czeka na niego.</summary>
+        internal static bool Pending { get { return _state.Length == 0; } }
+
         internal static string Export() { return "b1|" + _state + "|" + _firstPrisonerDay.ToString(Inv); }
 
         internal static void Import(string v)

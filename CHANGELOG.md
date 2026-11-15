@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 555: jednorazowy dar zalogi dla Banefortu - 336 sprzed oblezenia x 1.5 = 504 - Armoury (Banefort555.cs nowy, Banefort544.Pending, SubModuleMain; flaga w zapisie arm_555_banefort; bez nowego klucza)
+
+**Problem:** Jeff, czat 15.11: "Banefort - tak, daj mu zaloge taka jak mial przed szturmem i powieksz o 50%". 544 oddal Banefort (ROT_castle20) House Banefort bez obsady: Armoury-2026-11-15_15-14-12.log l.864 "zaloga Banefort 311 -> [...], zostalo 0 ... po zmianie Banefort: pan Banefort, zaloga 0"; Polnoc (Gregor Forrester) oblega go znowu od dnia 109116 przy 11.8:1 (l.8978, obroncy z milicja 411 - zaloga ok. 74 z werbunku pana).
+
+**Przyczyna:** 544 celowo bez obsady (TransferFor noFill: true - regula 326x "zaloga z werbunku pana, nic z niczego"); zaloga sprzed upadku (ludzie Polnocy) poszla do partii Polnocy. Zaloga korony sprzed oblezenia: oblezenie od dnia 108995 (Armoury-2026-11-15_01-07-36.log l.56285 "Czas oblezenia (471) start ... obroncy (strona gry, z milicja) 678"), linie OB1 dni 109003-109012 "obrona: zaloga 336, milicja 344-347" - 336 ludzi. Skladu zalogi zaden log nie zapisal.
+
+**Zmiana:**
+- Nowy `Banefort555` (wzor 544): raz na kampanie, HourlyTickEvent, flaga `arm_555_banefort` ("" czeka, "new" nowa kampania, "done:dzien:wynik").
+- Warunki: pan = House Banefort (ROTclan_59) albo rod panujacy korony "vlandia" (zapasowy odbiorca 544); rod gracza - koniec bez daru; pan spoza tych dwoch przy czekajacym 544 (nowe `Banefort544.Pending`) - czeka; inny pan - koniec bez daru.
+- Dar: zaloga do celu 504 (dodaje 504 - obecni szeregowi; zaloga >= 504 - bez daru). Sklad: drzewo oddzialow kultury pana (BasicTroop + awanse, bez bohaterow; zapas: kultura osady, korony), udzialy tierow T1 10% / T2 25% / T3 30% / T4 20% / T5 10% / T6 5% (brak tieru w drzewie - udzial na pozostale), w tierze po rowno, zdrowi.
+- Oblezenie: dar idzie takze w oblezeniu - gra sama dopisuje ludzi do zalogi oblezonej twierdzy (GarrisonTroopsCampaignBehavior.OnSettlementEntered bez warunku oblezenia, dekompilacja 1.4.8); werbunek gry wstrzymuje tylko przy MapEvent/SiegeEvent (regula projektu gry, nie bezpieczenstwo). Czeka tylko gdy bitwa (MapEvent osady albo zalogi) albo gracz stoi w Banefort.
+- Zamknieta ekonomia: WYJATEK z rozkazu Jeffa - ludzie z niczego, bez zlota i bez zdjecia z ludnosci, opisany w linii jako "dar 555"; ksiega ludzi: PeopleBook.GiveNone(..., -1) - koszyk bez pochodzenia (jak CartEscort297).
+- Linia logu `Banefort (555): ... DAR 555 zalogi Banefort ...` (zaloga przed -> po, tiery, typy, oblezenie, milicja, limit zalogi gry, budzet zoldu zalogi) + linia startu sesji; wiadomosc dla gracza: "Banefort's garrison is restored: N fresh troops join the defenders (M men in the castle)."
+
+**Ryzyko / co sprawdzic:**
+- Regresje/kolizje (kontrola w kodzie): zaloge Banefortu pisza tez 544 (u Jeffa juz zrobione - flaga done), gra (werbunek, zostawianie/zabieranie przez lordow), 326c-E FrontGarrison (tylko nieoblegane, werbunek gry), W4c OverflowHome (przepelnienie), zbrojownia zalogi. 555 nie zmienia zadnej z tych regul; liczy obecnych szeregowych w chwili daru, wiec nie dubluje ludzi dodanych wczesniej.
+- LIMIT ZALOGI: zamek gry ma 200 + Przywodztwo pana + budynki/perki (DefaultPartySizeLimitModel). Jesli limit < 504, nadwyzka odchodzi przez przepelnienie (gra: 25% nadwyzki na dobe, W4c - do wsi Banefortu), takze w oblezeniu (DesertionCampaignBehavior bez warunku oblezenia). Linia 555 pokazuje "limit zalogi gry" - jesli wyraznie < 504, dar rozplynie sie w kilka dob; ochrona daru to decyzja Jeffa (osobna zmiana), nie dopisana "przy okazji".
+- Zold: 504 ludzi to zold House Banefort (budzet zoldu zalogi w linii); przy braku pieniedzy zwykle reguly (limit zoldu, D5 do domu).
+- Jedzenie zalogi: z ok. 74 do 504 ludzi zapas spada szybciej (l.8978: 853 dob przy -13.6/d - zostaje duzy zapas).
+- Sprzet: nowi ludzie z ekwipunkiem szablonu; zbrojownia zalogi dokupi braki z sakiewki zalogi.
+- W logu po wczytaniu: "Banefort (555): start sesji | stan zapisu: czeka", w pierwszej godzinie gry "DAR 555 ..." (albo "czeka - ... bitwa" i dar po bitwie); w liniach OB1/471 Banefortu "zaloga" ok. 504.
+- Build 0 bledow; w grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".
