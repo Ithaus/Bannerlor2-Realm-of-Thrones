@@ -32,6 +32,15 @@ namespace Armoury
     ///    gdy dol bylby szerszy niz gora, pozycje PELNE (bez ostrzezenia) pokazuja sam licznik, a gdy to nie wystarczy (recenzja 541) - takze pozycje z brakiem
     ///    (kolor ostrzezenia zostaje, pelny ulamek w podpowiedzi); Horses ostrzega tylko, gdy ktos idzie pieszo bez uprzezy albo przez za niska Jazde;
     ///  - ikony: wlasne warstwy pedzla MapBar.Right.Icons (dopisane do pedzla, ktory wygral - BK zostaje) ze sprajtami gry (kon, juczne, miecz, zbroja).
+    /// 548 (Jeff 15.11: "nie rozumiem tej tabelki, mam 131 ludzi czemu 146 czerwone ... 82/43 czyli co ... wez to madrze zrob aby UX/UI byl czytelny"):
+    /// jedna zasada dla calego dolnego rzedu - "mam / potrzeba", zawsze pelny ulamek, zwykly kolor gdy pelne, ostrzezenie gdy brakuje (Pack: gdy ponad limit):
+    ///  - Horses = ludzie na koniach (pary + bohaterowie na wlasnych) / ludzie w partii (r.Men, ta sama liczba co gorny rzad); ostrzezenie, gdy ktos idzie pieszo;
+    ///  - Pack bez zmian (juczne / limit Herding), wlasna podpowiedz;
+    ///  - Weapons i Armour polaczone w jedna pozycje Drill (ikona miecza): ludzie z bronia i zbroja do musztry / wszyscy ludzie - min(w uzyciu bron, w uzyciu
+    ///    zbroje) / komplet (Drill.Full, od 548 1 na czlowieka - klucz Drill Men Per Piece); "w uzyciu" = min(stan, komplet), wiec licznik nie przekracza
+    ///    mianownika i nie skacze z nadwyzka ludzi (187/43 w logu 15.11). Cztery pelne ulamki nie mieszcza sie w szerokosci sprzed 537 (ok. 717 px wobec 690),
+    ///    trzy - tak (ok. 611 px); bezpiecznik szerokosci zostaje tylko na wypadek ulamkow czterocyfrowych (linia doby: "skrocone do licznika" ma byc 0).
+    ///  - podpowiedzi: pierwszy wiersz mowi zwyklym angielskim, co znacza liczby, dalej szczegoly.
     /// </summary>
     internal static class MarchHud
     {
@@ -41,11 +50,12 @@ namespace Armoury
         private const float TopMaxWidth = 52f, GameMaxWidth = 52f, MinText = 20f, ItemPad = 50f, RowPad = 75f, FontScale = 20f / 32f, Pad = 0.5f;   // MapBar.xml, Galahad.fnt, Text.cs
         internal static int BottomApplied;        // 541: ile razy UIExtenderEx nalozyl MaxWidth na prefab MapBar (getter MarchHudBottomTextWidth.Attributes)
 
-        private sealed class Items { public MapInfoItemVM Horses, Pack, Weapons, Armour; }
+        private sealed class Items { public MapInfoItemVM Horses, Pack, Drill; }   // 548: Drill (ItemId armoury_weapons) zamiast Weapons + Armour
 
         private static readonly ConditionalWeakTable<MapInfoVM, Items> _vms = new ConditionalWeakTable<MapInfoVM, Items>();
         private static Harmony _h;
         private static string _wired = "nie sprawdzane";
+        private const int NItems = 3;   // 548: Horses, Pack, Drill
         private static bool _ok;
         private static int _stumbles, _shown, _added, _dupRemoved, _bars, _shortened, _iconStumbles;
         private static string _lastText;
@@ -86,7 +96,8 @@ namespace Armoury
             try
             {
                 Log.Info(Tag + "latki " + _wired + " | klucz March Pairs Hud " + (On ? "TAK" : "NIE")
-                         + " | 541: gorny rzad bez naszych pozycji (szerokosc jak przed 537); dolny: Horses (z uprzezami), Pack, Weapons, Armour (zapas musztry "
+                         + " | 548: gorny rzad bez naszych pozycji (szerokosc jak przed 537); dolny, zawsze 'mam / potrzeba': Horses (na koniach / ludzie), Pack (juczne / limit), Drill (z bronia i zbroja / ludzie, 1 na "
+                         + Drill.OnePer + " - zapas musztry "
                          + (Drill.StockOn ? "czynny" : "NIECZYNNY - pozycje ukryte") + ") | pole tekstu dolnego rzedu: " + MarchHudUi.State + (BottomApplied > 0 ? ", nalozone " + BottomApplied + "x" : " (nakladane przy pierwszym wczytaniu paska mapy - po starcie sesji; liczbe pokazuje linia doby)")
                          + " | ikony: " + IconState()
                          + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
@@ -111,8 +122,11 @@ namespace Armoury
         // ---------------------------------------------------------------- teksty (te same w HUD i w linii doby)
         private static string Frac(int a, int b) { return a + "/" + b; }
 
-        internal static string HorsesText(MarchPairs.Rec r) { return r == null ? "-" : Frac(r.Ridden, r.AllHorses); }
-        internal static string HarnessText(MarchPairs.Rec r) { return r == null ? "-" : Frac(r.Ridden, r.AllHorses); }   // D10 a: mianownik = wszystkie konie (tylko linia doby - na pasku polaczone z Horses, 541)
+        /// <summary>548: ludzie na koniach (pary jazdy i puli + bohaterowie na wlasnych koniach); na morzu 0.</summary>
+        internal static int Mounted(MarchPairs.Rec r) { return r == null || r.AtSea ? 0 : r.Ridden + r.HeroMounted; }
+        /// <summary>548: ludzie na koniach / ludzie w partii (r.Men - ta sama liczba co gorny rzad gry); na morzu "-".</summary>
+        internal static string HorsesText(MarchPairs.Rec r) { return r == null || r.AtSea ? "-" : Frac(Mounted(r), r.Men); }
+        internal static string HarnessText(MarchPairs.Rec r) { return r == null ? "-" : Frac(r.Ridden, r.AllHorses); }   // D10 a: mianownik = wszystkie konie (tylko linia doby; 548: pasek pokazuje ludzi na koniach / ludzi)
         internal static string PackText(MarchPairs.Rec r) { return r == null ? "-" : Frac(r.CPack, r.PackLimit); }
 
         // ---------------------------------------------------------------- 541: ikony (warstwy pedzla MapBar.Right.Icons)
@@ -121,12 +135,11 @@ namespace Armoury
         {
             new[] { IdHorses,  "General\\EquipmentIcons\\equipment_type_mount",      "SPGeneral\\MountFlagIcons\\speed_mount", "speed" },
             new[] { IdPack,    "SPGeneral\\MountFlagIcons\\weight_carrying_mount",   "General\\EquipmentIcons\\equipment_type_mount", "food" },
-            new[] { IdWeapons, "General\\EquipmentIcons\\equipment_type_one_handed", "SPGeneral\\WeaponFlagIcons\\one_handed", "troops" },
-            new[] { IdArmour,  "General\\EquipmentIcons\\equipment_type_body_armor",  "General\\EquipmentIcons\\equipment_type_head_armor", "hit_points" },
+            new[] { IdWeapons, "General\\EquipmentIcons\\equipment_type_one_handed", "SPGeneral\\WeaponFlagIcons\\one_handed", "troops" },   // 548: pozycja Drill (bron i zbroja razem)
         };
         private static Brush _iconBrush;                  // pedzel, do ktorego dopisano warstwy (inny obiekt = BrushFactory przeladowana - dopisac od nowa)
-        private static readonly bool[] _iconOk = new bool[4];
-        private static readonly string[] _iconUsed = new string[4];
+        private static readonly bool[] _iconOk = new bool[NItems];
+        private static readonly string[] _iconUsed = new string[NItems];
 
         private static string IconState()
         {
@@ -235,7 +248,7 @@ namespace Armoury
                 Items it;
                 if (!On)
                 {
-                    if (_vms.TryGetValue(vm, out it)) { Drop(vm.SecondaryInfoItems, it.Horses); Drop(vm.SecondaryInfoItems, it.Pack); Drop(vm.SecondaryInfoItems, it.Weapons); Drop(vm.SecondaryInfoItems, it.Armour); }
+                    if (_vms.TryGetValue(vm, out it)) { Drop(vm.SecondaryInfoItems, it.Horses); Drop(vm.SecondaryInfoItems, it.Pack); Drop(vm.SecondaryInfoItems, it.Drill); }
                     // 537 E2: predkosc czyta rekord MarchPairs z pamieci - odswiezany tu (watek glowny, najwyzej raz na 1 s po zmianie) takze bez pozycji paska
                     if (_live && MarchPairs.Needed) MarchPairs.Main(false);   // 537 E3: takze waga i udzwig (RiddenHarnessWeightless)
                     return;
@@ -247,45 +260,48 @@ namespace Armoury
                     it = new Items
                     {
                         Horses = new MapInfoItemVM(IdHorses, Tooltip),
-                        Pack = new MapInfoItemVM(IdPack, Tooltip),
-                        Weapons = new MapInfoItemVM(IdWeapons, WeaponsTooltip),
-                        Armour = new MapInfoItemVM(IdArmour, ArmourTooltip)
+                        Pack = new MapInfoItemVM(IdPack, PackTooltip),
+                        Drill = new MapInfoItemVM(IdWeapons, KitTooltip)
                     };
                     _vms.Add(vm, it);
                     _bars++;
                 }
-                Visual(it.Horses, 0); Visual(it.Pack, 1); Visual(it.Weapons, 2); Visual(it.Armour, 3);
-                // 541: gorny rzad - tylko pozycje gry (szerokosc paska sprzed 537); dawna pozycja Harness zdjeta z dolnego
+                Visual(it.Horses, 0); Visual(it.Pack, 1); Visual(it.Drill, 2);
+                // 541: gorny rzad - tylko pozycje gry (szerokosc paska sprzed 537); dawne pozycje Harness (541) i Armour (548) zdjete z dolnego
                 PurgeOurs(vm.PrimaryInfoItems);
                 PurgeId(vm.SecondaryInfoItems, IdHarness);
+                PurgeId(vm.SecondaryInfoItems, IdArmour);
                 Ensure(vm.SecondaryInfoItems, it.Horses);
                 Ensure(vm.SecondaryInfoItems, it.Pack);
 
                 var r = MarchPairs.Main(false);
                 var k = Drill.HudKit();
                 bool kit = k != null && k.Ok;
-                if (kit) { Ensure(vm.SecondaryInfoItems, it.Weapons); Ensure(vm.SecondaryInfoItems, it.Armour); }
-                else { Drop(vm.SecondaryInfoItems, it.Weapons); Drop(vm.SecondaryInfoItems, it.Armour); }
+                if (kit) Ensure(vm.SecondaryInfoItems, it.Drill);
+                else Drop(vm.SecondaryInfoItems, it.Drill);
 
                 // pelne teksty, sam licznik, ostrzezenie
-                var full = new string[4]; var num = new string[4]; var warn = new bool[4]; var iv = new int[4];
-                full[0] = HorsesText(r); num[0] = r != null ? r.Ridden.ToString() : "-"; iv[0] = r != null ? r.Ridden : 0;
-                warn[0] = r != null && !r.AtSea && (r.WalkNoHarness > 0 || r.WalkSkill > 0);   // recenzja 541: ktos NAPRAWDE idzie pieszo - bez uprzezy albo para za trudna dla Riding (nadmiar koni / par w zbrojowni to nie brak)
+                // 548: kazda pozycja "mam / potrzeba" - pelny ulamek; ostrzezenie tylko przy braku (Pack: ponad limit)
+                var full = new string[NItems]; var num = new string[NItems]; var warn = new bool[NItems]; var iv = new int[NItems];
+                int mounted = Mounted(r);
+                full[0] = HorsesText(r); num[0] = r != null && !r.AtSea ? mounted.ToString() : "-"; iv[0] = mounted;
+                warn[0] = r != null && !r.AtSea && mounted < r.Men;   // 548: ktos idzie pieszo (bez konia, bez pasujacej uprzezy albo za niska Jazda) - kto i dlaczego w podpowiedzi
                 full[1] = PackText(r); num[1] = r != null ? r.CPack.ToString() : "-"; iv[1] = r != null ? r.CPack : 0;
                 warn[1] = r != null && r.CPack > r.PackLimit;
                 bool men = kit && k.Men > 0;
-                full[2] = men ? Frac(k.HaveW, k.Full) : "-"; num[2] = men ? k.HaveW.ToString() : "-"; iv[2] = men ? k.HaveW : 0; warn[2] = men && k.HaveW < k.Full;
-                full[3] = men ? Frac(k.HaveA, k.Full) : "-"; num[3] = men ? k.HaveA.ToString() : "-"; iv[3] = men ? k.HaveA : 0; warn[3] = men && k.HaveA < k.Full;
+                int ready = men ? k.Ready : 0;
+                full[2] = men ? Frac(ready, k.Full) : "-"; num[2] = men ? ready.ToString() : "-"; iv[2] = ready; warn[2] = men && ready < k.Full;
 
                 // bezpiecznik szerokosci: dolny rzad nie szerszy niz gorny (gorny = szerokosc sprzed 537)
                 float maxB = BottomApplied > 0 ? BottomMaxWidth : GameMaxWidth;
-                int n = kit ? 4 : 2;
-                var pick = new string[4];
+                int n = kit ? 3 : 2;
+                var pick = new string[NItems];
                 for (int i = 0; i < n; i++) pick[i] = TextPx(full[i]) <= maxB ? full[i] : num[i];   // nie miesci sie w polu - zawinalby sie do drugiej linii
                 float top = RowPx(vm.PrimaryInfoItems, TopMaxWidth);
                 float bottom = RowPx(vm.SecondaryInfoItems, maxB);
                 for (int i = 0; i < n; i++) bottom += ItemPx(pick[i], maxB);
                 int cut = 0;
+                // 548: przy trzech pozycjach rzad miesci sie z zapasem (ok. 611 px wobec gory 690+) - ponizsze tylko na wypadek ulamkow czterocyfrowych.
                 // runda 0: najpierw pozycje pelne (bez ostrzezenia); runda 1 (recenzja 541): gdy nadal za szeroko - takze z ostrzezeniem (kolor zostaje,
                 // pelny ulamek w podpowiedzi) - szerokosc paska jak przed 537 ma pierwszenstwo
                 for (int round = 0; round < 2; round++)
@@ -298,8 +314,8 @@ namespace Armoury
 
                 Put(it.Horses, pick[0], iv[0], warn[0]);
                 Put(it.Pack, pick[1], iv[1], warn[1]);
-                if (kit) { Put(it.Weapons, pick[2], iv[2], warn[2]); Put(it.Armour, pick[3], iv[3], warn[3]); }
-                string text = "Horses " + pick[0] + ", Pack " + pick[1] + (kit ? ", Weapons " + pick[2] + ", Armour " + pick[3] : "");
+                if (kit) Put(it.Drill, pick[2], iv[2], warn[2]);
+                string text = "Horses " + pick[0] + ", Pack " + pick[1] + (kit ? ", Drill " + pick[2] : "");
                 if (text != _lastText)
                 {
                     _lastText = text;
@@ -308,12 +324,12 @@ namespace Armoury
                     if (r != null && (_shown <= 20 || _shown % 50 == 0))
                         try
                         {
-                            Log.Info(Tag + "pasek (" + _shown + ") -> " + text + " | pelne: Horses " + full[0] + ", Pack " + full[1] + (kit ? ", Weapons " + full[2] + ", Armour " + full[3] : ", zapas musztry nieczynny")
+                            Log.Info(Tag + "pasek (" + _shown + ") -> " + text + " | pelne: Horses " + full[0] + " (na koniach / ludzie), Pack " + full[1] + (kit ? ", Drill " + full[2] + " (z bronia i zbroja do musztry / ludzie)" : ", zapas musztry nieczynny")
                                      + " | szerokosc (szacunek): gora " + top.ToString("0") + " px, dol " + bottom.ToString("0") + " px, MaxWidth dolu " + maxB + ", skrocone do licznika " + cut
-                                     + " | jedzie: jazda " + r.CavPairs + ", pula " + r.Ride + " z " + r.PoolMen
+                                     + " | jedzie: jazda " + r.CavPairs + ", pula " + r.Ride + " z " + r.PoolMen + ", bohaterowie " + r.HeroMounted + ", pieszo " + Math.Max(0, r.Men - mounted)
                                      + ", konie " + r.AllHorses + " (ladunek " + r.CMounts + ", zbrojownia " + r.AHorses + "), uprzeze " + r.AllHarness
                                      + ", juczne " + r.CPack + " / limit " + r.PackLimit + (r.AtSea ? ", na morzu" : "")
-                                     + (men ? " | musztra: bron " + k.HaveW + " (od Ciebie " + k.GivenW + ", nadwyzka ludzi " + k.SurW + "), zbroje " + k.HaveA + " (" + k.GivenA + " + " + k.SurA + "), komplet " + k.Full : "")
+                                     + (men ? " | musztra: bron " + k.HaveW + " (od Ciebie " + k.GivenW + ", nadwyzka ludzi " + k.SurW + "), zbroje " + k.HaveA + " (" + k.GivenA + " + " + k.SurA + "), komplet " + k.Full + " (1 na " + Drill.OnePer + ")" : "")
                                      + " (rekord liczony " + r.Ms.ToString("0.0") + " ms).");
                         }
                         catch { }
@@ -358,35 +374,41 @@ namespace Armoury
             for (int i = list.Count - 1; i >= 0; i--) { var x = list[i]; if (x != null && string.Equals(x.ItemId, id, StringComparison.Ordinal)) { list.RemoveAt(i); _dupRemoved++; } }
         }
 
-        // ---------------------------------------------------------------- podpowiedz (po angielsku; z pamieci, bez liczenia)
+        // ---------------------------------------------------------------- podpowiedzi (po angielsku; z pamieci, bez liczenia)
+        // 548: pierwszy wiersz kazdej podpowiedzi mowi zwyklym angielskim, co znacza liczby na pasku; dalej szczegoly
         private static List<TooltipProperty> Tooltip()
         {
             var l = new List<TooltipProperty>();
             try
             {
-                l.Add(new TooltipProperty("Horses and harness on the march", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
+                l.Add(new TooltipProperty("Horses on the march", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                 var r = MarchPairs.Last;
                 if (r == null || !r.Ok) { l.Add(new TooltipProperty("Not counted yet", "", 0, false, TooltipProperty.TooltipPropertyFlags.None)); return l; }
-                int mounted = r.AtSea ? 0 : r.Ridden + r.HeroMounted;
-                Row(l, "Men mounted", mounted + "/" + r.Men);
-                if (r.AtSea) Row(l, "At sea", "nobody rides on board");
-                else
+                if (r.AtSea) { Row(l, "At sea", "nobody rides on board"); return l; }
+                int mounted = Mounted(r), walk = Math.Max(0, r.Men - mounted);
+                Row(l, "Men riding / men", mounted + " of " + r.Men + " men ride (heroes included, as Troops on the top bar)" + (walk > 0 ? " - " + walk + " walk (red)" : " - nobody walks"));
+                if (walk > 0)
                 {
-                    Row(l, "On foot", (r.Men - mounted) + " (" + r.WalkNoHorse + " no horse, " + r.WalkNoHarness + " no harness, " + r.WalkSkill + " Riding too low)");
-                    Row(l, "Cavalry", r.CavPairs + "/" + (r.CavMen + r.CavWounded) + (r.CavWounded > 0 ? " (" + r.CavWounded + " wounded go on the spare horses)" : ""));
-                    Row(l, "Footmen on spare horses", r.Ride + "/" + r.PoolMen);
-                    if (r.HeroMounted > 0) Row(l, "Heroes on their own horses", r.HeroMounted.ToString());
+                    // recenzja 548: bohater bez wlasnego konia jest w puli piechoty (MarchPairs AddMan KHero) - jesli idzie, juz siedzi w WalkNoHorse / NoHarness / Skill;
+                    // HeroFoot liczy tez bohaterow jadacych na parach z puli, wiec nie dokladamy go drugi raz
+                    int known = r.WalkNoHorse + r.WalkNoHarness + r.WalkSkill;
+                    var why = new List<string>();
+                    if (r.WalkNoHorse > 0) why.Add(r.WalkNoHorse + " no horse");
+                    if (r.WalkNoHarness > 0) why.Add(r.WalkNoHarness + " no harness that fits a horse");
+                    if (r.WalkSkill > 0) why.Add(r.WalkSkill + " Riding too low" + (r.SkillLowEn.Count > 0 ? " (" + string.Join(", ", r.SkillLowEn) + ")" : ""));
+                    if (walk > known) why.Add((walk - known) + " other");
+                    Row(l, "On foot", walk + ": " + string.Join(", ", why));
                 }
+                Row(l, "Cavalry", r.CavPairs + "/" + (r.CavMen + r.CavWounded) + (r.CavWounded > 0 ? " (" + r.CavWounded + " wounded go on the spare horses)" : ""));
+                Row(l, "Footmen on spare horses", r.Ride + "/" + r.PoolMen);
+                if (r.HeroMounted > 0) Row(l, "Heroes on their own horses", r.HeroMounted.ToString());
                 if (r.SMounts + r.SHarness + r.SOther > 0) Row(l, "Footmen's mounts", r.SMounts + " horses, " + r.SHarness + " harness kept apart from the baggage (town or camp menu)");   // 537 E6
                 int notRidden = Math.Max(0, r.AllHorses - r.Ridden);
-                Row(l, "Horses", r.Ridden + " ridden, " + notRidden + " not ridden (" + r.FreeHerd + " free in the herd)");
+                Row(l, "Riding horses you own", r.AllHorses + ": " + r.Ridden + " under your men, " + notRidden + " spare (" + r.FreeHerd + " free in the herd)");
                 int unusedH = Math.Max(0, r.AllHarness - r.Ridden);
                 Row(l, "Harness", r.Ridden + " worn, " + unusedH + " unused"
                     + (r.UnusedPairs > 0 && r.UnusedReqMin >= 0 ? " (" + r.UnusedPairs + " horse and harness pairs need Riding " + r.UnusedReqMin + " or more)" : ""));
-                Row(l, "Pack animals", r.CPack + "/" + r.PackLimit + " before the herding penalty (" + r.Men + " men - " + r.CLive + " livestock - " + r.FreeHerd + " free horses)");
                 var s = Settings.Current;
-                if (s != null) Row(l, "Baggage pace", (int)Math.Ceiling(r.Men * Math.Max(0f, s.MarchPackAllowance)) + " pack animals allowed while all men ride");
-                if (r.SkillLowEn.Count > 0) Row(l, "Riding too low", string.Join(", ", r.SkillLowEn));
                 Row(l, " ", "A man rides only a horse with a harness that fits it and his Riding allows (footmen need no Riding for a pair that asks up to " + (s != null ? s.FootmenRidingWaiver : 0) + "). Counted from the baggage and the troops' armoury; "
                             + (MarchPairs.SpeedOn ? "party speed uses these numbers" : "party speed does not use these numbers (March Pairs Speed is off)")
                             + (MarchPairs.WeightOn ? "; harness on ridden horses does not weigh on the baggage." : "; cargo weight does not use them (Ridden Harness Weightless is off)."));   // 537 E2, E3
@@ -395,38 +417,66 @@ namespace Armoury
             return l;
         }
 
-        private static void Row(List<TooltipProperty> l, string k, string v) { l.Add(new TooltipProperty(k, v, 0, false, TooltipProperty.TooltipPropertyFlags.None)); }
-
-        // ---------------------------------------------------------------- 541: podpowiedz zapasu musztry (po angielsku; z pamieci Drill.HudKit)
-        private static List<TooltipProperty> WeaponsTooltip() { return KitTooltip(true); }
-        private static List<TooltipProperty> ArmourTooltip() { return KitTooltip(false); }
-
-        private static List<TooltipProperty> KitTooltip(bool w)
+        /// <summary>548: podpowiedz Pack (dotad wspolna z Horses).</summary>
+        private static List<TooltipProperty> PackTooltip()
         {
             var l = new List<TooltipProperty>();
             try
             {
-                string what = w ? "weapons" : "pieces of armour";
-                l.Add(new TooltipProperty(w ? "Drill kit - weapons" : "Drill kit - armour", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
+                l.Add(new TooltipProperty("Pack animals", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
+                var r = MarchPairs.Last;
+                if (r == null || !r.Ok) { l.Add(new TooltipProperty("Not counted yet", "", 0, false, TooltipProperty.TooltipPropertyFlags.None)); return l; }
+                int over = r.CPack - r.PackLimit;
+                Row(l, "Pack animals / allowed", r.CPack + " of " + r.PackLimit + " you may lead before the herding penalty" + (over > 0 ? " - " + over + " too many (red)" : ""));
+                Row(l, "Allowed", r.Men + " men - " + r.CLive + " livestock - " + r.FreeHerd + " free horses = " + r.PackLimit);
+                var s = Settings.Current;
+                if (s != null) Row(l, "Baggage pace", (int)Math.Ceiling(r.Men * Math.Max(0f, s.MarchPackAllowance)) + " pack animals allowed while all men ride");
+            }
+            catch (Exception e) { Stumble("PackTooltip", e); }
+            return l;
+        }
+
+        private static void Row(List<TooltipProperty> l, string k, string v) { l.Add(new TooltipProperty(k, v, 0, false, TooltipProperty.TooltipPropertyFlags.None)); }
+
+        // ---------------------------------------------------------------- 541/548: podpowiedz zapasu musztry (po angielsku; z pamieci Drill.HudKit)
+        private static string KitLine(Drill.Kit k, bool w)
+        {
+            int have = w ? k.HaveW : k.HaveA, given = w ? k.GivenW : k.GivenA, sur = w ? k.SurW : k.SurA;
+            int inUse = Math.Min(have, k.Full);
+            return inUse + "/" + k.Full + " (" + given + " from you, " + sur + " men's spare"
+                   + (have > k.Full ? "; " + (have - k.Full) + " extra to replace worn ones)" : have < k.Full ? ") - " + (k.Full - have) + " short" : ")");
+        }
+
+        private static List<TooltipProperty> KitTooltip()
+        {
+            var l = new List<TooltipProperty>();
+            try
+            {
+                l.Add(new TooltipProperty("Drill kit", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                 var k = Drill.HudKit();
                 if (k == null || !k.Ok) { l.Add(new TooltipProperty("Drill stock is off", "", 0, false, TooltipProperty.TooltipPropertyFlags.None)); return l; }
                 if (k.Men <= 0) { Row(l, "No soldiers", "nobody drills, the stock takes nothing"); return l; }
-                int have = w ? k.HaveW : k.HaveA, given = w ? k.GivenW : k.GivenA, sur = w ? k.SurW : k.SurA, room = w ? k.RoomW : k.RoomA;
-                int inUse = Math.Min(have, k.Full);
-                bool perk = w ? k.PerkW : k.PerkA;
-                Row(l, "Have / full set", have + "/" + k.Full + " (one per " + Drill.OnePer + " men; " + k.Men + " men)");
-                Row(l, "In use for drill", inUse + "/" + k.Full + (have > k.Full ? " - " + (have - k.Full) + " spare to replace worn pieces" : have < k.Full ? " - " + (k.Full - have) + " short" : ""));
-                Row(l, "From you", given + "  |  men's spare kit in the armoury: " + sur);
-                Row(l, "They take from you", room + " more " + what + " (up to " + Drill.IntakeSetsN + " full sets)");
-                float bonus = k.Bonus(w) * 100f, max = Drill.BonusPerSet * 100f * (perk ? Drill.BonusPerkMult : 1f);
-                Row(l, "Drill bonus", "+" + bonus.ToString("0.#") + "% of +" + max.ToString("0.#") + "% troop XP from drill (grows with the share of the full set; "
-                       + (w ? "Giving Hands" : "Paid in Promise") + (perk ? " raises it" : " would raise it") + " to +" + (Drill.BonusPerSet * 100f * Drill.BonusPerkMult).ToString("0.#") + "%)");
-                float rate = k.WearPerFullDay(w);
-                Row(l, "Wear", "a full day of drill (8 h) wears out about " + rate.ToString("0.00") + " " + what + " - the cheapest first, your gifts first, then the men's spare kit. No drill, no wear.");
-                float acc = w ? k.AccW : k.AccA;
-                if (rate > 0f) Row(l, "Next one worn out", "after about " + Math.Max(0f, (1f - acc) / rate).ToString("0.#") + " full days of drill");
-                Row(l, "Worn out today", (w ? k.WornW : k.WornA).ToString());
-                Row(l, " ", "Give " + what + " to your men in the inventory (Discard) or leave trophies after a battle - they keep them for drill. "
+                int per = Drill.OnePer, ready = k.Ready;
+                string unit = per == 1 ? "one weapon and one piece of armour per man" : "one weapon and one piece of armour per " + per + " men";
+                // recenzja 548: mianownik bez bohaterow (Drill.Men) - inny niz Troops i Horses, wiec mowimy to wprost
+                if (per == 1) Row(l, "Ready to drill / soldiers", ready + " of " + k.Men + " soldiers have a weapon and a piece of armour to drill with" + (ready < k.Full ? " (red)" : "") + " - heroes do not drill and are not counted");
+                else Row(l, "Ready / full set", ready + " of " + k.Full + " sets (" + unit + ", " + k.Men + " soldiers, heroes not counted)" + (ready < k.Full ? " (red)" : ""));
+                Row(l, "Weapons", KitLine(k, true));
+                Row(l, "Armour", KitLine(k, false));
+                Row(l, "Full set", unit + ", beside his battle kit");
+                Row(l, "They take from you", k.RoomW + " more weapons and " + k.RoomA + " more pieces of armour (up to " + (Drill.IntakeSetsN == 1 ? "one full set" : Drill.IntakeSetsN + " full sets") + ")");
+                float bonus = (k.Bonus(true) + k.Bonus(false)) * 100f;
+                float max = Drill.BonusPerSet * 100f * ((k.PerkW ? Drill.BonusPerkMult : 1f) + (k.PerkA ? Drill.BonusPerkMult : 1f));
+                Row(l, "Drill bonus", "+" + bonus.ToString("0.#") + "% of +" + max.ToString("0.#") + "% troop XP from drill (each half grows with its share of the full set; "
+                       + "Giving Hands raises the weapons half" + (k.PerkW ? "" : " - not taken") + ", Paid in Promise the armour half" + (k.PerkA ? "" : " - not taken")
+                       + ", from +" + (Drill.BonusPerSet * 100f).ToString("0.#") + "% to +" + (Drill.BonusPerSet * 100f * Drill.BonusPerkMult).ToString("0.#") + "%)");
+                float rw = k.WearPerFullDay(true), ra = k.WearPerFullDay(false);
+                Row(l, "Wear", "a full day of drill (8 h) wears out about " + rw.ToString("0.00") + " weapons and " + ra.ToString("0.00") + " pieces of armour - the cheapest first, your gifts first, then the men's spare kit. No drill, no wear.");
+                if (rw > 0f || ra > 0f)
+                    Row(l, "Next one worn out", "weapons " + (rw > 0f ? "after about " + Math.Max(0f, (1f - k.AccW) / rw).ToString("0.#") + " full days" : "-")
+                        + ", armour " + (ra > 0f ? "after about " + Math.Max(0f, (1f - k.AccA) / ra).ToString("0.#") + " full days" : "-"));
+                Row(l, "Worn out today", k.WornW + " weapons, " + k.WornA + " pieces of armour");
+                Row(l, " ", "Give weapons and armour to your men in the inventory (Discard) or leave trophies after a battle - they keep them for drill. "
                             + "Their spare kit is sold to the merchants of the next town; new recruits take what they need from it. "
                             + "Worn pieces become scrap the smiths of the next town buy - the coin goes to the men's purse. "
                             + "Every recruit raises the full set, so the same stock covers less.");

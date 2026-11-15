@@ -140,7 +140,7 @@ namespace Armoury
             if (harness && !armourySide && ridden > 0 && MarchPairs.WeightOn) rows.Add(new[] { "Weight", ridden + " on ridden horses weigh nothing" });
             if (armourySide) rows.Add(new[] { "Counted", "all pieces of this kind in the troops' armoury" });
             if (stableSide) rows.Add(new[] { "Footmen's mounts", "kept apart from the baggage; take a pair out to sell it - the pairs are counted again later" });
-            rows.Add(new[] { "Horses (map bar)", MarchHud.HorsesText(r) + " ridden" + (QuartermasterEscrow.Active ? " (as when the stash opened)" : "") });
+            rows.Add(new[] { "Men riding / men (map bar)", MarchHud.HorsesText(r) + (QuartermasterEscrow.Active ? " (as when the stash opened)" : "") });
             return rows;
         }
 
