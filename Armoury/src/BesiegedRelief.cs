@@ -506,7 +506,7 @@ namespace Armoury
                 if (party.Army != null && party.LeaderHero != null && !_relLogged.Contains(party.Army))
                 {
                     relSt = ReliefStrike.ReleasedTo(party.Army);
-                    if (relSt != null && !WarLeader(party.LeaderHero, k)) relSt = null;
+                    if (relSt != null && !WarLeaderPeek(party.LeaderHero, k)) relSt = null;   // recenzja 556: bez zapisu pamieci godziny _warLead
                 }
                 string relWhy = null; float relGame = -1f, relNew = -1f;
                 if (_tmpIdx.Count == 0)
@@ -647,6 +647,29 @@ namespace Armoury
                 else { dep = DeputyOf(k); _warLead[k] = new KeyValuePair<int, Hero>(hour, dep); }
             }
             return dep != null && ReferenceEquals(dep, h);
+        }
+
+        /// <summary>Recenzja 556 (tylko log): to samo co WarLeader, ale NIE zapisuje pamieci godziny _warLead - wolanie z linii logu nie moze ustalic zastepcy
+        /// wczesniej w godzinie niz zrobilaby to droga gry (OnArmyCreated / wezwanie armii krola). Nie rzuca.</summary>
+        internal static bool WarLeaderPeek(Hero h, Kingdom k)
+        {
+            try
+            {
+                if (h == null || k == null) return false;
+                if (ReferenceEquals(h, k.Leader)) return true;
+                var s = Settings.Current;
+                if (s == null || !s.RelievesWarLeader340) return false;
+                int hour = (int)CampaignTime.Now.ToHours;
+                Hero dep;
+                lock (_warLead)
+                {
+                    KeyValuePair<int, Hero> kv;
+                    if (_warLead.TryGetValue(k, out kv) && kv.Key == hour) return kv.Value != null && ReferenceEquals(kv.Value, h);
+                }
+                dep = DeputyOf(k);
+                return dep != null && ReferenceEquals(dep, h);
+            }
+            catch { return false; }
         }
 
         private static Hero DeputyOf(Kingdom k)

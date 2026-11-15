@@ -19,6 +19,13 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 556
+
+Diff 556 sprawdzony: podbicia OB5, rezerwacje, liczniki doby, zasieg f12 i armia krola bez zmian (nowy kod po `if (dnc) return;`, `relGame` czytane przed `SetBehaviorScore`, `LogAfterMuster` w try/catch, raz na armie); CanonWarWatch czyta `DoNotChangeBehavior` w postfiksie Last `CampaignEventDispatcher.AiHourlyTick` (po wszystkich zachowaniach, wiec po AiMilitaryBehavior) - odczyt poprawny; linia dobowa, bez spamu; liczniki `DncThinks`/`Dnc` jak dotychczasowe pola `W` (watek glowny mysli, zerowane w `ZeroDay`).
+- Poprawka: `WarLeader` z linii logu ZAPISYWAL pamiec godziny `_warLead` (zastepca 340). Mysli partii gra rozklada na cala godzine, wiec wolanie z logu moglo ustalic zastepce wczesniej niz droga gry (`OnArmyCreated`, wezwanie armii krola), a gdy pozniej w tej godzinie zastepca trafi do niewoli albo straci druzyne - gra uzylaby starego. Log zmienial zachowanie (rzadko, ale wbrew "tylko log"). Teraz `WarLeaderPeek`: ten sam wynik, czyta pamiec godziny, ale nic do niej nie zapisuje; w try/catch.
+- Uwaga bez zmiany: `_relLogged` trzyma rozwiazane armie do `Reset` (kilka na sesje - pomijalne).
+- Build Armoury Release: 0 bledow. Nie wgrane.
+
 ## 550: AI przy sztandarze - biegacz tylko bez zagrozenia, straz reaguje na podejscie (smycz od miejsca ofiary), kusznicy szyku piechoty wrecz albo czysty strzal - Armoury (BannerCompanies.Pickup.cs, BannerCompanies.Guard550.cs NOWY, BannerCompanies.cs, HorsePursuit.React.cs / ReactFire.cs / Hunt.cs; klucze NOWE BannerPickupSafeRadius = 10, BannerGuardsAnswer = TAK, MCM "Banner Pickup Safe Radius", "Standard Guards Close In")
 
 **Problem:** Jeff, czat 15.11, w trakcie bitwy: "podszedlem do goscia z banerem, armia przeciwnika stoi w obronie, atakuje go, zabilem, reszta jego ludzi gapi sie jak idioci, stoja, ludzie z wloczniami i kusznicy - zabijam jednego po drugim, normalnie rzucili by sie na mnie od razu jak tylko podejde do baneru, nie pozwolili go przechwycic; a druga rzecz jak upadnie baner nastepny uruchamia marsz ze idzie go przejac, ale ja stoje miedzy nim a banerem, ma to gdzies, idzie jak zombie, jak go bije on sie nie broni bo ma misje podniesc baner - podniesc baner tak, jak nie ma zagrozenia; oni zachowuja sie jak boty!" Log 16:09:31-16:10:09: 7 biegaczy 158, 3 zgineli w biegu, 0 rezygnacji "wrogowie przy sztandarze"; kusznicy z kusza w rece 2-3 m od Jeffa (16:14:34, 16:14:46); start 283 przy sztandarze z "piechoty 0", szyk 153 m szerokosci, Jeff 60-76 m od jego mediany.
