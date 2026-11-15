@@ -31,6 +31,20 @@
 
 **Status:** DO SPRAWDZENIA (galaz noc/550-sztandar-ai, nie wgrane)
 
+### Recenzja 550 (galaz noc/550-sztandar-ai-fix -> noc/550-sztandar-ai)
+
+Przyjete (sprawdzone w kodzie):
+- **(1) Szkoda "pierwszego kontaktu" liczona przy kazdej zmianie VicF** (HorsePursuit.React.cs BannerNear). `first = fresh || !OnBanner || VicF != f` - pieszy w 8 m od dwoch sztandarow (skan co 0.5 s ustawia VicF na zmiane A/B) albo ciosy w szyk A przy sztandarze B (MeleeEvent -> Victim ustawia VicF = A, nastepny skan widzi B jako nowy) wolaly `Fire` co 0.5 s - L3 cala jazda na pieszego, linie 550 zjadaly limit 40. Zmiana: `Threat.BannerFs` (HashSet szykow), `first = BannerFs.Add(f) || fresh`; `Victim` dopisuje szyk trafionego / celowanego chorazego (dawny przypadek "OnBanner z ciosu w chorazego" dalej bez drugiej szkody).
+- **(2) Stare VicAt przy nowym VicF** (React.cs Victim). Sam cel AI strzelca (`Victim(t, tg, false)`, Hunt.cs 340/356) zmienial VicF bez VicAt - szyk B dostawal odleglosc i kotwice smyczy od ofiary w szyku A, wyslani wracali "na smyczy" i FootCool 30 s. Zmiana: bez trafienia i przy innym szyku `VicAt = Vec2.Invalid` (FootPass liczy wtedy od srodka szyku, jak przed 550).
+- **(3) Konny przy sztandarze liczony jako napastnik wrecz** (React.cs BannerNear). `LastMelee = now` takze dla konnego -> KMeleeM: piechota za koniem, bez zawrotu 30 m, 333/344 i 204 wylaczone, `_nearMelee` wstrzymywal strzelcow, gdy chorazy w 6 m (objaw Jeffa "podjezdzam konno ... czemu nie strzelaja"). Zmiana: konny dostaje kontakt wrecz przy sztandarze tylko bez broni dystansowej w reku i bez wczesniejszego strzalu (`LastShot < 0`); zagrozenie dalej odswiezane przez Fire / LastFire. Odstepstwo od recenzji: konny z bronia biala, ktory nigdy nie strzelal (np. gracz z mieczem), zostaje "konny wrecz" az do ciosu - inaczej wpadalby w odpowiedz 204/333 jak konny lucznik, ktorym nie jest. Cios (MeleeEvent) i tak ustawia LastMelee.
+
+Nie zmieniane (ryzyka do logu, nie bledy kodu):
+- (4) 550a w zwarciu linii - porownac `Sztandar (158)` "bez wysylki - wrog przy sztandarze" z liczba zalaman 318c; suwak BannerPickupSafeRadius = 0 cofa bez DLL.
+- (5) Potwierdzone w kodzie: Guard550 stoi za bramka `BannerCompaniesEnabled` (BannerCompanies.cs Tick) i pilnuje tylko chorazych kompanii (`_bearerOf`) - przy wylaczonych kompaniach "Standard Guards Close In" nic nie robi. Zachowanie zgodne z projektem 550 (straz kompanii); do decyzji Jeffa, nie poprawiane "przy okazji".
+- (6) 550c i bratobojczy ogien kusznikow - w HIT pole `reka=` u R2 i liczniki bratobojczego ognia przy `_g550MixFoot` > 0.
+
+Ryzyko: (1) nowy HashSet na zagrozenie (tylko glowny watek, jak VicF); (3) mniej przypadkow KMeleeM dla konnych - konny lucznik przy sztandarze nie sciaga piechoty, strzelcy nie wstrzymuja ognia przez `_nearMelee`. Build Armoury 0 bledow. W grze nie sprawdzone.
+
 ## 548: pasek mapy czytelny - kazda pozycja "mam / potrzeba", pelne ulamki; zestaw do musztry 1 na czlowieka - Armoury (MarchHud.cs, Drill.cs, RiddenBy.cs; klucz NOWY DrillMenPerPiece = 1, MCM "Drill Men Per Piece")
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 250 (gora: troops 133; dol: Horses 131/146 CZERWONE, Pack 59/117, Weapons 82/43, Armour 82): "nie rozumiem tej tabelki, mam 131 ludzi czemu 146 czerwone, potem 82/43 czyli co, za duzo mam broni czy za malo, i 1 miecz i jeden pancerz na osobe a nie na 3 ludzi ... i te 82 czyli co 82/82 ... zrob aby UX/UI byl czytelny". Log Armoury-2026-11-15_15-14-12: 146 = wszystkie konie wierzchowe (ladunek + zbrojownia + stajnia), czerwien = 1 osoba pieszo (Amanda, Jazda 5); 82/43 = od gracza + nadwyzka ludzi / ceil(129/3); "Armour 82" = 82/43 skrocone bezpiecznikiem szerokosci (16:01:24 "skrocone do licznika 1", gora 690 px); liczniki broni skakaly 83 -> 187 -> 87 z nadwyzka ludzi.

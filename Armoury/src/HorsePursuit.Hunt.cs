@@ -104,6 +104,7 @@ namespace Armoury
             public bool Lone, Leader, OnArchers, OnBanner, H4Used, H5Used, Line204, Rx, DownByResp;
             public Formation VicF, LeaderF;
             public Vec2 VicAt = Vec2.Invalid;   // 550: miejsce ofiary / sztandaru (smycz R2 szyku ofiary przy szerokiej linii)
+            public readonly HashSet<Formation> BannerFs = new HashSet<Formation>();   // recenzja 550 (1): szyki, przy ktorych sztandarze byl juz pierwszy kontakt (szkoda raz na szyk)
             public float LastHarm = -1f;   // 311a: ostatnie trafienie czlowieka strony pociskiem (zegar epizodu oslony)
             public CovEp Cov;              // 311a: epizod oslony (null - brak)
             public bool Z333;              // 333: brama strefy armii strzelca dziala (konny i pieszy strzelec, klucz; bez nekajacego wrecz 283)

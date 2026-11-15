@@ -252,15 +252,21 @@ namespace Armoury
             var f = v.Formation;
             if (f != null && f.CountOfUnits > 0)
             {
-                t.VicF = f;
+                // recenzja 550 (2): sam cel AI (bez trafienia) w innym szyku - stare miejsce ofiary nie pasuje do nowego szyku (smycz FootPass od zlej kotwicy)
                 if (harm) t.VicAt = v.Position.AsVec2;   // 550b: miejsce ofiary - smycz R2 szyku ofiary przy szerokiej linii (FootPass)
+                else if (!ReferenceEquals(t.VicF, f)) t.VicAt = Vec2.Invalid;
+                t.VicF = f;
             }
             if (!t.OnArchers)
             {
                 var q = f != null ? f.QuerySystem : null;
                 if (v.IsRangedCached || (q != null && (q.IsRangedFormation || q.IsRangedCavalryFormation))) { t.OnArchers = true; RArchT.Add(t.S.Index); }
             }
-            if (!t.OnBanner && Banner(v)) { t.OnBanner = true; RBannerT.Add(t.S.Index); }
+            if (Banner(v))
+            {
+                if (f != null) t.BannerFs.Add(f);   // recenzja 550 (1): cios / strzal w chorazego tego szyku - pierwszy kontakt juz policzony
+                if (!t.OnBanner) { t.OnBanner = true; RBannerT.Add(t.S.Index); }
+            }
             if (!t.Leader && IsLeader(v))
             {
                 if (harm) MarkLeader(t, v);
@@ -273,6 +279,17 @@ namespace Armoury
         /// (AI nie samotny - zwykla walka; gracz w zwarciu frontu - nie). Kontakt przy sztandarze = rodzaj wrecz (KindNow); szkoda (Fire, okno 5 s) tylko przy
         /// pierwszym kontakcie z tym sztandarem - inaczej samo stanie przy sztandarze co 0.5 s nabijaloby 3 szkody w 5 s (L3 cala jazda na pieszego); dalej tylko
         /// LastFire (zagrozenie nie gasnie, poki stoi przy sztandarze). Nie dotyka kolejki MeleeQA ani HLock.</summary>
+        private static bool RangedHand(Agent a)
+        {
+            try
+            {
+                var w = a.WieldedWeapon;
+                var d = w.IsEmpty ? null : w.CurrentUsageItem;
+                return d != null && d.IsRangedWeapon;
+            }
+            catch { return false; }
+        }
+
         internal static bool BannerNear(Agent foe, Formation f, Vec2 at, float now, Agent bearer, int foes)
         {
             if (Volatile.Read(ref _rLive) == 0 || !_rKey || !_bannerGuard) return false;
@@ -291,8 +308,12 @@ namespace Armoury
             Threat t;
             bool fresh = !Threats.TryGetValue(foe, out t);
             if (fresh) t = Notice(foe, ss, vs, -1, now, false);
-            bool first = fresh || !t.OnBanner || !ReferenceEquals(t.VicF, f);
-            t.LastMelee = now;   // kontakt wrecz przy sztandarze (KindNow); MeleeHits bez zmian
+            // recenzja 550 (1): pierwszy kontakt liczony raz na szyk sztandaru (BannerFs), nie przy kazdej zmianie VicF - dwa sztandary w 8 m albo ciosy w szyk A
+            // przy sztandarze B nabijaly szkode co 0.5 s (L3 cala jazda na pieszego)
+            bool first = t.BannerFs.Add(f) || fresh;
+            // recenzja 550 (3): konny przy sztandarze to kontakt wrecz tylko bez broni dystansowej w reku i bez wczesniejszych strzalow - inaczej konny lucznik
+            // zostawal "konnym wrecz" (KMeleeM): piechota za koniem, strzelcy wstrzymani przy chorazym (_nearMelee); szkoda / cisza dalej przez Fire / LastFire
+            if (foe.MountAgent == null || (t.LastShot < 0f && !RangedHand(foe))) t.LastMelee = now;   // kontakt wrecz przy sztandarze (KindNow); MeleeHits bez zmian
             if (first) Fire(t, now);
             else t.LastFire = now;
             t.VicF = f;
