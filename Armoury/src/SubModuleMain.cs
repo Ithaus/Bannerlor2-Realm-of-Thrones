@@ -998,6 +998,7 @@ namespace Armoury
                 starter.AddBehavior(new HideoutPurge());
                 starter.AddBehavior(new BattleMuster());
                 starter.AddBehavior(new LegendaryLaw());
+                starter.AddBehavior(new DeadMounts561());   // 561: jednorozce nikomu, konie umarlych tylko Innym - czystka przy wczytaniu, co dobe i polki przy wejsciu gracza
                 starter.AddBehavior(new UniqueLaw());
                 starter.AddBehavior(new DesertionLaw());
                 starter.AddBehavior(new MusterBook());

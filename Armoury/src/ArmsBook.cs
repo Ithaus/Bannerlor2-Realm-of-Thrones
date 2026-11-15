@@ -424,6 +424,8 @@ namespace Armoury
         // z polki i znika ze swiata z nazwanym ujsciem "starosc koni roboczych"; wedlug kategorii ksiegi (juczny 3, zwykly 0, juczny wielblad 4)
         private static readonly long[,] _workN = new long[2, Cats];
         private static readonly long[] _workGold = new long[2];
+        // 561: jednorozce uwolnione i konie umarlych rozpadle u zywych (DeadMounts561) - UJSCIE wedlug kategorii ksiegi
+        private static readonly long[] _s561 = new long[Cats];
 
         internal static void Reset()
         {
@@ -437,6 +439,7 @@ namespace Armoury
             Array.Clear(_folkN, 0, _folkN.Length); Array.Clear(_folkGold, 0, _folkGold.Length); _folkBr = _folkPart = 0;
             Array.Clear(_disc, 0, Cats); _discHerd = _discWeight = 0;
             Array.Clear(_workN, 0, _workN.Length); _workGold[0] = _workGold[1] = 0;
+            Array.Clear(_s561, 0, Cats);
             ArmsLeaks.TakeFolkHorses();   // licznik kontrolny tej samej doby - zeby stara liczba nie wrocila po przerwie w pomiarze
         }
 
@@ -519,6 +522,13 @@ namespace Armoury
             if (cat < 0 || cat >= Cats || n <= 0 || !On) return;
             int k = town ? 0 : 1;
             _workN[k, cat] += n; _workGold[k] += gold;
+        }
+
+        /// <summary>DeadMounts561: wierzchowiec zdjety, bo nikt (zywy) nie moze go trzymac - ujscie ksiegi koni.</summary>
+        internal static void Note561(int cat, int n)
+        {
+            if (cat < 0 || cat >= Cats || n <= 0 || !On) return;
+            _s561[cat] += n;
         }
 
         private static string WorkRow(int k)
@@ -624,8 +634,8 @@ namespace Armoury
             for (int i = 0; i < Cats; i++)
             {
                 long work = _workN[0, i] + _workN[1, i];
-                rest[i] = (now[i] - _prev[i]) - _prod[i] - nDte[i] - nBk[i] + dead[i] + folk[i] + _disc[i] + gone[i] + removed[i] + work;
-                rs += rest[i]; src += _prod[i] + nDte[i] + nBk[i]; sink += dead[i] + folk[i] + _disc[i] + gone[i] + removed[i] + work;
+                rest[i] = (now[i] - _prev[i]) - _prod[i] - nDte[i] - nBk[i] + dead[i] + folk[i] + _disc[i] + gone[i] + removed[i] + work + _s561[i];
+                rs += rest[i]; src += _prod[i] + nDte[i] + nBk[i]; sink += dead[i] + folk[i] + _disc[i] + gone[i] + removed[i] + work + _s561[i];
             }
             Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " | zrodla: stadniny wsi " + Row(_prod)
                      + " | ujscia: " + k1
@@ -637,6 +647,7 @@ namespace Armoury
                      + " | zrodla nazwane z niczego (m6b): konwoje DTE " + Row(nDte) + ", partie BK " + Row(nBk)
                      + " | ujscia (m6b): konie przepadle przy RemoveParty - po zniszczeniu " + Row(gone) + ", bez zniszczenia (konwoje DTE) " + Row(removed)
                      + " | starosc koni roboczych (K1-3a): miasta " + WorkRow(0) + " szt. za " + _workGold[0] + " zl, zamki " + WorkRow(1) + " szt. za " + _workGold[1] + " zl"
+                     + " | zakazane wierzchowce (561, ujscie) " + Row(_s561)
                      + " | wielblady wyprodukowane: w Qarthu " + _camelQarth + ", poza Qarthem " + _camelElse
                      + " | reszta niewyjasniona " + Row(rest) + " (razem " + rs + ", mianownik zrodla + ujscia " + (src + sink)
                      + (src + sink > 0 ? ", " + (100.0 * rs / (src + sink)).ToString("0", CultureInfo.InvariantCulture) + "%" : "")

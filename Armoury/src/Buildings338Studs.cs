@@ -86,7 +86,8 @@ namespace Armoury
             {
                 var el = r.GetElementCopyAtIndex(i);
                 var it = el.EquipmentElement.Item;
-                if (it != null && el.Amount > 0 && it.ItemCategory == DefaultItemCategories.Horse && el.EquipmentElement.ItemModifier == null)
+                if (it != null && el.Amount > 0 && it.ItemCategory == DefaultItemCategories.Horse && el.EquipmentElement.ItemModifier == null
+                    && !DeadMounts561.Forbidden(it))   // 561: jednorozec / kon umarlych nie idzie do stadniny
                 {
                     r.AddToCounts(it, -1);
                     return it;
