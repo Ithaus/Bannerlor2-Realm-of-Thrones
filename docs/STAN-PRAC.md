@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 259 (560 musztra: druzyna z samych towarzyszy cwiczy, dowodcy partii AI cwicza; gracz nigdy), bez autotestu
+
+- Armoury.dll 9f281746 = noc/scal-perki 03eb01f1 (258 + 560). Kopie: .bak-2026-11-15-przed-wgranie259, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie259 i -przed).
+- Do sprawdzenia: 'Musztra bohaterow (558)' wiersz AI, potkniecia 0, profil PTrain; menu 'Train the men' przy samych towarzyszach. W toku: 559 kusze.
+
 ## STAN 15.11 - WGRANIE 258 (555 zaloga Banefortu - dar do limitu zalogi, wariant b Jeffa), bez autotestu
 
 - Armoury.dll 846f883c = noc/scal-perki 561dab78 (257 + 555/555b). Kopie: .bak-2026-11-15-przed-wgranie258, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie258 i -przed). Flaga zapisu arm_555_banefort.
