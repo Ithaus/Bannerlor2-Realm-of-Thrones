@@ -145,9 +145,10 @@ namespace Armoury
                     V(p, false) + "% greater chance of creating masterwork weapons, armour, bows, crossbows and ammunition." },
                 new Rule { Id = "Crafting.LegendarySmith", Get = () => DefaultPerks.Crafting.LegendarySmith, Secondary = false, Text = (s, p) =>
                     V(p, false) + "% greater chance of creating Legendary weapons, armour, bows, crossbows and ammunition, chance increases by 1% for every 5 skill points above 275."
-                    + (!s.ValyrianIngots ? ""   // 563: odblokowanie kucia stali valyrianskiej (zamiast ikony perku)
-                       : s.ValyrianLegendarySmithAt300 && s.ValyrianForgeSkill <= 300 ? " Unlocks forging Valyrian steel: a blade of one measure takes " + ValyrianBlades.IngotsPerMeasure + " ingots of Valyrian steel."
-                       : " With " + s.ValyrianForgeSkill + " Smithing it also unlocks forging Valyrian steel: a blade of one measure takes " + ValyrianBlades.IngotsPerMeasure + " ingots of Valyrian steel.") },
+                    // 563d (Jeff 15.11): perk zostaje na 275 i odblokowuje przetop oraz kucie stali valyrianskiej (podpowiedz i okno wyboru perku); 563c: wedlug masy
+                    + (!s.ValyrianIngots || !s.ValyrianNeedsLegendarySmith ? ""
+                       : (s.ValyrianNoSmelt ? " Unlocks melting down Valyrian steel and forging it anew" : " Unlocks forging Valyrian steel anew") + ": a blade melts into as much steel as its blade weighs, and a new blade takes as much as it weighs (an ingot is "
+                         + ValyrianBlades.KgText(ValyrianBlades.IngotG) + " kg; a Valyrian Steel Sword blade weighs " + ValyrianBlades.KgText(ValyrianBlades.MeasureG) + " kg).") },
 
                 // 512-E
                 new Rule { Id = "Scouting.BeastWhisperer", Get = () => DefaultPerks.Scouting.BeastWhisperer, Secondary = false, Text = (s, p) =>

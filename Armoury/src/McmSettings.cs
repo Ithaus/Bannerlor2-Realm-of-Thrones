@@ -3396,25 +3396,17 @@ namespace Armoury
         [SettingPropertyGroup("Valyrian steel")]
         public bool ValyrianGuard { get; set; } = true;
 
-        [SettingPropertyBool("Valyrian No Smelt", HintText = "no forge but the masters of Qohor can work Valyrian steel: Valyrian blades are not on the smelting list and cannot be melted down (other legendary pieces as before); off = a Valyrian blade melts like any other and its steel is lost to the world for good. With Valyrian Ingots on, a smith of the Smithing above may melt it into ingots; off = anyone may", RequireRestart = false)]
+        [SettingPropertyBool("Valyrian No Smelt", HintText = "no forge but the masters of Qohor can work Valyrian steel: Valyrian blades are not on the smelting list and cannot be melted down (other legendary pieces as before); off = a Valyrian blade melts like any other and its steel is lost to the world for good. With Valyrian Ingots on, a smith with the Legendary Smith perk may melt it into ingots; off = anyone may", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public bool ValyrianNoSmelt { get; set; } = true;
 
-        [SettingPropertyBool("Valyrian Ingots", HintText = "Valyrian steel can be melted into ingots and forged anew: a smith with enough Smithing melts a blade into 10 ingots for each measure (a greatsword 20), and a master with the Legendary Smith perk and enough Smithing forges a one-handed Valyrian blade from 10 ingots. Nothing is added and nothing is lost - the count of the world's Valyrian steel holds. Off = only the masters of Qohor work it, as before", RequireRestart = false)]
+        [SettingPropertyBool("Valyrian Ingots", HintText = "Valyrian steel can be melted into ingots and forged anew, by weight: an ingot is 0.5 kg of Valyrian steel. A smith with the Legendary Smith perk melts a blade into as much steel as its blade weighs (Ice 0.93 kg: one ingot, the rest kept at your forge as offcuts) and forges a Valyrian blade from as much steel as the new blade weighs (a Valyrian Steel Sword 0.8 kg). Nothing is added and nothing is lost - the world's Valyrian steel is counted in kilograms. Off = only the masters of Qohor work it, as before", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public bool ValyrianIngots { get; set; } = true;
 
-        [SettingPropertyInteger("Valyrian Smelt Skill", 0, 330, "0", HintText = "Smithing needed to melt a Valyrian blade into ingots in your own forge; below it only the masters of Qohor can work the steel", RequireRestart = false)]
+        [SettingPropertyBool("Valyrian Needs Legendary Smith", HintText = "Melting a Valyrian blade into ingots and forging Valyrian steel both need the Legendary Smith perk (275 Smithing); the perk's description says so. Off = any smith may do both", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
-        public int ValyrianSmeltSkill { get; set; } = 275;
-
-        [SettingPropertyInteger("Valyrian Forge Skill", 0, 330, "0", HintText = "Smithing needed - together with the Legendary Smith perk - to forge a Valyrian blade from ingots", RequireRestart = false)]
-        [SettingPropertyGroup("Valyrian steel")]
-        public int ValyrianForgeSkill { get; set; } = 300;
-
-        [SettingPropertyBool("Valyrian Legendary Smith At 300", HintText = "The Legendary Smith perk moves to 300 Smithing and unlocks forging Valyrian steel (smiths who already hold it keep it). Off = the perk stays at 275 and forging Valyrian steel needs it and the Smithing above. Takes effect after reloading the game", RequireRestart = false)]
-        [SettingPropertyGroup("Valyrian steel")]
-        public bool ValyrianLegendarySmithAt300 { get; set; } = true;
+        public bool ValyrianNeedsLegendarySmith { get; set; } = true;
 
         [SettingPropertyBool("Unique Inheritance", HintText = "a Valyrian blade does not die with its bearer: the executioner takes it, otherwise the heir (clan leader, children, spouse, siblings, kin); with no heir it lies on the market of his clan's town; blades of your own clan come to your baggage", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
@@ -3432,7 +3424,7 @@ namespace Armoury
         [SettingPropertyGroup("Valyrian steel")]
         public bool NoConjuredLegends { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Hist Valyrian Per Measure", 0.00f, 240000.00f, "0.00", HintText = "worth of one measure of Valyrian steel (a one-handed blade; a greatsword such as Ice is two), pence - about what a typical lord keeps in his purse, so no lord parts with one and only the richest can buy one; on a market stall it weighs only its making cost (needs Historical Prices; takes effect after reloading the game)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Valyrian Per Measure", 0.00f, 240000.00f, "0.00", HintText = "worth of one measure of Valyrian steel - 0.8 kg, the steel of a Valyrian Steel Sword (a named greatsword such as Ice is worth two measures; every other blade and ingot by its weight, an ingot of 0.5 kg five eighths of a measure), pence - about what a typical lord keeps in his purse, so no lord parts with one and only the richest can buy one; on a market stall it weighs only its making cost (needs Historical Prices; takes effect after reloading the game)", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public float HistValyrianPerMeasure { get; set; } = 60000f;
 
@@ -3460,11 +3452,11 @@ namespace Armoury
         [SettingPropertyGroup("Valyrian steel")]
         public float QohorTollPercent { get; set; } = 6.25f;
 
-        [SettingPropertyInteger("Qohor Charcoal Per Measure", 0, 10, "0", HintText = "charcoal the masters take from Qohor's stalls for each measure of steel; with none on the stalls the order waits", RequireRestart = false)]
+        [SettingPropertyInteger("Qohor Charcoal Per Measure", 0, 10, "0", HintText = "charcoal the masters take from Qohor's stalls for every 0.8 kg of steel in the fire (at least once an order); with none on the stalls the order waits", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public int QohorCharcoalPerMeasure { get; set; } = 2;
 
-        [SettingPropertyFloatingInteger("Valyrian Greatsword Min Cm", 0.00f, 420.00f, "0.00", HintText = "a two-handed Valyrian blade at least this long (cm) is a greatsword of two measures - steel enough for two swords, as Ice gave Oathkeeper and Widow's Wail (Ice 140, Heartsbane 114, Blackfyre 111, Brightroar 108); shorter blades are one measure (takes effect after reloading the game)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Valyrian Greatsword Min Cm", 0.00f, 420.00f, "0.00", HintText = "a two-handed Valyrian blade at least this long (cm) counts as a greatsword of two measures - only for the worth of the named greatswords of the realm (Ice 140, Heartsbane 114, Blackfyre 111, Brightroar 108) and for which captured blades a lord takes to the masters of Qohor; the steel itself is counted by weight (takes effect after reloading the game)", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public float ValyrianGreatswordMinCm { get; set; } = 105f;
 
@@ -14770,9 +14762,7 @@ namespace Armoury
             s.ValyrianGuard = ValyrianGuard;
             s.ValyrianNoSmelt = ValyrianNoSmelt;
             s.ValyrianIngots = ValyrianIngots;
-            s.ValyrianSmeltSkill = ValyrianSmeltSkill;
-            s.ValyrianForgeSkill = ValyrianForgeSkill;
-            s.ValyrianLegendarySmithAt300 = ValyrianLegendarySmithAt300;
+            s.ValyrianNeedsLegendarySmith = ValyrianNeedsLegendarySmith;
             s.UniqueInheritance = UniqueInheritance;
             s.UniqueNeverLost = UniqueNeverLost;
             s.UniquesNotFolkGoods = UniquesNotFolkGoods;

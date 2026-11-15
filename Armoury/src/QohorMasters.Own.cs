@@ -31,6 +31,7 @@ namespace Armoury
     ///    potem RegistryMove(wejscie -> wynik) jak przy kazdym przekuciu. Lista wlasnych mieczy w zapisie rejestru (arm_vs_registry, czesc 4).
     ///  - AI: nie zleca (lord nie ma projektu z kuzni). Wylacznik QohorOwnDesign (off = 449d453: opcji nie ma; zlecenia w toku - odbior i zwrot dzialaja).
     /// Zapis zlecenia: pole 12 rekordu QohorMasters (spec projektu, base64) - starszy DLL widzi wynik "@own" jako zniknieta pozycje i oddaje klinge.
+    /// 563c: dowolna klinga VS na wejsciu, klinga wyniku w skali projektu gracza (bez skracania ponizej 105 cm); stal wedlug masy (OwnOutG), brak - dodatek gracza.
     /// </summary>
     internal static partial class QohorMasters
     {
@@ -91,13 +92,14 @@ namespace Armoury
         {
             a.optionLeaveType = GameMenuOption.LeaveType.Craft;
             if (!OwnOn) return false;
-            int fee = Fee(1);
-            if (Blades(1).Count == 0)
+            var blades = Blades();
+            if (blades.Count == 0)
             {
                 a.IsEnabled = false;
-                a.Tooltip = new TextObject("{=!}You carry no Valyrian blade of one measure in your baggage. A blade you wear must be put in your baggage first; a greatsword of two measures must first be reforged into two blades.");
+                a.Tooltip = new TextObject("{=!}You carry no Valyrian blade in your baggage. A blade you wear must be put in your baggage first.");
                 return true;
             }
+            int fee = MinFee(blades);
             if (OwnDesigns().Count == 0)
             {
                 a.IsEnabled = false;
@@ -110,7 +112,8 @@ namespace Armoury
                 a.Tooltip = new TextObject("{=!}The masters ask " + fee + " gold. You have " + Hero.MainHero.Gold + ".");
                 return true;
             }
-            a.Tooltip = new TextObject("{=!}Your own design and your own name for the blade. Fee: " + FeeText(1) + ". " + Math.Max(1, Settings.Current.QohorDays) + " days of work.");
+            a.Tooltip = new TextObject("{=!}Your own design and your own name for the blade - it takes as much Valyrian steel as its blade weighs. Fee from " + fee + " gold. "
+                                       + Math.Max(1, Settings.Current.QohorDays) + " days of work.");
             return true;
         }
 
@@ -120,10 +123,11 @@ namespace Armoury
             {
                 var els = new List<InquiryElement>();
                 var r = MobileParty.MainParty.ItemRoster;
-                foreach (var el in Blades(1))
+                foreach (var el in Blades())
                 {
                     int n = r.GetItemNumber(el.Item);
-                    els.Add(new InquiryElement(el, el.Item.Name + (el.ItemModifier != null ? " (" + el.ItemModifier.Name + ")" : "") + (n > 1 ? "  x" + n : ""), SmithMenu.ItemPic(el.Item), true, "One measure of Valyrian steel."));
+                    els.Add(new InquiryElement(el, el.Item.Name + (el.ItemModifier != null ? " (" + el.ItemModifier.Name + ")" : "") + (n > 1 ? "  x" + n : ""), SmithMenu.ItemPic(el.Item), true,
+                        Kg(ValyrianBlades.SteelG(el.Item.StringId)) + " kg of Valyrian steel."));
                 }
                 if (els.Count == 0) return;
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
@@ -143,13 +147,17 @@ namespace Armoury
             try
             {
                 var els = new List<InquiryElement>();
+                int pool = ValyrianBlades.SteelG(blade.Item.StringId) + ValyrianBlades.SteelAvailableG();
                 foreach (var kv in OwnDesigns())
                 {
                     var d = kv.Value;
                     var b = d.UsedPieces[(int)CraftingPiece.PieceTypes.Blade];
+                    int g = OwnOutG(d);
+                    bool ok = g > 0 && g <= pool;
                     string hint = d.Template.StringId + ", blade " + (b.ScaledLength * 100f).ToString("0", CultureInfo.InvariantCulture) + " cm; the masters forge the blade in Valyrian steel ("
-                                  + (VsPieceFor(d) != null ? VsPieceFor(d).Name.ToString() : "?") + ") and keep your guard, grip and pommel.";
-                    els.Add(new InquiryElement(d, kv.Key, null, true, hint));
+                                  + (VsPieceFor(d) != null ? VsPieceFor(d).Name.ToString() : "?") + ", " + Kg(g) + " kg) and keep your guard, grip and pommel."
+                                  + (ok ? "" : " Not enough steel: the blade, your ingots and offcuts make " + Kg(pool) + " kg.");
+                    els.Add(new InquiryElement(d, kv.Key, null, ok, hint));
                 }
                 if (els.Count == 0) return;
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
@@ -194,12 +202,17 @@ namespace Armoury
 
         private static void OwnConfirm(EquipmentElement blade, WeaponDesign d, string name)
         {
-            int fee = Fee(1);
+            // 563c: wynik wedlug masy klingi projektu (skala gracza); brak stali - ze skrzynki resztek i sztab, reszta wraca przy wydaniu
+            int inG = ValyrianBlades.SteelG(blade.Item.StringId);
+            int outG = OwnOutG(d);
+            if (outG <= 0) { Log.Player("The masters cannot forge this design in Valyrian steel.", true); return; }
+            int fb, k;
+            int fee = Fee(inG + PlanExtra(inG, outG, out fb, out k));
             int days = Math.Max(1, Settings.Current.QohorDays);
             InformationManager.ShowInquiry(new InquiryData("The Masters of Qohor",
-                blade.Item.Name + " goes into the fire. In " + days + " days of work the masters will hand you " + name + ", a blade of Valyrian steel forged to your own design. Their fee of " + fee
-                + " gold is paid now and is not returned.", true, true, "Pay " + fee, "Not now",
-                delegate { Place(blade, new List<ItemObject>(), 1, fee, days, Spec(d, name)); },
+                blade.Item.Name + " (" + Kg(inG) + " kg of Valyrian steel) goes into the fire. In " + days + " days of work the masters will hand you " + name + ", a blade of Valyrian steel forged to your own design ("
+                + Kg(outG) + " kg)." + SteelText(inG, outG) + " Their fee of " + fee + " gold is paid now and is not returned.", true, true, "Pay " + fee, "Not now",
+                delegate { Place(blade, new List<ItemObject>(), fee, days, Spec(d, name), outG); },
                 delegate { }), true);
         }
 
@@ -274,8 +287,7 @@ namespace Armoury
             var vs = VsPieceFor(probe);
             if (vs == null) { why = "brak klingi valyrianskiej ROT"; return null; }
             int bs = els[0].IsValid ? els[0].ScalePercentage : 100;
-            float min = (Settings.Current != null ? Settings.Current.ValyrianGreatswordMinCm : 105f) - 1f;
-            while (bs > 50 && WeaponDesignElement.CreateUsablePiece(vs, bs).ScaledLength * 100f > min) bs--;   // 1 miara jak wejscie
+            // 563c: bez skracania ponizej progu wielkiego miecza - klinga ma skale projektu gracza, stal wedlug jej masy (OwnOutG, dodatek przy przyjeciu)
             els[0] = WeaponDesignElement.CreateUsablePiece(vs, bs);
             string id = NextCraftedId();
             var tname = new TextObject("{=!}" + name);
@@ -326,20 +338,47 @@ namespace Armoury
                 Log.Player("The masters could not forge your design and hand back " + string.Join(" and ", o.InIds.Select(NameOf).ToArray()) + " as it was.", true);
                 return;
             }
-            ValyrianBlades.AddOwn(it.StringId, Hero.MainHero != null ? Hero.MainHero.StringId : "");
+            // 563c: gramy stali nowej klingi - masa klingi; zlecenie sprzed masy z za mala stala: dobranie od gracza, inaczej wyrownanie (Settle)
+            int inG = o.InIds.Sum(id => ValyrianBlades.SteelG(id));
+            int outG = ValyrianBlades.BladeG(it.WeaponDesign);
+            string legacy = "";
+            if (outG <= 0) outG = inG + o.ExtraG;
+            if (outG > inG + o.ExtraG)
+            {
+                var one = new List<ItemObject> { it };
+                int og = outG;
+                legacy = Settle(o, inG, ref one, ref og);
+            }
+            int left = inG + o.ExtraG - outG;
+            ValyrianBlades.AddOwn(it.StringId, Hero.MainHero != null ? Hero.MainHero.StringId : "", outG);
             // recenzja 14.10: cena stali valyrianskiej od razu (PriceOne z OnNewItemCrafted wycenil go jak zwykly miecz i zablokowal te cene do konca sesji)
             HistoricalPrices.PriceValyrianOne(it);
             MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(it), 1);
             _orders.Remove(o);
             ValyrianBlades.RegistryMove(o.InIds, new[] { it.StringId });
+            int extraWas = o.ExtraG;
+            string rest = LeftOver(o, left);
             _dOwnMade++;
             try { CraftPopup.Show(it, null, 1); } catch { }
             Log.Player("The masters of Qohor lay " + it.Name + " before you, forged to your own design from the steel of " + string.Join(" and ", o.InIds.Select(NameOf).ToArray()) + ".");
             string blade = "?";
             try { blade = it.WeaponDesign.UsedPieces[0].CraftingPiece.StringId + " " + (ValyrianBlades.BladeCm(it)).ToString("0.0", CultureInfo.InvariantCulture) + " cm"; } catch { }
             Log.Info("Kronika unikatow: Qohor - " + string.Join(" + ", o.InIds.ToArray()) + " przekuty na wlasny projekt gracza " + it.StringId + " \"" + it.Name + "\" (szablon "
-                     + (it.WeaponDesign != null ? it.WeaponDesign.Template.StringId : "?") + ", klinga " + blade + ", miary " + o.InIds.Sum(id => ValyrianBlades.Measures(ValyrianBlades.Item(id)))
-                     + " -> " + ValyrianBlades.Measures(it) + ", wartosc " + it.Value + "), odbiera gracz.");
+                     + (it.WeaponDesign != null ? it.WeaponDesign.Template.StringId : "?") + ", klinga " + blade + ", masa " + inG + " g + dodatek " + extraWas
+                     + " g -> " + outG + " g, reszta " + left + " g: " + rest + legacy + ", wartosc " + it.Value + "), odbiera gracz.");
+        }
+
+        /// <summary>563c: gramy stali klingi wlasnego projektu - klinga valyrianska (VsPieceFor) przy skali klingi projektu gracza; 0 - brak.</summary>
+        private static int OwnOutG(WeaponDesign d)
+        {
+            try
+            {
+                var vs = VsPieceFor(d);
+                var b = d.UsedPieces[(int)CraftingPiece.PieceTypes.Blade];
+                int bs = b != null && b.IsValid ? b.ScalePercentage : 100;
+                return vs != null ? (int)Math.Round(WeaponDesignElement.CreateUsablePiece(vs, bs).ScaledWeight * 1000f) : 0;
+            }
+            catch { return 0; }
         }
 
         private static string OwnLine()

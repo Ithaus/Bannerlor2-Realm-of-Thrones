@@ -21,10 +21,11 @@ namespace Armoury
                 if (item == null) return null;
                 if (item == Recipes.MaterialItem(CraftingMaterials.Iron6))
                     return new[] { "Steel", "The finest steel of the castle forges - good steel, but not Valyrian." };
-                // 177-2: klinga ze spisu stali valyrianskiej - ile stali niesie (miary) i kto moze ja przekuc
+                // 177-2: klinga ze spisu stali valyrianskiej - ile stali niesie i kto moze ja przekuc; 563c: w kg (masa klingi)
                 if (ValyrianBlades.Is(item))
-                    return new[] { "Valyrian steel", (ValyrianBlades.Measures(item) >= 2 ? "Two measures" : "One measure")
-                                   + " of Valyrian steel. No smith alive can make more; only the masters of Qohor can rework it." };
+                    return new[] { "Valyrian steel", ValyrianBlades.KgText(ValyrianBlades.SteelG(item.StringId))
+                                   + " kg of Valyrian steel in its blade. No smith alive can make more; only the masters of Qohor"
+                                   + (Settings.Current != null && Settings.Current.ValyrianIngots ? " and a Legendary Smith" : "") + " can rework it." };
             }
             catch { }
             return null;

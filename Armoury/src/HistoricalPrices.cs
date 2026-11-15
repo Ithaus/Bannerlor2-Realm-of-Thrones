@@ -395,6 +395,14 @@ namespace Armoury
             catch (Exception e) { Log.Error("HistoricalPrices.PriceOne", e); }
         }
 
+        /// <summary>563c: wartosc klingi VS - nazwane legendy na mierze (miary x HistValyrianPerMeasure; premia legendy, da sie ja tylko stracic),
+        /// reszta (seryjne, wlasne) wedlug masy stali: gramy / 800 x HistValyrianPerMeasure.</summary>
+        internal static int ValyrianWorth(ItemObject it, Settings s)
+        {
+            if (ValyrianBlades.IsNamed(it.StringId)) return Math.Max(1, (int)Math.Round(Math.Max(1, ValyrianBlades.Measures(it)) * s.HistValyrianPerMeasure));
+            return Math.Max(1, (int)Math.Round(ValyrianBlades.SteelG(it.StringId) * s.HistValyrianPerMeasure / ValyrianBlades.MeasureG));
+        }
+
         /// <summary>177-2 wariant B (recenzja 14.10): wlasny miecz z Qohoru powstaje W TRAKCIE sesji - Apply przy starcie go nie widzial, a PriceOne
         /// (OnNewItemCrafted) wycenil go jak zwykly wykuty miecz i zablokowal te cene (_target). Ta sama wycena co petla stali valyrianskiej w Apply:
         /// miary x HistValyrianPerMeasure, na polce wazy koszt wykonania. Bez tego do konca sesji klinga szla za cene zwyklego miecza (sprzedaz za
@@ -409,13 +417,12 @@ namespace Armoury
                 if (setter == null) return;
                 int was = it.Value;
                 int making = Math.Max(1, was);
-                int m = Math.Max(1, ValyrianBlades.Measures(it));
                 if (!_orig.ContainsKey(it)) _orig[it] = MaterialLaw.Orig(it);
-                _ourSet = true; try { setter.Invoke(it, new object[] { Math.Max(1, (int)Math.Round(m * s.HistValyrianPerMeasure)) }); } finally { _ourSet = false; }
+                _ourSet = true; try { setter.Invoke(it, new object[] { ValyrianWorth(it, s) }); } finally { _ourSet = false; }
                 _target[it] = it.Value;
                 if (!_shelfWorth.ContainsKey(it)) _vsShelf++;
                 _shelfWorth[it] = making;
-                Log.Info("HistoricalPrices: stal valyrianska (wlasny miecz z Qohoru) " + it.StringId + " " + was + " -> " + it.Value + " d (miar " + m + "; na polce wazy " + making + ").");
+                Log.Info("HistoricalPrices: stal valyrianska (wlasny miecz) " + it.StringId + " " + was + " -> " + it.Value + " d (stali " + ValyrianBlades.SteelG(it.StringId) + " g; na polce wazy " + making + ").");
             }
             catch (Exception e) { Log.Error("HistoricalPrices.PriceValyrianOne", e); }
         }
@@ -732,21 +739,20 @@ namespace Armoury
                         var it = ValyrianBlades.Item(id);
                         if (it == null) continue;
                         int making = Math.Max(1, it.Value);
-                        int m = Math.Max(1, ValyrianBlades.Measures(it));
-                        set(it, m * s.HistValyrianPerMeasure);
+                        set(it, ValyrianWorth(it, s));
                         _target[it] = it.Value;
                         if (!_shelfWorth.ContainsKey(it)) _vsShelf++;
                         _shelfWorth[it] = making;
-                        if (vs.Count < 8) vs.Add(id + " " + making + " -> " + it.Value + " (miar " + m + ")");
+                        if (vs.Count < 8) vs.Add(id + " " + making + " -> " + it.Value + (ValyrianBlades.IsNamed(id) ? " (miar " + Math.Max(1, ValyrianBlades.Measures(it)) + ")" : " (" + ValyrianBlades.SteelG(id) + " g)"));
                     }
-                    // 563: sztaba stali valyrianskiej = miara / 10 (ValyrianBlades.IngotsPerMeasure) - jedna zasada z cena miary: klinga i jej sztaby kosztuja tyle samo
+                    // 563c: sztaba stali valyrianskiej wedlug masy - 500 g z ceny kg (miara = 800 g); jedna zasada z cena klng seryjnych i wlasnych (bez arbitrazu)
                     var ing = ValyrianBlades.Ingot;
                     if (ing != null)
                     {
                         int was = ing.Value;
-                        set(ing, s.HistValyrianPerMeasure / ValyrianBlades.IngotsPerMeasure);
+                        set(ing, s.HistValyrianPerMeasure * ValyrianBlades.IngotG / ValyrianBlades.MeasureG);
                         _target[ing] = ing.Value;
-                        vs.Add(ValyrianBlades.IngotId + " " + was + " -> " + ing.Value + " (sztaba, 1/" + ValyrianBlades.IngotsPerMeasure + " miary)");
+                        vs.Add(ValyrianBlades.IngotId + " " + was + " -> " + ing.Value + " (sztaba " + ValyrianBlades.IngotG + " g, 1 kg = " + (int)Math.Round(s.HistValyrianPerMeasure * 1000f / ValyrianBlades.MeasureG) + ")");
                     }
                     int rebuilt = 0;
                     foreach (var t in Town.AllTowns)

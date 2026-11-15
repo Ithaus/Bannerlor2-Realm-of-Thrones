@@ -18,7 +18,7 @@ using TaleWorlds.ObjectSystem;
 namespace Armoury
 {
     /// <summary>
-    /// 563 (Jeff 15.11): SZTABY STALI VALYRIANSKIEJ - zgodne z 177 (skonczony zasob). Klucz ValyrianIngots.
+    /// 563 (Jeff 15.11): SZTABY STALI VALYRIANSKIEJ - zgodne z 177 (skonczony zasob). Klucz ValyrianIngots. [Miary, progi 275/300 i perk na 300 ponizej - historia; obowiazuje 563c/d na dole.]
     ///  - JEDNOSTKA BILANSU to sztaba: 1 miara = IngotsPerMeasure (10) sztab. Stala w kodzie, nie w MCM (zmiana w trakcie kampanii rozjechalaby rejestr).
     ///    Stan = 10 x suma(klingi x miary) + sztaby w swiecie; Baza = 10 x BaseMeasures + R_I (rejestr sztab); Start = Baza przy pierwszym spisie 563 (zapis).
     ///    Stan == Baza == Start, poza legalnymi stratami (NoteLoss: odzysk sprzed 177 i stara droga przetopu przy ValyrianIngots NIE - "stal ginie").
@@ -31,10 +31,20 @@ namespace Armoury
     ///    wykonczeniu w kuzni gracza - miejsce nie do zmiany. Straznik: sztaby ponad R_I -> Castle-forged Steel (Iron6) w tym samym miejscu.
     ///  - PERK: Legendary Smith na 300 (klucz ValyrianLegendarySmithAt300, ustawiane w kampanii), opis przez PerkTexts, komunikat odblokowania raz.
     /// Kazda latka ma wlasny try/catch z licznikiem potkniec (log do 3 razy), bez globalnego wylacznika.
+    ///
+    /// 563c/d (Jeff 15.11: "ma dawac tyle, ile jest materialu w mieczu"; "dopisz do legendary smithing 275, ze mozesz wykuwac i przetapiac"):
+    ///  - JEDNOSTKA BILANSU to GRAM. Sztaba = IngotG (500 g; XML arm_valyrian_steel weight 0.5). Stal w klindze = ScaledWeight czesci Blade (BladeG) -
+    ///    jelec, rekojesc i glowica to zwykly metal. Gramy wzoru zapisane w rejestrze (SteelG, czwarte pole rekordu) - aktualizacja ROT nie rozjedzie bilansu.
+    ///  - SKRZYNKA RESZTEK gracza (_boxG, 0..499 g, w kuzni gracza): przetop box += G, pelne 500 g -> sztaby; kucie bierze najpierw ze skrzynki, potem
+    ///    otwiera sztaby (IngotsToOpen), reszta otwartej sztaby wraca do skrzynki. Cech Qohoru ma swoja skrzynke (_guildG - reszty zlecen AI, tylko rosnie).
+    ///  - SPIS: Stan S = klingi x G + sztaby x 500 + skrzynka gracza + cech + dodatki zlecen Qohoru (HeldExtraG); Baza T = rejestr x G + R_I x 500 + te same
+    ///    skrzynki; Start U = T przy pierwszym spisie 563c. S == T == U; NoteLoss w gramach obniza U.
+    ///  - PROG: przetop i kucie od perku Legendary Smith (275, bez przenoszenia na 300); klucz ValyrianNeedsLegendarySmith (NIE = kazdy kowal).
     /// </summary>
     internal static partial class ValyrianBlades
     {
-        internal const int IngotsPerMeasure = 10;
+        internal const int IngotG = 500;      // 563c: sztaba = 0.5 kg (XML arm_valyrian_steel weight 0.5)
+        internal const int MeasureG = 800;    // 563c: 1 miara do ceny = klinga valsteelblade_1 (VS Sword type 1) przy skali 100
         internal const string IngotId = "arm_valyrian_steel";
         internal const string IngotCategoryId = "arm_vs_stuff";
 
@@ -60,8 +70,9 @@ namespace Armoury
 
         // ------------------------------------------------------------ stan 563 (zapis arm_vs_ingots)
         private static int _regIngots;          // R_I
-        private static int _startUnits = -1;    // Start (sztaby); -1 = jeszcze nie ustawiony
-        private static int _smeltedUnits, _forgedSwords;
+        private static int _startG = -1;        // 563c: Start (gramy); -1 = jeszcze nie ustawiony
+        private static int _boxG, _guildG;      // 563c: skrzynka resztek gracza (0..499 g) i cechu Qohoru (gramy)
+        private static int _smeltedG, _forgedSwords;
         private static bool _unlockShown;
         private static int _stumbles563;
         private static int _dSmeltPieces, _dSmeltIngots, _dForged, _dGateRefusals, _dGuardIngots;
@@ -70,7 +81,7 @@ namespace Armoury
         private static readonly HashSet<string> _ingotLossLogged = new HashSet<string>();
         private static ItemObject _pricePending;
         private static Hero _smeltHero;
-        private static int _smeltMeasures;
+        private static int _smeltG;             // 563c: gramy stali przetapianego wzoru (SmeltPrefix)
 
         private static void Stumble563(string where, Exception e)
         {
@@ -80,43 +91,134 @@ namespace Armoury
 
         private static void ResetIngots()
         {
-            _regIngots = 0; _startUnits = -1; _smeltedUnits = 0; _forgedSwords = 0; _unlockShown = false; _stumbles563 = 0;
+            _regIngots = 0; _startG = -1; _boxG = 0; _guildG = 0; _smeltedG = 0; _forgedSwords = 0; _unlockShown = false; _stumbles563 = 0;
             _dSmeltPieces = _dSmeltIngots = _dForged = _dGateRefusals = _dGuardIngots = 0; _lastGate = null;
-            _balanceLogged.Clear(); _ingotLossLogged.Clear(); _pricePending = null; _smeltHero = null; _smeltMeasures = 0;
+            _balanceLogged.Clear(); _ingotLossLogged.Clear(); _pricePending = null; _smeltHero = null; _smeltG = 0;
             _vsPieces = null; _revealPieces = null; _vsPiecesFor = null;
             try { RestoreDesigner(); } catch { }
         }
 
-        /// <summary>"v1|R_I|Start|przetopione sztaby|wykute miecze|komunikat odblokowania".</summary>
+        /// <summary>563c: "v2|R_I|Start g|skrzynka gracza g|cech Qohoru g|przetopione g|wykute miecze|komunikat odblokowania".</summary>
         internal static string ExportIngots()
         {
-            return "v1|" + _regIngots.ToString(CultureInfo.InvariantCulture) + "|" + _startUnits.ToString(CultureInfo.InvariantCulture) + "|"
-                   + _smeltedUnits.ToString(CultureInfo.InvariantCulture) + "|" + _forgedSwords.ToString(CultureInfo.InvariantCulture) + "|" + (_unlockShown ? "1" : "0");
+            var inv = CultureInfo.InvariantCulture;
+            return "v2|" + _regIngots.ToString(inv) + "|" + _startG.ToString(inv) + "|" + _boxG.ToString(inv) + "|" + _guildG.ToString(inv) + "|"
+                   + _smeltedG.ToString(inv) + "|" + _forgedSwords.ToString(inv) + "|" + (_unlockShown ? "1" : "0");
         }
 
         internal static void ImportIngots(string s)
         {
-            _regIngots = 0; _startUnits = -1; _smeltedUnits = 0; _forgedSwords = 0; _unlockShown = false;
-            if (string.IsNullOrEmpty(s) || !s.StartsWith("v1|")) return;   // stary zapis bez klucza: R_I 0, Start przy pierwszym spisie
+            _regIngots = 0; _startG = -1; _boxG = 0; _guildG = 0; _smeltedG = 0; _forgedSwords = 0; _unlockShown = false;
+            if (string.IsNullOrEmpty(s)) return;   // stary zapis bez klucza: R_I 0, Start przy pierwszym spisie
             var f = s.Split('|');
             int n;
-            if (f.Length > 1 && int.TryParse(f[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) _regIngots = Math.Max(0, n);
-            if (f.Length > 2 && int.TryParse(f[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) _startUnits = Math.Max(-1, n);
-            if (f.Length > 3 && int.TryParse(f[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) _smeltedUnits = Math.Max(0, n);
-            if (f.Length > 4 && int.TryParse(f[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out n)) _forgedSwords = Math.Max(0, n);
+            Func<int, int, int> num = (i, min) => f.Length > i && int.TryParse(f[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out n) ? Math.Max(min, n) : min;
+            if (s.StartsWith("v2|"))
+            {
+                _regIngots = num(1, 0); _startG = num(2, -1); _boxG = num(3, 0); _guildG = num(4, 0); _smeltedG = num(5, 0); _forgedSwords = num(6, 0);
+                if (f.Length > 7) _unlockShown = f[7] == "1";
+                return;
+            }
+            if (!s.StartsWith("v1|")) return;
+            // 563c: zapis 563 v1 (tylko zapisy autotestu 563 - 563 nie bylo wgrane): sztaba v1 = 1/10 miary = 80 g; nadmiar fizycznych sztab zamieni straznik
+            int v1 = num(1, 0);
+            int tot = v1 * (MeasureG / 10);
+            _regIngots = tot / IngotG; _boxG = tot % IngotG; _startG = -1;
+            _smeltedG = num(3, 0) * (MeasureG / 10); _forgedSwords = num(4, 0);
             if (f.Length > 5) _unlockShown = f[5] == "1";
+            Log.Info("Stal valyrianska 563c: MIGRACJA zapisu 563 v1 - " + v1 + " sztab po " + (MeasureG / 10) + " g = " + tot + " g -> " + _regIngots + " sztab + " + _boxG
+                     + " g; nadmiar fizycznych sztab zamieni straznik (Castle-forged Steel), start bilansu od nowa.");
         }
 
-        /// <summary>Baza w sztabach: 10 x miary rejestru klng + rejestr sztab.</summary>
-        internal static int BaseUnits() { return IngotsPerMeasure * BaseMeasures() + _regIngots; }
+        /// <summary>563c: skrzynka resztek stali valyrianskiej gracza (gramy, 0..499).</summary>
+        internal static int BoxG { get { return _boxG; } }
+        internal static int GuildG { get { return _guildG; } }
 
-        /// <summary>Legalna strata stali (odzysk sprzed 177, przetop "stal ginie" przy ValyrianIngots NIE): Start w dol razem z baza.</summary>
-        internal static void NoteLoss(int units)
+        /// <summary>563c: reszta zlecenia AI w Qohorze - do skrzynki cechu (tylko rosnie, liczona w spisie).</summary>
+        internal static void GuildAdd(int g)
         {
-            if (units <= 0 || _startUnits < 0) return;
-            int was = _startUnits;
-            _startUnits = Math.Max(0, _startUnits - units);
-            Log.Info("Stal valyrianska 563: legalna strata " + units + " sztab (stal ginie) - start " + was + " -> " + _startUnits + ".");
+            if (g <= 0) return;
+            _guildG += g;
+        }
+
+        /// <summary>563c: gramy stali valyrianskiej projektu - ScaledWeight czesci Blade (jelec, rekojesc, glowica to zwykly metal); 0 - brak klingi.</summary>
+        internal static int BladeG(WeaponDesign d)
+        {
+            try
+            {
+                if (d != null && d.UsedPieces != null)
+                    foreach (var el in d.UsedPieces)
+                        if (el != null && el.IsValid && el.CraftingPiece != null && el.CraftingPiece.PieceType == CraftingPiece.PieceTypes.Blade)
+                            return (int)Math.Round(el.ScaledWeight * 1000f);
+            }
+            catch (Exception e) { Stumble563("BladeG", e); }
+            return 0;
+        }
+
+        /// <summary>563c: ile sztab trzeba otworzyc na needG, gdy najpierw idzie skrzynka gracza.</summary>
+        internal static int IngotsToOpen(int needG)
+        {
+            int lack = needG - _boxG;
+            return lack <= 0 ? 0 : (lack + IngotG - 1) / IngotG;
+        }
+
+        /// <summary>563c: stal pod reka gracza - skrzynka + sztaby w taborze (gramy).</summary>
+        internal static int SteelAvailableG() { return _boxG + IngotG * IngotsInBaggage(); }
+
+        /// <summary>563c: kilogramy do napisow (EN), np. "0.93".</summary>
+        internal static string KgText(int g) { return (g / 1000f).ToString("0.##", CultureInfo.InvariantCulture); }
+
+        /// <summary>563c: Baza w gramach: rejestr klng x gramy wzoru + R_I x 500 + skrzynka gracza + cech Qohoru + dodatki zlecen u mistrzow.</summary>
+        internal static int BaseG() { return BaseGrams() + IngotG * _regIngots + _boxG + _guildG + QohorMasters.HeldExtraG(); }
+
+        /// <summary>563c: pobranie stali gracza (najpierw skrzynka, potem cale sztaby z taboru; reszta otwartej sztaby jedzie z wynikiem - takenG >= needG).
+        /// false - za malo (nic nie ruszone).</summary>
+        internal static bool TakeSteel(int needG, out int takenG, out int ingots, out int fromBox)
+        {
+            takenG = 0; ingots = 0; fromBox = 0;
+            if (needG <= 0) return true;
+            fromBox = Math.Min(_boxG, needG);
+            int rest = needG - fromBox;
+            ingots = rest <= 0 ? 0 : (rest + IngotG - 1) / IngotG;
+            var ing = Ingot;
+            var r = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+            if (ingots > 0 && (ing == null || r == null || r.GetItemNumber(ing) < ingots)) { fromBox = 0; ingots = 0; return false; }
+            if (ingots > 0) { r.AddToCounts(ing, -ingots); _regIngots = Math.Max(0, _regIngots - ingots); }
+            _boxG -= fromBox;
+            takenG = fromBox + ingots * IngotG;
+            return true;
+        }
+
+        /// <summary>563c: stal do gracza: do skrzynki, pelne 500 g -> sztaby do taboru (R_I w gore). Bez przedmiotu sztaby - zostaje w skrzynce.</summary>
+        internal static void GiveSteel(int g, out int ingots)
+        {
+            ingots = 0;
+            if (g <= 0) return;
+            _boxG += g;
+            var ing = Ingot;
+            var r = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+            if (ing == null || r == null) return;
+            ingots = _boxG / IngotG;
+            _boxG %= IngotG;
+            if (ingots > 0) { r.AddToCounts(ing, ingots); _regIngots += ingots; }
+        }
+
+        /// <summary>563c: wyrownanie zlecenia Qohoru przyjetego na miary (przed 563c) - wynik ciezszy niz klinga i dodatek: Start w gore razem z baza (jawnie w logu).</summary>
+        internal static void NoteLegacy(int grams, string why)
+        {
+            if (grams <= 0) return;
+            int was = _startG;
+            if (_startG >= 0) _startG += grams;
+            Log.Info("Stal valyrianska 563c: wyrownanie " + grams + " g - " + why + "; start " + was + " -> " + _startG + " g.");
+        }
+
+        /// <summary>Legalna strata stali w gramach (odzysk sprzed 177, przetop "stal ginie" przy ValyrianIngots NIE): Start w dol razem z baza.</summary>
+        internal static void NoteLoss(int grams)
+        {
+            if (grams <= 0 || _startG < 0) return;
+            int was = _startG;
+            _startG = Math.Max(0, _startG - grams);
+            Log.Info("Stal valyrianska 563c: legalna strata " + grams + " g (stal ginie) - start " + was + " -> " + _startG + " g.");
         }
 
         // ------------------------------------------------------------ czesci VS w projektancie
@@ -185,22 +287,6 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Miary projektu: 2 - szablon dwureczny z klinga >= ValyrianGreatswordMinCm, inaczej 1 (ta sama zasada co Measures).</summary>
-        internal static int DesignMeasures(WeaponDesign d)
-        {
-            try
-            {
-                var tpl = d != null ? d.Template : null;
-                if (tpl == null || tpl.StringId == null || tpl.StringId.IndexOf("TwoHanded", StringComparison.Ordinal) < 0) return 1;
-                float min = Settings.Current != null ? Settings.Current.ValyrianGreatswordMinCm : 105f;
-                foreach (var el in d.UsedPieces)
-                    if (el != null && el.IsValid && el.CraftingPiece != null && el.CraftingPiece.PieceType == CraftingPiece.PieceTypes.Blade)
-                        return el.ScaledLength * 100f >= min ? 2 : 1;
-            }
-            catch (Exception e) { Stumble563("DesignMeasures", e); }
-            return 1;
-        }
-
         internal static int IngotsInBaggage()
         {
             try
@@ -217,15 +303,18 @@ namespace Armoury
             try { return h != null ? h.GetSkillValue(DefaultSkills.Crafting) : 0; } catch { return 0; }
         }
 
-        /// <summary>Kowal moze kuc stal valyrianska: perk Legendary Smith i Smithing >= ValyrianForgeSkill (jawnie - perk sprzed przeniesienia na 300 zostaje).</summary>
+        /// <summary>563d: kowal ma perk Legendary Smith (275) - jedyny prog i dla przetopu, i dla kucia stali valyrianskiej.</summary>
+        private static bool HasLegendarySmith(Hero h)
+        {
+            try { return h != null && h.GetPerkValue(DefaultPerks.Crafting.LegendarySmith); } catch { return false; }
+        }
+
+        /// <summary>563d: kowal moze przetapiac i kuc stal valyrianska: perk Legendary Smith (klucz ValyrianNeedsLegendarySmith NIE - kazdy kowal).</summary>
         internal static bool CanForge(Hero h)
         {
-            try
-            {
-                var s = Settings.Current;
-                return h != null && s != null && h.GetPerkValue(DefaultPerks.Crafting.LegendarySmith) && Smithing(h) >= s.ValyrianForgeSkill;
-            }
-            catch { return false; }
+            var s = Settings.Current;
+            if (h == null || s == null) return false;
+            return !s.ValyrianNeedsLegendarySmith || HasLegendarySmith(h);
         }
 
         private static List<Hero> PartyHeroes()
@@ -342,7 +431,7 @@ namespace Armoury
         }
 
         /// <summary>Dopisek linii spisu: sztaby i bilans. Ustawia Start przy pierwszym spisie. Rozjazd bazy ze startem = ERROR "BILANS" (raz na wartosc).</summary>
-        private static string IngotSummary(Dictionary<string, List<Copy>> copies, int measures, bool start)
+        private static string IngotSummary(Dictionary<string, List<Copy>> copies, int grams, bool start)
         {
             try
             {
@@ -359,36 +448,40 @@ namespace Armoury
                         else other++;
                     }
                 if (l != null && l.Count > 0) _lastIngotWhere = string.Join("; ", l.Select(c => c.Where).Distinct().Take(6).ToArray());
-                int S = IngotsPerMeasure * measures + I;
-                int T = BaseUnits();
-                if (_startUnits < 0 && !start)
+                int held = QohorMasters.HeldExtraG();
+                int S = grams + IngotG * I + _boxG + _guildG + held;
+                int T = BaseG();
+                if (_startG < 0 && !start)
                 {
-                    _startUnits = T;
-                    Log.Info("Stal valyrianska 563: pierwszy spis - start bilansu " + T + " sztab (" + BaseMeasures() + " miar x " + IngotsPerMeasure + " + rejestr sztab " + _regIngots + ").");
+                    _startG = T;
+                    Log.Info("Stal valyrianska 563c: pierwszy spis - start bilansu " + T + " g (klingi " + BaseGrams() + " g, sztaby " + _regIngots + " x " + IngotG + ", skrzynka gracza " + _boxG
+                             + ", cech Qohoru " + _guildG + ", u mistrzow " + held + ").");
                 }
-                int U = _startUnits;
+                int U = _startG;
                 string verdict;
                 if (U >= 0 && T != U)
                 {
                     verdict = "ROZNICA " + (T - U);
                     if (_balanceLogged.Add(T + "|" + U))
-                        Log.Error("ValyrianBlades.Census", new InvalidOperationException("Stal valyrianska: BILANS - baza " + T + " sztab, start " + U + " (roznica " + (T - U) + "); rejestr klng " + BaseMeasures() + " miar, rejestr sztab " + _regIngots));
+                        Log.Error("ValyrianBlades.Census", new InvalidOperationException("Stal valyrianska: BILANS - baza " + T + " g, start " + U + " g (roznica " + (T - U) + "); rejestr klng " + BaseGrams()
+                                                                                         + " g, rejestr sztab " + _regIngots + ", skrzynka gracza " + _boxG + ", cech " + _guildG + ", u mistrzow " + held));
                 }
                 else if (S != T) verdict = "ROZNICA " + (S - T);
                 else verdict = U < 0 ? "OK (start przy pierwszym spisie)" : "OK";
-                return ", sztaby " + I + " (= " + (I / (float)IngotsPerMeasure).ToString("0.#", CultureInfo.InvariantCulture) + " miar: tabor gracza " + mine + ", tabory AI " + ai
+                return ", sztaby " + I + " (= " + KgText(IngotG * I) + " kg: tabor gracza " + mine + ", tabory AI " + ai
                        + ", targi " + shelves + ", schowki i magazyny " + stash + ", w drodze wozem " + carts + (other > 0 ? ", inne " + other : "") + "; rejestr sztab " + _regIngots
-                       + "); bilans: stan " + S + " sztab, baza " + T + ", start " + U + " [" + verdict + "]";
+                       + "), skrzynka VS gracza " + KgText(_boxG) + " kg, u mistrzow Qohoru (dodatek) " + KgText(held) + " kg, cech Qohoru " + KgText(_guildG) + " kg; stal razem "
+                       + KgText(S) + " kg; bilans [g]: stan " + S + ", baza " + T + ", start " + U + " [" + verdict + "]";
             }
             catch (Exception e) { Stumble563("IngotSummary", e); return ", sztaby: blad spisu"; }
         }
 
         // ------------------------------------------------------------ przetop (latki z ApplyAll)
-        /// <summary>Przetop dozwolony: kowal od ValyrianSmeltSkill (albo ValyrianNoSmelt NIE)?</summary>
+        /// <summary>Przetop dozwolony: 563d - kowal z perkiem Legendary Smith (CanForge; albo ValyrianNoSmelt NIE)?</summary>
         private static bool SmeltAllowed(Hero h)
         {
             var s = Settings.Current;
-            return s != null && (!s.ValyrianNoSmelt || Smithing(h) >= s.ValyrianSmeltSkill);
+            return s != null && (!s.ValyrianNoSmelt || CanForge(h));
         }
 
         /// <summary>Lista Smelt: ktos w partii moze przetopic (faktycznego kowala sprawdza prefiks DoSmelting).</summary>
@@ -398,23 +491,24 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>SmeltPostfix przy sztabach: klinga -> sztaby (rejestr klingi w dol, R_I w gore, sztaby do taboru gracza).</summary>
+        /// <summary>SmeltPostfix przy sztabach (563c - wedlug masy): stal klingi do skrzynki gracza, pelne 500 g -> sztaby do taboru (R_I w gore),
+        /// reszta zostaje w skrzynce; rejestr klingi w dol.</summary>
         private static void SmeltToIngots(string id, ItemObject item, int gone, ItemRoster r)
         {
-            int m = Math.Max(1, _smeltMeasures > 0 ? _smeltMeasures : Measures(item));
-            int units = gone * m * IngotsPerMeasure;
-            int wasReg = Registered(id), wasI = _regIngots;
+            int perG = _smeltG > 0 ? _smeltG : SteelG(id);
+            int g = gone * perG;
+            int wasReg = Registered(id), wasI = _regIngots, wasBox = _boxG;
             for (int i = 0; i < gone; i++) RegistryMove(new[] { id }, new string[0]);
-            _regIngots += units;
-            var ing = Ingot;
-            if (ing != null) r.AddToCounts(ing, units);
-            else Log.Error("ValyrianBlades.SmeltPostfix", new InvalidOperationException("BILANS: brak przedmiotu " + IngotId + " - sztaby nie powstaly (XML arm_items_rare.xml)"));
-            _smeltedUnits += units;
-            _dSmeltPieces += gone; _dSmeltIngots += units;
+            if (Ingot == null) Log.Error("ValyrianBlades.SmeltPostfix", new InvalidOperationException("BILANS: brak przedmiotu " + IngotId + " - stal zostaje w skrzynce gracza (XML arm_items_rare.xml)"));
+            int n;
+            GiveSteel(g, out n);
+            _smeltedG += g;
+            _dSmeltPieces += gone; _dSmeltIngots += n;
             string hero = _smeltHero != null ? _smeltHero.Name.ToString() : "kowal";
-            Log.Player((_smeltHero != null ? _smeltHero.Name.ToString() : "Your smith") + " melts down " + item.Name + ": " + units + " ingots of Valyrian steel.");
-            Log.Info("Kronika unikatow: " + id + " przetopiona przez " + hero + " (Smithing " + Smithing(_smeltHero) + ") - " + (gone * m) + " miar -> " + units
-                     + " sztab; rejestr klingi " + wasReg + " -> " + Registered(id) + ", sztab " + wasI + " -> " + _regIngots + ".");
+            Log.Player((_smeltHero != null ? _smeltHero.Name.ToString() : "Your smith") + " melts down " + item.Name + " (" + KgText(g) + " kg of Valyrian steel): "
+                       + n + (n == 1 ? " ingot" : " ingots") + (_boxG > 0 ? ", and " + KgText(_boxG) + " kg of offcuts kept at your forge" : "") + ".");
+            Log.Info("Kronika unikatow: " + id + " przetopiona przez " + hero + " (Smithing " + Smithing(_smeltHero) + ") - " + g + " g stali -> " + n + " sztab, skrzynka VS "
+                     + wasBox + " -> " + _boxG + " g; rejestr klingi " + wasReg + " -> " + Registered(id) + ", sztab " + wasI + " -> " + _regIngots + ".");
         }
 
         /// <summary>Postfiks GetPartResearchGainForSmeltingItem: przetop klingi VS - punkty badan od wartosci wykonania (jak XP przetopu po
@@ -453,11 +547,16 @@ namespace Armoury
             if (s == null) return null;
             if (!s.ValyrianIngots) return "Only the masters of Qohor can work Valyrian steel.";
             if (order) return "Valyrian steel is not worked for hire.";
-            if (!CanForge(hero)) return "Only a smith with the Legendary Smith perk and " + s.ValyrianForgeSkill + " Smithing can forge Valyrian steel.";
-            int need = DesignMeasures(d);
-            if (need >= 2) return "A greatsword of Valyrian steel is beyond this forge.";
-            int have = IngotsInBaggage();
-            if (have < IngotsPerMeasure * need) return "You need " + (IngotsPerMeasure * need) + " ingots of Valyrian steel (you have " + have + ").";
+            if (!CanForge(hero)) return "Only a smith with the Legendary Smith perk can forge Valyrian steel.";
+            // 563c: stal wedlug masy klingi projektu (skrzynka resztek + sztaby z taboru)
+            int need = BladeG(d);
+            if (need <= 0) return "This blade cannot be weighed - the masters of Qohor alone could work it.";
+            if (SteelAvailableG() < need)
+            {
+                int open = IngotsToOpen(need);
+                return "You need " + KgText(need) + " kg of Valyrian steel - " + open + (open == 1 ? " ingot" : " ingots") + " with your offcuts (you have " + IngotsInBaggage()
+                       + " and " + KgText(_boxG) + " kg of offcuts).";
+            }
             return null;
         }
 
@@ -539,27 +638,26 @@ namespace Armoury
                     Log.Error("ValyrianBlades.OnCraftedVs", new InvalidOperationException("BILANS: kucie VS w trybie zlecenia mimo bramki - " + item.StringId + " bez rejestracji"));
                     return;
                 }
-                var r = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
-                var ing = Ingot;
-                int need = IngotsPerMeasure * Math.Max(1, DesignMeasures(item.WeaponDesign));
-                int have = ing != null && r != null ? r.GetItemNumber(ing) : 0;
-                if (r == null || ing == null || have < need || need > IngotsPerMeasure)
+                // 563c: stal wedlug masy klingi - najpierw skrzynka resztek, potem otwarte sztaby; reszta otwartej sztaby wraca do skrzynki
+                int need = BladeG(item.WeaponDesign);
+                int wasI = _regIngots, wasBox = _boxG, taken, k, fromBox;
+                if (need <= 0 || !TakeSteel(need, out taken, out k, out fromBox))
                 {
-                    Log.Error("ValyrianBlades.OnCraftedVs", new InvalidOperationException("BILANS: kucie VS bez sztab (jest " + have + ", potrzeba " + need + ") - " + item.StringId + " zostaje nierozpoznana kopia"));
+                    Log.Error("ValyrianBlades.OnCraftedVs", new InvalidOperationException("BILANS: kucie VS bez stali (potrzeba " + need + " g, skrzynka " + _boxG + " g, sztab w taborze "
+                                                                                          + IngotsInBaggage() + ") - " + item.StringId + " zostaje nierozpoznana kopia"));
                     return;
                 }
-                int wasI = _regIngots;
-                r.AddToCounts(ing, -need);
-                _regIngots = Math.Max(0, _regIngots - need);
-                AddOwn(item.StringId, Hero.MainHero != null ? Hero.MainHero.StringId : null);
+                _boxG += taken - need;   // reszta otwartych sztab do skrzynki (0..499)
+                AddOwn(item.StringId, Hero.MainHero != null ? Hero.MainHero.StringId : null, need);
                 RegistryMove(new string[0], new[] { item.StringId });
                 _pricePending = item;
                 _forgedSwords++; _dForged++;
                 Hero smith = null;
                 try { var cb = Campaign.Current.GetCampaignBehavior<ICraftingCampaignBehavior>(); smith = cb != null ? cb.GetActiveCraftingHero() : null; } catch { }
                 Log.Info("Kronika unikatow: " + (smith != null ? smith.Name.ToString() : "kowal gracza") + " (Smithing " + Smithing(smith) + ") wykul " + item.Name + " (" + item.StringId
-                         + ") ze stali valyrianskiej - " + need + " sztab; rejestr sztab " + wasI + " -> " + _regIngots + ", wlasne +1 (1 miara, razem " + OwnCount + ").");
-                Log.Player((smith != null ? smith.Name.ToString() : "Your smith") + " forges " + item.Name + " from " + need + " ingots of Valyrian steel.");
+                         + ") ze stali valyrianskiej - klinga " + need + " g: otwarte sztaby " + k + ", ze skrzynki " + fromBox + " g, skrzynka VS " + wasBox + " -> " + _boxG
+                         + " g; rejestr sztab " + wasI + " -> " + _regIngots + ", wlasne +1 (razem " + OwnCount + ").");
+                Log.Player((smith != null ? smith.Name.ToString() : "Your smith") + " forges " + item.Name + " from " + KgText(need) + " kg of Valyrian steel.");
             }
             catch (Exception e) { Stumble563("OnCraftedVs", e); }
         }
@@ -675,25 +773,9 @@ namespace Armoury
             }
             catch (Exception e) { Stumble563("SessionStart563(latki)", e); }
 
-            // perk Legendary Smith na 300 (po AfterLoad - ClearChangedPerks w tej sesji nikomu perku nie zdejmie; DefaultPerks nowe w kazdej kampanii)
-            string perk = "bez zmian";
-            try
-            {
-                var s = Settings.Current;
-                var p = DefaultPerks.Crafting.LegendarySmith;
-                if (s != null && s.ValyrianLegendarySmithAt300 && p != null)
-                {
-                    var f = AccessTools.Field(typeof(PerkObject), "<RequiredSkillValue>k__BackingField");
-                    if (f == null) perk = "BRAK pola RequiredSkillValue";
-                    else
-                    {
-                        float was = p.RequiredSkillValue;
-                        if (was < 300f) f.SetValue(p, 300f);
-                        perk = "prog " + was.ToString("0", CultureInfo.InvariantCulture) + " -> " + p.RequiredSkillValue.ToString("0", CultureInfo.InvariantCulture);
-                        Log.Info("Perk Legendary Smith: " + perk + " (563).");
-                    }
-                }
-            }
+            // 563d (Jeff 15.11): perk Legendary Smith zostaje na 275 (bez przenoszenia na 300) - odblokowuje przetop i kucie stali valyrianskiej (PerkTexts)
+            string perk = "?";
+            try { var p = DefaultPerks.Crafting.LegendarySmith; perk = p != null ? p.RequiredSkillValue.ToString("0", CultureInfo.InvariantCulture) : "BRAK"; }
             catch (Exception e) { perk = "BLAD"; Stumble563("SessionStart563(perk)", e); }
 
             try
@@ -701,14 +783,20 @@ namespace Armoury
                 var s = Settings.Current;
                 EnsurePieces();
                 var ing = Ingot;
+                if (ing != null && Math.Abs(ing.Weight - IngotG / 1000f) > 0.001f)
+                    Log.Error("ValyrianBlades.SessionStart563", new InvalidOperationException("Stal valyrianska 563c: sztaba " + IngotId + " wazy " + ing.Weight.ToString("0.###", CultureInfo.InvariantCulture)
+                                                                                             + " kg, a bilans liczy " + IngotG + " g (XML arm_items_rare.xml)"));
                 var hooks = string.Join(", ", _hooks563.Select(kv => kv.Key + " " + kv.Value).ToArray());
-                Log.Info("Stal valyrianska 563: sztaby " + (s != null && s.ValyrianIngots ? "TAK" : "NIE") + ", przetop od " + (s != null ? s.ValyrianSmeltSkill : 0)
-                         + (s != null && !s.ValyrianNoSmelt ? " (Valyrian No Smelt NIE - bez progu)" : "") + ", kucie od " + (s != null ? s.ValyrianForgeSkill : 0)
-                         + " (Legendary Smith na 300: " + (s != null && s.ValyrianLegendarySmithAt300 ? "TAK" : "NIE") + ", " + perk + "), sztaba " + IngotId + " "
+                Log.Info("Stal valyrianska 563: sztaby " + (s != null && s.ValyrianIngots ? "TAK" : "NIE") + ", przetop i kucie: "
+                         + (s != null && s.ValyrianNeedsLegendarySmith ? "perk Legendary Smith (prog perku " + perk + ")" : "kazdy kowal (Valyrian Needs Legendary Smith NIE)")
+                         + (s != null && !s.ValyrianNoSmelt ? " (Valyrian No Smelt NIE - przetop bez progu)" : "") + ", sztaba " + IngotId + " "
                          + (ing != null ? "wartosc " + ing.Value + ", kategoria " + (ing.ItemCategory != null ? ing.ItemCategory.StringId : "BRAK") : "BRAK PRZEDMIOTU")
                          + "; czesci VS w projektancie " + (_revealPieces != null ? _revealPieces.Count : 0) + " (wszystkich klng VS " + (_vsPieces != null ? _vsPieces.Count : 0)
-                         + "); rejestr sztab " + _regIngots + ", start " + _startUnits + ", przetopione sztaby " + _smeltedUnits + ", wykute miecze " + _forgedSwords
+                         + "); rejestr sztab " + _regIngots + ", start " + _startG + " g, przetopione " + _smeltedG + " g, wykute miecze " + _forgedSwords
                          + "; latki: przetop (ApplyAll), wynik przetopu (SmeltTab.OutputPostfix), " + hooks + ".");
+                Log.Info("Stal valyrianska 563c: gramy wzorow - " + GramsLine() + " | sztaba " + IngotG + " g (XML " + (ing != null ? ing.Weight.ToString("0.###", CultureInfo.InvariantCulture) : "BRAK")
+                         + " kg) | cena kg " + (s != null ? ((int)Math.Round(s.HistValyrianPerMeasure * 1000f / MeasureG)).ToString(CultureInfo.InvariantCulture) : "?")
+                         + " | skrzynka gracza " + _boxG + " g, cech Qohoru " + _guildG + " g, u mistrzow " + QohorMasters.HeldExtraG() + " g.");
             }
             catch (Exception e) { Stumble563("SessionStart563(linia)", e); }
             CheckUnlock();
@@ -719,10 +807,11 @@ namespace Armoury
         {
             try
             {
-                if (_unlockShown || !IngotsOn || Hero.MainHero == null || !CanForge(Hero.MainHero)) return;
+                var s = Settings.Current;
+                if (_unlockShown || !IngotsOn || s == null || !s.ValyrianNeedsLegendarySmith || Hero.MainHero == null || !CanForge(Hero.MainHero)) return;
                 _unlockShown = true;
-                Log.Player("You have mastered a lost art: you can forge Valyrian steel.");
-                Log.Info("Stal valyrianska 563: " + Hero.MainHero.Name + " moze kuc stal valyrianska (Legendary Smith, Smithing " + Smithing(Hero.MainHero) + ") - komunikat odblokowania.");
+                Log.Player("You have mastered a lost art: you can melt down and forge Valyrian steel.");
+                Log.Info("Stal valyrianska 563: " + Hero.MainHero.Name + " moze przetapiac i kuc stal valyrianska (Legendary Smith, Smithing " + Smithing(Hero.MainHero) + ") - komunikat odblokowania.");
             }
             catch (Exception e) { Stumble563("CheckUnlock", e); }
         }
