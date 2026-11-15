@@ -579,6 +579,18 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float ProneArmorPercent { get; set; } = 50f;
 
+        [SettingPropertyBool("Blows From Behind Hurt More", HintText = "Blows From Behind Hurt More: a melee blow that lands on a man from behind (the attacker more than 120 degrees off the way his body faces) deals more damage and pierces part of his armour. A shield on his back, a man on the ground, blows between friends and missiles are not counted. The same rule for you and for the AI, mounted or on foot. Counted in the Armoury log at the end of every fight (line 549).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool BackstabEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Blow From Behind Damage Multiplier", 1.00f, 3.00f, "0.00", HintText = "With Blows From Behind Hurt More: the damage of a blow from behind, after armour, is multiplied by this. 1 = no extra damage.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float BackstabDamageMult { get; set; } = 2.0f;
+
+        [SettingPropertyFloatingInteger("Blow From Behind Armour Piercing", 0.00f, 75.00f, "0", HintText = "With Blows From Behind Hurt More: percent of the victim's armour a blow from behind ignores. 0 = armour counts in full.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float BackstabArmourPen { get; set; } = 25f;
+
         [SettingPropertyBool("Rested Armour Bonus Removed", HintText = "With Realistic Battle Mod: takes away the hidden armour bonus of a rested man. Realistic Battle Mod multiplies the armour of anyone whose stamina bar is above 70 percent, up to 1.3 times at a full bar, so in the first minutes of every battle everybody is almost a third tougher - and with our doubled stamina that lasts twice as long. On = armour counts the same for a fresh and a tired man (with ROT Body Armour In RBM Scale on and the stock Realistic Battle Mod thresholds, a broadhead arrow from a 100 lb bow wounds a fresh man in a gambeson for about 27 instead of 9 and a javelin for about 84 instead of 64; mail and plate still hold). A tired man strikes weaker as before. A hit under the arm keeps the bonus. Off = as before this change. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 416).", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public bool RestedArmorBonusRemoved { get; set; } = true;
@@ -13993,6 +14005,9 @@ namespace Armoury
             s.NeckFromHelmetShare = NeckFromHelmetShare;
             s.ShoulderFromBodyShare = ShoulderFromBodyShare;
             s.ProneArmorPercent = ProneArmorPercent;
+            s.BackstabEnabled = BackstabEnabled;
+            s.BackstabDamageMult = BackstabDamageMult;
+            s.BackstabArmourPen = BackstabArmourPen;
             s.RestedArmorBonusRemoved = RestedArmorBonusRemoved;
             s.NativeBluntHammersEnabled = NativeBluntHammersEnabled;
             s.TwoHandedMaceSkillScaleFix = TwoHandedMaceSkillScaleFix;

@@ -776,6 +776,9 @@ namespace Armoury
                 // zeruje liczniki i zdejmuje znacznik ostatniej ofiary na koncu misji); bez zalozonych latek poza kampania nic nie dochodzi
                 if ((Campaign.Current != null || NeckGuard415.Patched) && mission != null)
                     mission.AddMissionBehavior(new NeckGuard415.Logic());
+                // 549: cios w plecy - liczniki i linia "Cios z tylu (549): koniec misji"; jak 415-p latka zostaje w procesie po wyjsciu z kampanii
+                if ((Campaign.Current != null || Backstab549.Patched) && mission != null)
+                    mission.AddMissionBehavior(new Backstab549.Logic());
                 // 416: premia pancerza wypoczetego (RBM x1.0-1.3) - liczniki ciosow w wypoczetych / zmeczonych i linia "Wypoczety (416): koniec misji"
                 // 416-p: jak 415-p - w bitwie wlasnej po kampanii latka dalej dziala, wiec zachowanie odswieza stan RBM (prefiks walki, stamina, slownik postaw),
                 // zeruje liczniki i zdejmuje znacznik ostatniej ofiary; bez zalozonej latki poza kampania nic nie dochodzi
