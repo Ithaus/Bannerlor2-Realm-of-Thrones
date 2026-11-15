@@ -335,6 +335,7 @@ namespace Armoury
         private static readonly string[] WhyPl = { "doba", "sklad", "bitwa", "miasto" };
         private static int _settleSig, _settleArmVer = int.MinValue;   // recenzja 562 (3): wersja zbrojowni DTE po ostatnim rozliczeniu
         private static bool _hudDirty = true, _migrPending;
+        private static int _lastTook = -1;   // 562b: ile sztuk wzial ostatni pobor (doba / sklad); -1 - jeszcze nie bylo w tej sesji
         private static int _pTaken, _pBack, _pBackOther, _pBackBattle, _pBackOff, _pLost, _settleN, _settlePv, _settleBad, _pvNone, _pWornN;
         private static long _settleTicks;
         private static readonly int[] _settleBy = new int[4];
@@ -366,7 +367,7 @@ namespace Armoury
                 int bb = ReturnForBattle(pv, arm);
                 if (bb > 0) { pv = KitPreview.ForArmoury(); _settlePv++; }
                 int took = 0;
-                if (why == WhyDaily || why == WhyRoster) took = TakePlayer(MeasurePlayer(), arm, pv);
+                if (why == WhyDaily || why == WhyRoster) { took = TakePlayer(MeasurePlayer(), arm, pv); _lastTook = took; _hudDirty = true; }   // 562b: wynik ostatniego poboru do podpowiedzi paska
                 _settleSig = m.Sig;
                 _settleArmVer = arm.VersionNo;
                 _settleN++; _settleBy[Math.Max(0, Math.Min(3, why))]++;
@@ -980,7 +981,11 @@ namespace Armoury
             internal int KitN { get { return Men + Heroes; } }
             internal readonly int[] Need = new int[NK], Cov = new int[NK], WornToday = new int[NK], RoleMen = new int[NR];
             internal readonly float[] Acc = new float[NK];     // ulamek zuzycia do nastepnej sztuki rodzaju (0..1)
-            internal int Taken, Back, BackBattle;
+            internal int Taken, Back, BackBattle, LastTook;
+            internal int CovSum(int lo, int hi) { int n = 0; for (int i = lo; i <= hi; i++) n += Math.Min(Cov[i], Need[i]); return n; }   // 562b: pokryte sztuki rodzajow lo..hi
+            internal int NeedSum(int lo, int hi) { int n = 0; for (int i = lo; i <= hi; i++) n += Need[i]; return n; }
+            /// <summary>562b: pokrycie sztuk calego zestawu w procentach (postep widoczny przed pierwszym pelnym zestawem); 100 tylko przy zerowych brakach.</summary>
+            internal int Pct { get { int n = NeedSum(0, NK - 1), c = CovSum(0, NK - 1); return n <= 0 ? 100 : (c >= n ? 100 : Math.Min(99, (int)(c * 100L / n))); } }
             internal bool PerkW, PerkA;
             internal int Short(int k) { return Math.Max(0, Need[k] - Cov[k]); }
             internal float Bonus(bool weapons)                 // premia S tej polowy (0.10 przy pelnej, x1.5 z perkiem)
@@ -1033,6 +1038,7 @@ namespace Armoury
                 Array.Copy(_pWorn, k.WornToday, NK);
                 var acc = AccOf(main, false);
                 if (acc != null) Array.Copy(acc.WK, k.Acc, NK); else Array.Clear(k.Acc, 0, NK);
+                k.LastTook = _lastTook;
                 k.Taken = _pTaken; k.Back = _pBack + _pBackOther + _pBackOff; k.BackBattle = _pBackBattle;
                 k.PerkW = main.HasPerk(DefaultPerks.Steward.GivingHands);
                 k.PerkA = main.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
@@ -1048,7 +1054,7 @@ namespace Armoury
         /// <summary>Nowa kampania - pamiec paska od zera.</summary>
         private static void HudKitReset()
         {
-            _hudStockVer = _hudRosVer = _hudDay = int.MinValue; _hudHeroes = _hudCfg = -1; _hudAt = Environment.TickCount - 60000; _hudN = 0; _hudHave = false; _hudDirty = true; _hudKit.Ok = false;
+            _hudStockVer = _hudRosVer = _hudDay = int.MinValue; _hudHeroes = _hudCfg = -1; _hudAt = Environment.TickCount - 60000; _hudN = 0; _hudHave = false; _hudDirty = true; _hudKit.Ok = false; _lastTook = -1;
         }
 
         // ------------------------------------------------------------ autotest: zasilenie zapasu (krytyka 7)
