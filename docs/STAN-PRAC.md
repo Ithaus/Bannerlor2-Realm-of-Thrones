@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 264 (563 + 563c/d stal valyrianska: sztaby 0.5 kg wedlug masy klingi, skrzynka resztek, Legendary Smith 275 odblokowuje przetop i kucie, Qohor wedlug masy), bez autotestu
+
+- Armoury.dll ecf8507e, CrashScribe.dll 32cb75a3 (OthersSteel), Armoury/ModuleData/arm_items_rare.xml dd926e52 (nowy przedmiot arm_valyrian_steel 0.5 kg) = noc/scal-perki 5665310c. Kopie .bak-2026-11-15-przed-wgranie264 przy kazdym pliku, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie264 i -przed). Klucz ValyrianNeedsLegendarySmith (TAK); zapis arm_vs_ingots v2.
+- Do sprawdzenia: start 'gramy wzorow', spis stali w gramach (S==T==U, bez ERROR BILANS/UBYTEK), przetop od Legendary Smith (sztaby + skrzynka + metal oprawy), wiersz VS w ForgeView, perk Legendary Smith na 275 z nowym zdaniem. Decyzja D1 (Lod 930 g = 1 miecz + 130 g) - przyjete wedlug masy. Czeka na Jeffa: kryjowki A-E.
+
 ## STAN 15.11 - WGRANIE 263 (562b pasek musztry %, 562c premia wedlug sztuk + oponcze dodatkiem, 564 tempo swiata mnoznikiem, 565 pasek taboru, 566 Strong tylko pieszo), bez autotestu
 
 - Armoury.dll 94fabd5c = noc/scal-perki af95ada4 (262 + 562b/562c/564/565/566). Kopie: .bak-2026-11-15-przed-wgranie263, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie263 i -przed). Klucz NOWY World Pace Whole Speed (564).
