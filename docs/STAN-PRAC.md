@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 255 (554 srebro do zlotnikow z doplata warsztatu, 557 log strat bitwy gracza), bez autotestu
+
+- Armoury.dll db98fd91 = noc/scal-perki 1d79cefa (254 + 554 + 557). Kopie: .bak-2026-11-15-przed-wgranie255, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie255 i -przed). Klucz NOWY CaravanSilverSmithPays (TAK).
+- Do sprawdzenia: linia doby 492 'doplata zlotnikow (554)' > 0, cykle zlotnikow > 0 (A: 'warsztaty srebrne'), bilans Jeffa; 312f 'wystawieni' = realni. Czeka: 555 (decyzja a/b/c - limit zalogi), 558 towarzysze cwicza, 556 log zbiorki, kusze (decyzja).
+
 ## STAN 15.11 - WGRANIE 254 (552 szyk AI pod ostrzalem: sygnal od samotnego strzelca, czolo i tarcze do strzelca, tarcze w marszu), bez autotestu
 
 - Armoury.dll b4f8f502 = noc/scal-perki 9bab2eb7 (253 + 552). Kopie: .bak-2026-11-15-przed-wgranie254, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie254 i -przed). Klucze NOWE: ShieldsUpHarassShots = 2, FormationsFaceTheShooter, ShieldsToTheShooter (TAK).
