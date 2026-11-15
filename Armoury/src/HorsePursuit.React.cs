@@ -95,6 +95,15 @@ namespace Armoury
         // poprawka 132b: R2 straz strzelcow - oddzial z szyku piechoty dalej niz smycz (do 110 m), gdy nekajacy bije strzelcow / wodza / chorazego
         private static int _rGuardN;
         private static readonly HashSet<Formation> RGuardForms = new HashSet<Formation>();
+        // 550 (Jeff 15.11 "normalnie rzucili by sie na mnie od razu jak tylko podejde do baneru"): straz sztandaru - klucz BannerGuardsAnswer (z 283), stale i liczniki
+        private static bool _bannerGuard;
+        internal const float GuardR = 8f, GuardMixNear = 10f, GuardShootRange = 50f, FootAnchorMargin = 15f;
+        internal const int GuardMaxFoes = 3, GuardQPerTick = 24, GuardLinesMax = 40;
+        private const int WideBit = 1 << 21;   // 550b: indeks szyku ofiary w RFormOrder - smycz od miejsca ofiary (t.VicAt), szeroka linia
+        private static int _g550Near, _g550NearPlayer, _g550Front, _g550NotLone, _g550Anchor, _g550MixFoot, _g550MixR1, _g550Lines;
+        private static readonly HashSet<Formation> G550WideF = new HashSet<Formation>();
+        // skan BannerCompaniesMission.Guard550 (glowny watek): ponad 3 wrogow w 8 m, limit zapytan, potkniecia
+        internal static int G550Many, G550Cut, G550Stum;
 
         // ------------------------------------------------------------ poczatek / koniec misji
 
@@ -103,6 +112,7 @@ namespace Armoury
             _rKey = c != null && c.FormationsAnswerHarassers;
             _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
             _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;   // 291
+            _bannerGuard = _rKey && c.BannerGuardsAnswer;      // 550
             _leashAhead = c != null && c.InfantryLeashLookahead;   // 305c
             Volatile.Write(ref _rLive, 0);
         }
@@ -130,6 +140,9 @@ namespace Armoury
             HaltClear();
             NearClear();                 // poprawka 132b
             _rGuardN = 0; RGuardForms.Clear();
+            _g550Near = _g550NearPlayer = _g550Front = _g550NotLone = _g550Anchor = _g550MixFoot = _g550MixR1 = _g550Lines = 0;   // 550
+            G550Many = G550Cut = G550Stum = 0;
+            G550WideF.Clear();
         }
 
         private static void RStumble(string where, Exception e)
@@ -237,7 +250,11 @@ namespace Armoury
         {
             if (v == null || !_rKey) return;
             var f = v.Formation;
-            if (f != null && f.CountOfUnits > 0) t.VicF = f;
+            if (f != null && f.CountOfUnits > 0)
+            {
+                t.VicF = f;
+                if (harm) t.VicAt = v.Position.AsVec2;   // 550b: miejsce ofiary - smycz R2 szyku ofiary przy szerokiej linii (FootPass)
+            }
             if (!t.OnArchers)
             {
                 var q = f != null ? f.QuerySystem : null;
@@ -249,6 +266,56 @@ namespace Armoury
                 if (harm) MarkLeader(t, v);
                 else _rLeaderAim++;
             }
+        }
+
+        /// <summary>550b (glowny watek - skan BannerCompaniesMission.Guard550 w Tick309, co 0.5 s): wrog-czlowiek w 8 m od chorazego AI albo lezacego sztandaru
+        /// szyku f (najwyzej 3 wrogow w 8 m - sprawdza skan) - zagrozenie 283 juz przy podejsciu, nie dopiero po ciosie. Ta sama bramka frontu co MeleeEvent
+        /// (AI nie samotny - zwykla walka; gracz w zwarciu frontu - nie). Kontakt przy sztandarze = rodzaj wrecz (KindNow); szkoda (Fire, okno 5 s) tylko przy
+        /// pierwszym kontakcie z tym sztandarem - inaczej samo stanie przy sztandarze co 0.5 s nabijaloby 3 szkody w 5 s (L3 cala jazda na pieszego); dalej tylko
+        /// LastFire (zagrozenie nie gasnie, poki stoi przy sztandarze). Nie dotyka kolejki MeleeQA ani HLock.</summary>
+        internal static bool BannerNear(Agent foe, Formation f, Vec2 at, float now, Agent bearer, int foes)
+        {
+            if (Volatile.Read(ref _rLive) == 0 || !_rKey || !_bannerGuard) return false;
+            if (foe == null || !foe.IsActive() || !foe.IsHuman || foe.IsRunningAway) return false;
+            if (f == null || f.CountOfUnits <= 0 || PlayerForm(f)) return false;
+            int ss = SideOf(foe.Team), vs = SideOf(f.Team);
+            if (ss < 0 || vs < 0 || ss == vs) return false;
+            bool lone = !IntactNear(ss, foe.Position.AsVec2, IntactRadius);
+            if (!lone)
+            {
+                // ta sama bramka frontu co MeleeEvent: AI w swoim szyku - zwykla walka (RBM); gracz przy szyku w zwarciu - front
+                if (!foe.IsMainAgent && !ReferenceEquals(foe, _tA)) { _g550NotLone++; return false; }
+                int sl = Slot(f.Team, f);
+                if (sl < 0 || !_quiet[sl]) { _g550Front++; return false; }
+            }
+            Threat t;
+            bool fresh = !Threats.TryGetValue(foe, out t);
+            if (fresh) t = Notice(foe, ss, vs, -1, now, false);
+            bool first = fresh || !t.OnBanner || !ReferenceEquals(t.VicF, f);
+            t.LastMelee = now;   // kontakt wrecz przy sztandarze (KindNow); MeleeHits bez zmian
+            if (first) Fire(t, now);
+            else t.LastFire = now;
+            t.VicF = f;
+            t.VicAt = at;
+            if (!t.OnBanner) { t.OnBanner = true; RBannerT.Add(foe.Index); }
+            _g550Near++;
+            if (foe.IsMainAgent) _g550NearPlayer++;
+            if (first && _g550Lines < GuardLinesMax)
+            {
+                _g550Lines++;
+                try
+                {
+                    var inv = Inv;
+                    float dm = foe.Position.AsVec2.Distance(FootHome(f));
+                    float d = foe.Position.AsVec2.Distance(at);
+                    Log.Info("Straz sztandaru (550): wrog przy sztandarze | nekajacy " + Who(foe) + " (" + (foe.IsMainAgent ? "gracz" : "AI") + ", "
+                             + (foe.MountAgent != null ? "konno" : "pieszo") + ", " + Weapon(foe) + ") | szyk " + (int)f.FormationIndex + " (" + f.FormationIndex + "), "
+                             + (bearer != null ? "chorazy " + Who(bearer) : "sztandar lezy") + " | od sztandaru " + d.ToString("0.0", inv) + " m, od srodka szyku "
+                             + dm.ToString("0", inv) + " m | wrogow w " + GuardR.ToString("0", inv) + " m " + foes + " | zagrozenie " + (fresh ? "nowe" : "istniejace"));
+                }
+                catch { }
+            }
+            return true;
         }
 
         /// <summary>Recenzja 283 (5): szyk nie w zwarciu (tablica _quiet z passu).</summary>
@@ -479,14 +546,23 @@ namespace Armoury
                 bool far = !own && e > MarchToContact.InfRearm;
                 if (far && (guard == null || e > HuntClose)) continue;
                 if (fi.Player) continue;   // szyk gracza - nigdy
+                // 550b: szyk ofiary (szeroka linia, Jeff na skrzydle 60-76 m od mediany szyku 153 m) - odleglosc od miejsca ofiary / sztandaru, gdy blizej;
+                // smycz takiego oddzialu od tego miejsca (kotwica TakeFoot), gdy nekajacy jest blisko krawedzi smyczy od mediany (wide)
+                float dl = dm;
+                bool wide = false;
+                if (_bannerGuard && own && t.VicAt.IsValid)
+                {
+                    float dv = sp.Distance(t.VicAt);
+                    if (dv < dl) { dl = dv; wide = dm > MarchToContact.InfRearm - FootAnchorMargin; }
+                }
                 // recenzja 283 (3): nekajacy poza smycza 50 m od srodka szyku (InfRearm, smycz HunterCheck) - nieosiagalny, takze dla szyku ofiary i wodza (R1, jazda)
-                if (!far && dm > MarchToContact.InfRearm) { RUnreachT.Add(t.S.Index); continue; }
+                if (!far && dl > MarchToContact.InfRearm) { RUnreachT.Add(t.S.Index); continue; }
                 if (fi.Engaged && !lead)
                 {
                     if (RFwSeenF.Add(fi.F)) Fw[FwEngaged] += fi.N;
                     continue;
                 }
-                RFormOrder.Add(new KeyValuePair<float, int>(lead ? -2f : (own ? -1f : e), far ? (i | GuardBit) : i));
+                RFormOrder.Add(new KeyValuePair<float, int>(lead ? -2f : (own ? -1f : e), (far ? (i | GuardBit) : i) | (wide ? WideBit : 0)));
             }
             if (RFormOrder.Count == 0) return 0;
             if (RFormOrder.Count > 1) RFormOrder.Sort((x, y) => x.Key.CompareTo(y.Key));
@@ -494,8 +570,9 @@ namespace Armoury
             for (int k = 0; k < RFormOrder.Count; k++)
             {
                 int idx = RFormOrder[k].Value;
-                var fi = fl[idx & ~GuardBit];
+                var fi = fl[idx & ~(GuardBit | WideBit)];
                 Formation home = (idx & GuardBit) != 0 ? guard : null;
+                Vec2? anchor = (idx & WideBit) != 0 && t.VicAt.IsValid ? (Vec2?)t.VicAt : null;   // 550b
                 int want = RWant(t, FormTier(fi.F), down) * (t.Leader ? 2 : 1);
                 int need = want - t.Foot;
                 if (need <= 0) break;
@@ -508,7 +585,9 @@ namespace Armoury
                     if (RFwSeen.Add(((long)fi.F.GetHashCode() << 8) | FwHalf)) Fw[FwHalf]++;
                     continue;
                 }
-                sent += TakeFoot(m, t, fi, Math.Min(need, room), now, home);
+                int got = TakeFoot(m, t, fi, Math.Min(need, room), now, home, anchor);
+                if (got > 0 && anchor.HasValue) G550WideF.Add(fi.F);
+                sent += got;
             }
             return sent;
         }
@@ -545,7 +624,10 @@ namespace Armoury
         private static int EligFoot(Agent a, Threat t, float now)
         {
             if (a == null || !a.IsActive() || !a.IsHuman || Hunters.ContainsKey(a)) return -2;
-            if (a.IsMainAgent || !a.IsAIControlled || a.MountAgent != null || a.IsRangedCached) return -2;   // lucznicy strzelaja (R1)
+            if (a.IsMainAgent || !a.IsAIControlled || a.MountAgent != null) return -2;
+            // lucznicy strzelaja (R1); 550c: kusznik / lucznik z bronia boczna w szyku ofiary przy sztandarze, w 10 m od nekajacego - idzie wrecz (R2)
+            if (a.IsRangedCached && !(_bannerGuard && t.OnBanner && a.HasMeleeWeaponCached && ReferenceEquals(a.Formation, t.VicF)
+                                      && a.Position.AsVec2.Distance(t.S.Position.AsVec2) <= GuardMixNear)) return -2;
             if (a.IsHero) return FwHero;
             if (Undead.Character(a.Character)) return -2;
             if (Banner(a)) return FwBanner;
@@ -559,7 +641,7 @@ namespace Armoury
             return -1;
         }
 
-        private static int TakeFoot(Mission m, Threat t, FI fi, int cap, float now, Formation home = null)
+        private static int TakeFoot(Mission m, Threat t, FI fi, int cap, float now, Formation home = null, Vec2? anchor = null)
         {
             int left = _hScanCap - _hScan;
             if (left <= 0) { _hScanCut++; return 0; }
@@ -600,7 +682,10 @@ namespace Armoury
                     continue;
                 }
                 var hf = StartHunter(t, a, fi, RoleFoot, 0f, now);
+                if (a.IsRangedCached) _g550MixFoot++;   // 550c: strzelec z bronia boczna w R2 (EligFoot przepuszcza tylko przy sztandarze)
                 if (home != null) { hf.Home = home; _rGuardN++; RGuardForms.Add(fi.F); }   // poprawka 132b: straz strzelcow
+                // 550b: smycz od miejsca ofiary / sztandaru (FootLeash: Home == null i Anchor - od kotwicy); 132b ma pierwszenstwo, 291 tylko bez kotwicy 550
+                else if (anchor.HasValue) { hf.Anchor = anchor.Value; hf.Anchor550 = true; _g550Anchor++; }
                 // 291: szyk nie staje (idzie dalej z armia) - oddzial trzyma sie miejsca, z ktorego wyszedl, nie uciekajacej mediany szyku (inaczej smycz 50 m
                 // sciagalaby go po ok. 30 s marszu, przerwa 30 s i znowu wypad - "raz ida do mnie raz do nich")
                 else if (_rMarchOn) { hf.Anchor = FootHome(fi.F); _l291Anchor++; }
@@ -727,6 +812,11 @@ namespace Armoury
               .Append(" | test: ").Append(ReactTestSummary())
               .Append(" | smycz z wyprzedzeniem (305c) ").Append(_leashAhead ? "TAK" : "NIE").Append(": zawroceni przed smycza ").Append(_rLeashEarly)
               .Append(", w kroku sterowania ").Append(_rLeashStep).Append(", prognoza najwyzej ").Append(F0(_rLeashPredMax)).Append(" m")
+              .Append(" | 550 (klucz ").Append(_bannerGuard ? "TAK" : "NIE").Append("): przy sztandarze wykryc ").Append(_g550Near).Append(" (gracz ").Append(_g550NearPlayer)
+              .Append("; odrzucone: front ").Append(_g550Front).Append(", nie samotny ").Append(_g550NotLone).Append(", ponad ").Append(GuardMaxFoes).Append(" wrogow ")
+              .Append(G550Many).Append(", limit zapytan ").Append(G550Cut).Append("), smycz od miejsca ofiary ").Append(G550WideF.Count).Append(" szykow, kotwica od ofiary ")
+              .Append(_g550Anchor).Append(" ludzi, strzelcy z bronia boczna w R2 ").Append(_g550MixFoot).Append(", strzelcy szyku piechoty w R1 ").Append(_g550MixR1)
+              .Append(", potkniecia ").Append(G550Stum)
               .Append(" | potkniecia nekanie ").Append(_rStum).Append('.');
             Log.Info(sb.ToString());
         }

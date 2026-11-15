@@ -686,6 +686,8 @@ namespace Armoury
             if (c == null || !c.BannerCompaniesEnabled) return;
             try { TickLead(now, c, m); }   // 318c: wodzowie druzyn, zdarzenie "ostatni bohater strony zszedl" (przed rzutami taktu)
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.TickLead", e); }
+            try { Guard550(now, c, m); }   // 550b: straz sztandaru - wrog przy chorazym AI / lezacym sztandarze budzi 283 (BannerCompanies.Guard550.cs)
+            catch (Exception e) { HorsePursuit.G550Stum++; BannerCompanies.Stumble("BannerCompaniesMission.Guard550", e); }
             for (int i = 0; i < _all.Count; i++)
             {
                 var co = _all[i];

@@ -180,12 +180,16 @@ namespace Armoury
             for (int i = 0; i < fl.Count; i++)
             {
                 var fi = fl[i];
-                if (!(fi.Rng || fi.Ha)) continue;
+                // 550c: szyk piechoty ofiary przy sztandarze (kusznicy i lucznicy w szyku piechoty) - strzelaja tylko z czysta linia (wszystkie testy ponizej bez
+                // zmian); zasieg GuardShootRange (pierwszy czlowiek szyku piechoty nie mowi o zasiegu strzelcow)
+                bool mix = !(fi.Rng || fi.Ha) && _bannerGuard && t.OnBanner && fi.Foot && ReferenceEquals(fi.F, t.VicF);
+                if (!(fi.Rng || fi.Ha || mix)) continue;
                 if (fi.Player) continue;   // szyk gracza - nigdy (jak RangedPass 204)
                 if (fi.Retreat) continue;
                 var u0 = fi.F.GetFirstUnit();
                 float range = 0f;
-                if (u0 != null && u0.IsActive() && u0.IsRangedCached) range = ShooterRange(u0);
+                if (mix) range = GuardShootRange;
+                else if (u0 != null && u0.IsActive() && u0.IsRangedCached) range = ShooterRange(u0);
                 if (range <= 1f || Math.Max(0f, sp.Distance(fi.C) - fi.R) > range) continue;
                 RangedForms.Add(i);
                 RangedRange.Add(range);
@@ -201,6 +205,7 @@ namespace Armoury
                 if (_rRays >= RaysPerPass) { _rRayCap++; break; }
                 var fi = fl[RangedForms[j]];
                 float range = RangedRange[j];
+                bool mixF = !(fi.Rng || fi.Ha);   // 550c: szyk piechoty ofiary (licznik _g550MixR1)
                 // pojedynek strzelecki: wrog (inny szyk) w zasiegu - obraca sie tylko polowa blizsza nekajacemu (RBM 0.5), reszta trzyma swoj cel;
                 // recenzja 283 (1): polowa = polplaszczyzna przez srodek szyku od strony nekajacego (nie kolo wokol niego); nekajacy w szyku albo przy nim
                 // (w promieniu szyku) - odpowiadaja wszyscy w zasiegu
@@ -239,6 +244,7 @@ namespace Armoury
                         wb.SetVec2(back);
                         if (wb.GetNavMesh() == UIntPtr.Zero) continue;
                         var hb = StartHunter(t, a, fi, RoleRanged, range, now);
+                        if (mixF) _g550MixR1++;
                         ApplyStep(hb, back, _nearMelee);   // poprawka 132b: przy zwarciu ze swoimi - krok bez strzalu
                         _rBack++;
                         _hNewRanged++;
@@ -253,6 +259,7 @@ namespace Armoury
                     if (r == 1)
                     {
                         StartHunter(t, a, fi, RoleRanged, range, now);
+                        if (mixF) _g550MixR1++;
                         _hNewRanged++;
                         n++;
                         continue;
@@ -262,6 +269,7 @@ namespace Armoury
                     if (mt == null && TryStep(m, a, t.S, fi.F, out at))
                     {
                         var hs = StartHunter(t, a, fi, RoleRanged, range, now);
+                        if (mixF) _g550MixR1++;
                         ApplyStep(hs, at);
                         _hNewRanged++;
                         n++;

@@ -59,6 +59,10 @@ namespace Armoury
         internal const float RunPlayerRange = 12f, RunMaxRange = 40f, RunCrowdRadius = 6f, RunSettle = 1f, RunPickEvery = 0.5f, RunStepEvery = 0.25f,
                              RunGiveUpAfter = 8f, RunStallAfter = 2f, RunProgress = 0.5f, RunCompanyNear = 10f;
         internal const int RunMaxTries = 5, RunMaxFails = 5, RunQueueMax = 256;
+        // 550a (Jeff 15.11 "podniesc baner tak, jak nie ma zagrozenia"): biegacz tylko bez zagrozenia - kandydatow sprawdzanych na Pick, zwrotow proby
+        // na upadek; spokoj po ciosie przed wyslaniem / w biegu (s), gorny limit promienia z klucza, cel AI kandydata blizej niz (m)
+        internal const int RunThreatChecks = 4, RunThreatRefunds = 3;
+        internal const float RunHitCalm = 3f, RunHitGiveUp = 1f, RunSafeMax = 20f, RunTargetNear = 10f;
 
         /// <summary>158: wyslany pierwszy biegacz po upadly sztandar kompanii - okrzyk "Save the banner!" (BattleSound). Wzor BannerCompanies.Events.cs (plik integratora
         /// bez zmian).</summary>
@@ -94,8 +98,9 @@ namespace Armoury
             public Agent Dropper, Runner;
             public Vec3 Pos;
             public float At, RunAt, LastBetter, Best, StartDist, Dist;
-            public int Sent, Uses, Fails, LastWhy = -1;
-            public bool Cried, GameSeen, Closed, UserCut;   // UserCut (recenzja 158): ostatni bieg przerwal ktos inny, ktory zaczal podnosic (gracz / gra)
+            public int Sent, Uses, Fails, LastWhy = -1, Refunds;   // Refunds (550a): zwroty proby po porzuceniu pod zagrozeniem
+            // EverSent (550a): Sent moze wrocic do 0 po zwrocie proby; ThrBanner / ThrCand (550a) - liczniki linii raz na upadek
+            public bool Cried, GameSeen, Closed, UserCut, EverSent, ThrBanner, ThrCand;   // UserCut (recenzja 158): ostatni bieg przerwal ktos inny, ktory zaczal podnosic (gracz / gra)
             public readonly HashSet<Agent> Tried = new HashSet<Agent>();
         }
 
@@ -103,16 +108,16 @@ namespace Armoury
 
         // powody rezygnacji biegacza
         private const int GTime = 0, GStall = 1, GPanic = 2, GWound = 3, GPursuit = 4, GForm = 5, GRetreat = 6, GBroken = 7, GCrowd = 8,
-                          GLost = 9, GUseFail = 10, GGone = 11, GOther = 12, GDown = 13, GEnd = 14, GFail = 15, NG = 16;
+                          GLost = 9, GUseFail = 10, GGone = 11, GOther = 12, GDown = 13, GEnd = 14, GFail = 15, GThreat = 16, NG = 17;
         private static readonly string[] GNames = { "czas 8 s", "brak postepu 2 s", "panika (139)", "rana (143)", "poscig (148)", "inny szyk",
             "rozkaz odwrotu", "kompania zlamana", "wrogowie przy sztandarze", "ruch zdjety cudza reka", "podnoszenie przerwane", "sztandar zniknal",
-            "podniosl inny", "padl / omdlal", "koniec misji", "potkniecia" };
+            "podniosl inny", "padl / omdlal", "koniec misji", "potkniecia", "wrog przy biegaczu / cios" };
         // dlaczego upadek skonczyl sie bez biegacza (ostatni powod)
         private const int SNotYet = 0, SOff = 1, SPlayer = 2, SBroken = 3, SRetreat = 4, SGame = 5, SCrowd = 6, SNoOne = 7, SLimit = 8, SEmpty = 9, SFail = 10,
-                          SRedrop = 11, NS = 12;
+                          SRedrop = 11, SThreat = 12, NS = 13;
         private static readonly string[] SNames = { "zanim szukano (ponizej 1 s / przed rozstawieniem)", "klucz zasieg 0", "szyk gracza (klucz NIE)", "kompania zlamana",
             "rozkaz odwrotu", "gra juz biegnie / ktos podnosi", "wrogowie przy sztandarze", "nikogo w zasiegu", "limit prob", "szyk pusty", "potkniecia",
-            "po ponownym upuszczeniu w szyku" };
+            "po ponownym upuszczeniu w szyku", "kandydaci pod zagrozeniem" };
 
         private readonly List<Fallen> _fallen = new List<Fallen>();
         private readonly Dictionary<Agent, Fallen> _runners = new Dictionary<Agent, Fallen>();
@@ -133,6 +138,9 @@ namespace Armoury
         private int _rDrops, _rNoForm, _rSent, _rFallsRun, _rCries, _rRaised, _rGame, _rGamePlayer, _rGameRun, _rGameSeen, _rVanished, _rLeft;
         private int _rRedrop, _rRedropRunner, _rRedropPanic, _rPickOther, _rStumbles, _rSpeedN, _rQueueCut, _rEvFail;
         private int _rSpeedTN, _rTargetBack;
+        private int _r550Banner, _r550Cand, _r550Refund;   // 550a: upadki z wrogiem przy sztandarze / z kandydatami pod zagrozeniem (raz na upadek), zwroty proby
+        private readonly List<KeyValuePair<float, Agent>> _cand = new List<KeyValuePair<float, Agent>>();   // 550a: kandydaci Pick (glowny watek)
+        private static readonly Comparison<KeyValuePair<float, Agent>> CandByDist = (x, y) => x.Key.CompareTo(y.Key);
         private float _rRaisedFall, _rRaisedRun, _rSpeedSum, _rSpeedTSum;   // predkosc: _rSpeed* - podniesieni, _rSpeedT* - porzuceni po 8 s (recenzja 158)
         private readonly int[] _rGiveUp = new int[NG], _rNoRunner = new int[NS];
 
@@ -363,23 +371,80 @@ namespace Armoury
             if (_noRunForm.Contains(f)) { fl.LastWhy = SRedrop; return; }   // recenzja 158: nowy chorazy tego szyku upuscil juz sztandar zywy
             if (fl.Sent >= BannerCompanies.RunMaxTries) { fl.LastWhy = SLimit; return; }
             try { fl.Pos = sie.GameEntity.GlobalPosition; } catch { }
-            if (Crowded(fl.Pos, f.Team, m)) { fl.LastWhy = SCrowd; return; }
+            // 550a: przy kluczu BannerPickupSafeRadius > 0 - dowolny czynny, nieuciekajacy wrog (nie w panice) w promieniu od sztandaru, samotny gracz tez
+            // (stary Crowded "wrogow > swoich + 1" nigdy go nie liczyl: 1 > 0 + 1 to falsz). 0 = stara regula
+            float sr = SafeRadius(c);
+            if (sr > 0f ? Threatened(fl.Pos.AsVec2, f.Team, m, sr) : Crowded(fl.Pos, f.Team, m))
+            {
+                fl.LastWhy = SCrowd;
+                if (sr > 0f && !fl.ThrBanner) { fl.ThrBanner = true; _r550Banner++; }
+                return;
+            }
             var mg = MissionGameModels.Current;
             var model = mg != null ? mg.BattleBannerBearersModel : null;
-            Agent best = null;
-            float bd = float.MaxValue;
             var p2 = fl.Pos.AsVec2;
+            _cand.Clear();
             m.GetNearbyAllyAgents(p2, range, f.Team, _near);
             for (int i = 0; i < _near.Count; i++)
             {
                 var a = _near[i];
                 if (!Fit(a, fl, model)) continue;
-                float d = a.Position.AsVec2.Distance(p2);
-                if (d < bd) { bd = d; best = a; }
+                _cand.Add(new KeyValuePair<float, Agent>(a.Position.AsVec2.Distance(p2), a));
             }
             _near.Clear();
-            if (best == null) { fl.LastWhy = SNoOne; return; }
+            if (_cand.Count == 0) { fl.LastWhy = SNoOne; return; }
+            Agent best = null;
+            float bd = 0f;
+            if (sr > 0f)
+            {
+                // 550a: najwyzej RunThreatChecks najblizszych - idzie pierwszy bez zagrozenia (cios w ostatnich 3 s, wrog w 6 m, cel AI - wrog blizej niz 10 m)
+                _cand.Sort(CandByDist);
+                int n = Math.Min(_cand.Count, BannerCompanies.RunThreatChecks);
+                for (int i = 0; i < n; i++)
+                {
+                    var a = _cand[i].Value;
+                    bool bad;
+                    try { bad = CandThreat(a, f.Team, m, now); }
+                    catch (Exception e) { _rStumbles++; BannerCompanies.Stumble("BannerCompaniesMission.Kandydat550", e); bad = true; }
+                    if (bad) continue;
+                    best = a;
+                    bd = _cand[i].Key;
+                    break;
+                }
+            }
+            else
+            {
+                bd = float.MaxValue;
+                for (int i = 0; i < _cand.Count; i++) if (_cand[i].Key < bd) { bd = _cand[i].Key; best = _cand[i].Value; }
+            }
+            _cand.Clear();
+            if (best == null)
+            {
+                fl.LastWhy = SThreat;
+                if (!fl.ThrCand) { fl.ThrCand = true; _r550Cand++; }
+                return;
+            }
             Send(fl, best, bd, now);
+        }
+
+        /// <summary>550a: promien bezpieczenstwa sztandaru z klucza BannerPickupSafeRadius (0 = stara regula Crowded; najwyzej 20 m).</summary>
+        private static float SafeRadius(Settings c)
+        {
+            float sr = c != null ? c.BannerPickupSafeRadius : 0f;
+            if (!(sr > 0f)) return 0f;
+            return sr > BannerCompanies.RunSafeMax ? BannerCompanies.RunSafeMax : sr;
+        }
+
+        /// <summary>550a: kandydat pod zagrozeniem - cios wrecz w ostatnich RunHitCalm s (Agent.LastMeleeHitTime liczone Mission.CurrentTime), wrog w 6 m
+        /// albo jego cel AI to czynny wrog blizej niz 10 m (wzor gry HumanAIComponent.ItemPickupTick: brak celu blizej niz 20 m).</summary>
+        private bool CandThreat(Agent a, Team t, Mission m, float now)
+        {
+            if (now - a.LastMeleeHitTime < BannerCompanies.RunHitCalm) return true;
+            if (Threatened(a.Position.AsVec2, t, m, BannerCompanies.RunCrowdRadius)) return true;
+            var tg = a.GetTargetAgent();
+            if (tg != null && tg.IsActive() && tg.IsHuman && !tg.IsRunningAway && tg.Team != null && t != null && tg.Team.IsEnemyOf(t)
+                && tg.Position.AsVec2.DistanceSquared(a.Position.AsVec2) < BannerCompanies.RunTargetNear * BannerCompanies.RunTargetNear) return true;
+            return false;
         }
 
         /// <summary>Kandydat na biegacza (patrz opis klasy BannerCompanies.Pickup).</summary>
@@ -410,7 +475,7 @@ namespace Armoury
             fl.Tried.Add(a);
             _runners[a] = fl;
             _rSent++;
-            if (fl.Sent == 1) _rFallsRun++;
+            if (!fl.EverSent) { fl.EverSent = true; _rFallsRun++; }   // 550a: Sent moze wrocic do 0 po zwrocie proby - upadek liczony raz
             var inv = CultureInfo.InvariantCulture;
             Line(fl, "BIEGACZ (158) wyslany z " + d.ToString("0.0", inv) + " m, " + (now - fl.At).ToString("0.0", inv) + " s po upadku (proba " + fl.Sent + ")", a, "biegacz");
             if (!fl.Cried)
@@ -448,7 +513,27 @@ namespace Armoury
             if (Retreating(fl.F)) { GiveUp(fl, GRetreat, now, true); return; }
             if (fl.Co != null && fl.Co.Broken) { GiveUp(fl, GBroken, now, true); return; }
             try { fl.Pos = sie.GameEntity.GlobalPosition; } catch { }
-            if (Crowded(fl.Pos, fl.F.Team, m)) { GiveUp(fl, GCrowd, now, true); return; }
+            float sr = SafeRadius(Settings.Current);
+            if (sr > 0f)
+            {
+                // 550a: wrog przy sztandarze, wrog w 6 m od biegacza albo cios w biegu - rzuca bieg i walczy (stop: StopUsingGameObject(false) zdejmuje NoAttack
+                // i pozycje skryptowa; wolny dla R2 283 w nastepnym passie); proba zwrocona (najwyzej RunThreatRefunds na upadek) - limit RunMaxTries nie
+                // zuzywa sie przez jednego wroga
+                if (Threatened(fl.Pos.AsVec2, fl.F.Team, m, sr) || Threatened(a.Position.AsVec2, fl.F.Team, m, BannerCompanies.RunCrowdRadius)
+                    || now - a.LastMeleeHitTime < BannerCompanies.RunHitGiveUp)
+                {
+                    GiveUp(fl, GThreat, now, true);
+                    if (fl.Refunds < BannerCompanies.RunThreatRefunds && fl.Sent > 0)
+                    {
+                        fl.Refunds++;
+                        fl.Sent--;
+                        fl.Tried.Remove(a);
+                        _r550Refund++;
+                    }
+                    return;
+                }
+            }
+            else if (Crowded(fl.Pos, fl.F.Team, m)) { GiveUp(fl, GCrowd, now, true); return; }
             float d = a.Position.AsVec2.Distance(fl.Pos.AsVec2);
             fl.Dist = d;
             if (d < fl.Best - BannerCompanies.RunProgress) { fl.Best = d; fl.LastBetter = now; }
@@ -527,7 +612,7 @@ namespace Armoury
         {
             if (fl.Closed) return;
             fl.Closed = true;
-            if (fl.Sent == 0) _rNoRunner[fl.LastWhy < 0 ? SNotYet : fl.LastWhy]++;
+            if (!fl.EverSent) _rNoRunner[fl.LastWhy < 0 ? SNotYet : fl.LastWhy]++;   // 550a: EverSent, bo Sent wraca do 0 po zwrocie proby
             fl.Tried.Clear();
         }
 
@@ -565,6 +650,21 @@ namespace Armoury
             for (int i = 0; i < _near2.Count; i++) { var x = _near2[i]; if (x != null && x.IsActive() && x.IsHuman && !x.IsRunningAway) own++; }
             _near2.Clear();
             return foes > own + 1;
+        }
+
+        /// <summary>550a: zagrozenie - dowolny czynny, nieuciekajacy wrog-czlowiek (nie w panice 139) w promieniu r od punktu.</summary>
+        private bool Threatened(Vec2 p, Team t, Mission m, float r)
+        {
+            if (t == null || m == null) return false;
+            bool hit = false;
+            m.GetNearbyEnemyAgents(p, r, t, _near2);
+            for (int i = 0; i < _near2.Count; i++)
+            {
+                var x = _near2[i];
+                if (x != null && x.IsActive() && x.IsHuman && !x.IsRunningAway && !SurvivalMode.InPanic(x)) { hit = true; break; }
+            }
+            _near2.Clear();
+            return hit;
         }
 
         private static bool Retreating(Formation f)
@@ -631,7 +731,7 @@ namespace Armoury
 
         private void RunClear()
         {
-            _fallen.Clear(); _runners.Clear(); _picked.Clear(); _pickedByRunner.Clear(); _noRun.Clear(); _noRunForm.Clear(); _near.Clear(); _near2.Clear(); _runQ2.Clear();
+            _fallen.Clear(); _runners.Clear(); _picked.Clear(); _pickedByRunner.Clear(); _noRun.Clear(); _noRunForm.Clear(); _near.Clear(); _near2.Clear(); _runQ2.Clear(); _cand.Clear();
             lock (_runQLock) _runQ.Clear();
         }
 
@@ -673,6 +773,9 @@ namespace Armoury
               .Append(" | upuszczonych ponownie przy zmianie broni ").Append(_rRedrop).Append(" (zywy, nie w panice; z tego po biegu ").Append(_rRedropRunner)
               .Append("; nowy chorazy w panice ").Append(_rRedropPanic).Append("; szykow odtad bez biegaczy ").Append(_noRunForm.Count)
               .Append("; cel automatyczny przywrocony (RBM) ").Append(_rTargetBack).Append(')')
+              .Append(" | 550: promien bezpieczenstwa ").Append(SafeRadius(c).ToString("0", inv)).Append(" m")
+              .Append(", bez wysylki - wrog przy sztandarze ").Append(_r550Banner).Append(", kandydaci pod zagrozeniem ").Append(_r550Cand)
+              .Append("; porzucone - wrog przy biegaczu / cios ").Append(_rGiveUp[GThreat]).Append(" (zwrotow proby ").Append(_r550Refund).Append(')')
               .Append(" | podniesienia spoza listy ").Append(_rPickOther)
               .Append(" | kolejka: pominiete ").Append(_rQueueCut).Append(", bledy zdarzen ").Append(Volatile.Read(ref _rEvFail))
               .Append(" | potkniecia ").Append(_rStumbles).Append('.');
