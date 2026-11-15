@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 262 (562 komplet cwiczebny wedlug roli, sam sie uzupelnia ze zbrojowni), bez autotestu
+
+- Armoury.dll 1a96acf6 = noc/scal-perki afd1449d (261 + 562). Kopie: .bak-2026-11-15-przed-wgranie262, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie262 i -przed). Nowy plik kodu DrillKit.cs; zestaw musztry wazy ('Drill kit'); rekawice poza zestawem.
+- Do sprawdzenia: 'Musztra (gracz)' - 'bilans zapasu musztry ZGODNY', 'kontrola sztuk ZGODNE'; pasek Drill X/Y i podpowiedz wedlug rol; migracja starego zapasu (rekawice do zbrojowni). W toku: 563 stal valyrianska.
+
 ## STAN 15.11 - WGRANIE 261 (561 jednorozce nigdzie, konie wight tylko u Innych; Skagos na koniach gorskich), bez autotestu
 
 - Armoury.dll 2891ca06 = noc/scal-perki d628b6ca (260 + 561). Kopie: .bak-2026-11-15-przed-wgranie261, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie261 i -przed).
