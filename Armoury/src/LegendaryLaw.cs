@@ -90,6 +90,8 @@ namespace Armoury
             // 177-2: stan startowy stali valyrianskiej z szablonow postaci - PRZED SweepTemplates (ta podmienia klingi w szablonach w pamieci sesji)
             try { ValyrianBlades.CaptureTemplates(); } catch (Exception e) { Log.Error("ValyrianBlades.CaptureTemplates", e); }
             try { SweepTemplates(); } catch (Exception e) { Log.Error("LegendaryLaw.SweepTemplates", e); }
+            // 561: jednorozec / kon umarlych u zywych schodzi z szablonow jednostek - tez przed TroopFit.Run (wymogi jazdy z koncowego szablonu)
+            try { DeadMounts561.SweepTemplates(); } catch (Exception e) { Log.Error("DeadMounts561.SweepTemplates", e); }
             try { if (!_playerCulledAll) { CullPlayerAll(); _playerCulledAll = true; } }
             catch (Exception e) { Log.Error("LegendaryLaw.Cull", e); }
             try { SweepAiArmories("wczytanie"); } catch (Exception e) { Log.Error("LegendaryLaw.SweepAiArmories", e); }

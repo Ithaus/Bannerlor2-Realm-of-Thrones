@@ -1451,6 +1451,9 @@ namespace Armoury
                 // (Jeff 29.08: "skad slonie na polnocy?!"). Smoki tak samo.
                 var id = it.StringId ?? "";
                 if (id == "elephant" || id.StartsWith("rot_elephant") || id.StartsWith("dragon_")) return false;
+                // 561 (Jeff 15.11: jednorozce i konie umarlych na targu Winterfell): jednorozec i kon umarlych to nie zwykly kon - Stajnia AI ich nie kupuje,
+                // zapas, sprzedaz nadwyzek, pula weteranow i Prologue.Dragons ich nie licza (klucz NoMagicMountsForLiving)
+                if (DeadMounts561.Forbidden(it)) return false;
                 var hc = it.HorseComponent;
                 if (hc == null || !hc.IsMount) return false;
                 // MAMUT MA item_category=horse (14.09: "Stajnia AI: Barristan Selmy

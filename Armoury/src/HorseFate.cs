@@ -1242,6 +1242,23 @@ namespace Armoury
             }
         }
 
+        /// <summary>561 (DeadMounts561): z puli weteranow schodza wierzchowce, ktorych nikt nie moze trzymac (jednorozec, kon umarlych) - ujscie, note liczy.</summary>
+        internal static void Purge561(Func<ItemObject, bool> bad, Action<ItemObject, int> note)
+        {
+            EnsureLoaded();
+            var drop = new List<string>();
+            foreach (var kv in _vetPool)
+            {
+                if (kv.Value == null) continue;
+                List<ItemObject> kill = null;
+                foreach (var x in kv.Value) if (x.Key != null && x.Value > 0 && bad(x.Key)) { if (kill == null) kill = new List<ItemObject>(); kill.Add(x.Key); }
+                if (kill == null) continue;
+                foreach (var it in kill) { int n = kv.Value[it]; kv.Value.Remove(it); note(it, n); }
+                if (kv.Value.Count == 0) drop.Add(kv.Key);
+            }
+            foreach (var k in drop) _vetPool.Remove(k);
+        }
+
         /// <summary>HorseBook (stan koni): konie w pulach karczm wedlug kategorii.</summary>
         internal static void VetPoolCats(long[] dst)
         {
