@@ -1,5 +1,45 @@
 # DZIENNIK ZMIAN
 
+## 549: cios w plecy - cios wrecz z tylu x2 obrazen i 25% przebicia pancerza, jedna regula dla wszystkich - Armoury (Backstab549.cs NOWY, NightHooks.cs, SubModuleMain.cs; klucze NOWE BackstabEnabled = TAK, BackstabDamageMult = 2.0, BackstabArmourPen = 25 w Settings.cs + McmSettings.cs recznie, RANGES w gen_mcm.py)
+
+**Problem:** Jeff, czat 15.11, w trakcie bitwy: "jak ktos zada mi cios z tylu powinno liczyc sie x2 obrazenia z tylu albo przynajmniej x2 i 25% armour penetration". Dzis cios w plecy liczy sie jak kazdy inny (gra nie ma premii za kierunek; jest tylko sneak attack z ukrycia).
+
+**Przyczyna:** MissionCombatMechanicsHelper.ComputeBlowDamage (gra) i prefiks RBM OverrideDamageCalc nie patrza na kierunek ciosu wzgledem ofiary - pancerz i obrazenia sa te same z przodu i z tylu.
+
+**Zmiana:**
+- Nowy `Backstab549.cs` (wzor NeckGuard415): prefiks `Priority.First` (przed RBM) i postfiks `Priority.Last` na `AccessTools.DeclaredMethod(typeof(MissionCombatMechanicsHelper), "ComputeBlowDamage")` - ten sam MethodInfo co 415 / 416 / 417 / 423b. Zakladane w kampanii (NightHooks, linia "Latki nocy (K3)": "cios z tylu (549)"), nigdy w SubModuleMain. Logic dodawany w misji jak 415-p (`Campaign.Current != null || Backstab549.Patched`).
+- Z tylu: d = (napastnik - ofiara).AsVec2, cos = dot(d, VictimAgentMovementDirection) / (|d| |dir|) <= BannerCompanies.RearCos (-0.5), czyli napastnik ponad 120 st. od kierunku TULOWIA (nie LookDirection jak 448 - gracz z Altem obraca glowe). |d| < 0.05 pominiete.
+- Warunki: klucz TAK; nie pocisk, upadek, szarza konia, cios alternatywny (kopniak, tarcza), cios na tarcze; bron != null; oboje ludzie, nie ten sam agent; pominiete z licznikiem: swoj w swojego, tarcza na plecach (RBM / Perk506 D9), lezacy w akcji Fall (zjawisko 415), sneak attack gry (postfiks).
+- Prefiks: ArmorAmountFloat x (1 - przebicie/100), przebicie przyciete 0..75. Bez RBM dziala tak samo (gra czyta to pole).
+- Postfiks: gotowe inflictedDamage x mnoznik (przyciety 1..3, gorna granica 2000), absorbedByArmor = max(0, surowe - po). Mnozymy wynik, nie magnitude (RBM odejmuje pancerz nieliniowo).
+- Watki: znacznik `[ThreadStatic]`, liczniki `Interlocked` (sumy long), wyjatek zapisany w polu volatile i zgloszony `RoutHold.Stumble(SiteBanner)` na koncu misji. Prefiks i postfiks w try/catch, bez globalnego wylacznika.
+- MCM (grupa "Wear and tear", po Prone Armor Percent): "Blows From Behind Hurt More", "Blow From Behind Damage Multiplier" (1-3), "Blow From Behind Armour Piercing" (0-75). Klucze nowe - w Armoury.json Jeffa ich nie ma, wejda domyslne.
+- Linia konca misji: "Cios z tylu (549): koniec misji (<rodzaj>) | klucz TAK, x2.00, przebicie 25% | ciosy wrecz czlowiek-czlowiek M, z tylu N (p%), obrazenia srednio a -> b, pancerz srednio x -> y | w gracza z tylu k, gracza z tylu j | pominiete: swoj F, tarcza na plecach S, lezacy P, sneak K | potkniecia E | latki 2/2."
+
+**Ryzyko / co sprawdzic (regula 0):**
+- Kolizje (ComputeBlowDamage): 415 lezacy - wykluczony z 549; 416 i 423b (prefiksy First na ArmorAmountFloat) - mnozenie, kolejnosc bez znaczenia, 423b to pociski (549 je pomija); 417 znacznik - nie czyta obrazen; Perk506 D9 - CollidedWithShieldOnBack pominiety; FriendlyFire / Perk514 (CalculateDamage po nas) - IsFriendlyFire pominiety; OthersSteel (CrashScribe) - mnozenie; BlowFate421, HeroBlow422, 448, Bleed czytaja wieksze obrazenia - wiecej smierci i ciezszych ran od ciosu w plecy (zamierzone). RBM twarz / pacha: RBM podmienia pancerz po naszym prefiksie - tam przebicie nie dziala, x2 dziala (znana luka 415/416). Sneak attack gry pominiety.
+- Srednie pancerza w linii przyblizone (pole czytane przed albo po prefiksach 415 / 416 / 423b - kolejnosc Harmony), bez mnoznika zmeczenia RBM.
+- Zuzycie sprzetu: suma inflicted + absorbed stala, dopoki po <= surowe; przy prawie golym celu suma rosnie do "po" i FieldCraft policzy troche wiecej zuzycia broni napastnika. Skala mala.
+- Okrazenie bardzo zabojcze, takze dla gracza (szacunek bez pomiaru: pchniecie wlocznia 1h w piers w kolczudze ok. 44, z tylu ok. 110-125; w plycie ok. 18, z tylu ok. 45-55). Poscig jazdy: wiecej zabitych uciekajacych.
+- Turnieje i arena objete regula (decyzja Jeffa, gdyby nie - bramka trybu jak FriendlyFire). Komunikatu dla gracza nie ma (zasada 3).
+- Co sprawdzic w logu: start "Latki nocy (K3) ... cios z tylu (549): wpiete 2/2" i "Cios z tylu (549): latka raz na proces"; koniec misji: z tylu ok. 10-15% ciosow wrecz (448 ostatnio 18 z 132), b/a ok. 2.0, potkniecia 0; linie 415 i 448 bez zmian w liczbie trafien.
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA (galaz noc/549-cios-w-plecy, nie wgrane).
+
+### Recenzja 549 (galaz noc/549-cios-w-plecy-fix -> noc/549-cios-w-plecy)
+
+Recenzja: brak bledu blokujacego wgranie (cel DeclaredMethod, nazwy parametrow, kolejnosc przed RBM, kolizje 415/416/423b/Perk506, watki, jedno zalozenie na proces, klucz NIE = stare zachowanie - potwierdzone).
+
+Przyjete (sprawdzone w kodzie):
+- **Uwaga 3: srednie pancerza w linii konca misji liczone przed odrzuceniem sneaka.** Prefiks dodawal do _armN/_armB10/_armA10 zanim postfiks odrzucal cios z ukrycia (isSneakAttack), wiec srednie obejmowaly ciosy, ktorych 549 nie liczy w "z tylu". Teraz prefiks zapisuje pancerz przed/po w polach [ThreadStatic] (_armBefore/_armAfter), a do sum trafia on dopiero w postfiksie, przy ciosie faktycznie pomnozonym. Tylko log - obrazenia bez zmian (przebicie pancerza przy sneaku zostaje, RBM i tak zabija takim ciosem).
+
+Odrzucone (bez zmiany kodu):
+- **Uwaga 1: regula obejmuje kazda misje (turnieje GrandTourney, arena, kryjowki, pojedynki).** Nie blad kodu - wpis 549 opisuje to jako decyzje Jeffa ("gdyby nie - bramka trybu jak FriendlyFire"). Przekazane Jeffowi jako pytanie.
+- **Uwaga 2: MCM dopisane recznie, gen_mcm.py nie uruchomiony.** Generator dalby gorsze tytuly ("Backstab Damage Mult", opisy z przedrostkiem "549: ") i i tak rozjezdza sie z recznym McmSettings.cs w wielu wpisach - uruchomienie przepisaloby cudze pozycje. Zapisane wartosci trzyma nazwa pola, wiec reczne wpisy sa poprawne. Stan zastany, nie ruszam.
+
+- Build Armoury 0 bledow. W grze nie sprawdzone, nie wgrane.
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".

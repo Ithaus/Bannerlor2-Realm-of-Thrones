@@ -27,6 +27,8 @@ RANGES = {
     'NeckFromHelmetShare': (0.0, 1.0, "0.00"),
     'ShoulderFromBodyShare': (0.0, 1.0, "0.00"),
     'ProneArmorPercent': (0.0, 100.0, "0"),
+    'BackstabDamageMult': (1.0, 3.0, "0.00"),   # 549
+    'BackstabArmourPen': (0.0, 75.0, "0"),        # 549
     # 414-p: bron miotana w tarcze - zakres jak w recznym McmSettings.cs (ShieldGuard.Classify przycina do 0..100; regula ogolna dalaby 0..400)
     'ThrownShieldDamagePercent': (0.0, 100.0, "0.00"),
     # 402 / 404 (402-p): lochy - zakresy jak w recznym McmSettings.cs (kod przycina prog do 0.05..0.99, przebieg do >= 1)
