@@ -116,7 +116,9 @@ namespace Armoury
             if (side) return true;
             var mp = MobileParty.MainParty;
             var me = mp != null ? mp.MapEvent : null;
-            return me != null && me.IsRaid && mp.MapEventSide != null && mp.MapEventSide == me.AttackerSide;
+            if (me == null || !me.IsRaid || mp.MapEventSide == null || mp.MapEventSide != me.AttackerSide) return false;
+            // 577 (Raid Night Halt): rabunek stojacy na noc nie jest rabunkiem teraz - ludzie spia przy wsi (ksiega snu, ArmyRestDay, trening przed snem)
+            return !RaidHaltHolds(me.Component as TaleWorlds.CampaignSystem.MapEvents.RaidEventComponent);
         }
 
         /// <summary>m103-drobne (klucz RaidCountsAsWork): w ostatniej godzinie gry druzyna gracza rabowala (klatka OnTickCore albo tick godzinowy) - ta godzina to
@@ -316,6 +318,10 @@ namespace Armoury
                 bool sideRaid = false;
                 bool raided = false;
                 if (s.RaidCountsAsWork && !enl) { raided = PlayerRaidingNow(out sideRaid); if (!raided && RaidedLastHour) { raided = true; sideRaid = _lastRaidSide; } }
+                // 577 (Raid Night Halt): godzina ksiegi z nocnym postojem przy rabunku (postoj trwa w chwili ticku) to sen jak w obozie - nie praca, takze gdy poczatek
+                // godziny jeszcze rabowal (zmierzch w srodku godziny; jak oboz rozbity o 21:00). Godzina wznowienia o swicie (postoj juz zdjety) - jak dotad
+                bool raidHalt = RaidHaltNow && !enl;
+                if (raidHalt) { raided = false; _haltTicksDay++; }
                 bool work = drilled || raided;
                 if (raided && resting && !forced && !drilled)
                 {
@@ -330,6 +336,7 @@ namespace Armoury
                     }
                 }
                 if (resting && !forced && !work) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+                if (raidHalt && resting && !forced && !work) _haltRestDay += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);   // 577: do linii switu i wznowienia
                 InnDrink.RestHour(resting && !forced && !work ? (night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f)) : 0f, _sleeping);   // m98-plotki: odsypianie kufli tym samym odpoczynkiem (wlasny try)
                 TownInns.NightHour(mp, night);   // 486: godzina nocy ksiegi w miescie - licznik do oplaty noclegu o swicie (wlasny try)
 
@@ -503,6 +510,7 @@ namespace Armoury
                     _menuSleptDay = _sleeping;   // 316b: nowa doba - sen trwajacy przez swit liczy sie tez do niej
                     TbsDawnLine();   // 311e: linia doby treningu przed snem (wlasny try)
                     _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _raidWorkHoursDay = 0;
+                    RaidHaltDawnReset();   // 577: liczniki postoju nocnego przy rabunku - nowa doba
                 }
                 // T10: AiNightCamp i AiBanditRest przeniesione do AiHourly (przed wyjscia gracza)
             }
@@ -638,6 +646,7 @@ namespace Armoury
                 _promptNight = -1; _warnNight = -1; _campMsgNight = -1; _raidNight = -1;
                 _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _lastDawnMsg = null;
                 _lastRaidAt = -1e9; _raidWorkHoursDay = 0; _raidWorkLogDay = long.MinValue;   // m103-drobne: rabunek gracza z poprzedniej kampanii nie jest praca tej godziny
+                ResetRaidHalt();   // 577: postoj nocny przy rabunku poprzedniej kampanii / sprzed wczytania (tylko pamiec)
                 // PlayerSleepGuard: flaga snu z poprzedniej kampanii / sprzed wczytania nie przechodzi (dotad zawieszony sen przezywal wczytanie zapisu
                 // z mapy); wczytanie zapisu z menu snu ustawia ja od nowa w SleepInit (menu wstaje po konstruktorze)
                 var sg = Settings.Current;
@@ -2197,6 +2206,8 @@ namespace Armoury
                 // grupa11-p: ksiega snu AI z zapisu od pierwszej klatki po wczytaniu (kary AI od reki, jak dlug gracza) - raz, potem _aiPending == null
                 if (Campaign.Current != null) AiImportNow(s);
                 // m103-drobne (RaidCountsAsWork): klatka z rabunkiem druzyny gracza - chwila do ksiegi snu (rabunek skonczony w srodku godziny i tak czyni ja godzina pracy)
+                // 577 (Raid Night Halt): postoj nocny przy rabunku - PRZED odczytem rabunku (rabunek stojacy na noc nie jest praca tej klatki)
+                RaidHaltFrame(s);
                 if (s.RaidCountsAsWork && Campaign.Current != null) { bool sideR; if (PlayerRaidingNow(out sideR)) { _lastRaidAt = CampaignTime.Now.ToHours; _lastRaidSide = sideR; } }
 
                 // straznik co klatke: namiot nie jezdzi po mapie - gracz ruszyl,

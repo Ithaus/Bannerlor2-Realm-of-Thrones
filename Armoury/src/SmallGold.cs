@@ -146,6 +146,7 @@ namespace Armoury
             {
                 if (__instance == null || !Live) return;
                 if (DistrictRaid.Owns(__instance)) return;                      // E7/R1 (v2): rabunek osada po osadzie placi sam (PayRaidLoot - ten sam platnik), oryginal nie biegnie
+                if (NightRest.RaidHaltHolds(__instance)) return;                // 577: rabunek gracza stoi na noc - oryginal nie biegnie, nie ma czego mierzyc
                 var def = __instance.DefenderSide;
                 if (def == null || def.TroopCount > 0) return;                  // poza faza lupienia gra nie placi (R:162) - bez alokacji co klatke
                 var st = __instance.MapEventSettlement;

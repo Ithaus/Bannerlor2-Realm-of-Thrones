@@ -118,6 +118,9 @@ namespace Armoury
         private static readonly Dictionary<string, int> _alert = new Dictionary<string, int>(StringComparer.Ordinal);   // id wsi -> doba konca czujnosci
         private static int _pendingDays;
         private static bool _ready;
+        /// <summary>577: prefiks kroku rabunku (UpdatePrefix) wpiety - bez niego postoj nocny przy rabunku nie zaczyna sie (NightRest.RaidHaltFrame).</summary>
+        internal static bool UpdWired { get; private set; }
+        private static long _dHaltTicks;   // 577: tykniecia rabunku zatrzymane postojem nocnym (linia doby)
         private static Action<Settlement, float> _setHp;
         private static Action<RaidEventComponent, float> _setDmg;
         private static Action<MapEvent, BattleState> _setBs;
@@ -154,7 +157,7 @@ namespace Armoury
             _dSettl = _dHit = _dDead = _dFled = _dRef = _dRaidDead = _dCheckDead = 0.0;
             _dCap = _dGold = _dTake = _dTakeValue = _dBurn = _dBurnValue = _dEat = 0;
             _dBal1 = _dBal2 = _dBal3 = 0.0;
-            _dTicks = 0;
+            _dTicks = 0; _dHaltTicks = 0;
             _dDaysPer.Clear();
             _dPStarted = _dPEnded = _dPWon = _dPCalled = _dPBroken = _dPSteps = _dAsk = _dShown = _dShownAgain = _dNoNext = _dNext = _dEndPopup = _dEndMenu = _dEndMenu0 = _dAutoEnd = _dAskFail = 0;
             _dPSettl = 0.0;
@@ -250,7 +253,14 @@ namespace Armoury
             Sess ss;
             try { ss = Decide(__instance); }
             catch (Exception e) { Stumble("UpdatePrefix(decyzja)", e); return true; }
-            if (ss == null) return true;
+            // 577 (Raid Night Halt): rabunek gry (nie R1) stojacy na noc - oryginal nie biegnie w fazie lupienia (bez CalculateHitDamage, zlota, towaru); jak G :164
+            if (ss == null)
+            {
+                if (!NightRest.RaidHaltHolds(__instance)) return true;
+                try { var me0 = __instance.MapEvent; if (me0 != null) me0.WasEverInLootingPhase = true; } catch { }
+                _dHaltTicks++;
+                return false;
+            }
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -270,6 +280,8 @@ namespace Armoury
                     else if (ss.Choice == ChoiceEnd) { Win(ss, __instance, me, st); finish = true; }
                     return false;
                 }
+                // 577 (Raid Night Halt): noc - postep kroku stoi (bez Prog, uderzen, spichlerza, LootDays i dni na osade); wybor z okienka E7/R2 wyzej dziala od reki
+                if (NightRest.RaidHaltHolds(__instance)) { _dHaltTicks++; return false; }
                 if (!ss.Started) { Start(ss, __instance, men); if (ss.Player) _dPStarted++; }
                 double dt = TickDays();
                 if (men > 0 && dt > 0.0)
@@ -1131,6 +1143,7 @@ namespace Armoury
               .Append(", oddane grze (potkniecia) ").Append(_dReleased);
             if (_dAbandoned > 0) sb.Append(", porzucone bez konca rabunku ").Append(_dAbandoned);
             sb.Append(" | czas ").Append(F(_dTicks * 1000.0 / Stopwatch.Frequency, "0.0")).Append(" ms");
+            if (_dHaltTicks > 0) sb.Append(" | postoj nocny gracza (577): tykniec rabunku bez postepu ").Append(_dHaltTicks);
             sb.Append(" | potkniecia ").Append(_dStumbles).Append('.');
             Log.Info(sb.ToString());
         }
@@ -1181,7 +1194,7 @@ namespace Armoury
                 if (m != null && m.DeclaringType == typeof(RaidEventComponent))
                 {
                     h.Patch(m, prefix: new HarmonyMethod(typeof(DistrictRaid), nameof(UpdatePrefix)) { priority = Priority.First });
-                    upd = true; _wired.Add("krok rabunku (Update, First)");
+                    upd = true; UpdWired = true; _wired.Add("krok rabunku (Update, First)");
                 }
                 else _missing.Add("RaidEventComponent.Update");
             }

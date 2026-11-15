@@ -398,6 +398,7 @@ namespace Armoury
             // E7/R1 (v2, K11): rabunek prowadzi DistrictRaid (prefiks First, oryginal nie biegnie w lupieniu) - bez osobodni, StateOf i podmiany hearth tutaj;
             // __state pusty, wiec RaidFinalizer nic nie robi. Stan rabunku zaklada i wypelnia DistrictRaid (StrikePeople) - jeden stan.
             if (__instance == null || DistrictRaid.Owns(__instance)) return;
+            if (NightRest.RaidHaltHolds(__instance)) return;   // 577: rabunek gracza stoi na noc (oryginal nie biegnie) - bez osobodni lupienia i podmiany hearth
             if (!On) return;
             try
             {
