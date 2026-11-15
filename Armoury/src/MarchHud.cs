@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapBar;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI;
@@ -43,6 +44,10 @@ namespace Armoury
     ///  - podpowiedzi: pierwszy wiersz mowi zwyklym angielskim, co znacza liczby, dalej szczegoly.
     /// 562: pozycja Drill = ludzie z pelnym zestawem do swojej roli / ludzie (Drill.HudKit, DrillKit.cs); opisy Weapons / Armour i "1 na 3 ludzi" z 541
     /// wyzej sa historyczne.
+    /// 565 (Jeff 15.11 pkt 2 "tak koniecznie"): Pack = tabor kolumny marszowej (juczne + bydlo, z doczepionymi partiami armii) / przydzial wolny od kary taboru
+    /// (MarchPackAllowance x ludzie - MarchPace.TrainOf / Allowance, ta sama regula co sufit MarchTrainPace w ColumnPostfix); ostrzezenie ponad przydzial (wtedy cala
+    /// partia ma sufit tempa taboru) albo - jak dotad - ponad limit Herding. Podpowiedz: sufit, ile zwierzat zdjac, czy tabor teraz wiaze (MarchPace.Explain), limit
+    /// Herding jako druga informacja. Klucz MarchHudPackTrain (off, albo regula kolumny nie dotyczy partii - MarchPaceEnabled off, morze) = Pack jak w 548.
     /// </summary>
     internal static class MarchHud
     {
@@ -288,8 +293,11 @@ namespace Armoury
                 int mounted = Mounted(r);
                 full[0] = HorsesText(r); num[0] = r != null && !r.AtSea ? mounted.ToString() : "-"; iv[0] = mounted;
                 warn[0] = r != null && !r.AtSea && mounted < r.Men;   // 548: ktos idzie pieszo (bez konia, bez pasujacej uprzezy albo za niska Jazda) - kto i dlaczego w podpowiedzi
-                full[1] = PackText(r); num[1] = r != null ? r.CPack.ToString() : "-"; iv[1] = r != null ? r.CPack : 0;
-                warn[1] = r != null && r.CPack > r.PackLimit;
+                int tMen, tTrain, tAllow;
+                bool train = PackTrain(out tMen, out tTrain, out tAllow);   // 565: prog taboru kolumny; false - Pack jak w 548 (limit Herding)
+                bool overHerd = r != null && r.CPack > r.PackLimit;
+                if (train) { full[1] = Frac(tTrain, tAllow); num[1] = tTrain.ToString(); iv[1] = tTrain; warn[1] = tTrain > tAllow || overHerd; }
+                else { full[1] = PackText(r); num[1] = r != null ? r.CPack.ToString() : "-"; iv[1] = r != null ? r.CPack : 0; warn[1] = overHerd; }
                 bool men = kit && k.KitN > 0;   // 558: zolnierze + towarzysze, ktorzy cwicza
                 int ready = men ? k.Ready : 0;   // 562: ludzie z pelnym zestawem do swojej roli
                 // 562b (Jeff 15.11 "0/164"): pasek pokazuje postep w sztukach (pokryte / potrzebne wszystkich rodzajow, %), bo pelny zestaw bywa 0 przy wielu sztukach;
@@ -329,7 +337,7 @@ namespace Armoury
                     if (r != null && (_shown <= 20 || _shown % 50 == 0))
                         try
                         {
-                            Log.Info(Tag + "pasek (" + _shown + ") -> " + text + " | pelne: Horses " + full[0] + " (na koniach / ludzie), Pack " + full[1] + (kit ? ", Drill " + full[2] + " (562b: pokrycie sztuk zestawu " + (men ? k.CovSum(0, Drill.NK - 1) + "/" + k.NeedSum(0, Drill.NK - 1) : "-") + ")" : ", zapas musztry nieczynny")
+                            Log.Info(Tag + "pasek (" + _shown + ") -> " + text + " | pelne: Horses " + full[0] + " (na koniach / ludzie), Pack " + full[1] + (train ? " (565: tabor kolumny / wolne od kary, ludzie kolumny " + tMen + ")" : " (juczne / limit Herding)") + (kit ? ", Drill " + full[2] + " (562b: pokrycie sztuk zestawu " + (men ? k.CovSum(0, Drill.NK - 1) + "/" + k.NeedSum(0, Drill.NK - 1) : "-") + ")" : ", zapas musztry nieczynny")
                                      + " | szerokosc (szacunek): gora " + top.ToString("0") + " px, dol " + bottom.ToString("0") + " px, MaxWidth dolu " + maxB + ", skrocone do licznika " + cut
                                      + " | jedzie: jazda " + r.CavPairs + ", pula " + r.Ride + " z " + r.PoolMen + ", bohaterowie " + r.HeroMounted + ", pieszo " + Math.Max(0, r.Men - mounted)
                                      + ", konie " + r.AllHorses + " (ladunek " + r.CMounts + ", zbrojownia " + r.AHorses + "), uprzeze " + r.AllHarness
@@ -422,14 +430,30 @@ namespace Armoury
             return l;
         }
 
-        /// <summary>548: podpowiedz Pack (dotad wspolna z Horses).</summary>
+        /// <summary>565: tabor kolumny gracza do pozycji Pack (klucz MarchHudPackTrain i regula kolumny czynna); false - Pack jak w 548.</summary>
+        private static bool PackTrain(out int men, out int train, out int allowance)
+        {
+            men = 0; train = 0; allowance = 0;
+            var s = Settings.Current;
+            if (s == null || !s.MarchHudPackTrain) return false;
+            var mp = MobileParty.MainParty;
+            return mp != null && MarchPace.TrainOf(mp, out men, out train, out allowance);
+        }
+
+        /// <summary>548: podpowiedz Pack (dotad wspolna z Horses). 565: najpierw tabor kolumny (to, co naprawde hamuje), limit Herding jako druga informacja.</summary>
         private static List<TooltipProperty> PackTooltip()
         {
             var l = new List<TooltipProperty>();
             try
             {
-                l.Add(new TooltipProperty("Pack animals", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                 var r = MarchPairs.Last;
+                int tMen, tTrain, tAllow;
+                if (PackTrain(out tMen, out tTrain, out tAllow))
+                {
+                    TrainTooltip(l, r, tMen, tTrain, tAllow);
+                    return l;
+                }
+                l.Add(new TooltipProperty("Pack animals", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                 if (r == null || !r.Ok) { l.Add(new TooltipProperty("Not counted yet", "", 0, false, TooltipProperty.TooltipPropertyFlags.None)); return l; }
                 int over = r.CPack - r.PackLimit;
                 Row(l, "Pack animals / allowed", r.CPack + " of " + r.PackLimit + " you may lead before the herding penalty" + (over > 0 ? " - " + over + " too many (red)" : ""));
@@ -439,6 +463,83 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("PackTooltip", e); }
             return l;
+        }
+
+        /// <summary>565: podpowiedz Pack - tabor kolumny marszowej (MarchPace.TrainOf / Allowance, sufit z MarchPace.Explain), potem limit Herding (MarchPairs.Last).
+        /// Recenzja 565: tabor to SUFIT, nie tempo - "Now" mowi, czy tnie teraz (wpis w rozpisce predkosci gry, TrainBinds); sufit z podniesieniem perkow
+        /// (ScoutPace515.CapShare, jak Lift w ColumnPostfix); zwierzeta wlasne z ItemRoster na zywo (bez rekordu par, ktory odswieza sie co 1 s).</summary>
+        private static void TrainTooltip(List<TooltipProperty> l, MarchPairs.Rec r, int men, int train, int allow)
+        {
+            var c = Settings.Current;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var mp = MobileParty.MainParty;
+            l.Add(new TooltipProperty("Baggage train", "", 0, false, TooltipProperty.TooltipPropertyFlags.Title));
+            int over = train - allow;
+            Row(l, "Baggage / free", train + " pack animals and livestock, " + allow + " ride free with " + men + " men"
+                   + (over > 0 ? " - " + over + " too many (red): the party's speed is capped at the baggage-train pace" : " - no baggage-train cap"));
+            var ir = mp != null ? mp.ItemRoster : null;
+            if (ir != null)
+            {
+                int ownPack = ir.NumberOfPackAnimals, ownLive = ir.NumberOfLivestockAnimals;
+                int others = Math.Max(0, train - ownPack - ownLive);   // TrainOf: reszta to doczepione partie armii
+                Row(l, "Animals", ownPack + " pack animals, " + ownLive + " livestock" + (others > 0 ? ", " + others + " in your army's parties" : ""));
+            }
+            MarchPace.Column col = null;
+            try { col = MarchPace.Explain(mp); } catch (Exception e) { Stumble("TrainTooltip.Explain", e); }
+            float scale = col != null ? col.Scale : Math.Max(5, Math.Min(100, c.WorldPacePercent)) / 100f;
+            float ceilF = c.MarchTrainPace * scale;
+            string ceil = ceilF.ToString("0.00", inv);
+            if (over > 0)
+            {
+                float share = ScoutPace515.CapShare(mp);
+                Row(l, "Speed ceiling", ceil + " on the map" + (share > 0.0001f ? ", up to " + (ceilF * (1f + share)).ToString("0.00", inv) + " with your scout's and leader's speed perks (+"
+                       + (share * 100f).ToString("0", inv) + "%)" : "") + (c.MapRoadSpeedBonus ? ", higher on roads" : ""));
+                Row(l, "To lift it", "drop or sell " + over + " pack " + (over == 1 ? "animal or head" : "animals or livestock") + ", or take on more men (one free per "
+                       + (c.MarchPackAllowance > 0.0001f ? (1f / c.MarchPackAllowance).ToString("0.#", inv) : "-") + " men)");
+                float now;
+                bool? binds = TrainBinds(mp, out now);
+                if (binds == true)
+                    Row(l, "Now", "it holds you back - you march at " + now.ToString("0.00", inv) + " ('Marching column: baggage train' in the speed tooltip)");
+                else if (col != null && col.Kind != 3 && col.CapRaw * col.Scale < ceilF - 0.001f)
+                {
+                    string slow = (col.CapRaw * col.Scale).ToString("0.00", inv);
+                    if (col.Kind == 1)   // recenzja 565 pkt 3: jakosc koni (HorseQualitySpeed) zbija sufit jazdy - to nie zniknie samo, tabor nie wiaze, poki tak jest
+                        Row(l, "Now", "your riders' horses hold the column lower (" + slow + ") - the baggage train does not bind while they do");
+                    else
+                        Row(l, "Now", "something slower holds you first (" + (col.Kind == 0 ? col.N + " on foot" : col.Kind == 2 ? col.N + " footmen on spare horses"
+                               : col.Kind == 4 ? col.N + " footmen riding double" : "the column") + ", " + slow + ") - the baggage train binds once that is gone");
+                }
+                else if (binds == false)
+                    Row(l, "Now", "it does not hold you back - you already march at " + now.ToString("0.00", inv) + ", below it");
+            }
+            else Row(l, "Speed ceiling", "none from the baggage - over " + allow + " it would be " + ceil);
+            if (r != null && r.Ok)
+            {
+                int hOver = r.CPack - r.PackLimit;
+                Row(l, "Herding limit", r.CPack + " of " + r.PackLimit + " pack animals before the herding speed penalty (" + r.Men + " men - " + r.CLive + " livestock - " + r.FreeHerd + " free horses)"
+                       + (hOver > 0 ? " - " + hOver + " over (red)" : ""));
+            }
+        }
+
+        /// <summary>Recenzja 565 (pkt 1): czy sufit taboru tnie TERAZ - wpis "Marching column: baggage train" (sam bohater: "your pack animals") w rozpisce
+        /// predkosci gry, liczonej wprost bez zapisu do pamieci partii (MapRoads.Explained, jak okno przegladu armii). now - wynik gry.
+        /// null = nie wiadomo (gracz w cudzej armii - tempo daje wodz, albo gra nie dala liczby).</summary>
+        private static bool? TrainBinds(MobileParty mp, out float now)
+        {
+            now = 0f;
+            try
+            {
+                if (mp == null || (mp.AttachedTo != null && mp.AttachedTo != mp)) return null;
+                TaleWorlds.CampaignSystem.ExplainedNumber en;
+                if (!MapRoads.Explained(mp, out en)) return null;
+                now = en.ResultNumber;
+                string a = new TaleWorlds.Localization.TextObject("{=!}Marching column: baggage train").ToString();
+                string b = new TaleWorlds.Localization.TextObject("{=!}Marching column: your pack animals").ToString();
+                foreach (var ln in en.GetLines())
+                    if (ln.Item1 == a || ln.Item1 == b) return true;
+                return false;
+            }
+            catch (Exception e) { Stumble("TrainBinds", e); return null; }
         }
 
         private static void Row(List<TooltipProperty> l, string k, string v) { l.Add(new TooltipProperty(k, v, 0, false, TooltipProperty.TooltipPropertyFlags.None)); }

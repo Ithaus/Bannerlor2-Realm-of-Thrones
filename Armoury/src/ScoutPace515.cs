@@ -141,6 +141,20 @@ namespace Armoury
             return Math.Max(0f, probe.ResultNumber - 1f);
         }
 
+        /// <summary>565 (recenzja, pkt 2): udzial perkow, o ktory Lift podnosi sufit kolumny (klucz ScoutPerksLiftMarchCap; 0 przy wylaczonym) - ten sam PerkShare,
+        /// bez licznikow pomiaru i bez zapisu. Tylko odczyt do podpowiedzi paska mapy (MarchHud).</summary>
+        internal static float CapShare(MobileParty mp)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || mp == null || !s.ScoutPerksLiftMarchCap) return 0f;
+                int mask;
+                return PerkShare(mp, out mask);
+            }
+            catch (Exception e) { Stumble("CapShare", e); return 0f; }
+        }
+
         /// <summary>MarchPace.ColumnPostfix: sufit kolumny wiaze (current &gt; cap). Zwraca sufit podniesiony o premie perkow (klucz TAK), nigdy ponad current;
         /// sumOfFactors - suma czynnikow wyniku gry (do pomiaru: predkosc bez perkow).</summary>
         internal static float Lift(MobileParty mp, float cap, float current, float sumOfFactors)

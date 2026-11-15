@@ -55,6 +55,37 @@ namespace Armoury
             }
         }
 
+        /// <summary>565: juczne + bydlo wolne od kary taboru (MarchPackAllowance na czlowieka) - jedna regula dla Mounted (sufit), Explain i paska mapy.</summary>
+        internal static int Allowance(Settings c, int men) { return c == null ? 0 : (int)Math.Ceiling(men * Math.Max(0f, c.MarchPackAllowance)); }
+
+        /// <summary>565 (Jeff 15.11 pkt 2, pasek Pack): tabor partii jak w CountColumn (ludzie, juczne + bydlo, z doczepionymi partiami armii) i przydzial wolny
+        /// od kary taboru - bez HorseState i bez par (tani odczyt co odswiezenie paska). false = regula kolumny nie dotyczy partii (klucz MarchPaceEnabled
+        /// wylaczony, morze, wies, karawana, zaloga, milicja, AI przy MarchPaceAiToo off, pusta partia) - jak warunki ColumnPostfix.</summary>
+        internal static bool TrainOf(MobileParty mp, out int men, out int train, out int allowance)
+        {
+            men = 0; train = 0; allowance = 0;
+            var c = Settings.Current;
+            if (c == null || !c.MarchPaceEnabled || mp == null || mp.MemberRoster == null) return false;
+            if (mp.IsCurrentlyAtSea || mp.IsVillager || mp.IsCaravan || mp.IsGarrison || mp.IsMilitia) return false;
+            if (!c.MarchPaceAiToo && mp != MobileParty.MainParty) return false;
+            men = mp.MemberRoster.TotalManCount;
+            var r = mp.ItemRoster;
+            train = r != null ? r.NumberOfPackAnimals + r.NumberOfLivestockAnimals : 0;
+            var attached = mp.AttachedParties;
+            if (attached != null)
+                for (int i = 0; i < attached.Count; i++)
+                {
+                    var ap = attached[i];
+                    if (ap == null) continue;
+                    men += ap.MemberRoster != null ? ap.MemberRoster.TotalManCount : 0;
+                    var ar = ap.ItemRoster;
+                    if (ar != null) train += ar.NumberOfPackAnimals + ar.NumberOfLivestockAnimals;
+                }
+            if (men <= 0) return false;
+            allowance = Allowance(c, men);
+            return true;
+        }
+
         /// <summary>Sufit kolumny w jednostkach mapy PRZED tempem swiata. kind: 0 ktos idzie (n - idacych), 1 sami jezdzcy, 2 piechota na luzakach (n),
         /// 3 tabor, 4 (311d2) garstka piechurow "na drugiego" za jezdzcami (n). E6/K0: wolany dwa razy w tym samym wywolaniu (z wolnymi konmi zbrojowni i bez nich - sufit na sucho do linii).
         /// 311d (HorseQualitySpeed): mulRider / mulFoot - jakosc koni (HorsePace.CapMul) mnozy sufit sytuacji 1 i 2 (1 = bez zmian); wybor najnizszego po mnozeniu.
@@ -135,7 +166,7 @@ namespace Armoury
                 }
                 if (footRider < cap) { cap = footRider; kind = 2; n = ridingFoot; }
             }
-            int allowance = (int)Math.Ceiling(men * Math.Max(0f, c.MarchPackAllowance));
+            int allowance = Allowance(c, men);
             if (train > allowance && c.MarchTrainPace < cap) { cap = c.MarchTrainPace; kind = 3; n = 0; }
             if (dbl > 0 && cap < c.MarchFootPace) { cap = c.MarchFootPace; kind = 4; n = dbl; }   // 311d2: na drugiego nigdy wolniej niz pieszo (tylko przy dziwnych ustawieniach sufitow); opis - na drugiego, nie tabor
             return cap;
@@ -205,7 +236,7 @@ namespace Armoury
             r.CapOld = (v2 && (c.FootmenOnSpareHorsesRidePace || c.RideDoubleFewFootmen)
                         ? Cap(c, mp, false, r.Men, r.Foot, r.Horses, r.Train, r.Prisoners, r.MulRider, r.MulFoot, out k9, out n9, out d9, out rf9, out w9, r.RideCap)
                         : r.CapRaw) * r.Scale;
-            r.Allowance = (int)Math.Ceiling(r.Men * Math.Max(0f, c.MarchPackAllowance));
+            r.Allowance = Allowance(c, r.Men);
             r.Alone = mp == MobileParty.MainParty && r.Men == 1 && r.Prisoners == 0;
             return r;
         }
