@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 544: Banefort wraca do korony - jednorazowa naprawa zapisu (kapitulacja z terminu 471b) - Armoury (Banefort544, flaga arm_544_banefort)
+
+**Problem:** Jeff, czat 15.11: "oddaj po zaladowaniu gry zamek koronie ten banefort ... do jego prawowitego wlasciciela, bo zakladamy ze to byl cheat - zamek bronil sie i nie powinien pasc". Armoury-2026-11-15_04-07-23.log l.10459-10462, dzien 109026: Banefort (ROT_castle20, maly zamek korony House Baratheon of King's Landing) padl na rzecz Polnocy (wodz Gawen Glover, zdobywca Ondrew Locke) TYLKO z reguly 471b "KAPITULACJA z terminu" - jedzenie zalogi 144 dob, 4 szturmy odparte; pan ROTclan_59 (House Banefort, glowa Quenten Banefort) -> clan_battania_1. Zaloga 282 wyszla z honorami do druzyn rodu.
+
+**Przyczyna:** regula 471b (termin R minal = kapitulacja mimo jedzenia i odpartych szturmow). Zmiana 542 (osobna galaz) zdejmuje kapitulacje z terminu na przyszlosc; zwrot 326b (North Conquest Return) u Jeffa wylaczony (log 13-18-25: "klucz North Conquest Return NIE"), wiec nic zamku nie zwroci.
+
+**Zmiana:** nowy Banefort544 (+ Banefort544Behavior w SubModuleMain po NorthConquestBehavior). Raz na kampanie (flaga w zapisie "arm_544_banefort"; nowa kampania = "new", nic), proba co godzine gry, gdy gracz stoi na mapie (BookHoldings.PlayerOnMapFor - nie w osadzie, menu, spotkaniu, bitwie, armii, rozmowie; zadnego SwitchToMenu). Warunki: korona "vlandia" zywa; Banefort u rodu spoza korony; pan nie jest rodem gracza (wtedy koniec bez zmian). Odbiorca: House Banefort (ROTclan_59) - zywy, glowa zywa, w koronie, nie najemnik; glowa w niewoli - czeka do 15 dob (w lochu Banefortu - od razu, gra ja wypusci), potem / bez rodu - rod panujacy korony. Sama zmiana droga 326b: BookHoldings.TransferFor (oblezenie / bitwa w osadzie, zalodze, wsiach, przy bramie - czeka; bohaterowie bez druzyny do wlasnej twierdzy; zaloga Polnocy do partii i zalog Polnocy od najblizszej, reszta do druzyny glowy rodu, bez odbiorcy - do domu W4c; ksiega ludzi i sprzet z ludzmi; roszczenie SCA Polnocy jak przed zmiana; ApplyByDefault; jency - zolnierze korony - do zalogi f23; BEZ obsady zalogi z innych partii - 326x). Po zmianie roszczenie SCA korony na Banefort zdjete. Linie "Banefort (544): ..." (start sesji, "czeka" raz na dobe na powod, linia TryRow ze szczegolami zalogi, linia ZWROT), wiadomosc: "Banefort is returned to House Banefort: the castle held out and should not have surrendered." Wyjatek - licznik, po 3 z rzedu naprawa porzucona z linia (bez globalnego wylacznika).
+
+**Ryzyko / co sprawdzic:**
+- Kolizje: ApplyByDefault (nie BySiege) - zaloga nie niszczona, bez kar relacji/wplywu, bez glosowania o lenno, bez naszych sluchaczy zdobycia (KingdomBalance, MoneyWeight, CitySack tylko BySiege); BKTitleBehavior przenosi tytuly tylko przy ByGift/ByBarter - tytul BK zostaje, jaki byl; BKWorkshop zabiera Polnocy warsztaty w Banefort (zmiana frakcji); BKDiplomacy przelicza fronty; FiefGrants tylko zapisuje zmiane; BesiegedRelief/CanonThroneWars/CartRisk - pamiec, bez skutku. Wsie Banefortu ida za zamkiem (gra), HouseLevies czyta pana na zywo (rekruci rodu Banefort wroca). Wrogie partie w murach wyprowadza gra przy zmianie pana.
+- Rekordy oblezen: SiegeWalls 471 / SiegeCamp / SiegeForage trzymane po SiegeEvent i zdejmowane na koncu oblezenia; SiegeSurrender374 _recs po osadzie, ale z czasem startu (nowe oblezenie = nowy rekord) - nic do czyszczenia. Rozejmy SiegeRansom bez zmian.
+- Bez weta 326b (klucz NIE) - Polnoc moze Banefort znow oblegac; zaloga pusta po wyjsciu ludzi Polnocy (326x - werbunek pana), milicja zostaje. Jesli Jeff chce obsady z partii korony - osobna decyzja (TransferFor z noFill false).
+- Wczytanie: linia "Banefort (544): start sesji | stan zapisu: czeka"; potem w pierwszej godzinie na mapie linia TryRow z "Banefort (544):" i "ZWROT". Gracz w osadzie - "czeka - ... gracz w osadzie".
+- Build Armoury 0 bledow. W grze nie sprawdzone.
+
+**Status:** DO SPRAWDZENIA
+
 ## 539: kuznia - napis "Hours spent for all actions" pokazuje te same godziny, ktore odliczy pasek - Armoury (ForgeJob: postfiks CraftingMixin.OnRefresh, napis po NotePiece)
 
 **Problem:** Jeff, czat 15.11: "jak kuje np. luk to pokazuje czas 2 h a potem leci 4 h jakby 2x dluzej". Log Armoury-2026-11-15_05-07-27: jeden Ravens' Teeth Longbow - kolejka 8.1 h, miara BK 4.3 h; 6 lukow w Riverrun 48.8 h wobec 26.0 h (Seagard, Fairmarket tak samo, x1.875).
