@@ -206,6 +206,7 @@ namespace Armoury
             _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0; _maskSegSeen = false;
             _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length); _profReads = 0;   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
+            HudKitReset();       // 541: pamiec paska mapy
             CampDrill.Reset();   // m97-szkolenie
             VetReset();          // 319b
         }
@@ -1441,6 +1442,86 @@ namespace Armoury
             if (PartyWords.NoTroops) return "Remaining {COUNT} items will be left on the field.";   // m110-sam: bez zolnierzy zapas nic nie przyjmuje - jak LeftBehindTip
             return "Remaining {COUNT} items: your men keep up to " + room + " pieces of arms and armour for their drill stock, the rest stay on the field.";
         }
+
+        // ------------------------------------------------------------ 541: zapas musztry na pasku mapy (MarchHud - Weapons i Armour)
+        /// <summary>541: stan zapasu musztry gracza dla paska mapy. Have = od gracza + nadwyzka ludzi (ta sama liczba co "drill kit" w Accept i wzor S w CtxOf).</summary>
+        internal sealed class Kit
+        {
+            internal bool Ok;                                  // false - zapas wylaczony albo blad liczenia
+            internal int Men, Full, GivenW, GivenA, SurW, SurA, WornW, WornA;
+            internal bool PerkW, PerkA;
+            internal float AccW, AccA;                         // ulamek zuzycia do nastepnej sztuki (0..1)
+            internal int HaveW { get { return GivenW + SurW; } }
+            internal int HaveA { get { return GivenA + SurA; } }
+            internal int RoomW { get { return Math.Max(0, IntakeSets * Full - GivenW); } }
+            internal int RoomA { get { return Math.Max(0, IntakeSets * Full - GivenA); } }
+            internal float Bonus(bool weapons)                 // premia S tej grupy (0.10 przy pelnym, x1.5 z perkiem)
+            {
+                int have = weapons ? HaveW : HaveA;
+                float u = Full > 0 ? Math.Min(1f, have / (float)Full) : 0f;
+                return StockBonus * u * ((weapons ? PerkW : PerkA) ? PerkMult : 1f);
+            }
+            internal float WearPerFullDay(bool weapons)        // sztuk na pelny dzien cwiczen (8 h, CampDrill.DayFull)
+            {
+                int inUse = Math.Min(weapons ? HaveW : HaveA, Full);
+                return inUse * CampDrill.DayFull / WearDays;
+            }
+        }
+        internal static float BonusPerSet { get { return StockBonus; } }
+        internal static float BonusPerkMult { get { return PerkMult; } }
+        internal static int OnePer { get { return MenPerPiece; } }
+        internal static int IntakeSetsN { get { return IntakeSets; } }
+
+        private static readonly Kit _hudKit = new Kit();
+        private static int _hudArmVer = int.MinValue, _hudRosVer = int.MinValue, _hudAt = Environment.TickCount - 60000, _hudN;
+        private static ItemRoster _hudArm;
+
+        /// <summary>541: odczyt dla paska mapy (watek glowny, co 0.2 s). Ludzie i od gracza - zywe (dwa pola i mala petla); nadwyzka ludzi (11 planow K1) liczona od nowa
+        /// tylko po zmianie zbrojowni albo skladu (VersionNo) i najwyzej raz na 1 s - inaczej z pamieci. Licznik MenPurse._keptGiven przywracany. Nie rzuca.</summary>
+        internal static Kit HudKit()
+        {
+            var k = _hudKit;
+            try
+            {
+                var main = MobileParty.MainParty;
+                k.Ok = false;
+                if (!StockOn || main == null) return k;
+                k.Men = Men(main);
+                k.Full = Full(k.Men);
+                int w, a; GivenCounts(out w, out a); k.GivenW = w; k.GivenA = a;
+                k.WornW = _pWornW; k.WornA = _pWornA;
+                var acc = AccOf(main, false);
+                k.AccW = acc != null ? acc.WW : 0f; k.AccA = acc != null ? acc.WA : 0f;
+                if (k.Men <= 0) { k.SurW = k.SurA = 0; k.Ok = true; return k; }
+                var arm = QuartermasterLaw.DteArmory();
+                int av = arm != null ? arm.VersionNo : -1, rv = main.MemberRoster != null ? main.MemberRoster.VersionNo : -1;
+                int now = Environment.TickCount;
+                bool changed = !ReferenceEquals(arm, _hudArm) || av != _hudArmVer || rv != _hudRosVer;
+                if (changed && unchecked(now - _hudAt) >= 1000)
+                {
+                    _hudAt = now; _hudArm = arm; _hudArmVer = av; _hudRosVer = rv; _hudN++;
+                    int sw = 0, sa = 0, kept = MenPurse.KeptGiven;
+                    try
+                    {
+                        if (arm != null)
+                            foreach (var kv in PlayerSurplus()) { int g = TypeGroup((int)kv.Key); if (g == GW) sw += kv.Value.Count; else if (g == GA) sa += kv.Value.Count; }
+                    }
+                    finally { MenPurse.KeptGiven = kept; }
+                    k.SurW = sw; k.SurA = sa;
+                }
+                k.PerkW = main.HasPerk(DefaultPerks.Steward.GivingHands);
+                k.PerkA = main.HasPerk(DefaultPerks.Steward.PaidInPromise, true);
+                k.Ok = true;
+            }
+            catch (Exception e) { k.Ok = false; Stumble("HudKit", e); }
+            return k;
+        }
+
+        /// <summary>541: liczba przeliczen nadwyzki dla paska (do linii doby MarchHud.State).</summary>
+        internal static int HudKitCounts { get { return _hudN; } }
+
+        /// <summary>541: nowa kampania - pamiec paska od zera.</summary>
+        private static void HudKitReset() { _hudArm = null; _hudArmVer = _hudRosVer = int.MinValue; _hudAt = Environment.TickCount - 60000; _hudN = 0; _hudKit.Ok = false; _hudKit.SurW = _hudKit.SurA = 0; }
 
         // ekran 1 (zwykly ekwipunek "Discard") i 2 (lup gry): prefiks + finalizer na metodzie otwierajacej, postfiks na InventoryLogic.Initialize
         public static void OpenDiscardPrefix() { _opening = 1 + SrcDiscard; }

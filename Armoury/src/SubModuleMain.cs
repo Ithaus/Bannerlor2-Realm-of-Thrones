@@ -47,7 +47,12 @@ namespace Armoury
             // 155: pasek staminy konia gracza w HUD bitwy (UIExtenderEx: wstawka prefabu AgentStatus + pasywny mixin MissionAgentStatusVM) - osobny UIExtender,
             // rejestracja zawsze (klucz HorseStaminaBar tylko chowa pasek), wlasny try
             try { HorseBarRegister(); } catch (Exception e) { Log.Error("HorseWindBarUi.Register (UIExtenderEx)", e); }
+            // 541: pasek mapy - szersze pole tekstu dolnego rzedu (pelne ulamki pozycji Armoury); osobny UIExtender, wlasny try
+            try { MarchHudUiRegister(); } catch (Exception e) { Log.Error("MarchHudUi.Register (UIExtenderEx)", e); }
         }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void MarchHudUiRegister() { MarchHudUi.Register(); }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void HorseBarRegister() { HorseWindBarUi.Register(); }
