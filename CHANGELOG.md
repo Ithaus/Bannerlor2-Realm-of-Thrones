@@ -12,6 +12,11 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 557 (galaz noc/557-straty-log-fix -> noc/557-straty-log)
+- **Przyjeta (BattleLosses312.cs:151, blokada ostatecznej migawki na stale):** sprawdzone w dekompilacji - waniliowa CheckIfBattleShouldContinueAfterBattleMissionInternal (PlayerEncounter.cs:1860-1874) zwraca true przy PlayerVictory, gdy pobici maja jeszcze >= 1 zdrowego, wtedy ContinueBattle i druga misja w tym samym MapEvent. Bez latek RBM AI (SetRoutedPatch zwraca false tylko gdy wpieta) migawka z konca pierwszej misji zostawala i Snap gubil straty drugiej misji (kontrola ujemna). U Jeffa RBM dziala, wiec dzis bez skutku.
+- **Poprawka (wariant 2 recenzji, tylko log):** nowa SameEnd - ostateczna migawka zostaje tylko, gdy w MapEvent sa te same partie i kazda ma tych samych zabitych i zbieglych, a partie spoza strony pobitej tych samych rannych (tego RBM nie rusza). Inaczej migawka idzie od nowa. Wariantu 1 (zdjecie w CommanderWithdraw458Map.Clear) nie wzialem: zachowanie 458 jest dodawane tylko przy kluczu BattleAiMeasurements albo CommanderWithdrawsUnderRearguard (SubModuleMain.cs:910), wiec przy obu NIE czyszczenie by nie zaszlo.
+- **Ryzyko:** druga misja, w ktorej nikt nie zginal, nie zbiegl i nikt ze zwyciezcow nie zostal ranny (sami ranni pobitych) - blokada zostaje jak przed poprawka (praktycznie niemozliwe). Dodatkowe odczyty tylko przy powtornym DoWait po ostatecznej migawce; wyjatek w PreRbm (try/catch, licznik potkniec). Build 0 bledow, nie wgrane.
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".

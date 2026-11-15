@@ -46,7 +46,8 @@ namespace Armoury
     ///     pobitej strony (GetAllTroops = gotowi + przydzieleni w misji, takze zabici / ranni / zbiegli) - WoundedInBattle rosnie o cala wystawiona
     ///     strone (458-s: B2 przy migawce 105, przy pojmaniu 267). Migawka 1 liczyla ich drugi raz (B1 "wystawieni 524", B2 322). PreRbm (wolany z
     ///     CommanderWithdraw458Map.ContPre, Priority.First - przed RBM) zapisuje liczniki i sklad partii obu stron; Snap bierze je dla pobitych,
-    ///     gdy migawka jest "ostateczna" (warunek RBM: walka w polu, PlayerVictory, BattleResolved). Bez RBM migawka = stan biezacy (bez zmian liczb).
+    ///     gdy migawka jest "ostateczna" (warunek RBM: walka w polu, PlayerVictory, BattleResolved). Bez RBM migawka = stan biezacy (bez zmian liczb);
+    ///     recenzja 557: ostateczna zdejmowana, gdy w tym samym MapEvent ruszyli zabici / zbiegli / ranni zwyciezcow albo sklad stron (druga misja - SameEnd).
     /// Kontrola: wystawieni + ranni sprzed bitwy - zabici - zbiegli - jency (gracz + AI + A17) - bez odbiorcy - zostali w skladzie = 0 (H3 i A17 tylko
     /// przesuwaja ludzi). Rozjazd != 0 = ktos poza tymi drogami zmienil sklad pobitych (do sprawdzenia w kodzie).
     /// Koszt: migawka tylko bitew gracza i AI od 100 na strone (filtr z HealthyManCountAtStart, bez petli po skladzie); reszta - slownik slaby (bitwa bez
@@ -81,7 +82,7 @@ namespace Armoury
         private static readonly ConditionalWeakTable<MapEvent, Rec> _recs = new ConditionalWeakTable<MapEvent, Rec>();
 
         // 557: migawka przed RBM SetRoutedPatch - na partie: [0] DiedInBattle, [1] WoundedInBattle, [2] RoutedInBattle, [3] sklad, [4] ranni w skladzie (szeregowi)
-        private sealed class PreRec { public readonly Dictionary<MapEventParty, int[]> P = new Dictionary<MapEventParty, int[]>(); public bool Final; }
+        private sealed class PreRec { public readonly Dictionary<MapEventParty, int[]> P = new Dictionary<MapEventParty, int[]>(); public bool Final; public BattleSideEnum Lose; }
         private static readonly ConditionalWeakTable<MapEvent, PreRec> _pre = new ConditionalWeakTable<MapEvent, PreRec>();
         private static Rec _open;                                       // biezace okno pojmania (gra jednowatkowa, CaptureDefeatedPartyMembers bez wnikania)
         private static int _seq, _lines, _stumbles;
@@ -148,11 +149,13 @@ namespace Armoury
                 PreRec old;
                 if (_pre.TryGetValue(me, out old))
                 {
-                    if (old.Final) return;
+                    // recenzja 557: ostateczna zostaje, dopoki ten sam koniec walki (RBM rusza tylko WoundedInBattle i rannych w skladzie pobitych);
+                    // druga misja w tym samym MapEvent (ContinueBattle - bez latek RBM AI) zmienia zabitych / zbieglych / rannych zwyciezcow albo sklad stron
+                    if (old.Final && SameEnd(me, old)) return;
                     _pre.Remove(me);
                 }
                 var res = PlayerEncounter.CampaignBattleResult;
-                var pr = new PreRec { Final = me.IsFieldBattle && res != null && res.PlayerVictory && res.BattleResolved };
+                var pr = new PreRec { Final = me.IsFieldBattle && res != null && res.PlayerVictory && res.BattleResolved, Lose = me.DefeatedSide };
                 foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
                 {
                     if (side == null || side.Parties == null) continue;
@@ -171,6 +174,36 @@ namespace Armoury
                 _pre.Add(me, pr);
             }
             catch (Exception e) { Stumble("PreRbm", e); }
+        }
+
+        /// <summary>Recenzja 557: czy stan bitwy to nadal ten sam koniec walki co ostateczna migawka - te same partie, zabici i zbiegli kazdej partii, ranni
+        /// partii spoza strony pobitej (tych RBM SetRoutedPatch nie rusza). Rozny = nowa misja w tym samym MapEvent - migawka idzie od nowa. Tylko odczyt.</summary>
+        private static bool SameEnd(MapEvent me, PreRec old)
+        {
+            int n = 0;
+            foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
+            {
+                if (side == null || side.Parties == null) continue;
+                for (int i = 0; i < side.Parties.Count; i++)
+                {
+                    var mep = side.Parties[i];
+                    if (mep == null || mep.Party == null) continue;
+                    int[] v;
+                    if (!old.P.TryGetValue(mep, out v)) return false;
+                    n++;
+                    int d, dw, ro, row;
+                    Regs(mep.DiedInBattle, out d, out dw);
+                    Regs(mep.RoutedInBattle, out ro, out row);
+                    if (d != v[0] || ro != v[2]) return false;
+                    if (side.MissionSide != old.Lose)
+                    {
+                        int wb, wbw;
+                        Regs(mep.WoundedInBattle, out wb, out wbw);
+                        if (wb != v[1]) return false;
+                    }
+                }
+            }
+            return n == old.P.Count;
         }
 
         // ------------------------------------------------------------ 1. migawka po walce (KingdomBalance.ResultsPrefix, Priority 801 - przed H3)
