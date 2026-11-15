@@ -1,5 +1,34 @@
 # DZIENNIK ZMIAN
 
+## 564: tempo swiata jako prawdziwy mnoznik calej predkosci (x WorldPacePercent na koncu), sufit kolumny bez drugiej skali, podloga gry x tempo - Armoury (WorldPace.cs, MarchPace.cs, DrMarchArrival.cs, SubModuleMain.cs, Settings.cs, McmSettings.cs)
+
+**Problem:** Jeff, czat 15.11, audyt predkosci partii (punkt 1, odpowiedz "ok"). Armoury-2026-11-15_19-36-27.log, linia 5944 (Audyt predkosci gracza, Plain): "Base +3.13 | ... | World pace -1.02 | ... | Road +0.94 => 3.92"; linia 6546 (Drogi DR, gracz): "bez premii 3.019, z premia 3.925, LimitMax 4.096". Tempo swiata 75% zdejmowalo 25% samej bazy (3.134 x 0.25 = 0.78 przed droga), a nie 25% predkosci - premie i kary szly od pelnej bazy. Sufit kolumny MarchPace (tabor 4.2) byl osobno mnozony x 0.75 (4.096 = 4.2 x 0.75 x 1.3) - dwie rozne skale tego samego tempa.
+
+**Przyczyna:** WorldPace.BasePostfix: `AddFactor(p/100 - 1)` na CalculateBaseSpeed - wspolczynnik w tej samej sumie co Cavalry, Strong, noc, las... (wynik = B x (1 + F - 0.25), nie 0.75 x B x (1 + F)). MarchPace.ColumnPostfix: `cap *= scale` (WorldPacePercent) - sufit w jednostkach mapy liczony obok. Podloga gry LimitMin(1) bez tempa.
+
+**Zmiana:** nowy klucz MCM **World Pace Whole Speed** (`WorldPaceWholeSpeed`, domyslnie TAK; wylaczony = dokladnie stara regula).
+- WorldPace.FinalPostfix (nowy): postfiks Priority.Last na kazdym zadeklarowanym CalculateFinalSpeed, wpiety w SubModuleMain PO MarchPace i NightRest (ten sam priorytet, pozniejsza rejestracja = biegnie po nich), raz na lancuch (SpeedDepth.OutermostFinal). Wynik bez granic U -> k x U przez `AddFactor((k - 1) x (1 + SumOfFactors))`, LimitMin i LimitMax x k. Wynik = k x clamp(U, min, max): tempo mnozy wspolczynniki, dodatki (droga, sufit kolumny, kary plaskie TerrainEase, sen, woz, nosze) i granice jednakowo, raz, na koncu.
+- Wpis "World pace" w rozpisce gry = B_koncowe x wspolczynnik = (k - 1) x U - rzeczywisty ubytek predkosci.
+- WorldPace.BasePostfix: przy kluczu nic nie robi (tempo nie wchodzi do bazy). `WorldPace.Whole(s)` = klucz i latka wpieta (0 modeli z latka = stary tryb, zeby tempo nie zniknelo z obu miejsc).
+- MarchPace.ColumnPostfix: przy kluczu sufit kolumny w jednostkach pelnego tempa (colScale 1) - x tempo dopiero w FinalPostfix (przez LimitMax). Prog 0.25 i linie doby (HorseState / HorsePace NoteCap) dalej na suficie na mapie; opis jazdy na drugiego (RideDoubleCut) dzieli przez colScale. Explain (okno Review the army): Cap = CapRaw x ten sam mnoznik.
+- LimitMin 1 (podloga gry): x tempo (0.75) - spojnie: k x max(U, 1). Partia na podlodze jedzie 0.75 zamiast 1.
+- DrMarchArrival.FootUph (oszacowanie dojscia pieszych do bitwy): przy kluczu noc i snieg bez tempa w sumie, wynik z podloga 1 x tempo (ta sama regula co FinalPostfix).
+- Wyjatek (jak dotad): druzyny CustomPartyComponent z wlasnym BaseSpeed - gra zastepuje im cala predkosc, stary wspolczynnik bazy do nich nie dochodzil; FinalPostfix je pomija.
+
+**Przypadek Jeffa (log 5944/6546: baza 3.134, reszta wspolczynnikow F = +0.213, droga +30%, tempo 75%, tabor - sufit 4.2):**
+- PRZED: 3.134 x (1 + 0.213 - 0.25) = 3.018; droga +0.94 (Add / 0.963) -> 3.925; World pace w rozpisce -1.02 (4.074 x -0.25); sufit 4.2 x 0.75 x 1.3 = 4.096 (nie wiaze); podloga 1.
+- PO: 3.134 x 1.213 = 3.802; droga +0.94 (Add / 1.213) -> 4.942; sufit surowy 4.2 x 1.3 = 5.46 (nie wiaze); x 0.75 -> **3.706**; World pace w rozpisce -1.236 (4.074 x -0.303 = -0.25 x 4.942); sufit na mapie 5.46 x 0.75 = 4.095 (bez zmian); podloga 0.75.
+- Roznica -0.22 (-5.6%). Ogolnie: partia z premiami (F > 0) zwalnia, z karami (F < 0, noc, las, ranni) przyspiesza wzgledem starej reguly, np. F = -0.30: dotad x0.45, teraz x0.525. Partia na suficie kolumny - bez zmian (k x sufit jak dotad).
+
+**Ryzyko / co sprawdzic:**
+- Regresje (grep): wszystkie postfiksy predkosci koncowej sa procentem wyniku (MapRoads, MapMud, SeaStorms, CampCart, ForcedMarch, InnDrink, TownInns, NightRest sen, Litter501) albo wspolczynnikami (HorsePace, MarchPairs, Perk514) - przed FinalPostfix licza sie w jednostkach pelnego tempa, kolejnosc i proporcje bez zmian. Kary plaskie TerrainEase (Add do bazy: noc, las, snieg) sa teraz tez x tempo (dotad x (1 + F - 0.25)) - przy 75% noc -0.5 zdejmuje ok. 0.375 na mapie zamiast ok. 0.48.
+- Kolizje: BasePostfix i FinalPostfix wykluczaja sie (Whole); sufit kolumny mnozony raz (colScale 1 przy kluczu); MapRoads podloga (MapRoadBonusAboveFloor) czyta LimitMinValue 1 przed tempem - spojnie. ScoutPace515.Lift dostaje sumy bez -0.25 - wzor procentowy, spojny. Sondy (MapRoads/MapMud/SeaStorms/TerrainEase/BkrotChains liczace model wprost) dostaja wynik po tempie i podloge 0.75 - porownania wynik/podloga spojne.
+- Kolejnosc: FinalPostfix Priority.Last zarejestrowany po NightRest - Harmony sortuje rowne priorytety wg kolejnosci wpiecia. Postfiks cudzego moda z Priority.Last wpiety PO Armoury (pozniejsze ladowanie) bieglby po tempie - sprawdzic w logu linie "WorldPace 564: ... latka predkosci koncowej w N modelach" (N jak MarchPace) i audyt predkosci (wpis World pace ostatni przed Maximum/Minimum).
+- Cudzy kod: ExplainedNumber (gra 1.4.8): wynik = Clamp(B x (1 + SumOfFactors), LimitMin, LimitMax); linia Multiply w rozpisce = B_koncowe x procent; LimitMin/LimitMax nadpisuja (nie min/max). MobileParty kopiuje bazowy ExplainedNumber przy kazdym liczeniu (struct) - wspolczynnik nie narasta. NavalDLCTroopSacrificeModel porownuje stosunek predkosci bazowych - tempo poza baza go nie zmienia (dotad sie skracalo).
+- W grze: rozpiska predkosci gracza na drodze (World pace ok. -25% calego wyniku, wynik ok. 3.7 przy tym samym skladzie), oddzial pieszy w nocy w lesie (szybciej niz dotad), partia na podlodze (0.75). Klucz OFF w MCM - rozpiska jak przed 564 (World pace w bazie).
+
+**Status:** DO SPRAWDZENIA (galaz noc/564-tempo-swiata, nie wgrane)
+
 ## 562b: musztra - pasek Drill pokazuje postep w sztukach (%), podpowiedz mowi, czego brakuje najbardziej i dlaczego pobor nic nie bierze - Armoury (DrillKit.cs, MarchHud.cs)
 
 **Problem:** Jeff, czat 15.11, zrzut paska po WGRANIU 262: Horses 165/165, Pack 80/139, Drill 0/164 czerwone - "mam rzeczy w armoury, ale wojsko nie pobiera - jak mam cos kliknac?". Log Armoury-2026-11-15_19-36-27.log, linia 953: migracja 562 - zapas 299 -> 255 szt., do zbrojowni 53, wzieto z nadwyzki 9 (wlocznie 14 -> 23/26), kontrola ZGODNE. Pokrycie rodzajow: 1H 88/88, 2H 3/3, wlocznie 23/26, tarcze 0/88, luki 0/73, strzaly 0/73, oszczepy 0/7, korpus 61/164, helmy 38/164, nogi 31/164, oponcze 0/164 = 244/1013 sztuk (24%).

@@ -349,11 +349,14 @@ namespace Armoury
         private static float FootUph(int men, float baseSpeed, Settings s, bool night, bool snow)
         {
             float b = baseSpeed * (float)Math.Pow(200.0 / (200.0 + Math.Max(1, men)), 0.4);
-            float f = Pace(s) / 100f;
+            float k = Pace(s) / 100f;
+            bool whole = WorldPace.Whole(s);   // 564: tempo mnozy cala predkosc (z podloga 1) zamiast wspolczynnika w sumie z noca i sniegiem
+            float f = whole ? 1f : k;
             bool ease = s != null && s.TerrainEaseEnabled;
             if (night) { if (ease) b -= NightPen(s); else f -= 0.25f; }
             if (snow) { if (ease) b -= SnowPen(s); else f -= 0.1f; }
             float v = Math.Max(1f, b * f);   // finalSpeed.LimitMin(MinimumSpeed = 1) - granica trzyma tez po latkach TerrainEase
+            if (whole) v *= k;               // 564: WorldPace.FinalPostfix - wynik i podloga x tempo
             return v / HoursPerDt;
         }
 
