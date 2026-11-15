@@ -1456,6 +1456,46 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public int HideoutGoodsStashCap { get; set; } = 6000;
 
+        [SettingPropertyBool("Hideout Reprisal Kin Only", HintText = "the reprisal gathers only bands of the den's own clan or den; a band led by a hero, or a hero's escort, is never merged - it follows the warband as an ally; one warband, one message (off = every nearby band merges, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutReprisalKinOnly { get; set; } = true;
+
+        [SettingPropertyBool("Hideout Vendetta", HintText = "after you carry off a rich hoard, the den's own bands hunt you for days: the strong attack, the weaker shadow you and strike when you are weakened, the hopeless give up (off = no hunt after the search, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutVendetta { get; set; } = true;
+
+        [SettingPropertyInteger("Hideout Vendetta Min Gold", 0, 50000, "0", HintText = "with Hideout Vendetta: the hoard (coin plus goods) you carried off must be worth at least this much for the bands to hunt it", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public int HideoutVendettaMinGold { get; set; } = 1500;
+
+        [SettingPropertyFloatingInteger("Hideout Vendetta Days", 0.00f, 14.00f, "0.00", HintText = "with Hideout Vendetta: the hunt lasts this many days", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutVendettaDays { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Hideout Vendetta Radius", 0.00f, 160.00f, "0.00", HintText = "with Hideout Vendetta: on the first day, bands of the den within this map-distance of you join the hunt", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutVendettaRadius { get; set; } = 25f;
+
+        [SettingPropertyFloatingInteger("Hideout Vendetta Radius Per Day", 0.00f, 80.00f, "0.00", HintText = "with Hideout Vendetta: each full day word spreads this much further", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutVendettaRadiusPerDay { get; set; } = 15f;
+
+        [SettingPropertyFloatingInteger("Hideout Vendetta Attack Odds", 0.00f, 6.00f, "0.00", HintText = "with Hideout Vendetta: the gathered bands attack when their strength is at least this many times yours", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutVendettaAttackOdds { get; set; } = 1.3f;
+
+        [SettingPropertyFloatingInteger("Hideout Vendetta Give Up Odds", 0.00f, 2.00f, "0.00", HintText = "with Hideout Vendetta: when all the hunting bands together are weaker than this share of you, they give up", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutVendettaGiveUpOdds { get; set; } = 0.4f;
+
+        [SettingPropertyFloatingInteger("Hideout Vendetta Weak Factor", 0.00f, 1.00f, "0.00", HintText = "with Hideout Vendetta: weakened - after a battle, with many wounded, or camped for the night - your strength counts only this much", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutVendettaWeakFactor { get; set; } = 0.6f;
+
+        [SettingPropertyFloatingInteger("Hideout Vendetta Cooldown Days", 0.00f, 60.00f, "0.00", HintText = "with Hideout Vendetta: after a hunt ends, no new hunt starts for this many days", RequireRestart = false)]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutVendettaCooldownDays { get; set; } = 10f;
+
         [SettingPropertyBool("Hideout Gold Messages", HintText = "after a hideout fight you are told what coin the bands carried, after the search what the den held - also when there was nothing (off = only the old message when gold is found)", RequireRestart = false)]
         [SettingPropertyGroup("The hideout purge")]
         public bool HideoutGoldMessages { get; set; } = true;
@@ -14302,6 +14342,16 @@ namespace Armoury
             s.HideoutGoodsStash = HideoutGoodsStash;
             s.HideoutGoodsStashShare = HideoutGoodsStashShare;
             s.HideoutGoodsStashCap = HideoutGoodsStashCap;
+            s.HideoutReprisalKinOnly = HideoutReprisalKinOnly;
+            s.HideoutVendetta = HideoutVendetta;
+            s.HideoutVendettaMinGold = HideoutVendettaMinGold;
+            s.HideoutVendettaDays = HideoutVendettaDays;
+            s.HideoutVendettaRadius = HideoutVendettaRadius;
+            s.HideoutVendettaRadiusPerDay = HideoutVendettaRadiusPerDay;
+            s.HideoutVendettaAttackOdds = HideoutVendettaAttackOdds;
+            s.HideoutVendettaGiveUpOdds = HideoutVendettaGiveUpOdds;
+            s.HideoutVendettaWeakFactor = HideoutVendettaWeakFactor;
+            s.HideoutVendettaCooldownDays = HideoutVendettaCooldownDays;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;

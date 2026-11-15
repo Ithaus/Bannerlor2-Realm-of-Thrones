@@ -42,6 +42,11 @@ namespace Armoury
         private static readonly System.Collections.Generic.List<MobileParty> _reprisalPack =
             new System.Collections.Generic.List<MobileParty>();
         private static CampaignTime _reprisalUntil = CampaignTime.Zero;
+        // 570 E: klan bandytow kryjowki (z pokonanych w bitwie) - odwet i poscig tylko tego klanu albo tej kryjowki; kryjowka, dla ktorej odwet juz
+        // ruszyl (jeden odwet, jedno scalenie, jeden komunikat - dotad Reprisal biegl przy bitwie i drugi raz przy starcie przeszukania); bandy
+        // z bohaterem i eskorty bohatera BK - nie scalane i bez naszych rozkazow (patrz Reprisal: wzajemna eskorta z BK SetFollow)
+        private static Clan _pendingClan;
+        private static Settlement _reprisalFor;
         private static DateTime _lastReprisalRefresh = DateTime.MinValue;   // tylko klucz HideoutPursuitHours 0 (stara regula 3 s realne)
         // E7/C (227, R4): odnowienie pogoni na zegarze gry - co HideoutPursuitHours h gry przy kazdej predkosci gry
         // (dotad co 3 s realne: przy x8 co ok. 7 h gry, przy x1 co ok. 0.9 h); licznik odnowien do linii konca pogoni
@@ -73,6 +78,7 @@ namespace Armoury
             int had = (_pending ? 1 : 0) + _reprisalPack.Count + (_lootRoster != null && _lootRoster.Count > 0 ? 1 : 0) + (_searchLeave ? 1 : 0) + (_lootOpen != null ? 1 : 0);
             _pending = false; _pendingGold = 0; _pendingBands = 0; _pendingName = ""; _pendingPos = default(CampaignVec2); _pendingHasPos = false; _pendingHideout = null;
             _reprisalPack.Clear();
+            _reprisalFor = null; _pendingClan = null; _reprisalUntil = CampaignTime.Zero;   // 570 E
             _searchLeave = false;
             _lootRoster = null;
             _lootOpen = null; _lootOpenIn = 0; _lootOpenMissing = 0;
@@ -87,9 +93,16 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, _ => LogClock());   // E7/C: linia startowa
             CampaignEvents.OnHideoutBattleCompletedEvent.AddNonSerializedListener(this, OnHideoutBattle);
             CampaignEvents.TickEvent.AddNonSerializedListener(this, OnTick);
+            // 570 D: poscig za skarbem - godzina (sam test flagi, gdy nic nie trwa), bitwy gracza (migawka zlota, wynik z banda poscigu)
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, HideoutVendetta.Hourly);
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(this, HideoutVendetta.OnMapEventStarted);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, HideoutVendetta.OnMapEventEnded);
         }
 
         public override void SyncData(IDataStore dataStore) { }
+
+        /// <summary>570 D: banda prowadzona przez odwet (poscig za skarbem jej nie rusza - jeden zarzadca bandy).</summary>
+        internal static bool InReprisal(MobileParty mp) { return mp != null && _reprisalPack.Contains(mp); }
 
         /// <summary>Czy lup tej kryjowki czeka na przeszukanie przez gracza (odczyt dla OutlawLaw: takiej kasy nikt inny nie rusza).</summary>
         internal static bool Holds(Settlement hideout) { return _pending && hideout != null && ReferenceEquals(hideout, _pendingHideout); }
@@ -123,6 +136,8 @@ namespace Armoury
                 if (sett != null) _pendingPos = sett.GatePosition;
                 _pendingName = sett != null && sett.Name != null ? sett.Name.ToString() : "the hideout";
                 _pendingBands = bands;
+                _pendingClan = BanditClanOf(mapEvent, winnerSide, sett);   // 570 E: klan kryjowki - do odwetu i poscigu za skarbem
+                _reprisalFor = null;   // 570 E: nowa bitwa w kryjowce - odwet od nowa (drugie wywolanie - start przeszukania - juz nie)
                 // AUDYT 04.10 (C6): lup to PRAWDZIWA kasa i magazyn kryjowki, nie zloto i zelastwo z niczego.
                 // 568: poprawka komentarza - gra NIE odklada towaru do kryjowki (BanditSpawnCampaignBehavior.OnSettlementEntered dopisywala
                 // 25% wartosci jukow jako ZLOTO z niczego, towaru nie zdejmowala; dosypke blokuje kurek OutlawLaw.HideoutGoldPostfix).
@@ -499,13 +514,21 @@ namespace Armoury
                 }
                 if (pack.Count == 0) { Log.Info("Vendetta: brak band w okolicy - nic do scalenia."); return; }
 
+                bool kin = Settings.Current != null && Settings.Current.HideoutReprisalKinOnly;   // 570 E: jak odwet - boss i scalane tylko Mergeable, jednego klanu
                 MobileParty boss = null;
                 foreach (var mp in pack)
-                    if (boss == null || mp.MemberRoster.TotalManCount > boss.MemberRoster.TotalManCount) boss = mp;
+                    if ((!kin || Mergeable(mp)) && (boss == null || mp.MemberRoster.TotalManCount > boss.MemberRoster.TotalManCount)) boss = mp;
+                if (boss == null) { Log.Info("Vendetta: w okolicy same bandy z bohaterem albo eskorty bohatera - nic do scalenia (570)."); return; }
                 int merged = 0;
                 foreach (var mp in pack)
                 {
                     if (mp == boss) continue;
+                    if (kin)
+                    {
+                        if (!Mergeable(mp) || mp.ActualClan != boss.ActualClan) continue;
+                        try { MergeInto(boss, mp); merged++; } catch (Exception e) { Log.Error("HideoutPurge.OneShotVendetta.Merge", e); }
+                        continue;
+                    }
                     try
                     {
                         var mr = mp.MemberRoster;
@@ -618,6 +641,13 @@ namespace Armoury
             {
                 var c = Settings.Current;
                 if (c == null || !c.HideoutReprisalEnabled || !_pendingHasPos) return;
+                bool kin = c.HideoutReprisalKinOnly;   // 570 E: klucz off = jak dotad (kazda banda w promieniu, scalenie wszystkich)
+                // 570 E: odwet tej kryjowki juz ruszyl (albo stchorzyl) - drugie wywolanie (start przeszukania) bez drugiego scalenia i komunikatu
+                if (kin && _reprisalFor != null && ReferenceEquals(_reprisalFor, _pendingHideout))
+                {
+                    Log.Info("HideoutPurge: odwet (570) dla " + _pendingName + " juz rozstrzygniety - bez drugiego scalenia i komunikatu.");
+                    return;
+                }
                 float radius = Math.Max(1f, c.HideoutReprisalRadius);
                 float fleeOdds = Math.Max(1f, c.HideoutReprisalFleeOdds);
                 float mine = 0f;
@@ -625,19 +655,33 @@ namespace Armoury
 
                 var pack = new System.Collections.Generic.List<MobileParty>();
                 float theirs = 0f;
+                int foreign = 0;
                 foreach (var mp in MobileParty.All)
                 {
                     if (mp == null || !mp.IsBandit || !mp.IsActive) continue;
                     if (mp.CurrentSettlement != null) continue;          // siedza w innej kryjowce
                     if (mp.MapEvent != null) continue;
                     if (mp.GetPosition2D.Distance(_pendingPos.ToVec2()) > radius) continue;
+                    if (kin)
+                    {
+                        // 570 E: tylko bandy klanu kryjowki albo z ta kryjowka jako domem; bez band w zadaniu i bez nieumarlych
+                        if (!Kin(mp, _pendingClan, _pendingHideout)) { foreign++; continue; }
+                        if (mp.IsCurrentlyUsedByAQuest || Undead.Party(mp)) continue;
+                        if (mp.MemberRoster == null || mp.MemberRoster.TotalManCount <= 0) continue;
+                        if (HideoutVendetta.Hunting(mp)) continue;   // juz w poscigu za skarbem (570 D) - jeden zarzadca bandy
+                    }
                     pack.Add(mp);
                     try { theirs += mp.Party.EstimatedStrength; } catch { }
                 }
-                if (pack.Count == 0) return;
+                if (pack.Count == 0)
+                {
+                    if (kin && foreign > 0) Log.Info("HideoutPurge: odwet (570) - w promieniu tylko obce bandy (" + foreign + "), nikt nie idzie.");
+                    return;
+                }
 
                 if (mine >= theirs * fleeOdds)
                 {
+                    if (kin) _reprisalFor = _pendingHideout;   // 570 E: jeden komunikat na kryjowke
                     Log.Player("Bandits circle the ridge to take their den back - one look at your line and they melt away.", true);
                     Log.Info("HideoutPurge: odwet stchorzyl (" + pack.Count + " band, sila " + (int)theirs + " vs " + (int)mine + ").");
                     return;
@@ -646,18 +690,33 @@ namespace Armoury
                 // i uciekaja"): pack scala sie w najwieksza bande - ludzie, jency
                 // i dobytek przechodza, oproznione bandy znikaja ze swiata.
                 // Jedna horda z suma sil idzie po swoje zloto.
+                // 570 E: przy kluczu HideoutReprisalKinOnly scalane tylko bandy bez bohatera i nie bedace eskorta bohatera (Mergeable); boss tez
+                // tylko z Mergeable. Bandy z bohaterem i eskorty bohatera zostaja sojusznikami w sile odwetu, ale BEZ naszych rozkazow: BK
+                // (BKBanditBehavior.TickBandits, co godzine) kaze kazdej bandzie bez bohatera w promieniu 10 od bohatera-bandyty isc za nim
+                // (SetFollow: eskorta + AI wylaczone 2 h) - rozkaz "bohater za bossem" dawalby wzajemna eskorte (boss za bohaterem, bohater
+                // za bossem) i horda stalaby w miejscu. Bohater idzie wiec wlasnym rozumem (ochrona bohaterow), jego eskorta - za nim. Scalenie przez MergeInto (towar zdjety ze scalanej bandy,
+                // sakiewka ludzi przeniesiona - dotad towar zostawal tez w znikajacej bandzie i nasluchy zniszczenia rozdawaly go drugi raz).
                 MobileParty boss = null;
                 foreach (var mp in pack)
-                    if (mp.MapEvent == null && (boss == null || mp.MemberRoster.TotalManCount > boss.MemberRoster.TotalManCount))
+                    if (mp.MapEvent == null && (!kin || Mergeable(mp)) && (boss == null || mp.MemberRoster.TotalManCount > boss.MemberRoster.TotalManCount))
                         boss = mp;
+                if (kin && boss == null)
+                {
+                    _reprisalFor = _pendingHideout;
+                    Log.Info("HideoutPurge: odwet (570) - w promieniu same bandy z bohaterem albo eskorty bohatera (" + pack.Count + ") - nikt ich nie scala ani nie prowadzi.");
+                    return;
+                }
                 int merged = 0;
+                int allies = 0;
                 if (boss != null)
                 {
                     foreach (var mp in pack)
                     {
                         if (mp == boss || mp.MapEvent != null) continue;
+                        if (kin && !Mergeable(mp)) { allies++; continue; }
                         try
                         {
+                            if (kin) { MergeInto(boss, mp); merged++; continue; }
                             var mr = mp.MemberRoster;
                             for (int i = 0; i < mr.Count; i++)
                             {
@@ -689,14 +748,132 @@ namespace Armoury
                 }
                 _reprisalPack.Clear();
                 if (boss != null) _reprisalPack.Add(boss); else _reprisalPack.AddRange(pack);
+                if (kin) _reprisalFor = _pendingHideout;
                 _reprisalUntil = CampaignTime.HoursFromNow(Math.Max(1f, c.HideoutReprisalHours));
                 StartPursuitClock();
                 DriveReprisal();
                 Log.Player("The scattered bands mass into one warband - they want their gold back and they will chase you for it!", true);
                 Log.Info("HideoutPurge: odwet rusza JEDNA HORDA (" + (merged + 1) + " band scalono, "
-                         + (boss != null ? boss.MemberRoster.TotalManCount : 0) + " ludzi, sila " + (int)theirs + " vs " + (int)mine + ").");
+                         + (boss != null ? boss.MemberRoster.TotalManCount : 0) + " ludzi, sila " + (int)theirs + " vs " + (int)mine + ")"
+                         + (kin ? "; 570: klan " + (_pendingClan != null ? _pendingClan.StringId : "-") + ", sojusznikow bez scalenia i rozkazow (bohater / eskorta bohatera) " + allies + ", obcych band w promieniu pominietych " + foreign : "") + ".");
             }
             catch (Exception e) { Log.Error("HideoutPurge.Reprisal", e); }
+        }
+
+        // ================================================================ 570 E: kto nalezy do kryjowki i kogo wolno scalic
+
+        /// <summary>570 E: klan bandytow kryjowki - z pokonanych w bitwie (pierwsza banda z klanem), zapasowo wlasciciel osady kryjowki.</summary>
+        private static Clan BanditClanOf(MapEvent ev, BattleSideEnum winnerSide, Settlement sett)
+        {
+            try
+            {
+                var side = ev != null ? ev.GetMapEventSide(winnerSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker) : null;
+                if (side != null && side.Parties != null)
+                    foreach (var p in side.Parties)
+                    {
+                        var mp = p != null && p.Party != null ? p.Party.MobileParty : null;
+                        if (mp != null && mp.IsBandit && mp.ActualClan != null) return mp.ActualClan;
+                    }
+                if (sett != null && sett.OwnerClan != null && sett.OwnerClan.IsBanditFaction) return sett.OwnerClan;
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>570 E/D: banda klanu kryjowki albo z ta kryjowka jako domem (BanditPartyComponent.Hideout).</summary>
+        internal static bool Kin(MobileParty mp, Clan clan, Settlement home)
+        {
+            if (mp == null) return false;
+            try
+            {
+                if (clan != null && mp.ActualClan == clan) return true;
+                var bc = mp.BanditPartyComponent;
+                return home != null && bc != null && bc.Hideout != null && ReferenceEquals(bc.Hideout.Settlement, home);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>570 E: eskorta bohatera (BK BKBanditBehavior.SetFollow: SetMoveEscortParty na partie bohatera-bandyty) - jej sklad nalezy do bohatera.</summary>
+        internal static bool HeroEscort(MobileParty mp)
+        {
+            try
+            {
+                var t = mp != null ? mp.TargetParty : null;
+                return mp != null && mp.DefaultBehavior == AiBehavior.EscortParty && t != null && t.IsActive && t.LeaderHero != null;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>570 E: czy bande wolno scalic (wchlonac albo uczynic bossem): bez bohatera, nie eskorta bohatera, nie w zadaniu, nie w bitwie,
+        /// nie w osadzie, nie w armii, nie nieumarli.</summary>
+        internal static bool Mergeable(MobileParty mp)
+        {
+            try
+            {
+                return mp != null && mp.IsActive && !mp.IsMainParty && mp.LeaderHero == null && !HeroEscort(mp) && !mp.IsCurrentlyUsedByAQuest
+                       && mp.MapEvent == null && mp.CurrentSettlement == null && mp.Army == null && !Undead.Party(mp)
+                       && mp.MemberRoster != null && mp.MemberRoster.TotalManCount > 0
+                       && !(Hero.MainHero != null && Hero.MainHero.IsPrisoner && Hero.MainHero.PartyBelongedToAsPrisoner == mp.Party);   // gracz w jej lochu
+            }
+            catch { return false; }
+        }
+
+        /// <summary>570 E: jedno scalenie bandy w bossa - ludzie, jency, towar, kiesa i sakiewka ludzi (MenPurse) przechodza; scalana banda pusta
+        /// znika (DestroyPartyAction bez niszczyciela). Towar zdejmowany ze scalanej bandy (dotad zostawal i nasluchy zniszczenia - HorseFate,
+        /// UniqueSpoils, A17Fix - rozdawaly go drugi raz: rzeczy z niczego). Bohater w skladzie - takiej bandy nie scalamy (Mergeable); jency-bohaterowie
+        /// przechodza akcja gry TransferPrisonerAction (gracz w lochu - bandy nie scalamy). Zwraca liczbe przeniesionych ludzi. Wyjatek idzie do wolajacego.</summary>
+        internal static int MergeInto(MobileParty boss, MobileParty mp)
+        {
+            int men = 0;
+            var mr = mp.MemberRoster;
+            var pr = mp.PrisonRoster;
+            var moveM = new System.Collections.Generic.List<TroopRosterElement>();
+            var moveP = new System.Collections.Generic.List<TroopRosterElement>();
+            for (int i = 0; i < mr.Count; i++) { var el = mr.GetElementCopyAtIndex(i); if (el.Character != null && el.Number > 0 && !el.Character.IsHero) moveM.Add(el); }
+            var heroesP = new System.Collections.Generic.List<CharacterObject>();
+            for (int i = 0; i < pr.Count; i++)
+            {
+                var el = pr.GetElementCopyAtIndex(i);
+                if (el.Character == null || el.Number <= 0) continue;
+                if (!el.Character.IsHero) moveP.Add(el);
+                else if (!el.Character.IsPlayerCharacter) heroesP.Add(el.Character);
+            }
+            foreach (var el in moveM)
+            {
+                boss.MemberRoster.AddToCounts(el.Character, el.Number, false, el.WoundedNumber);
+                mr.AddToCounts(el.Character, -el.Number, false, -el.WoundedNumber);
+                men += el.Number;
+            }
+            foreach (var el in moveP)
+            {
+                boss.PrisonRoster.AddToCounts(el.Character, el.Number, false, el.WoundedNumber);
+                pr.AddToCounts(el.Character, -el.Number, false, -el.WoundedNumber);
+            }
+            // jency-bohaterowie akcja gry (TransferPrisonerAction) - zostaja w niewoli u bossa (dotad wpis kopiowany recznie, a stara partia ich wypuszczala)
+            foreach (var h in heroesP) try { TransferPrisonerAction.Apply(h, mp.Party, boss.Party); } catch { }
+            var ir = mp.ItemRoster;
+            for (int i = ir.Count - 1; i >= 0; i--)
+            {
+                var el = ir.GetElementCopyAtIndex(i);
+                if (el.Amount <= 0 || el.EquipmentElement.Item == null) continue;
+                boss.ItemRoster.AddToCounts(el.EquipmentElement, el.Amount);
+                ir.AddToCounts(el.EquipmentElement, -el.Amount);
+            }
+            try { if (mp.PartyTradeGold > 0) { boss.PartyTradeGold += mp.PartyTradeGold; mp.PartyTradeGold = 0; } } catch { }
+            try { int purse = MenPurse.Get(mp); if (purse > 0) { int t = MenPurse.Take(mp, purse); if (t > 0) MenPurse.Add(boss, t); } } catch { }
+            DestroyPartyAction.Apply(null, mp);
+            return men;
+        }
+
+        /// <summary>570 D: poscig za skarbem przejmuje odwet - horda i sojusznicy dostaja normalna inicjatywe (od nastepnej godziny rozkazy poscigu).</summary>
+        internal static int HandOverReprisal()
+        {
+            int n = _reprisalPack.Count;
+            if (n == 0) return 0;
+            foreach (var mp in _reprisalPack) try { if (mp != null && mp.IsActive) { mp.Ai.SetInitiative(1f, 1f, 1f); mp.Ai.RethinkAtNextHourlyTick = true; } } catch { }
+            _reprisalPack.Clear();
+            Log.Info("HideoutPurge: odwet przejety przez poscig za skarbem (570) - " + n + " partii." + PursuitTally());
+            return n;
         }
 
         /// <summary>
@@ -794,6 +971,13 @@ namespace Armoury
                     }
                     catch (Exception e) { HideoutGoods.Stumble("DoSearch", e); }
                 }
+                // 570 D: skarb zabrany (zloto + towar z magazynu) - bandy klanu kryjowki ruszaja w poscig (HideoutVendetta, klucz HideoutVendetta)
+                try
+                {
+                    long goods = HideoutGoods.On && _lootRoster != null ? HideoutGoods.ValueOfRoster(_lootRoster) : 0;
+                    HideoutVendetta.Start(_pendingHideout, _pendingClan, _pendingGold, goods);
+                }
+                catch (Exception e) { HideoutVendetta.Stumble("Start", e); }
                 _pendingHideout = null;
                 if (_pendingGold > 0) Hero.MainHero.ChangeHeroGold(_pendingGold);
                 if (c.HideoutGoldMessages)

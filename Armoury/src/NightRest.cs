@@ -1540,6 +1540,7 @@ namespace Armoury
                     if (mp == null || !mp.IsActive || !mp.IsBandit) continue;
                     if (mp.CurrentSettlement != null || mp.MapEvent != null) continue;
                     if (Undead.Party(mp)) continue;
+                    if (HideoutVendetta.Hunting(mp)) continue;   // 570 D: banda w poscigu za skarbem (eskorta / sledzenie) nie drzemie - pogon nie zna pory
                     if (s.AiCampFastScan) { if (StbKind(mp) != 0) continue; }   // NW O5 (d): pogon nie zna pory - te same slowa bez ToString
                     else { string stb = mp.ShortTermBehavior.ToString(); if (stb.StartsWith("Flee") || stb.StartsWith("Engage")) continue; }   // pogon nie zna pory
                     bool dayHunter = mp.Id.InternalValue % 4u == 0u;   // stala natura bandy

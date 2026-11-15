@@ -517,6 +517,18 @@ namespace Armoury
         public bool HideoutGoodsStash = true;              // 568: every day a band with a home hideout carries part of its plundered trade goods (not food, not beasts, not its own gear) back to the den; whoever clears the den takes them - you when you search it, an AI victor into its baggage or its town (off = goods stay in the packs and go to the fence, as before)
         public float HideoutGoodsStashShare = 0.25f;       // with Hideout Goods Stash: share of each bale of plundered goods a band carries home each day
         public int HideoutGoodsStashCap = 6000;            // with Hideout Goods Stash: a den holds goods worth at most this many denars (base value) - beyond it the bands sell to the fence as before (0 = no limit)
+        // 570 E (Jeff 15.11 "ABCDE tak rob"): odwet tylko klanu kryjowki, bez scalania bohaterow i ich eskort, jedno scalenie i jeden komunikat (HideoutPurge.Reprisal)
+        public bool HideoutReprisalKinOnly = true;         // the reprisal gathers only bands of the den's own clan or den; a band led by a hero, or a hero's escort, is never merged - it follows the warband as an ally; one warband, one message (off = every nearby band merges, as before)
+        // 570 D: poscig za skarbem (HideoutVendetta)
+        public bool HideoutVendetta = true;                // after you carry off a rich hoard, the den's own bands hunt you for days: the strong attack, the weaker shadow you and strike when you are weakened, the hopeless give up (off = no hunt after the search, as before)
+        public int HideoutVendettaMinGold = 1500;          // with Hideout Vendetta: the hoard (coin plus goods) you carried off must be worth at least this much for the bands to hunt it
+        public float HideoutVendettaDays = 4f;             // with Hideout Vendetta: the hunt lasts this many days
+        public float HideoutVendettaRadius = 25f;          // with Hideout Vendetta: on the first day, bands of the den within this map-distance of you join the hunt
+        public float HideoutVendettaRadiusPerDay = 15f;    // with Hideout Vendetta: each full day word spreads this much further
+        public float HideoutVendettaAttackOdds = 1.3f;     // with Hideout Vendetta: the gathered bands attack when their strength is at least this many times yours
+        public float HideoutVendettaGiveUpOdds = 0.4f;     // with Hideout Vendetta: when all the hunting bands together are weaker than this share of you, they give up
+        public float HideoutVendettaWeakFactor = 0.6f;     // with Hideout Vendetta: weakened - after a battle, with many wounded, or camped for the night - your strength counts only this much
+        public float HideoutVendettaCooldownDays = 10f;    // with Hideout Vendetta: after a hunt ends, no new hunt starts for this many days
         public bool HideoutGoldMessages = true;            // after a hideout fight you are told what coin the bands carried, after the search what the den held - also when there was nothing (off = only the old message when gold is found)
 
         // --- Loot from the field ---
