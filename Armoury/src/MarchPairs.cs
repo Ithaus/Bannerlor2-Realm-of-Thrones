@@ -732,6 +732,8 @@ namespace Armoury
             public int N, CavG, CavO, FootG, MountsG, Num10G, Num10O, HerdG, HerdO, RideO, FreeO, AttRide, Att;
             public float Wet = 1f, Nomad, Shep, DCav, DFoot, DHerd;
             public bool CavRule;
+            // 566 (klucz StrongWalkersOnly): perk Strong gry - piesi gry (FootG) wobec ludzi idacych naprawde (WalkO); HorsePace u rodu: Extra / Walk; DStrong - wpis
+            public bool StrongPk; public int WalkO, HpExtra, HpWalk; public float StrongB, DStrong;
         }
         private static volatile Calc _lastCalc;   // ostatnie liczenie gracza w modelu predkosci (linia doby)
 
@@ -793,7 +795,7 @@ namespace Armoury
                 foreach (var q in r.RideQ) { h = h * 397 + (int)(q.Q * 10f); h = h * 397 + q.N; }
                 // E3: waga i udzwig - uprzeze par jadacych, pary pod jencami, prawo wagi (przelaczenie klucza tez liczy wage od nowa)
                 h = h * 397 + (int)(r.RideHarnessKg * 10f); h = h * 397 + r.UnusedCargoHorse; h = h * 397 + r.Prisoners;
-                h = h * 397 + (WeightOn ? 1 : 0) + (SpeedOn ? 2 : 0);
+                h = h * 397 + (WeightOn ? 1 : 0) + (SpeedOn ? 2 : 0) + (StrongOn ? 4 : 0);   // 566: przelaczenie Strong tez liczy predkosc od nowa
                 h = h * 397 + r.SMounts; h = h * 397 + r.RideStableHorse; h = h * 397 + r.SHarness;   // E6: stajnia piechoty
                 return h;
             }
@@ -882,7 +884,44 @@ namespace Armoury
             c.DCav = -0.3f * (cavG - c.CavO) / n * c.Wet;
             c.DFoot = 0.15f * (c.Num10O - c.Num10G) / n * (c.Wet + c.Nomad);
             c.DHerd = (Herd(n, c.HerdO) - Herd(n, c.HerdG)) * (1f + c.Shep);
+            if (StrongOn) StrongOf(mp, c, poolM, footA);
             return c;
+        }
+
+        // ---------------------------------------------------------------- 566: perk Strong tylko za ludzi idacych naprawde (Jeff 15.11 pkt 3)
+        // Gra (DefaultPartySpeedCalculatingModel.GetFootmenPerkBonus 1.4.8): AddFactor(piesi / N x Athletics.Strong.SecondaryBonus, "Strong"), piesi =
+        // NumberOfMenWithoutHorse (z doczepionymi) - takze piechurzy jadacy na luzakach, parach ze stajni 537 i zbrojowni. Tu wpis roznicy w tym samym
+        // ExplainedNumber (ApplySpeed, najbardziej zewnetrzny poziom lancucha): idacy naprawde = pula piechoty z rekordu par (u gracza z jezdzcami bez pary,
+        // rannymi jezdzcami i bohaterami bez konia - D6, D9) minus piechota na parach (RideO, jak "Footmen on horses: ..."), plus piesi doczepionych minus
+        // doczepieni na luzakach gry (AttRide); u rodu dodatkowo jak HorsePace.Apply: jezdzcy bez konia idacy pieszo (krok 3, Walk) i piechurzy niesieni
+        // przez wolne konie zbrojowni ponad gre (krok 1, Extra) - te same liczby co wpisy jazdy, wiec ten sam czlowiek albo jedzie, albo ma Strong.
+        // Zasieg = zasieg rekordu par (gracz i partie jego rodu); reszta AI bez zmian (gra: Strong za kazdego bez konia we wzorcu). Bez perka - nic.
+        private static TextObject _txStrong;
+        private static TextObject TxStrong { get { return _txStrong ?? (_txStrong = new TextObject("{=!}Strong: only men on foot")); } }
+
+        /// <summary>566: klucz StrongWalkersOnly (NOWY; dziala razem z MarchPairsSpeed - te same pary).</summary>
+        internal static bool StrongOn { get { var s = Settings.Current; return s != null && s.StrongWalkersOnly; } }
+
+        private static void StrongOf(MobileParty mp, Calc c, int poolM, int footA)
+        {
+            try
+            {
+                var pk = DefaultPerks.Athletics.Strong;
+                if (pk == null || !mp.HasPerk(pk, true)) return;   // jak gra: checkSecondaryRole
+                c.StrongPk = true; c.StrongB = pk.SecondaryBonus;
+                int foot = poolM - c.RideO + Math.Max(0, footA - c.AttRide);
+                if (!mp.IsMainParty)
+                {
+                    // rod: wpisy HorsePace krokow 1 i 3 (u gracza zastapione rekordem par - pm w HorsePace.Apply)
+                    int ex, wk; HorsePace.FootOf(mp, out ex, out wk);
+                    c.HpExtra = ex; c.HpWalk = wk;
+                    foot += wk - ex;
+                }
+                c.WalkO = Math.Max(0, Math.Min(foot, c.N));
+                if (c.FootG <= 0 && c.WalkO <= 0) return;
+                c.DStrong = (float)(c.WalkO - c.FootG) / c.N * c.StrongB;
+            }
+            catch (Exception e) { Stumble("StrongOf", e); c.DStrong = 0f; }
         }
 
         /// <summary>E2: MarchPace.SpeedPostfix PRZED sufitem kolumny (obok HorsePace.Apply): trzy wpisy roznicy. Dowolny watek; tylko odczyt pamieci (gracz).</summary>
@@ -902,6 +941,7 @@ namespace Armoury
                 // E6: konie stajni piechoty sa poza NumberOfMounts gry - wpis dodatni nazwany od stajni, gdy w niej jada ludzie
                 if (Math.Abs(c.DFoot) > 1e-6f) result.AddFactor(c.DFoot, c.DFoot < 0f ? TxFootLess : r.RideStableHorse > 0 ? TxFootStable : TxFootMore);
                 if (Math.Abs(c.DHerd) > 1e-6f) result.AddFactor(c.DHerd, TxHerd);
+                if (Math.Abs(c.DStrong) > 1e-6f) result.AddFactor(c.DStrong, TxStrong);   // 566: Strong gry tylko za idacych naprawde
             }
             catch (Exception e) { Stumble("ApplySpeed", e); }
         }
@@ -1088,7 +1128,8 @@ namespace Armoury
                 var sr = SpeedRec(x);
                 if (sr == null) return ", E2: brak (morze albo poza zasiegiem)";
                 var c = Compute(x, sr);
-                return ", E2: num10 " + c.Num10O + "/gra " + c.Num10G + ", stado " + c.HerdO + "/gra " + c.HerdG + ", Footmen " + F3(c.DFoot) + ", Herding " + F3(c.DHerd);
+                return ", E2: num10 " + c.Num10O + "/gra " + c.Num10G + ", stado " + c.HerdO + "/gra " + c.HerdG + ", Footmen " + F3(c.DFoot) + ", Herding " + F3(c.DHerd)
+                       + (c.StrongPk ? ", Strong: piesi " + c.WalkO + "/gra " + c.FootG + " " + F3(c.DStrong) : "");
             }
             catch (Exception e) { Stumble("SpeedClan", e); return ", E2: blad"; }
         }
@@ -1106,9 +1147,11 @@ namespace Armoury
               .Append(" | pary: jazda ").Append(c.CavO).Append(c.CavRule ? "" : " (jak gra - TroopsFightWithOwnKitOnly NIE)").Append(", piechota na parach ").Append(c.RideO)
               .Append(c.Att > 0 ? " + doczepione " + c.AttRide : "").Append(" = num10 ").Append(c.Num10O).Append(", wolne konie w stadzie ").Append(c.FreeO).Append(", stado ").Append(c.HerdO)
               .Append(" | wpisy: Riders without harness ").Append(F3(c.DCav)).Append(", Footmen on horses ").Append(F3(c.DFoot)).Append(", Herding: horses without riders ").Append(F3(c.DHerd))
-              .Append(" (mokro x").Append(c.Wet.ToString("0.0", Inv)).Append(", NomadicTraditions ").Append(c.Nomad.ToString("0.00", Inv)).Append(", Shepherd ").Append(c.Shep.ToString("0.00", Inv)).Append(')');
+              .Append(" (mokro x").Append(c.Wet.ToString("0.0", Inv)).Append(", NomadicTraditions ").Append(c.Nomad.ToString("0.00", Inv)).Append(", Shepherd ").Append(c.Shep.ToString("0.00", Inv)).Append(')')
+              .Append(" | 566 Strong (klucz StrongWalkersOnly ").Append(StrongOn ? "TAK" : "NIE").Append("): ")
+              .Append(!StrongOn ? "jak gra" : !c.StrongPk ? "bez perka" : "idacy " + c.WalkO + "/piesi gry " + c.FootG + ", wpis " + F3(c.DStrong) + " (premia " + c.StrongB.ToString("0.000", Inv) + ")");
             var lc = _lastCalc;
-            if (lc != null) sb.Append(" | ostatnio w modelu predkosci: ").Append(F3(lc.DCav)).Append(" / ").Append(F3(lc.DFoot)).Append(" / ").Append(F3(lc.DHerd))
+            if (lc != null) sb.Append(" | ostatnio w modelu predkosci: ").Append(F3(lc.DCav)).Append(" / ").Append(F3(lc.DFoot)).Append(" / ").Append(F3(lc.DHerd)).Append(" / Strong ").Append(F3(lc.DStrong))
                               .Append(" (num10 ").Append(lc.Num10O).Append(", stado ").Append(lc.HerdO).Append(')');
             int qn = 0; double qs = 0; foreach (var q in sr.RideQ) { qn += q.N; qs += q.N * (double)q.Q; }
             sb.Append(" | konie pod piechota z par ").Append(qn).Append(qn > 0 ? " (szybkosc srednio " + (qs / qn).ToString("0.0", Inv) + ")" : "");

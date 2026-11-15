@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 566: perk Strong (Athletics) liczy tylko ludzi, ktorzy naprawde ida pieszo - Armoury (MarchPairs.cs, HorsePace.cs, Settings.cs, McmSettings.cs)
+
+**Problem:** Jeff, czat 15.11, po audycie predkosci partii (pkt 3: "tak"): "Strong" gry dostaja tez piechurzy jadacy na koniach stajni 537. Log Armoury-2026-11-15_19-36-27.log linia 4084: "Strong +0.17 ... Footmen on horses: footmen's mounts +0.55" - prawie cala piechota gracza jedzie na parach, a premia za marsz pieszo liczy sie w calosci.
+
+**Przyczyna:** gra (DefaultPartySpeedCalculatingModel.GetFootmenPerkBonus 1.4.8) daje AddFactor(NumberOfMenWithoutHorse / N x Athletics.Strong.SecondaryBonus) - piesi = kazdy bez konia we wzorcu (z doczepionymi), takze piechur na luzaku gry, na parze ze stajni / ladunku / zbrojowni (537), wiec ten sam czlowiek ma "Footmen on horses" i "Strong".
+
+**Zmiana:** nowy klucz MCM `StrongWalkersOnly` (Strong Walkers Only, domyslnie TAK; NIE = jak gra). MarchPairs.Compute -> StrongOf: gdy partia ma perk (HasPerk(Strong, checkSecondaryRole) jak gra), idacy naprawde = pula piechoty z rekordu par (u gracza przy TroopsFightWithOwnKitOnly z jezdzcami bez pary, rannymi jezdzcami i bohaterami bez konia) - piechota na parach (RideO) + piesi doczepionych - doczepieni na luzakach gry (AttRide); u partii rodu dodatkowo jak HorsePace.Apply: + jezdzcy bez konia idacy pieszo (krok 3 Walk) - piechurzy niesieni przez wolne konie zbrojowni ponad gre (krok 1 Extra) - nowe HorsePace.FootOf zwraca te liczby z pamieci tego samego wywolania. ApplySpeed (MarchPace.SpeedPostfix, SpeedDepth.OutermostFinal, przed sufitem kolumny) dopisuje wpis roznicy "Strong: only men on foot" = (idacy - piesi gry) / N x SecondaryBonus (zwykle ujemny; dodatni, gdy jezdzcy bez pary ida pieszo). Linia doby "Pary marszowe" (E2) i dopiski rodu pokazuja idacych / pieszych gry i wpis. SpeedSig zawiera klucz (przelaczenie liczy predkosc gracza od nowa).
+Zasieg: gracz i partie jego rodu (zasieg rekordu par MarchPairs; potrzebny klucz MarchPairsSpeed). Pozostale AI - BEZ ZMIAN (gra: Strong za kazdego bez konia we wzorcu, takze piechura na luzaku) - regula par dotyczy dzis tylko gracza i rodu.
+
+**Ryzyko / co sprawdzic:**
+- Regresje/kolizje: Strong dodaje tylko gra (grep: nikt w repo nie dotyka Athletics.Strong); wpis idzie w tym samym ExplainedNumber co "Footmen on horses: ..." i sumuje sie przed sufitem kolumny MarchPace, ScoutPace515 i drogami (MapRoads dzieli przez 1+F - mniejsze F po naszym wpisie, jak przy kazdym wpisie). Liczby jazdy te same co wpisy MarchPairs/HorsePace (RideO, AttRide, Extra, Walk) - jeden czlowiek albo jedzie, albo ma Strong. Bez perka wpisu nie ma (liczenie konczy sie na HasPerk).
+- WorldPace / 564 (tempo swiata jako mnoznik) - inna galaz; tu nie ruszane.
+- W logu: linia "Pary marszowe (gracz)" -> "566 Strong (klucz StrongWalkersOnly TAK): idacy X/piesi gry Y, wpis -0.xxx"; audyt predkosci: przy linii 4084 oczekiwane "Strong: only men on foot" -0.17 (wspolczynnik -138/168 x 0.05 = -0.041; idacy 0, cala piechota na parach), Strong netto dokladnie 0.
+- Koszt: HasPerk + kilka dodawan na wywolanie modelu predkosci gracza/rodu (bez nowych pamieci).
+
+**Status:** DO SPRAWDZENIA (galaz noc/566-strong-pieszo, nie wgrane)
+
+### Recenzja 566 (galaz noc/566-strong-pieszo-fix -> noc/566-strong-pieszo)
+Przeglad fdba6fbf: brak uwag w kodzie (sprawdzone na kodzie i logu, nie w grze). Liczby: SecondaryBonus Strong 0.05 (DefaultPerks.cs:2109), gra GetFootmenPerkBonus (:429-436) piesi / N x 0.05; DStrong = (WalkO - FootG) / N x B w tym samym ExplainedNumber -> suma WalkO / N x B. Podwojnego liczenia brak (gracz: HorsePace zeruje Extra/Walk przy rekordzie par; rod: jadacy RideO + AttRide + Extra, idacy reszta - te same liczby co wpisy +0.15/-0.3; rozjazd uprzezy Extra HorsePace vs MarchPairs sprzed 566). Bezpiecznik zagniezdzen bez zmian (StrongOf tylko z Compute, FootOf z pamieci GetFast). Klucz NIE = identycznie (SpeedSig +0). 564 mnozy wpis Strong raz (WorldPace.FinalPostfix po MarchPace); 565 nie dotyka Compute/ApplySpeed/ColumnOf; git merge-tree z 564, 565 i noc/scal-perki - konflikt tylko w CHANGELOG.
+Poprawione (tylko tekst wpisu, kod bez zmian): "Ryzyko" - tempo swiata to wpis 564, nie 565; oczekiwany wpis w audycie przy linii 4084 to -0.17 (audyt pokazuje Strong +0.17 = cala premia gry, 138/168 piesi gry, idacy 0), nie "okolo -0.15" - Strong netto dokladnie 0.
+
 ## 565: pasek mapy - Pack pokazuje prog taboru kolumny marszowej (to, co naprawde hamuje), limit Herding w podpowiedzi jako druga informacja - Armoury (MarchHud.cs, MarchPace.cs, klucz MarchHudPackTrain w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** audyt predkosci 15.11 (pkt 2), Jeff: "tak koniecznie". Pasek "Pack 81/147" ostrzegal tylko ponad limit Herding (juczne / ludzie - bydlo - wolne konie), a kolumna MarchPace uznaje partie za tabor juz przy jucznych + bydle ponad MarchPackAllowance (0.25) x ludzie i wtedy daje sufit MarchTrainPace 4.2 x tempo swiata. Log Armoury-2026-11-15_19-36-27.log, linia 13051 (Pary marszowe, gracz): ludzie 169, juczne 81, bydlo 2 -> tabor 83 przy przydziale ceil(169 x 0.25) = 43, a pasek pokazywal "81/147" bez koloru.

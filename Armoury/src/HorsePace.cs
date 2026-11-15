@@ -565,6 +565,20 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>566: piechurzy niesieni ponad gre (krok 1, Extra) i jezdzcy bez konia idacy pieszo (krok 3, Walk) - te same liczby co wpisy Apply
+        /// (u gracza 0/0 przy rekordzie par - zastapione przez MarchPairs). MarchPairs.StrongOf (perk Strong tylko za idacych naprawde). Dowolny watek.</summary>
+        internal static void FootOf(MobileParty mp, out int extra, out int walk)
+        {
+            extra = 0; walk = 0;
+            if (_dry) return;
+            var s = Settings.Current;
+            if (!AnyOn(s) || !InScope(mp)) return;
+            var r = GetFast(mp);
+            if (r == null) return;
+            if (mp.IsMainParty && MarchPairs.SpeedRec(mp) != null) return;
+            extra = r.Extra; walk = r.Walk;
+        }
+
         /// <summary>Jezdzcy bez konia idacy pieszo (krok 3) - MarchPace.CountColumn dolicza do piechoty (Cap i Explain).</summary>
         internal static int WalkOf(MobileParty mp)
         {
