@@ -29,6 +29,9 @@ namespace Armoury
     ///  - S = 1 + 0.10 x uB x kB + 0.10 x uZ x kZ, u = pokrycie sztuk polowy (562c: suma min(Cov, Need) / suma Need rodzajow broni / zbroi - ta sama miara,
     ///    co zuzycie i pasek; dawniej ludzie z pelnym kompletem, przez co premia stala na zerze do pierwszego pelnego kompletu).
     ///  - Zuzycie wedlug rodzaju (zycie w dniach musztry = WearDays x LifeX).
+    ///  - 574 (Jeff 15.11 "jesli ma lucznictwo 30 a luk lezy 40 ... nie moze uzyc"; klucz DrillKitSkillCheck): do zestawu trafia tylko sztuka, ktora udzwignie
+    ///    typ z brakiem jej rodzaju (GearFit.ForTroop - umiejetnosc, siodlo, kultura, jak kwatermistrz bitwy; bohater ItemReq.MeetsHero). Pokrycie per typ:
+    ///    typ z n ludzmi pokrywaja najwyzej Units(n) sztuk, ktore sam udzwignie (FitMatch); sztuki, ktorych nikt w roli nie udzwignie, wracaja do zbrojowni.
     /// </summary>
     internal static partial class Drill
     {
@@ -128,8 +131,8 @@ namespace Armoury
             return RSword;
         }
 
-        /// <summary>Sztuka do zapasu: rodzaj zestawu, bez wyrobow gracza, bez unikatow i sztuk zakazanych w bitwie (ArmsPricing.IsUnique). Szczebel, kultura,
-        /// umiejetnosc i modyfikator dowolne (musztra to nie bitwa).</summary>
+        /// <summary>Sztuka do zapasu: rodzaj zestawu, bez wyrobow gracza, bez unikatow i sztuk zakazanych w bitwie (ArmsPricing.IsUnique). Szczebel i modyfikator
+        /// dowolne; umiejetnosc, siodlo i kultura - 574 (klucz DrillKitSkillCheck): osobno, per typ (Fits / Claim / UsableAny).</summary>
         private static bool Eligible(ItemObject it)
         {
             if (KindOf(it) < 0) return false;
@@ -151,6 +154,14 @@ namespace Armoury
             internal int L2N, L21, LP0, LP2, LP1, LPb;   // po przydziale: wolne dwureczne (bez 1H / z 1H) i drzewce wedlug klasy
             internal int Men, Heroes, Ready, ReadyW, ReadyA, ReadyM, NeedM, ReadyR, NeedR, Sig;
             internal int CapeOpt;                // 562c: oponcza-dodatek - ile sztuk zapasu moze sluzyc (1 na MenPerPiece ludzi kazdej grupy); Need[KCape] = 0
+            // 574 (Jeff 15.11 "aby respektowane byly umiejetnosci"): typy oddzialow (i bohaterowie musztry) z rola i ludzmi; przy Skill sztuka liczy sie
+            // do zestawu tylko, gdy typ, ktory jej potrzebuje, ja udzwignie (GearFit.ForTroop - ten sam predykat co kwatermistrz bitwy; bohater - ItemReq.MeetsHero)
+            internal readonly List<KitT> Types = new List<KitT>();
+            internal bool Skill;                 // 574: sprawdzanie umiejetnosci czynne przy tej mierze (klucz DrillKitSkillCheck)
+            internal int Unfit;                  // 574: sztuki zapasu, ktorych nikt w potrzebujacej roli nie udzwignie - poza Have, zawsze nadmiar (ReturnExcess)
+            internal readonly int[] Fit = new int[NK];   // 574: sztuki rodzaju dopasowane do typow (typ z n ludzmi - najwyzej Units(n) sztuk, ktore sam udzwignie)
+            internal int[][] Resid;              // 574: [rodzaj][typ] wolne miejsca typu po dopasowaniu (Claim je zajmuje)
+            internal Dictionary<ItemObject, int> FitItems;   // 574: dopasowane sztuki wedlug przedmiotu (rodzaj podstawowy) - ReturnExcess oddaje najpierw reszte
             internal int Kit { get { return Men + Heroes; } }
             /// <summary>562c: pokrycie sztuk rodzajow lo..hi (suma min(Cov, Need) / suma Need), 0..1; bez popytu - 0.</summary>
             internal float Cover(int lo, int hi)
@@ -160,7 +171,142 @@ namespace Armoury
                 return n > 0 ? Math.Min(1f, c / (float)n) : 0f;
             }
             internal int Short(int k) { return Math.Max(0, Need[k] - Cov[k]); }
-            internal int Pieces { get { int n = Other; for (int k = 0; k < NK; k++) n += Have[k]; return n; } }
+            internal int Pieces { get { int n = Other + Unfit; for (int k = 0; k < NK; k++) n += Have[k]; return n; } }
+        }
+
+        /// <summary>574: typ oddzialu w mierze zestawu (bohater musztry - osobny typ z 1 czlowiekiem).</summary>
+        internal sealed class KitT { internal CharacterObject Ch; internal int Mask, Men, Cap; internal bool Hero; }
+
+        private static bool SkillOn { get { var s = Settings.Current; return s != null && s.DrillKitSkillCheck; } }
+
+        // 574: pamiec predykatu (typ, przedmiot) na dobe - umiejetnosci szeregowych sa stale, bohaterow rosna wolno; czyszczona tez przy zmianie bramek GearFit
+        private static readonly Dictionary<CharacterObject, Dictionary<ItemObject, bool>> _fitMemo = new Dictionary<CharacterObject, Dictionary<ItemObject, bool>>();
+        private static int _fitMemoDay = int.MinValue, _fitMemoCfg = -1, _fitMemoN;
+
+        /// <summary>574: czy typ udzwignie sztuke: szeregowi GearFit.ForTroop (umiejetnosc, siodlo przy GearFitKits, kultura - jak kwatermistrz bitwy i FitsAny),
+        /// bohaterowie ItemReq.MeetsHero (sito bohaterow). Bez licznikow GearFit (Quiet). Wyjatek - true (jak ItemReq), slad w potknieciach.</summary>
+        private static bool Fits(KitT t, ItemObject it)
+        {
+            if (t == null || t.Ch == null || it == null) return true;
+            int day = (int)CampaignTime.Now.ToDays, cfg = (GearFit.On ? 1 : 0) + (GearFit.CultureOn ? 2 : 0);
+            if (day != _fitMemoDay || cfg != _fitMemoCfg || _fitMemoN > 200000) { _fitMemo.Clear(); _fitMemoN = 0; _fitMemoDay = day; _fitMemoCfg = cfg; }
+            Dictionary<ItemObject, bool> d;
+            if (!_fitMemo.TryGetValue(t.Ch, out d)) _fitMemo[t.Ch] = d = new Dictionary<ItemObject, bool>();
+            bool v; if (d.TryGetValue(it, out v)) return v;
+            bool q = GearFit.Quiet; GearFit.Quiet = true;
+            try { v = t.Hero ? ItemReq.MeetsHero(t.Ch, it) : GearFit.ForTroop(t.Ch, it, GearFit.On); }
+            catch (Exception e) { Stumble("Fits", e); v = true; }
+            finally { GearFit.Quiet = q; }
+            d[it] = v; _fitMemoN++;
+            return v;
+        }
+
+        /// <summary>574: maska rodzajow, ktorym sztuka moze sluzyc (z zastepstwami, jak KindsFor).</summary>
+        private static int KindsMask(ItemObject it) { int mk = 0; foreach (int k in KindsFor(it)) mk |= 1 << k; return mk; }
+
+        /// <summary>574: czy ktos w roli potrzebujacej ktoregos z rodzajow sztuki ja udzwignie (oponcza-dodatek: ktokolwiek). Bez Skill albo bez ludzi - true.</summary>
+        private static bool UsableAny(KitM m, ItemObject it)
+        {
+            if (m == null || !m.Skill || m.Types.Count == 0 || KindInfo(it) < 0) return true;
+            int mk = KindsMask(it);
+            bool cape = (mk & (1 << KCape)) != 0;
+            foreach (var t in m.Types) if ((cape || (t.Mask & mk) != 0) && Fits(t, it)) return true;
+            return false;
+        }
+
+        /// <summary>574: czy ktos w roli z rodzajem k udzwignie sztuke (bez patrzenia na wolne miejsca; oponcza-dodatek - ktokolwiek) - zuzycie i licznik
+        /// "za trudne". Bez Skill albo bez ludzi - true.</summary>
+        private static bool FitsKind(KitM m, int k, ItemObject it)
+        {
+            if (m == null || !m.Skill || m.Types.Count == 0) return true;
+            bool cape = k == KCape;
+            foreach (var t in m.Types) if ((cape || (t.Mask & (1 << k)) != 0) && Fits(t, it)) return true;
+            return false;
+        }
+
+        /// <summary>574: zajmij do max miejsc rodzaju k u typow, ktore sztuke udzwigna (najpierw typ z najnizsza umiejetnoscia sztuki - mocniejsi zostaja
+        /// dla trudniejszych sztuk). Bez Skill - max. Zwraca zajete.</summary>
+        private static int Claim(KitM m, int k, ItemObject it, int max)
+        {
+            if (max <= 0) return 0;
+            if (m == null || !m.Skill || m.Resid == null) return max;
+            var r = m.Resid[k];
+            var sk = ItemReq.SkillFor(it);
+            int got = 0;
+            while (got < max)
+            {
+                int best = -1, bs = int.MaxValue;
+                for (int t = 0; t < r.Length; t++)
+                {
+                    if (r[t] <= 0 || !Fits(m.Types[t], it)) continue;
+                    int sv = 0;
+                    if (sk != null) { try { sv = m.Types[t].Ch.GetSkillValue(sk); } catch { sv = 0; } }
+                    if (sv < bs) { bs = sv; best = t; }
+                }
+                if (best < 0) break;
+                int x = Math.Min(max - got, r[best]);
+                r[best] -= x; got += x;
+            }
+            return got;
+        }
+
+        /// <summary>574: dopasowanie sztuk do typow wedlug rodzajow (Fit, Resid, FitItems). Rodzaj k bierze sztuki, ktore mu sluza (podstawowe i zastepstwa,
+        /// jak Allocate); najpierw sztuki, ktore udzwignie najmniej typow (przy progach umiejetnosci dopasowanie pelne). pcs == null - same wolne miejsca.</summary>
+        private static void FitMatch(KitM m, Dictionary<ItemObject, int> pcs)
+        {
+            int nt = m.Types.Count;
+            m.Resid = new int[NK][];
+            m.FitItems = new Dictionary<ItemObject, int>();
+            for (int k = 0; k < NK; k++)
+            {
+                m.Fit[k] = 0;
+                var r = new int[nt];
+                for (int t = 0; t < nt; t++) r[t] = (m.Types[t].Mask & (1 << k)) != 0 ? m.Types[t].Cap : 0;
+                m.Resid[k] = r;
+            }
+            if (!m.Skill || pcs == null || pcs.Count == 0) return;
+            for (int k = 0; k < NK; k++)
+            {
+                if (k == KCape || m.Need[k] <= 0) continue;
+                var l = new List<KeyValuePair<ItemObject, int>>();
+                var cnt = new Dictionary<ItemObject, int>();
+                foreach (var kv in pcs)
+                {
+                    var it = kv.Key; int v = KindInfo(it);
+                    if (kv.Value <= 0 || !(Serves(v, k, false) || Serves(v, k, true)) || !UsableAny(m, it)) continue;
+                    int c = 0;
+                    for (int t = 0; t < nt; t++) if ((m.Types[t].Mask & (1 << k)) != 0 && Fits(m.Types[t], it)) c++;
+                    if (c == 0) continue;
+                    l.Add(kv); cnt[it] = c;
+                }
+                l.Sort((a, b) =>
+                {
+                    int c = cnt[a.Key].CompareTo(cnt[b.Key]);
+                    if (c != 0) return c;
+                    c = b.Key.Value.CompareTo(a.Key.Value);
+                    return c != 0 ? c : string.CompareOrdinal(a.Key.StringId, b.Key.StringId);
+                });
+                foreach (var kv in l)
+                {
+                    int x = Claim(m, k, kv.Key, kv.Value);
+                    if (x <= 0) continue;
+                    m.Fit[k] += x;
+                    if ((KindInfo(kv.Key) & 0xFF) == k) { int f; m.FitItems.TryGetValue(kv.Key, out f); m.FitItems[kv.Key] = f + x; }
+                }
+            }
+        }
+
+        /// <summary>574: po Allocate - pokrycie rodzaju najwyzej tyle, ile sztuk dopasowano do typow; rodzaje bez zastepstw - Used tez (reszta to nadmiar
+        /// i wraca, najpierw niedopasowane). Bron biala (1H, 2H, drzewce): Used bez zmian (przydzial klas zastepstw), tylko pokrycie - wersja per rodzaj.</summary>
+        private static void ClampFit(KitM m)
+        {
+            if (!m.Skill) return;
+            for (int k = 0; k < NK; k++)
+            {
+                if (k == KCape || m.Cov[k] <= m.Fit[k]) continue;
+                m.Cov[k] = m.Fit[k];
+                if (k != K1H && k != K2H && k != KPole) m.Used[k] = m.Cov[k];
+            }
         }
 
         /// <summary>Grupy rol partii (zolnierze z pamieci typu, bohaterowie musztry z zestawu bitewnego) i popyt. Jedna petla po rosterze, bez planow.</summary>
@@ -170,6 +316,7 @@ namespace Armoury
             var r = mp != null ? mp.MemberRoster : null;
             if (r == null) return m;
             var by = new Dictionary<int, int>();
+            m.Skill = SkillOn;   // 574
             bool heroes = r.TotalHeroes > 0 && HeroesOn(s, noBase);
             for (int i = 0; i < r.Count; i++)
             {
@@ -184,6 +331,7 @@ namespace Armoury
                 }
                 else { mask = RoleOf(ch); n = el.Number; m.Men += n; }
                 int v; by.TryGetValue(mask, out v); by[mask] = v + n;
+                m.Types.Add(new KitT { Ch = ch, Mask = mask, Men = n, Cap = Units(n), Hero = ch.IsHero });   // 574
             }
             var keys = new List<int>(by.Keys);
             keys.Sort((a, b) => { int pa = Pop(a), pb = Pop(b); return pa != pb ? pa.CompareTo(pb) : a.CompareTo(b); });   // od najkrotszej maski
@@ -208,6 +356,7 @@ namespace Armoury
             if (n <= 0) return;
             int v = KindInfo(it);
             if (v < 0) { m.Other += n; return; }
+            if (m.Skill && !UsableAny(m, it)) { m.Unfit += n; return; }   // 574: nikt w roli nie udzwignie - poza zestawem
             int b = v & 0xFF;
             m.Have[b] += n;
             if (b == K2H && (v & F1H) != 0) m.T1 += n;
@@ -309,12 +458,17 @@ namespace Armoury
         private static KitM MeasurePlayer()
         {
             var m = Groups(MobileParty.MainParty, Settings.Current, true);
+            var pcs = new Dictionary<ItemObject, int>();   // 574: sztuki wedlug przedmiotu do dopasowania
             for (int i = 0; i < _stock.Count; i++)
             {
                 var el = _stock.GetElementCopyAtIndex(i);
-                if (el.Amount > 0) AddHave(m, el.EquipmentElement.Item, el.Amount);
+                if (el.Amount <= 0) continue;
+                var it = el.EquipmentElement.Item;
+                AddHave(m, it, el.Amount);
+                if (it != null) { int v; pcs.TryGetValue(it, out v); pcs[it] = v + el.Amount; }
             }
-            Allocate(m); FillReady(m);
+            FitMatch(m, pcs);
+            Allocate(m); ClampFit(m); FillReady(m);
             return m;
         }
 
@@ -496,7 +650,8 @@ namespace Armoury
 
         /// <summary>a) Nadmiar: dla rodzaju t Have - Used - ceil(Used x SurplusKeepPercent / 100) do zbrojowni, najlepsze najpierw, tylko z wolnych klas przydzialu
         /// (pokrycie sie nie zmienia); sztuki spoza rodzajow (stare rekawice) zawsze. Do czesci ludzi - K1 je potem sprzeda jak kazda nadwyzke; 571: sztuki
-        /// wziete z listy gracza (_fromBook) wracaja na liste gracza (BackToArmory).</summary>
+        /// wziete z listy gracza (_fromBook) wracaja na liste gracza (BackToArmory). 574: sztuki, ktorych nikt w roli nie udzwignie (Unfit), wracaja zawsze
+        /// (sprzatanie zapasu sprzed 574 - przy pierwszym rozliczeniu); nadmiar najpierw ze sztuk niedopasowanych do typow, dopiero potem z dopasowanych.</summary>
         private static int ReturnExcess(KitM m, ItemRoster arm)
         {
             var s = Settings.Current;
@@ -509,30 +664,62 @@ namespace Armoury
                 ex[t] = Math.Max(0, m.Have[t] - m.Used[t] - keep);
                 any += ex[t];
             }
+            any += m.Unfit;   // 574: za trudne - zawsze do zbrojowni
             if (any <= 0) return 0;
             int[] p2 = { m.L2N, m.L21 }, pp = { m.LP0, m.LP2, m.LP1, m.LPb };
             var els = new List<ItemRosterElement>();
             for (int i = 0; i < _stock.Count; i++) { var el = _stock.GetElementCopyAtIndex(i); if (el.Amount > 0) els.Add(el); }
             els.Sort((x, y) => y.EquipmentElement.ItemValue.CompareTo(x.EquipmentElement.ItemValue));   // najlepsze najpierw
-            int n = 0;
-            foreach (var el in els)
+            // 574: sztuki uzywalne, ale niedopasowane do typow (FitItems - dopasowane wedlug przedmiotu) wracaja jako nadmiar PRZED dopasowanymi
+            // (inaczej zwrot drogiej dopasowanej sztuki obnizalby pokrycie, a pobor bralby ja jutro z powrotem)
+            Dictionary<ItemObject, int> unm = null;
+            if (m.Skill && m.FitItems != null)
             {
-                var it = el.EquipmentElement.Item;
-                int v = KindInfo(it), give;
-                if (v < 0) { give = el.Amount; _pBackOther += give; }
-                else
+                unm = new Dictionary<ItemObject, int>();
+                foreach (var el in els)
                 {
-                    int b = v & 0xFF;
-                    if (ex[b] <= 0) continue;
-                    give = Math.Min(el.Amount, ex[b]);
-                    if (b == K2H) { int c = Cls2H(v); give = Math.Min(give, p2[c]); p2[c] -= give; }
-                    else if (b == KPole) { int c = ClsPole(v); give = Math.Min(give, pp[c]); pp[c] -= give; }
-                    ex[b] -= give;
-                    _pBack += give;
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || KindInfo(it) < 0 || !UsableAny(m, it)) continue;
+                    int u; unm.TryGetValue(it, out u); unm[it] = u + el.Amount;
                 }
-                if (give <= 0) continue;
-                BackToArmory(arm, el.EquipmentElement, give);   // 571: czesc gracza na liste gracza, reszta na stan wojska
-                n += give;
+                foreach (var key in new List<ItemObject>(unm.Keys)) { int f; m.FitItems.TryGetValue(key, out f); unm[key] = Math.Max(0, unm[key] - f); }
+            }
+            var left = new int[els.Count];
+            for (int i = 0; i < els.Count; i++) left[i] = els[i].Amount;
+            int n = 0;
+            for (int pass = 0; pass < 3; pass++)   // 0: spoza rodzajow i za trudne (cale), 1: nadmiar z niedopasowanych (574), 2: reszta nadmiaru
+            {
+                if (pass == 1 && unm == null) continue;
+                for (int i = 0; i < els.Count; i++)
+                {
+                    var el = els[i];
+                    if (left[i] <= 0) continue;
+                    var it = el.EquipmentElement.Item;
+                    int v = KindInfo(it), give;
+                    if (v < 0) { if (pass != 0) continue; give = left[i]; _pBackOther += give; }
+                    else if (m.Skill && !UsableAny(m, it)) { if (pass != 0) continue; give = left[i]; _pBackHard += give; }   // 574
+                    else
+                    {
+                        if (pass == 0) continue;
+                        int b = v & 0xFF;
+                        if (ex[b] <= 0) continue;
+                        give = Math.Min(left[i], ex[b]);
+                        int u = 0;
+                        if (pass == 1) { unm.TryGetValue(it, out u); give = Math.Min(give, u); }
+                        if (b == K2H) give = Math.Min(give, p2[Cls2H(v)]);
+                        else if (b == KPole) give = Math.Min(give, pp[ClsPole(v)]);
+                        if (give <= 0) continue;
+                        if (b == K2H) p2[Cls2H(v)] -= give;
+                        else if (b == KPole) pp[ClsPole(v)] -= give;
+                        if (pass == 1) unm[it] = u - give;
+                        ex[b] -= give;
+                        _pBack += give;
+                    }
+                    if (give <= 0) continue;
+                    left[i] -= give;
+                    BackToArmory(arm, el.EquipmentElement, give);   // 571: czesc gracza na liste gracza, reszta na stan wojska
+                    n += give;
+                }
             }
             return n;
         }
@@ -614,13 +801,15 @@ namespace Armoury
                         int inArm = idx >= 0 ? arm.GetElementCopyAtIndex(idx).Amount : 0;
                         int x = Math.Min(Math.Min(p.Sell, want), inArm);
                         if (x <= 0) continue;
+                        x = ClaimTake(m, k, it, x, false);   // 574: tylko dla typu z brakiem, ktory sztuke udzwignie
+                        if (x <= 0) continue;
                         arm.AddToCounts(el, -x);
                         _stock.AddToCounts(el, x);
                         p.Sell -= x; want -= x; took += x;
                         if (want <= 0) break;
                     }
                 }
-                if (want > 0 && book) took += TakeBook(k, want, arm, keep, bookPlans);   // 571: reszta braku z listy gracza
+                if (want > 0 && book) took += TakeBook(m, k, want, arm, keep, bookPlans);   // 571: reszta braku z listy gracza
             }
             _pTaken += took;
             return took;
@@ -686,7 +875,7 @@ namespace Armoury
         }
 
         /// <summary>571: brak rodzaju k (want sztuk) z nienoszonych sztuk gracza (plan PlayerBookPlan na typ, pamiec planow na rozliczenie). Zwraca liczbe wzietych.</summary>
-        private static int TakeBook(int k, int want, ItemRoster arm, Dictionary<ItemObject, int> keep, Dictionary<int, List<SwapMath.Piece>> plans)
+        private static int TakeBook(KitM m, int k, int want, ItemRoster arm, Dictionary<ItemObject, int> keep, Dictionary<int, List<SwapMath.Piece>> plans)
         {
             int took = 0;
             foreach (var t in TakeTypes(k))
@@ -708,6 +897,8 @@ namespace Armoury
                     int free = ArmCount(arm, it) - kp;   // nastepna bitwa ma pierwszenstwo: na przedmiot zostaje co najmniej KeepFor
                     int x = Math.Min(Math.Min(Math.Min(p.Sell, want), inArm), free);
                     if (x <= 0) continue;
+                    x = ClaimTake(m, k, it, x, false);   // 574
+                    if (x <= 0) continue;
                     arm.AddToCounts(el, -x);
                     _stock.AddToCounts(el, x);
                     ArmouryBehavior.StockWithdrawKey(el, x);
@@ -723,6 +914,17 @@ namespace Armoury
 
         /// <summary>571: ile sztuk zapasu to sztuki gracza (pamiec _fromBook) - do linii doby.</summary>
         private static int BookPieces() { int n = 0; foreach (var v in _fromBook.Values) n += v; return n; }
+
+        // 574: liczniki doby - za trudne oddane z zapasu gracza, pominiete przy braniu (gracz: TakePlayer, TakeBook, Accept; AI: rezerwacja)
+        private static int _pBackHard, _pHardSkip, _aHardSkip;
+
+        /// <summary>574: Claim przy braniu sztuki do zestawu + licznik "za trudne" (nikt w roli z rodzajem k jej nie udzwignie).</summary>
+        private static int ClaimTake(KitM m, int k, ItemObject it, int x, bool ai)
+        {
+            int got = Claim(m, k, it, x);
+            if (got < x && !FitsKind(m, k, it)) { if (ai) _aHardSkip += x - got; else _pHardSkip += x - got; }
+            return got;
+        }
 
         /// <summary>571: pamiec czesci gracza przycieta do stanu zapasu (wczytanie, kontrola) - klucz bez sztuk w zapasie znika. Zwraca przyciete sztuki.</summary>
         private static int ClipBook()
@@ -775,6 +977,7 @@ namespace Armoury
             var m = Groups(mp, s, c.NoBase);
             var arm = ArmoryOf(mp);
             var res = new Dictionary<ItemObject, int>();
+            FitMatch(m, null);   // 574: wolne miejsca typow (rezerwacja bierze tylko sztuki, ktore typ z brakiem udzwignie)
             if (arm != null && arm.Count > 0 && m.Kit > 0)
             {
                 var plans = new Dictionary<int, List<SwapMath.Piece>>();
@@ -800,6 +1003,8 @@ namespace Armoury
                             int n = Math.Min(Math.Min(p.Sell, inArm) - have, want);
                             if (melee) n = Math.Min(n, meleeLeft);
                             if (n <= 0) continue;
+                            n = ClaimTake(m, k, it, n, true);   // 574
+                            if (n <= 0) continue;
                             res[it] = have + n; want -= n;
                             AddHave(m, it, n);
                             if (melee && meleeLeft != int.MaxValue) meleeLeft -= n;
@@ -808,7 +1013,8 @@ namespace Armoury
                     }
                 }
             }
-            Allocate(m); FillReady(m);
+            FitMatch(m, res);   // 574: pokrycie z rezerwacji per typ (jak u gracza z zapasu)
+            Allocate(m); ClampFit(m); FillReady(m);
             if (c.StockOn)
             {
                 _aiKit[mp] = res;
@@ -864,7 +1070,7 @@ namespace Armoury
                     a.WK[k] -= n;
                     for (int i = 0; i < n; i++)
                     {
-                        if (!(c.Main ? WearPlayerOne(k, a) : WearAiOne(mp, k, a, arm, res))) break;
+                        if (!(c.Main ? WearPlayerOne(m, k, a) : WearAiOne(mp, k, a, arm, res))) break;
                         changed = true;
                         if (c.Main) { _pWorn[k]++; _pWornN++; } else _aWorn[k]++;
                     }
@@ -886,8 +1092,9 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Gracz: najtansza sztuka zapasu sluzaca rodzajowi (najpierw typ podstawowy, potem zastepstwa).</summary>
-        private static bool WearPlayerOne(int k, Acc a)
+        /// <summary>Gracz: najtansza sztuka zapasu sluzaca rodzajowi (najpierw typ podstawowy, potem zastepstwa); 574: tylko sztuka, ktora ktos w roli z rodzajem k
+        /// udzwignie (za trudne nie cwicza, wiec sie nie zuzywaja - wracaja przy rozliczeniu).</summary>
+        private static bool WearPlayerOne(KitM m, int k, Acc a)
         {
             for (int pass = 0; pass < 2; pass++)
             {
@@ -896,6 +1103,7 @@ namespace Armoury
                 {
                     var el = _stock.GetElementCopyAtIndex(i);
                     if (el.Amount <= 0 || !Serves(KindInfo(el.EquipmentElement.Item), k, pass == 1)) continue;
+                    if (m != null && m.Skill && !FitsKind(m, k, el.EquipmentElement.Item)) continue;
                     int v = el.EquipmentElement.ItemValue;
                     if (v < bv) { bv = v; best = i; }
                 }
@@ -1032,6 +1240,8 @@ namespace Armoury
                     {
                         int x = Math.Min(el.Amount - t, sh[k]);
                         if (x <= 0) continue;
+                        x = ClaimTake(m, k, el.EquipmentElement.Item, x, false);   // 574: tylko sztuki, ktore typ z brakiem udzwignie
+                        if (x <= 0) continue;
                         sh[k] -= x; t += x;
                     }
                     if (t > 0) { from.AddToCounts(el.EquipmentElement, -t); _stock.AddToCounts(el.EquipmentElement, t); taken += t; }
@@ -1093,6 +1303,7 @@ namespace Armoury
                 if (m.Have[k] > m.Used[k]) sb.Append(" (+").Append(m.Have[k] - m.Used[k]).Append(')');
             }
             if (m.Other > 0) sb.Append(sb.Length > 0 ? ", " : "").Append("spoza zestawu ").Append(m.Other);
+            if (m.Unfit > 0) sb.Append(sb.Length > 0 ? ", " : "").Append("za trudne (574) ").Append(m.Unfit);
             return sb.ToString();
         }
 
@@ -1174,7 +1385,7 @@ namespace Armoury
                 var ros = main.MemberRoster;
                 int sv = _stock.VersionNo, rv = ros != null ? ros.VersionNo : -1, hn = ros != null ? ros.TotalHeroes : 0, day = (int)CampaignTime.Now.ToDays;
                 int now = Environment.TickCount;
-                int cfg = MenPerPiece * 2 + (HeroesOn(Settings.Current, true) ? 1 : 0);   // recenzja 562 (6): MCM Drill Men Per Piece / Drill Heroes
+                int cfg = MenPerPiece * 4 + (HeroesOn(Settings.Current, true) ? 1 : 0) + (SkillOn ? 2 : 0);   // recenzja 562 (6): MCM Drill Men Per Piece / Drill Heroes; 574: Drill Kit Skill Check
                 bool changed = _hudDirty || !_hudHave || sv != _hudStockVer || rv != _hudRosVer || hn != _hudHeroes || day != _hudDay || cfg != _hudCfg;
                 if (changed && (!_hudHave || unchecked(now - _hudAt) >= 1000))
                 {

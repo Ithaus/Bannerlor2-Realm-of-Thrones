@@ -1,5 +1,40 @@
 # DZIENNIK ZMIAN
 
+## 574: umiejetnosci w zestawie musztry - do zapasu trafia tylko sprzet, ktory typ z brakiem udzwignie; pokrycie per typ; za trudne wraca do zbrojowni - Armoury (DrillKit.cs, Drill.cs; nowy klucz DrillKitSkillCheck w Settings.cs + McmSettings.cs recznie)
+
+**Problem:** Jeff, czat 15.11: "sprawdz czy w sprzecie do treningu zabieramy jest sprzet ... tylko taki ktory dany czlowiek ma umiejetnosci aby cwiczyc np jesli ma lucznictwo 30 a luk lezy 40 to mimo ze lezy to nie moze uzyc ... aby respektowane byly umiejetnosci". Audyt (3 raporty, sceptyk): NIE - `Eligible` sprawdza tylko rodzaj, wyrob gracza i unikat ("umiejetnosc dowolna (musztra to nie bitwa)"); zadna droga brania (TakePlayer, TakeBook, AiKit, Accept) nie wola ItemReq/GearFit, a `AddHave`/`Allocate` licza pokrycie z kazdej sztuki rodzaju (luk 40 "pokrywa" lucznika 30, zawyza premie S i pasek). Dowod mozliwosci w logu `Armoury-2026-11-15_21-30-26.log` l. 874 (kwatermistrz): "nikt nie udzwignie - zostaje gracza: crossbow_f x6 (Crossbow 100, najlepszy 60) ... crossbow_g x29 (Crossbow 80, najlepszy 60)" - nienoszone sztuki gracza, `PlayerBookPlan` daje im Sell = Own, `TakeBook` mogl je brac do musztry. Log nie wypisuje zapasu per przedmiot, wiec obecnosci tych sztuk w zapasie nie da sie dowiesc.
+
+**Przyczyna:** zestaw musztry nie mial predykatu "kto tego uzyje" - jedyne `GearFit.ForTroop` w DrillKit bylo w `FitsAny` przy zwrocie pod bitwe (ReturnForBattle). Miara (Groups) laczyla ludzi po masce roli, bez typow.
+
+**Zmiana (klucz DrillKitSkillCheck, domyslnie TAK; wylaczony = jak przed 574):**
+- `Groups` zapisuje typy (`KitM.Types`: CharacterObject, maska roli, ludzie, `Cap = Units(ludzi)`; bohater musztry - osobny typ z 1 czlowiekiem).
+- Predykat `Fits(typ, sztuka)`: szeregowi `GearFit.ForTroop(t, it, GearFit.On)` - ten sam co kwatermistrz bitwy i `FitsAny` (umiejetnosc/Difficulty przez ItemReq.Meets, siodlo przy GearFitKits, kultura przy GearFitCulture); bohaterowie `ItemReq.MeetsHero`. Pamiec (typ, przedmiot) na dobe (czyszczona tez przy zmianie bramek GearFit, nowej kampanii i powyzej 200 tys. wpisow); `GearFit.Quiet` w czasie sprawdzania (bez licznikow odmow GearFit).
+- `UsableAny(m, it)`: ktos w roli potrzebujacej ktoregos z rodzajow sztuki (z zastepstwami, KindsFor) ja udzwignie; oponcza-dodatek - ktokolwiek. Sztuka, ktorej nikt nie udzwignie, w `AddHave` idzie do `KitM.Unfit` (poza Have i pokryciem).
+- POKRYCIE PER TYP (`FitMatch`): dla kazdego rodzaju z popytem sztuki, ktore mu sluza (podstawowe i zastepstwa, jak Allocate), dopasowane do miejsc typow (typ z n ludzmi - najwyzej Units(n) sztuk, ktore SAM udzwignie): najpierw sztuki, ktore udzwignie najmniej typow, kazda do typu z najnizsza umiejetnoscia tej sztuki (przy progach umiejetnosci - dopasowanie pelne). `ClampFit` po Allocate: `Cov[k] = min(Cov[k], Fit[k])`; rodzaje bez zastepstw takze `Used[k] = Cov[k]`. Luk 40 nie pokrywa lucznika 30 dlatego, ze w druzynie jest lucznik 50. Ready/FillReady, premia S (Cover), pasek mapy i zuzycie (min(Cov, Need)) ida za Cov.
+- BRANIE: `Claim(m, k, it, x)` zajmuje wolne miejsce typu z brakiem, ktory sztuke udzwignie - w `TakePlayer` (nadwyzka ludzi), `TakeBook` (lista gracza), `AiKit` (rezerwacja AI: `FitMatch(m, null)` przed, `FitMatch(m, res)` po) i `Accept` (ekrany, lup, trofea, autotest). Sztuka za trudna nie trafia do zestawu, a sztuka uzywalna tylko przez typy juz pokryte - tez nie.
+- SPRZATANIE: `ReturnExcess` - przebieg 0: spoza rodzajow (jak dotad) i `Unfit` cale do zbrojowni (`BackToArmory` - czesc gracza na liste gracza, reszta na stan wojska); przebieg 1: nadmiar najpierw ze sztuk niedopasowanych do typow (`FitItems`), przebieg 2: reszta nadmiaru jak dotad (najdrozsze najpierw, klasy 2H/drzewc). Pierwsze rozliczenie po wgraniu oddaje caly "za trudny" zapas.
+- ZUZYCIE: `WearPlayerOne` zuzywa tylko sztuke, ktora ktos w roli z rodzajem k udzwignie (za trudne nie cwicza). AI - rezerwacja ma tylko uzywalne.
+- Log: linia "Musztra" gracza - "574: za trudne - oddane do zbrojowni X, pominiete przy braniu Y" (Y = sztuki planu pominiete, bo nikt w roli z tym rodzajem ich nie udzwignie; sumowane po rozliczeniach doby); rodzaje [...] - "za trudne (574) N" (w zapasie przed zwrotem); linia AI (rezerwacja 562) - "574: pominiete za trudne Z". Pasek mapy przelicza sie po zmianie klucza.
+- MCM (Drill): Drill Kit Skill Check (TAK). gen_mcm.py NIE uruchamiany. W Armoury.json Jeffa klucza nie ma - dziala domyslne.
+
+**Decyzje / roznice od pelnego per typ:**
+- Bron biala (1H, 2H, drzewce) ma zastepstwa klas (Allocate): dopasowanie liczy sie per rodzaj osobno, wiec ta sama dwureczna/drzewce moze byc policzona w Fit dwoch rodzajow (Allocate i tak ogranicza laczny przydzial klas). Dla tych rodzajow `ClampFit` obniza tylko pokrycie, `Used` zostaje (zadnych dodatkowych zwrotow) - wersja "per rodzaj", nie pelne dopasowanie laczne. Luki, kusze, amunicja, tarcze, oszczepy i zbroje - pelne per typ.
+- Need zostaje per grupa roli (Units(sumy ludzi)); miejsca typow Units(n) sumuja sie do >= Need, dopasowanie i tak ograniczone popytem przez Cov.
+- Bohaterowie: tylko sito ItemReq.MeetsHero (bez siodla i kultury - jak GearFit.ForTroop, ktory bohaterom zawsze mowi TAK).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Zbrojownia + zapas: wszystkie ruchy przez pary AddToCounts / BackToArmory (bez nowych sciezek tworzenia/usuwania) - kontrola "zbrojownia + zapas ZGODNE" w linii Musztra zostaje i ma wyjsc ZGODNE.
+- Oddane za trudne sztuki ludzi (nie gracza) to nadwyzka ludzi - `SellPlayerSurplus` w miescie moze je sprzedac (zgodne z K1 i z tym, co Jeff zaakceptowal); sztuki gracza wracaja na liste gracza (BookOut), nie do sprzedazy. AI: nieuzywalne sztuki wypadaja z rezerwacji, wiec `SellArmorySurplus` moze je sprzedac kupcom.
+- Premia S i pasek moga spasc u gracza i AI (pokrycie liczy tylko sztuki, ktore typ udzwignie) - to zamierzone; pobor dobierze latwiejsze sztuki, jesli sa w nadwyzce/na liscie.
+- Ping-pong: zwrocone niedopasowane sztuki nie wracaja nazajutrz (Claim bierze tylko dla typu z wolnym miejscem, ktory je udzwignie). Przy kulturze (zbiory typow nie zagniezdzone) dopasowanie zachlanne moze byc nieoptymalne - mozliwy drobny ruch tam i z powrotem; obserwowac "zwrocono ponad komplet" i "wzieto ze zbrojowni" dzien po dniu.
+- Koszt: predykat w pamieci dobowej; FitMatch = rodzaje x przedmioty zapasu x typy (z pamieci). Obserwowac ms rozliczen w linii Musztra i stoper PCtxSur AI.
+- ItemReq.MeetsHero liczy GiantGear.SieveRefused przy odmowie olbrzymiej sztuki bohaterowi - teraz raz na (bohater, przedmiot, dobe) takze z musztry.
+- ReturnForBattle, MoveAll, OnPrisonerTaken, KitPreview, MenPurse (plany K1) - bez zmian. 575 (najtansze i wymiana) - osobno, nastepny krok.
+- Test: linia Musztra gracza po pierwszej dobie - "za trudne - oddane" > 0, jesli w zapasie byly kusze 80/100 przy Kuszy 60; ZGODNE; rodzaje bez "za trudne" po rozliczeniu.
+- Build Armoury 0 bledow (Release). NIE wgrane.
+
+**Status:** DO SPRAWDZENIA
+
 ## 573: kapitulanci bez walki obszukani - sprzet jak lup z pola (dzialka dowodcy na liste gracza w zbrojowni, reszta ludziom) - Armoury (ArmouryBehavior.cs OnPrisonerTaken + nowe StripSurrendered; BattlefieldLaw.SimSharePercent internal; nowy klucz SurrenderCaptivesStripped w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "Pojmalem bandytow poddali sie ale wchodze do ekwipunku a tam nic zero ich sprzetu gdzie podzial sie ich sprzet gdzie moje 30%". Dowod: `Armoury-2026-11-15_21-30-26.log` 22:01:26-22:01:41, Tumblestone Farms - banda looters_2145787377 (25 ludzi) poddala sie: "Lup bitwy (m109): ... misja NIE ... powaleni przez druzyne 0", "Straty bitwy (312f): ... wystawieni 0, ranni sprzed bitwy 25 ... pojmanie TAK: u gracza 25", "Okno lupu (117): ... sprzet 7 szt. za 124 ... (Spoils razem 13/2387 - sztuki zgodne NIE)". Brak linii "Jency obszukani" - 25 jencow weszlo do lochu, ich rynsztunek przepadl.

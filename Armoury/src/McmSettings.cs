@@ -7777,6 +7777,10 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public bool DrillTakesPlayerStash { get; set; } = true;
 
+        [SettingPropertyBool("Drill Kit Skill Check", HintText = "your men put into their drill kit only arms and armour that a troop of theirs who needs that kind can actually use - the same check as for battle (skill, use from the saddle, culture): an archer with Bow 30 does not drill with a bow that needs 40, even if it lies in the armoury, and such a bow does not count towards the kit or the drill bonus; each troop is covered only by pieces it can use itself. Pieces already in the kit that nobody can use go back to the armoury (yours back to your list). The same rule for AI lords' men (off = any piece of the right kind counts, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool DrillKitSkillCheck { get; set; } = true;
+
         [SettingPropertyBool("Drill Stock Ai", HintText = "AI lords' men drill with the same full drill kit for their role as your men, set aside each day from the spare arms and armour of their armoury (their baggage - loot and Banner Kings supplies - does not count, just as your own packs do not); the set-aside pieces stay in the armoury, the merchants do not get them, and in battle the men use the whole armoury as before: up to 20-30% faster, the kit wears out and the smiths of the next town buy the scrap - a third to the lord, the rest to the men (off = AI drill without a kit, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool DrillStockAi { get; set; } = true;
@@ -15942,6 +15946,7 @@ namespace Armoury
             s.DrillNeedsArmsPlayer = DrillNeedsArmsPlayer;
             s.DrillStock = DrillStock;
             s.DrillTakesPlayerStash = DrillTakesPlayerStash;
+            s.DrillKitSkillCheck = DrillKitSkillCheck;
             s.DrillStockAi = DrillStockAi;
             s.DrillMenPerPiece = DrillMenPerPiece;
             s.DrillPenaltyAi = DrillPenaltyAi;
