@@ -20,8 +20,8 @@ namespace Armoury
     /// ktory tylko loguje doklad gry) zdejmuje to, czego przybylo - dokladnie dolozone sztuki, nic z prawdziwego lupu (prawdziwy lup jest w rosterze
     /// PRZED wywolaniem tej metody, inne mody/sluchacze nie dzialaja w jej wnetrzu). Metoda gry biegnie jak dotad (zeruje _initialHideoutPopulation,
     /// transpiler Wyceny20 D zostaje), tylko jej doklad schodzi. Zloto: gra niczego nie dosypuje (PlunderedGold to prawdziwe zloto bitwy) - bez zmian.
-    /// Latka W KAMPANII (OnSessionLaunched, CLAUDE.md 7), raz na proces, tylko przy wlaczonym kluczu; postfiks sprawdza klucz przy kazdym wywolaniu
-    /// (wylaczony = jak w grze). Cel przez AccessTools.DeclaredMethod (pulapka 15.10). Wyjatek = licznik potkniec, bez wylacznika.
+    /// Latka W KAMPANII (OnSessionLaunched, CLAUDE.md 7), raz na proces, zawsze (recenzja 569); prefiks i postfiks sprawdzaja klucz przy kazdym wywolaniu
+    /// (wylaczony = jak w grze, wlaczenie w MCM dziala od razu). Cel przez AccessTools.DeclaredMethod (pulapka 15.10). Wyjatek = licznik potkniec, bez wylacznika.
     /// Log: start sesji "Kryjowka noca (569)", zdarzenie "Kryjowka noca (569): zablokowano ... szt. ... d".
     /// </summary>
     internal sealed class HideoutNightLoot569 : CampaignBehaviorBase
@@ -54,11 +54,8 @@ namespace Armoury
         private static void SessionStart()
         {
             const string K = "Kryjowka noca (569, klucz Hideout Night No Free Loot): ";
-            if (!On)
-            {
-                Log.Info(K + "WYLACZONE (MCM)" + (_hooked ? " - latka wpieta wczesniej, nieczynna" : " - nic nie wpiete") + ", towar z niczego po nocnym ataku na kryjowke jak w grze.");
-                return;
-            }
+            // Recenzja 569: latka wpinana ZAWSZE (takze przy kluczu NIE) - Pre/Post sprawdzaja klucz przy kazdym wywolaniu, wiec wlaczenie w MCM
+            // w trakcie sesji dziala od razu, bez ponownego wczytania (RequireRestart = false). Przy NIE Pre wychodzi od razu, Post nic nie robi.
             if (!_hooked)
             {
                 try
@@ -76,7 +73,7 @@ namespace Armoury
                 }
                 catch (Exception e) { _status = "BLAD wpiecia (" + e.GetType().Name + ")"; Stumble("Hook", e); }
             }
-            Log.Info(K + "CZYNNE - " + _status + "; dotad zablokowano " + _blockedTimes + " razy, " + _blockedPieces + " szt., " + _blockedValue + " d, potkniec " + _stumbles + ".");
+            Log.Info(K + (On ? "CZYNNE - " : "WYLACZONE (MCM, towar z niczego jak w grze; latka czeka na wlaczenie klucza) - ") + _status + "; dotad zablokowano " + _blockedTimes + " razy, " + _blockedPieces + " szt., " + _blockedValue + " d, potkniec " + _stumbles + ".");
         }
 
         /// <summary>Liczba sztuk BEZ modyfikatora per przedmiot (tylko takie doklada gra).</summary>

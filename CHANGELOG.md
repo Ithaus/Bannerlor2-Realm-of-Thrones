@@ -22,6 +22,15 @@
 **Pliki do wgrania (gra zamknieta):**
 - `Armoury/bin/Release/Armoury.dll` -> `Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll`
 
+### Recenzja 569
+
+Recenzja (aa8c602b) bez uwag blokujacych; trzy drobne uwagi sprawdzone w kodzie:
+1. **Przyjeta (poprawione).** Latka wpinala sie tylko przy kluczu TAK w OnSessionLaunched, a klucz ma `RequireRestart = false` - wlaczenie w MCM w trakcie sesji nie dzialalo do wczytania. Teraz `SessionStart` wpina latke ZAWSZE (raz na proces); Pre sprawdza klucz przy kazdym wywolaniu (NIE = `__state = null`, Post nic nie robi), wiec przelaczenie dziala od razu w obie strony. Linia startu: "CZYNNE - wpiete ..." albo "WYLACZONE (MCM, towar z niczego jak w grze; latka czeka na wlaczenie klucza) - wpiete ...". Opis MCM: "Takes effect at once". Koszt przy NIE: jedno sprawdzenie klucza na zbieranie lupu (raz na bitwe).
+2. **Przyjeta czesciowo.** Opis klucza HistHideoutLootOldCoin (Settings.cs + McmSettings.cs) zaczyna sie teraz od "while Hideout Night No Free Loot is off" - przy 569 TAK tego towaru nie ma. Odrzucone: zmiana linii logu "Kryjowka nocna (n20): gra dolozyla ..." (Wyceny20.HidePost) - to tylko log, zaraz po niej stoi linia 569 z ta sama liczba sztuk (opisane w Ryzyku), jedna zmiana naraz.
+3. **Uwaga dla B (bez zmiany kodu).** Wszystko, co B (skarb band w kryjowce) dolozy do lupu WEWNATRZ `HideoutCampaignBehavior.OnCollectLootItems` (postfiks lub prefiks po prefiksie 569), Post 569 zdejmie jako "towar z niczego" (sztuki bez modyfikatora). B musi oddawac skarb poza ta metoda: wlasny sluchacz `OnCollectLootsItemsEvent`, postfiks dispatchera albo osobny ekran lupu.
+
+Zbudowane, 0 bledow. Status bez zmian: DO SPRAWDZENIA (nie wgrane).
+
 ## 563: stal valyrianska w sztabach - przetop od 275 (10 sztab na miare), kucie klingi jednorecznej z 10 sztab (perk Legendary Smith + 300), sztaba jako towar; zgodne z 177 (bilans stali) - Armoury (ValyrianBlades.Ingots.cs nowy, ValyrianBlades.cs, SmeltTab.cs, ForgeBill.cs, HistoricalPrices.cs, RareMaterials.cs, UniqueShelf.cs, UniqueSpoils.cs, CastleSteel.cs, PerkTexts.cs, QohorMasters.Own.cs, ArmouryBehavior.cs; ModuleData/arm_items_rare.xml - nowy przedmiot arm_valyrian_steel; nowe klucze ValyrianIngots, ValyrianSmeltSkill, ValyrianForgeSkill, ValyrianLegendarySmithAt300 w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11: "dodaj valyrianska stal: jesli przetapiam valyrianska stal, to otrzymuje x valyrianskiej stali - jesli do miecza potrzeba 10, a przetopilem ten sam miecz, to dostane 10; valyrianska stal - znajdz lub stworz ikone do handlu; w kuzni przy wykuwaniu mieczy moze byc nad innymi surowcami ...; zeby wytopic valyrianska stal trzeba miec 275 smithing; zmien tez umiejetnosc [perk], ze pozwala wykuwac bron z valyrianskiej stali - daj na poziomie 300; stworz ikone, ze odblokowuje ..." oraz "i jak teraz jest to z valyrianska stala - cos podobno jest w grze, ze mozna wykuc - zeby sie nie gryzlo". Dzis (177) przetop VS w zwyklej kuzni jest zablokowany ("Only the masters of Qohor can work Valyrian steel."), jedyna droga do nowej klingi to Qohor. Bez dowodu z logu - nowa funkcja.
