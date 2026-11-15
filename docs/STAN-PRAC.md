@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 15.11 - WGRANIE 245 (538 piechur na koniu w marszu bez wymogu Jazdy do 20), bez autotestu
+
+- Armoury.dll f9b0ccf2 = noc/scal-perki f2fad9ff (244 + 538). Kopie: .bak-2026-11-15-przed-wgranie245, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie245 i -przed). Klucz NOWY FootmenRidingWaiver = 20 (nie ma go w Armoury.json Jeffa).
+- Do sprawdzenia: linia doby 'Pary marszowe' - mniej pieszo z powodu Jazdy, wiecej jadacych; 6d stajni (jezdzcy bez pary maja pierwszenstwo) - wpisy oddania do zbrojowni jak przed 538; plus wszystko z 244.
+
 ## STAN 15.11 - WGRANIE 244 (537 konie i uprzeze: pary marszowe, pasek Horses/Harness/Pack, waga par ze stash, stajnia Footmen's mounts), bez autotestu
 
 - Armoury.dll b87afb85 = noc/scal-perki 37e6891f (243 + scalenie 537). Kopie: .bak-2026-11-15-przed-wgranie244, Backup-Bannerlord-C/wgrane i D: (2026-11-15-wgranie244 i -przed). Nowe klucze FootmenMountsStable, StableRidersFirst (TAK, nie ma ich w Armoury.json Jeffa = domyslne); MarchPairsSpeed/RiddenHarnessWeightless/MarchPairsHud tez z domyslnych TAK, TroopsFightWithOwnKitOnly w pliku true.
