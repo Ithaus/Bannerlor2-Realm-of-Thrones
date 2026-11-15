@@ -161,6 +161,7 @@ namespace Armoury
         private static int _autotest = -1, _dailyN, _feedTries;
         private static bool _fed;
         private static string _pendingStock, _importNote;
+        private static string _pendingBook;   // 571: segment B= (czesc gracza w zapasie) - rozwiazywany po zapasie w ResolveImport
         private static int _importRejected;
         private static bool _maskSegSeen;                  // MUSZTRA-jp: w zapisie byl segment T= (maski partii lordow) - tylko do linii startowej
 
@@ -210,6 +211,7 @@ namespace Armoury
         {
             _tr.Clear(); _pendingMainMask = -1; _pendingMasks.Clear(); _acc.Clear(); _stock.Clear(); _ctx = null; _e = false; _eC = null; _tick = null; _room.Clear();
             _screen = null; _opening = 0; _dailyN = 0; _feedTries = 0; _fed = false; _pendingStock = null; _importNote = null; _importRejected = 0; _maskSegSeen = false;
+            _pendingBook = null; _fromBook.Clear();   // 571
             _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length); _profReads = 0;   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
             _kindOf.Clear(); _roleOf.Clear(); _aiKit.Clear(); _settleSig = 0; _settleArmVer = int.MinValue; _migrPending = false; _importLegacy = 0; _kgOk = false; _kgVer = int.MinValue;   // 562: jak _ore
@@ -222,7 +224,9 @@ namespace Armoury
         {
             Array.Clear(_in, 0, _in.Length); _noRoom = _backBag = _pNoMetal = _pSoldU = _pSoldGold = 0; _pOreAdd = 0f;
             // 562: liczniki zestawu (ruch zbrojownia - zapas, zuzycie wedlug rodzaju, rezerwacja AI)
-            _pTaken = _pBack = _pBackOther = _pBackBattle = _pBackOff = _pLost = _settleN = _settlePv = _settleBad = _pvNone = _pWornN = 0; _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
+            _pTaken = _pBack = _pBackOther = _pBackBattle = _pBackOff = _pLost = _settleN = _settlePv = _settleBad = _pvNone = _pWornN = 0;
+            _settleTicks = 0; Array.Clear(_settleBy, 0, _settleBy.Length);
+            _pTakenBook = _pBookBack = _pBookGone = 0;   // 571
             Array.Clear(_pWorn, 0, NK); Array.Clear(_aWorn, 0, NK); _aKitParties = _aKitPieces = _aiKept = _aiNoKitSale = 0;
             _cParties = _cMen = _cRest = _cOff = 0; _cXp = _cL = 0;
             _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;
@@ -1516,6 +1520,23 @@ namespace Armoury
                     sb.Append(it.StringId).Append(',').Append(mid).Append(',').Append(el.Amount);
                     pcs += el.Amount;
                 }
+                // 571: czesc gracza w zapasie "id,mod,n;..." (pamiec _fromBook); stary DLL segment pomija (sztuki zostaja w zapasie jako ludzi)
+                sb.Append("|B=");
+                first = true; int bookPcs = 0;
+                for (int i = 0; i < _stock.Count; i++)
+                {
+                    var el = _stock.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (el.Amount <= 0 || it == null || !Safe(it.StringId)) continue;
+                    int bv; if (!_fromBook.TryGetValue(QuartermasterLaw.KeyOf(el.EquipmentElement), out bv) || bv <= 0) continue;
+                    var mod = el.EquipmentElement.ItemModifier;
+                    if (mod != null && !Safe(mod.StringId)) continue;
+                    if (!first) sb.Append(';');
+                    first = false;
+                    int bn = Math.Min(bv, el.Amount);
+                    sb.Append(it.StringId).Append(',').Append(mod != null ? mod.StringId : "").Append(',').Append(bn);
+                    bookPcs += bn;
+                }
                 sb.Append("|A=");
                 first = true; float oreMain = 0f; int parties = 0;
                 foreach (var kv in _acc)
@@ -1565,7 +1586,7 @@ namespace Armoury
                 }
                 int w, ar; GivenCounts(out w, out ar);
                 Log.Info("Musztra: zapis - zapas od gracza " + pcs + " szt. (bron " + w + ", zbroje " + ar + "), godzin ruchu gracza " + (mask >= 0 ? Pop(mask).ToString() : "-")
-                         + " z 24, maski godzin ruchu partii lordow AI " + masks + " (z " + Math.Max(0, _tr.Count - (main != null && _tr.ContainsKey(main) ? 1 : 0)) + " obserwowanych), napis "
+                         + " z 24, w tym z listy gracza (571) " + bookPcs + " szt., maski godzin ruchu partii lordow AI " + masks + " (z " + Math.Max(0, _tr.Count - (main != null && _tr.ContainsKey(main) ? 1 : 0)) + " obserwowanych), napis "
                          + sb.Length + " zn., zlom gracza czeka " + F2(oreMain) + " rudy, partii z licznikami " + parties + ", zasilenie autotestu " + (_fed ? "tak" : "nie") + ".");
                 return sb.ToString();
             }
@@ -1578,7 +1599,7 @@ namespace Armoury
         {
             try
             {
-                _pendingStock = null; _importNote = null; _importRejected = 0; _importLegacy = 0; _pendingMasks.Clear(); _maskSegSeen = false;
+                _pendingStock = null; _importNote = null; _importRejected = 0; _importLegacy = 0; _pendingMasks.Clear(); _maskSegSeen = false; _pendingBook = null;
                 var pendK = new Dictionary<string, float[]>();   // 562: liczniki rodzajow z segmentu K=
                 if (string.IsNullOrEmpty(v)) { _importNote = "z zapisu: brak klucza (stary zapis) - zapas pusty, godziny ruchu nieznane (ruch)"; return; }
                 var inv = CultureInfo.InvariantCulture;
@@ -1615,6 +1636,7 @@ namespace Armoury
                         }
                     }
                     else if (part.StartsWith("S=")) _pendingStock = part.Substring(2);
+                    else if (part.StartsWith("B=")) _pendingBook = part.Substring(2);   // 571
                     else if (part.StartsWith("A="))
                     {
                         foreach (var e in part.Substring(2).Split(';'))
@@ -1669,13 +1691,37 @@ namespace Armoury
                 }
             }
             catch (Exception ex) { Stumble("ResolveImport", ex); }
+            // 571: czesc gracza w zapasie - tylko egzemplarze, ktore zapas naprawde ma (ClipBook); nieznane pominiete
+            int bookIn = 0, bookCut = 0;
+            try
+            {
+                _fromBook.Clear();
+                var rawB = _pendingBook;
+                _pendingBook = null;
+                if (!string.IsNullOrEmpty(rawB))
+                    foreach (var e in rawB.Split(';'))
+                    {
+                        var f = e.Split(',');
+                        int n;
+                        if (f.Length != 3 || !int.TryParse(f[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out n) || n <= 0) continue;
+                        ItemObject it = null; ItemModifier mod = null;
+                        try { it = MBObjectManager.Instance.GetObject<ItemObject>(f[0]); } catch { }
+                        if (f[1].Length > 0) { try { mod = MBObjectManager.Instance.GetObject<ItemModifier>(f[1]); } catch { } }
+                        if (it == null || (f[1].Length > 0 && mod == null)) continue;
+                        string key = QuartermasterLaw.KeyOf(new EquipmentElement(it, mod));
+                        int v; _fromBook.TryGetValue(key, out v); _fromBook[key] = v + n;
+                        bookIn += n;
+                    }
+                bookCut = ClipBook();
+            }
+            catch (Exception ex) { _fromBook.Clear(); Stumble("ResolveImport.Book", ex); }
             int w, a; GivenCounts(out w, out a);
             float oreMain = 0f; Acc am;
             var main = MobileParty.MainParty;
             if (main != null && _acc.TryGetValue(main.StringId ?? "", out am)) oreMain = am.Ore;
             return "z zapisu: zapas " + pcs + " szt. (bron " + w + ", zbroje " + a + "), godzin ruchu gracza " + (_pendingMainMask >= 0 ? Pop(_pendingMainMask).ToString() : "-")
                    + " z 24, zlom gracza czeka " + F2(oreMain) + " rudy, partii z licznikami " + _acc.Count + ", zasilenie autotestu " + (_fed ? "tak" : "nie")
-                   + ", odrzucono " + _importRejected + " szt., rekawice i inne spoza zestawu 562 (do zbrojowni przy pierwszym rozliczeniu) " + _importLegacy + " szt.";
+                   + ", z listy gracza (571) " + (bookIn - bookCut) + " szt." + (bookCut > 0 ? " (przyciete do zapasu " + bookCut + ")" : "") + ", odrzucono " + _importRejected + " szt., rekawice i inne spoza zestawu 562 (do zbrojowni przy pierwszym rozliczeniu) " + _importLegacy + " szt.";
         }
 
         // ------------------------------------------------------------ autotest: zasilenie zapasu (krytyka 7)
@@ -1790,8 +1836,8 @@ namespace Armoury
               .Append(", trofea ").Append(_in[SrcTrophies]).Append(", autotest ").Append(_in[SrcAutotest]).Append("), bez miejsca ").Append(_noRoom).Append(", wrocone do taborow ").Append(_backBag)
               .Append("; rozliczenia 562: ").Append(_settleN).Append(" (doba ").Append(_settleBy[WhyDaily]).Append(", sklad ").Append(_settleBy[WhyRoster]).Append(", bitwa ").Append(_settleBy[WhyBattle])
               .Append(", miasto ").Append(_settleBy[WhyTown]).Append("; ").Append((_settleTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", CultureInfo.InvariantCulture)).Append(" ms, podgladow bitwy ")
-              .Append(_settlePv).Append(_pvNone > 0 ? ", bez podgladu " + _pvNone : "").Append("), wzieto ze zbrojowni ").Append(_pTaken).Append(", zwrocono ponad komplet ").Append(_pBack)
-              .Append(", spoza zestawu ").Append(_pBackOther).Append(", pod braki bitwy ").Append(_pBackBattle).Append(", przy wylaczonym zapasie / pojmaniu ").Append(_pBackOff).Append(", stracone przy pojmaniu ").Append(_pLost).Append(", kontrola sztuk zbrojownia + zapas ").Append(_settleBad == 0 ? "ZGODNE" : "NIEZGODNE x" + _settleBad)
+              .Append(_settlePv).Append(_pvNone > 0 ? ", bez podgladu " + _pvNone : "").Append("), wzieto ze zbrojowni ").Append(_pTaken).Append(" (571: z listy gracza ").Append(_pTakenBook).Append(BookOn ? "" : ", klucz Drill Takes Player Stash wylaczony").Append(')').Append(", zwrocono ponad komplet ").Append(_pBack)
+              .Append(", spoza zestawu ").Append(_pBackOther).Append(", pod braki bitwy ").Append(_pBackBattle).Append(", przy wylaczonym zapasie / pojmaniu ").Append(_pBackOff).Append(", stracone przy pojmaniu ").Append(_pLost).Append(", 571: na liste gracza wrocilo ").Append(_pBookBack).Append(", zuzyte/stracone sztuki gracza ").Append(_pBookGone).Append(", sztuk gracza w zapasie ").Append(BookPieces()).Append(", kontrola sztuk zbrojownia + zapas ").Append(_settleBad == 0 ? "ZGODNE" : "NIEZGODNE x" + _settleBad)
               .Append(", waga zapasu ").Append(F1(StockKg(MobileParty.MainParty, MobileParty.MainParty != null && MobileParty.MainParty.IsCurrentlyAtSea, true))).Append(" kg")
               .Append("; zuzyto ").Append(_pWornN).Append(" (").Append(IntLog(_pWorn))
               .Append("; bez metalu ").Append(_pNoMetal).Append("), zlom +").Append(F2(_pOreAdd)).Append(" rudy, czeka ").Append(F2(ore)).Append(", sprzedano ").Append(_pSoldU)

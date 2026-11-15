@@ -619,6 +619,46 @@ namespace Armoury
             return pieces;
         }
 
+        /// <summary>571 (Jeff 15.11: "missing most helmets, tymczasem w stash ma helmow"): sztuki GRACZA (lista gracza w zbrojowni DTE - ksiega wkladow, czesc Own
+        /// z KitPieces), ktorych nikt nie nosi w tym samym dopasowaniu co PlayerSurplusPlan (FitBest przy wymianie 1:1, inaczej Fit; predykat MeetsFitOf).
+        /// Sell = Own - OwnWorn (OwnWorn = max(0, Used - MenTotal) - przy identycznym egzemplarzu ludzie nosza najpierw swoje); bez sztuk wykluczonych z bitwy
+        /// (Barred - pamiatki, klingi lore, sprzet umarlych). Kolejnosc WorseFirst (do musztry najgorsze). Ochrona bitwy (KeepFor) - u wolajacego, na zywych
+        /// licznikach zbrojowni. Bez koni i uprzezy. null - nic. Nic nie zmienia (sam plan).</summary>
+        internal static List<SwapMath.Piece> PlayerBookPlan(ItemRoster armory, ItemObject.ItemTypeEnum type)
+        {
+            var s = Settings.Current;
+            var main = MobileParty.MainParty;
+            if (armory == null || s == null || main == null || main.MemberRoster == null) return null;
+            if (type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) return null;
+            var pieces = QuartermasterLaw.KitPieces(armory, type, true);
+            int own = 0;
+            foreach (var p in pieces) own += p.Own;
+            if (own <= 0) return null;
+            List<CharacterObject> troops; int[] men; SkillObject skill;
+            QuartermasterLaw.MenOf(main.MemberRoster, type, pieces, out troops, out men, out skill);
+            var meets = QuartermasterLaw.MeetsFitOf(troops);
+            if (s.QuartermasterSwapOneForOne) SwapMath.FitBest(men, troops.Count, meets, pieces);
+            else SwapMath.Fit(men, troops.Count, meets, pieces);
+            var free = new List<SwapMath.Piece>();
+            foreach (var p in pieces)
+            {
+                p.Sell = 0;
+                if (p.Barred || p.Own <= 0) continue;
+                p.Sell = Math.Max(0, p.Own - Math.Max(0, p.Used - p.MenTotal));
+                if (p.Sell > 0) free.Add(p);
+            }
+            if (free.Count == 0) return null;
+            free.Sort(SwapMath.WorseFirst);
+            return free;
+        }
+
+        /// <summary>571: ile sztuk kazdego przedmiotu musi zostac w zbrojowni pod nastepna bitwe - ta sama miara co KeepGiven (Given + sztuki lezace, ktore
+        /// zapelniaja braki podgladu). pv == null - null (wolajacy wtedy nie bierze nic z listy gracza).</summary>
+        internal static Dictionary<ItemObject, int> KeepFor(KitPreview.Result pv)
+        {
+            return pv != null ? KeepOf(pv) : null;
+        }
+
         private static int _keptGiven;   // 535: sztuki zdjete ze sprzedazy, bo podglad bitwy je wydaje (licznik do linii sprzedazy)
         /// <summary>541: pasek mapy (Drill.HudKit) liczy nadwyzke tym samym planem - zapamietuje i przywraca licznik, zeby nie dopisywal sie do linii sprzedazy.</summary>
         internal static int KeptGiven { get { return _keptGiven; } set { _keptGiven = value; } }
