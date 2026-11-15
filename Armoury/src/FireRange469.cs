@@ -64,7 +64,7 @@ namespace Armoury
     internal static class FireRange469
     {
         // 469-q: wstrzymanie od G (HoldOver 1.0; 469-a/p: 1.1 G - strzal miedzy G a 1.1 G byl mozliwy); OldOver - dawny licznik "poza 1.1 G" do porownania
-        internal const float Every = 0.5f, HoldOver = 1.0f, OldOver = 1.1f, Eff = 0.85f, ThreatR = 6f, FirstVolley = 6f, ArrowW = 0.043f, BoltW = 0.06f, DzStep = 5f;
+        internal const float Every = 0.5f, HoldOver = 1.0f, OldOver = 1.1f, Eff = 0.85f, ThreatR = 6f, FirstVolley = 6f, ArrowW = 0.043f, DzStep = 5f;
         // 469-q: podejscie szyku (zastep wylacznika zastoju 469-p): zastoj AdvStall s bez zblizenia wroga o AdvStallD m, >= AdvShare ludzi szyku (min. AdvMinMen)
         // wstrzymanych; cel AdvFrac x sr. G; krok >= AdvMinStep; oslona: front szyku najwyzej CoverAhead m przed frontem wlasnej piechoty; jazda wroga w CavNear m -
         // bez podejscia; podejscie najwyzej AdvMaxT s; postfiks musi odebrac rozkaz w NoHitT s; zatrzymanie trzymane do odbioru, najwyzej StopMax s
@@ -221,6 +221,7 @@ namespace Armoury
         internal static void Begin(Mission m, Settings c)
         {
             Clear();
+            XbowCap559.ResetMission();   // 559: liczniki pulapu od poczatku misji
             _live = false;
             _written = false;
             _m = null;
@@ -401,6 +402,12 @@ namespace Armoury
 
         /// <summary>Predkosc strzaly wedlug RBM Utilities.calculateMissileSpeed (rbmcombat.cs:5466-5500) - co do wzoru.</summary>
         internal static int RbmSpeed(float ammoWeight, string usage, int drawWeight)
+        {
+            return XbowCap559.Clamp(ammoWeight, usage, RbmSpeedRaw(ammoWeight, usage, drawWeight));   // 559: pulap energii beltu (tylko gdy latka RBM weszla)
+        }
+
+        /// <summary>Wzor RBM bez pulapu 559.</summary>
+        internal static int RbmSpeedRaw(float ammoWeight, string usage, int drawWeight)
         {
             float stroke = 0.635f, eff = 0.9f, c = 0.00015f;
             if (usage == "long_bow") { eff = 0.835f; c = 0.00018f; }
@@ -955,6 +962,7 @@ namespace Armoury
                 sb.Append(RangeCache.TryGetValue(p.V * 64 + 6, out r0) ? F0(r0) : "-").Append('/').Append(p.NatStatic > 0f ? F0(p.NatStatic) : "-").Append(';');
             }
             if (shown == 0) sb.Append(" brak");
+            sb.Append(XbowCap559.MissionNote());   // 559
             sb.Append(" | koszt ").Append(Ms(_sumTicks).ToString("0.0", Inv)).Append(" ms razem, najwiecej ").Append(Ms(_maxTicks).ToString("0.000", Inv))
               .Append(" ms na klatke | potkniecia ").Append(_stum).Append('.');
             Log.Info(sb.ToString());
@@ -1349,6 +1357,7 @@ namespace Armoury
                 var c = Settings.Current;
                 bool hist = rbm && (c == null || c.HistoricalBowAndCrossbowRange);
                 float k = Friction();
+                float boltW = XbowCap559.BoltAWeight();   // 559: waga bolt_a z danych (bylo stale 0.06 kg - tylko ta linia logu)
                 int bows = 0, xbows = 0;
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
@@ -1361,7 +1370,7 @@ namespace Armoury
                 var sb = new StringBuilder(1200);
                 sb.Append("Zasieg lukow (469): start sesji | ").Append(rbm ? "RBM - predkosc z naciagu (wzor RBM)" : "brak RBM - predkosc gry")
                   .Append(", opor k ").Append(k.ToString("0.0000", Inv)).Append(", strzala ").Append(ArrowW.ToString("0.000", Inv)).Append(" kg, belt ")
-                  .Append(BoltW.ToString("0.000", Inv)).Append(" kg, G = ").Append(hist ? "min(historyczny 469-b, " : "").Append(Eff.ToString("0.00", Inv))
+                  .Append(boltW.ToString("0.000", Inv)).Append(" kg (bolt_a), pulap beltu 559 ").Append(XbowCap559.Live ? "wpiety" : "nie").Append(", G = ").Append(hist ? "min(historyczny 469-b, " : "").Append(Eff.ToString("0.00", Inv))
                   .Append(" x zasieg maks.").Append(hist ? ")" : "").Append(", zasieg historyczny ").Append(hist ? "TAK" : (rbm ? "NIE" : "brak RBM - bez naciagu"))
                   .Append(" | lukow ").Append(bows).Append(", kusz ").Append(xbows).Append(" | bron: uzytek, naciag lb, v m/s, zasieg maks. m, historyczny m, G m:");
                 int shown = 0;
@@ -1373,7 +1382,7 @@ namespace Armoury
                     var w = it.PrimaryWeapon;
                     string u = w.ItemUsage ?? "";
                     int lb = rbm ? w.MissileSpeed : 0;
-                    int v = rbm ? RbmSpeed(it.ItemType == ItemObject.ItemTypeEnum.Crossbow ? BoltW : ArrowW, u, lb) : w.MissileSpeed;
+                    int v = rbm ? RbmSpeed(it.ItemType == ItemObject.ItemTypeEnum.Crossbow ? boltW : ArrowW, u, lb) : w.MissileSpeed;
                     float r = Simulate(v, 0f, k);
                     int h = rbm ? HistRange(u, lb) : 0;
                     float g = Eff * r;
@@ -1385,6 +1394,7 @@ namespace Armoury
                 if (shown == 0) sb.Append(" brak typowych broni w danych");
                 sb.Append('.');
                 Log.Info(sb.ToString());
+                if (rbm) XbowCap559.SessionTable(boltW);   // 559: tabela kusz przed / po pulapie (wlasny try/catch)
             }
             catch (Exception e) { Log.Error("FireRange469.StartTable", e); }
         }
