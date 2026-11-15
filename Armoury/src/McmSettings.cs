@@ -3428,15 +3428,15 @@ namespace Armoury
         [SettingPropertyGroup("Valyrian steel")]
         public float HistValyrianPerMeasure { get; set; } = 60000f;
 
-        [SettingPropertyBool("Qohor Rework Enabled", HintText = "the masters of Qohor rework Valyrian steel - the only way to a new Valyrian sword: bring a blade from your baggage to Qohor, pay the guild and wait; a blade of one measure becomes one sword of a new shape, a greatsword of two measures (such as Ice) becomes two swords; nothing is added and nothing is lost (off = no new orders; collecting and taking back still work)", RequireRestart = false)]
+        [SettingPropertyBool("Qohor Rework Enabled", HintText = "the masters of Qohor rework Valyrian steel: bring a blade from your baggage to Qohor, pay the guild and wait. Steel goes by weight - each new sword takes as much Valyrian steel as its blade weighs: Ice (0.93 kg) makes one sword of 0.8 kg with 0.13 kg left over, or two swords if you add your own ingots; what is left comes back to you as ingots and offcuts. The fee grows with the weight of steel in the fire. Nothing is added and nothing is lost (off = no new orders; collecting and taking back still work)", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public bool QohorReworkEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Qohor Own Design", HintText = "the masters of Qohor can also forge a Valyrian blade of one measure to a design of your own: pick one of your forge designs (or a sword you forged and carry) - they keep its guard, grip and pommel, make the blade of Valyrian steel close to its length - and give it the name you choose. The same fee, days and charcoal as any reforging; the new sword is Valyrian steel of one measure and the only one of its kind. Off: only the patterns of the realm", RequireRestart = false)]
+        [SettingPropertyBool("Qohor Own Design", HintText = "the masters of Qohor can also forge any Valyrian blade to a design of your own: pick one of your forge designs (or a sword you forged and carry) - they keep its guard, grip and pommel, make the blade of Valyrian steel at the size of your design - and give it the name you choose. The new blade takes as much steel as it weighs: if the old blade is lighter, the rest comes from your ingots and offcuts; if heavier, the rest comes back to you. Fee and charcoal by the weight of steel in the fire, the same days as any reforging; the new sword is the only one of its kind. Off: only the patterns of the realm", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public bool QohorOwnDesign { get; set; } = true;
 
-        [SettingPropertyBool("Qohor Ai Rework", HintText = "a lord whose party stands in Qohor and who bears a Valyrian greatsword won from another house may have it reforged into two swords by the same rule - the same fee to Qohor's treasury, the same days (as Tywin Lannister did with Ice); the masters send the finished swords to him, or to his heir; lords of your own house never order it on their own", RequireRestart = false)]
+        [SettingPropertyBool("Qohor Ai Rework", HintText = "a lord whose party stands in Qohor and who bears a Valyrian greatsword won from another house may have it reforged (as Tywin Lannister did with Ice) - into as many swords as its steel makes by weight (Ice: one), the steel left over stays with the guild; the fee to Qohor's treasury by the weight of steel, the same days; the masters send the finished swords to him, or to his heir; lords of your own house never order it on their own", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public bool QohorAiRework { get; set; } = true;
 

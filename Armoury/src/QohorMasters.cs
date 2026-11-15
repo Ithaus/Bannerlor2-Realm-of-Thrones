@@ -70,6 +70,7 @@ namespace Armoury
             public string Town = "";
             public string Own = "";                                     // wariant B (QohorMasters.Own): spec projektu gracza; "" = przekucie we wzor seryjny
             public int ExtraG;                                          // 563c: dodatek stali gracza (gramy: skrzynka + otwarte sztaby) u mistrzow do wydania
+            public bool Legacy;                                         // recenzja 563c/d: zlecenie przyjete przed 563c (zapis bez pola dodatku) - wlasny projekt kuty na 1 miare jak wtedy
             public bool Coal;
             public bool Ready { get { return DaysLeft <= 0; } }
             public bool IsPlayer { get { return Owner == PlayerOwner; } }
@@ -465,6 +466,16 @@ namespace Armoury
             // 563c: bilans w gramach - wynik bierze tyle stali, ile wazy; reszta do gracza (sztaby + skrzynka) albo do skrzynki cechu (AI)
             int inG = o.InIds.Sum(id => ValyrianBlades.SteelG(id)), outG = outs.Sum(x => ValyrianBlades.SteelG(x.StringId));
             string legacy = Settle(o, inG, ref outs, ref outG);
+            if (legacy == null)
+            {
+                // recenzja 563c/d: zlecenie AI sprzed 563c, jeden wzor ciezszy niz klinga (np. Blackfyre 700 g -> wzor 730 g) - mistrzowie oddaja klinge
+                // zamiast tworzyc stal z niczego (oplata zostaje w kasie Qohoru, jak przy nieudanym wlasnym projekcie)
+                Log.Info("QohorMasters: zlecenie AI sprzed 563c - wzor ciezszy niz klinga (" + inG + " g + dodatek " + o.ExtraG + " g < " + outG + " g) - mistrzowie oddaja "
+                         + string.Join(", ", o.InIds.ToArray()) + " wlascicielowi; oplata zostaje w kasie Qohoru.");
+                ReturnInputs(o);
+                _orders.Remove(o);
+                return;
+            }
             int left = inG + o.ExtraG - outG;
             string to;
             if (o.IsPlayer)
@@ -490,7 +501,7 @@ namespace Armoury
 
         /// <summary>563c: zlecenie sprzed masy (przyjete na miary, bez dodatku) moze potrzebowac wiecej stali niz klinga: gracz - dobranie ze skrzynki i sztab;
         /// dalej za malo - wynik bez ostatnich wzorow (Lod AI: jeden miecz zamiast dwoch); jeden wzor dalej ciezszy - wyrownanie startu bilansu (NoteLegacy).
-        /// Zwraca dopisek do kroniki ("" - nic).</summary>
+        /// Zwraca dopisek do kroniki ("" - nic); null - zlecenie AI, ktorego jeden wzor dalej jest ciezszy (Deliver oddaje klinge, recenzja 563c/d).</summary>
         private static string Settle(Order o, int inG, ref List<ItemObject> outs, ref int outG)
         {
             if (inG + o.ExtraG >= outG) return "";
@@ -514,6 +525,7 @@ namespace Armoury
                 outG -= ValyrianBlades.SteelG(last.StringId);
                 note += "; zlecenie sprzed 563c - bez " + last.StringId + " (za malo stali)";
             }
+            if (inG + o.ExtraG < outG && !o.IsPlayer) return null;   // recenzja 563c/d: AI - zwrot klingi w Deliver, bez stali z niczego
             if (inG + o.ExtraG < outG)
             {
                 int gap = outG - inG - o.ExtraG;
@@ -813,7 +825,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ zapis
         /// <summary>"v1" + rekordy "#wlasciciel;wej1,wej2;mod1,mod2;wyn1,wyn2;zostalo;razem;oplata;miasto;wegiel;dzien;godziny;spec;dodatek" (spec - wariant B, "" = brak;
-        /// dodatek - 563c, gramy stali gracza u mistrzow; starszy zapis bez pola = 0; naglowek zostaje v1 - starszy DLL czyta zlecenia dalej).</summary>
+        /// dodatek - 563c, gramy stali gracza u mistrzow; starszy zapis bez pola = 0; naglowek zostaje v1 - starszy DLL czyta zlecenia dalej;
+        /// pole 14 - recenzja 563c/d: "1" = zlecenie sprzed 563c).</summary>
         internal static string Export()
         {
             var sb = new StringBuilder("v1");
@@ -822,7 +835,8 @@ namespace Armoury
                 sb.Append('#').Append(o.Owner).Append(';').Append(string.Join(",", o.InIds.ToArray())).Append(';').Append(string.Join(",", o.InMods.ToArray()))
                   .Append(';').Append(string.Join(",", o.OutIds.ToArray())).Append(';').Append(o.DaysLeft.ToString(inv)).Append(';').Append(o.DaysTotal.ToString(inv))
                   .Append(';').Append(o.Fee.ToString(inv)).Append(';').Append(o.Town).Append(';').Append(o.Coal ? "1" : "0").Append(';').Append(o.Placed.ToString(inv))
-                  .Append(';').Append(o.Hours.ToString("0.##", inv)).Append(';').Append(o.Own ?? "").Append(';').Append(o.ExtraG.ToString(inv));
+                  .Append(';').Append(o.Hours.ToString("0.##", inv)).Append(';').Append(o.Own ?? "").Append(';').Append(o.ExtraG.ToString(inv))
+                  .Append(';').Append(o.Legacy ? "1" : "0");
             return sb.ToString();
         }
 
@@ -847,6 +861,8 @@ namespace Armoury
                 if (f.Length > 10) float.TryParse(f[10], NumberStyles.Float, CultureInfo.InvariantCulture, out o.Hours);
                 if (f.Length > 11) o.Own = f[11];   // wariant B: spec wlasnego projektu (starszy zapis - brak pola)
                 if (f.Length > 12) { int.TryParse(f[12], NumberStyles.Integer, CultureInfo.InvariantCulture, out o.ExtraG); o.ExtraG = Math.Max(0, o.ExtraG); }   // 563c
+                // recenzja 563c/d: zapis bez pola dodatku (12 pol) = zlecenie sprzed 563c; potem flaga w polu 14 (starszy DLL 563c ja pomija)
+                o.Legacy = f.Length <= 12 || (f.Length > 13 && f[13] == "1");
                 while (o.InMods.Count < o.InIds.Count) o.InMods.Add("");
                 if (o.InIds.Count == 0 || o.OutIds.Count == 0) { bad++; continue; }
                 _orders.Add(o);

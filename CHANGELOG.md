@@ -93,6 +93,24 @@ Recenzja kodu (bfa4cff4) - 4 usterki potwierdzone w kodzie i poprawione, bilans 
 
 **Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane, nie testowane w grze).
 
+#### Recenzja 563c/d (galaz noc/563c-masa-fix -> noc/563c-masa)
+
+Recenzja kodu 19d0a396 - 3 uwagi, wszystkie potwierdzone w kodzie i poprawione (punkt 3 z dopiskiem dla AI).
+
+**1. (sredni) Przetop klingi VS gubil zwykly metal oprawy.** Przyczyna: `SmeltTab.OutputPostfix` przy klindze VS zerowal caly metal gatunkow 1-6, a kucie (`ValyrianBlades.CostPostfix`) zwraca tylko materialy czesci klingi VS - jelec, rekojesc i glowica placa zwyklymi sztabami. Po 563c "stal = sama klinga" metal oprawy nie mial odbiorcy (Lod: `ice_guard` Iron4 x2, `ice_handle` Iron3 x1, `ice_pommel` Iron5 x1 - ok. 0.8 kg zelaza). Zmiana: nowe `SmeltTruth.ApplyVsFittings` - metal czesci bez czesci typu Blade (ta sama klinga, ktora liczy `BladeG` i przetop na sztaby) idzie zwykla regula przetopu broni (udzial SmeltingReturnShare + Smithing x bonus, najwyzej 0.5; sufit klasy BK; surowka jako zelazo kute przy SmithNoCrudeInput; skrzynka resztek `SmeltScraps` przy SmeltKeepsScraps). Tylko wywolanie zewnetrzne (jak `ApplyWeapon`); wewnetrzne dalej zeruje. Liczone takze przy SmeltWeaponByParts NIE - inaczej oprawa ginelaby jak dotad. Lod (udzial 45%): 4 sztaby oprawy x 0.45 = 1.8 sztaby - steel 0.9, iron 0.45, fine 0.45 do skrzynki resztek (cale sztaby, gdy sie uzbiera; bez SmeltKeepsScraps: 1 steel), obok 930 g stali VS.
+
+**2. (niski) Opisy MCM mowily o miarach.** `QohorReworkEnabled`, `QohorOwnDesign`, `QohorAiRework` (Settings.cs + McmSettings.cs, recznie, bez gen_mcm.py) - teraz wedlug masy: Lod daje 1 miecz 0.8 kg i 0.13 kg reszty (dwa - z dolozonymi sztabami), wlasny projekt w skali projektu gracza (brak stali z sztab/resztek, nadmiar wraca), oplata i wegiel od masy stali w ogniu, AI tyle mieczy, ile miesci stal (Lod: jeden), reszta do cechu. `SteelTooltip`: przy Valyrian Needs Legendary Smith NIE - "and a smith at your forge" zamiast "and a Legendary Smith".
+
+**3. (niski) Zlecenia sprzed 563c mogly stworzyc stal z niczego.** Przyczyna: 563c usunal skracanie klingi wlasnego projektu ponizej 105 cm takze dla zlecen juz przyjetych (bez dodatku stali), a `Settle` przy braku stali gracza wyrownywal start bilansu (`NoteLegacy`). Zmiana: `Order.Legacy` - zapis bez pola dodatku (12 pol, DLL sprzed 563c) = zlecenie sprzed 563c; flaga w nowym polu 14 `arm_qohor_orders` (starszy DLL 563c je pomija, naglowek dalej v1). `BuildOwn` przy takim zleceniu (i dodatku 0) skraca klinge jak wtedy (1 miara ponizej `ValyrianGreatswordMinCm`). Zlecenie AI sprzed 563c, ktorego jeden wzor dalej jest ciezszy niz klinga (np. Blackfyre 700 g -> wzor 730 g): `Settle` zwraca null, `Deliver` oddaje klinge wlascicielowi (`ReturnInputs`, oplata zostaje w kasie Qohoru - jak przy nieudanym wlasnym projekcie), linia w logu - bez stali z niczego. Gracz bez zmian (dobranie ze skrzynki i sztab; dalej brak - `NoteLegacy` z linia w logu, jak w 563c).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: `PartsMetalRaw` dostal parametr `noBlade` (domyslnie false) - pozostale wywolania bez zmian. `ApplyWeapon` dla zwyklej broni bez zmian. Samosprawdzenie startu sesji (SmeltTruth.SessionStart) widzi teraz przy klingach VS metal oprawy - gatunki tylko z czesci, ilosc ponizej polowy, wiec bez nowych ERROR.
+- Kolizje: stal VS (gramy, `_boxG`) i zwykly metal (`SmeltScraps`, gatunki 1..6) w osobnych skrzynkach - nic liczone dwa razy. Kucie VS dalej placi oprawe zwyklymi sztabami (`CostPostfix` zwraca tylko czesci VS) - teraz przetop oddaje ja ta sama regula co kazda bron (zamknieta ekonomia).
+- Zapis: pole 14 dopisywane na koncu; zapis 563c (13 pol) czytany jako nie-legacy, zapis sprzed 563c (12 pol) jako legacy.
+- Nie sprawdzone w grze: wynik przetopu Lodu w panelu Smelt (stal VS + zwykly metal oprawy), linia "Przetop broni (n20-kuznia)".
+
+**Status recenzji:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane).
+
 ## 561: jednorozce nikomu, konie umarlych tylko Innym - czystka polek, taborow, zbrojowni DTE, puli weteranow i bohaterow; szablony Skagosu na konie gorskie; IsPlainMount bez nich - Armoury (DeadMounts561.cs nowy, Stables.cs, Buildings338Studs.cs, HorseFate.cs, ArmsBook.cs, LegendaryLaw.cs, SubModuleMain.cs; nowy klucz NoMagicMountsForLiving w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 15.11, zrzut targu Winterfell ("Ivory Unicorn" 1 za 19219, "Wight Horse" 2 za 856 na sprzedaz): "dlaczego mozna kupic ivory horses i wight - martwe konie; wywal z mozliwosci zakupu; na martwych koniach moga jezdzic tylko martwi; a kucyki jednorozce nie da sie kupic, to zwierzeta magiczne - wywal je z armii ludzi; a konie zmarlych tylko moga byc w armii zmarlych i tez wywal z kazdej armii martwe konie i kucyki tez wywal z kazdej armii; skad ten kucyk jednorozec".

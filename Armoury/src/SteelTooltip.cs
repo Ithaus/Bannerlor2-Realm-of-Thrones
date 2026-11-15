@@ -25,7 +25,7 @@ namespace Armoury
                 if (ValyrianBlades.Is(item))
                     return new[] { "Valyrian steel", ValyrianBlades.KgText(ValyrianBlades.SteelG(item.StringId))
                                    + " kg of Valyrian steel in its blade. No smith alive can make more; only the masters of Qohor"
-                                   + (Settings.Current != null && Settings.Current.ValyrianIngots ? " and a Legendary Smith" : "") + " can rework it." };
+                                   + (Settings.Current != null && Settings.Current.ValyrianIngots ? (Settings.Current.ValyrianNeedsLegendarySmith ? " and a Legendary Smith" : " and a smith at your forge") : "") + " can rework it." };
             }
             catch { }
             return null;

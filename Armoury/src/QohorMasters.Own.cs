@@ -264,7 +264,7 @@ namespace Armoury
         }
 
         /// <summary>Miecz ze spec: czesci projektu gracza, klinga valyrianska (VsPieceFor), id kolejnego wyrobu kuzni; null + powod - mistrzowie oddaja klinge.</summary>
-        private static ItemObject BuildOwn(string spec, out string why)
+        private static ItemObject BuildOwn(string spec, out string why, bool legacy = false)
         {
             why = null;
             var f = (spec ?? "").Split('|');
@@ -288,6 +288,13 @@ namespace Armoury
             if (vs == null) { why = "brak klingi valyrianskiej ROT"; return null; }
             int bs = els[0].IsValid ? els[0].ScalePercentage : 100;
             // 563c: bez skracania ponizej progu wielkiego miecza - klinga ma skale projektu gracza, stal wedlug jej masy (OwnOutG, dodatek przy przyjeciu)
+            // recenzja 563c/d: zlecenie przyjete przed 563c (bez dodatku stali) - jak wtedy skrocona do 1 miary ponizej progu wielkiego miecza; inaczej klinga
+            // pelnej skali bylaby ciezsza niz wejscie i Settle dobieralby stal gracza albo (bez niej) wyrownywal start bilansu - stal z niczego
+            if (legacy)
+            {
+                float min = (Settings.Current != null ? Settings.Current.ValyrianGreatswordMinCm : 105f) - 1f;
+                while (bs > 50 && WeaponDesignElement.CreateUsablePiece(vs, bs).ScaledLength * 100f > min) bs--;
+            }
             els[0] = WeaponDesignElement.CreateUsablePiece(vs, bs);
             string id = NextCraftedId();
             var tname = new TextObject("{=!}" + name);
@@ -327,7 +334,7 @@ namespace Armoury
         {
             string why;
             ItemObject it = null;
-            try { it = BuildOwn(o.Own, out why); }
+            try { it = BuildOwn(o.Own, out why, o.Legacy && o.ExtraG == 0); }
             catch (Exception e) { why = "wyjatek " + e.GetType().Name; Log.Error("QohorMasters.BuildOwn", e); }
             if (it == null)
             {
@@ -347,7 +354,7 @@ namespace Armoury
             {
                 var one = new List<ItemObject> { it };
                 int og = outG;
-                legacy = Settle(o, inG, ref one, ref og);
+                legacy = Settle(o, inG, ref one, ref og) ?? "";
             }
             int left = inG + o.ExtraG - outG;
             ValyrianBlades.AddOwn(it.StringId, Hero.MainHero != null ? Hero.MainHero.StringId : "", outG);

@@ -133,6 +133,9 @@ namespace Armoury
                     if (ValyrianBlades.IngotsOn && ValyrianBlades.Is(item))
                     {
                         for (int g = 1; g <= 6 && g < __result.Length; g++) if (__result[g] > 0) __result[g] = 0;
+                        // recenzja 563c/d: stal = sama klinga; zwykly metal oprawy (jelec, rekojesc, glowica - przy kuciu placony zwyklymi sztabami, CostPostfix)
+                        // wraca regula przetopu broni - bez tego Lod gubil ok. 0.8 kg zelaza oprawy bez odbiorcy
+                        if (outer) SmeltTruth.ApplyVsFittings(item, __result);
                         return;
                     }
                     // n20-kuznia (klucz SmeltWeaponByParts): metal wedlug gatunkow czesci, bez surowki z niczego (po BK - stad tylko zewnetrzne)
