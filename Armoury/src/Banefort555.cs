@@ -191,8 +191,12 @@ namespace Armoury
                 // DesertionCampaignBehavior co dobe) liczy nadwyzke jako Party.NumberOfAllMembers - Party.PartySizeLimit i zdejmuje 25% nadwyzki na dobe
                 // (W4c odsyla ja do wsi) - dar ponad limit rozplynalby sie w tydzien. Ta sama miara co gra: wszyscy czlonkowie (z rannymi i bohaterami)
                 // i PartySizeLimit czynnego modelu (BK/ROT/BEE/Naval). Cel 504 (336 x 1.5) zostaje gorna granica.
+                // Recenzja 555b: limit liczony WPROST z czynnego modelu, nie z PartyBase.PartySizeLimit - ta wlasciwosc trzyma wartosc z pamieci do
+                // zmiany wersji rosteru (PartyBase: _cachedPartyMemberSizeLimit / MemberRoster.VersionNo), a 544 oproznia zaloge PRZED zmiana pana
+                // (BookHoldings YieldOut, potem ChangeOwnerOfSettlementAction.ApplyByDefault, ktory rosteru nie rusza) - pamiec mialaby limit starego pana
+                // (Przywodztwo i perki glowy rodu Polnocy). Po darze roster ma nowa wersje i gra przy dezercji przelicza limit od nowa - ta sama wartosc co tu.
                 int limitN, allN;
-                try { limitN = g.Party.PartySizeLimit; allN = g.Party.NumberOfAllMembers; }
+                try { limitN = (int)Campaign.Current.Models.PartySizeLimitModel.GetPartyMemberSizeLimit(g.Party).ResultNumber; allN = g.Party.NumberOfAllMembers; }
                 catch { Wait(day, "brak odczytu limitu zalogi gry - dar czeka"); return; }
                 int room = Math.Max(0, limitN - allN);
                 int add = Math.Min(Math.Max(0, Target - g0), room);

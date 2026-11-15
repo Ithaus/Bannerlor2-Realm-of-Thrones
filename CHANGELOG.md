@@ -58,6 +58,12 @@ Jeff, czat 15.11: po wyjasnieniu, ze gra co dobe zdejmuje 25% nadwyzki zalogi po
 
 **Status:** DO SPRAWDZENIA
 
+#### Recenzja 555b: limit wprost z modelu, nie z pamieci PartyBase
+
+- **Problem (kod, dekompilacja 1.4.8):** `PartyBase.PartySizeLimit` trzyma wartosc w pamieci (`_cachedPartyMemberSizeLimit`) i przelicza ja tylko po zmianie wersji rosteru (`MemberRoster.VersionNo`). 544 (BookHoldings.TransferFor) najpierw oproznia zaloge (YieldOut), potem zmienia pana (`ChangeOwnerOfSettlementAction.ApplyByDefault` - rosteru zalogi nie rusza). Jesli do daru nic nie zmienilo rosteru, 555b czytal limit STAREGO pana (Przywodztwo i perki glowy rodu Polnocy - `CalculateGarrisonPartySizeLimit`: 200 + Przywodztwo wlasciciela + perki + budynki). Gra po darze (nowa wersja rosteru) przelicza limit od nowa dla House Banefort - przy wyzszym starym limicie nadwyzka splywalaby 25% na dobe, czyli dokladnie to, czego wariant b mial uniknac.
+- **Zmiana (Banefort555.Hourly):** limit = `(int)Campaign.Current.Models.PartySizeLimitModel.GetPartyMemberSizeLimit(g.Party).ResultNumber` - ten sam lancuch modeli (BK/ROT/BEE/Naval) i ta sama wartosc, ktora gra policzy przy dezercji po darze. Reszta 555b bez zmian.
+- **Ryzyko / co sprawdzic:** jedno wywolanie modelu raz na kampanie; postfiks BK (`BKPartyLimitTweakPatches.SyncCachedSize`) przy okazji odswieza pamiec PartyBase - bez skutkow ubocznych (dla zalogi bez lidera BK nic nie dodaje). Zold ponad budzet zalogi (limit zoldu `a` w tej samej metodzie gry, do 20/dobe) nadal moze zdejmowac ludzi - to decyzja Jeffa o zoldzie, nie limit. Build 0 bledow; w grze nie sprawdzone.
+
 ## 553: ulga Jazdy w marszu takze dla bohatera bez wlasnego konia - Armoury (MarchPairs.Eff; bez nowego klucza)
 
 **Problem:** Jeff 15.11 (pasek 548 pokazal 132/133, czerwone - Amanda, bohater z Jazda 5 idzie pieszo): "no ale moze jechac na koniu do 20 riding jesli tylko przemieszcza sie po mapie!".
