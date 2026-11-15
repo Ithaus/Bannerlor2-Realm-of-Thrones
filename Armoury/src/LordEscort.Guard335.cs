@@ -208,7 +208,7 @@ namespace Armoury
         {
             float sp = 0f;
             try { sp = d.Speed; } catch { sp = 0f; }
-            float uph = Math.Max(1f, sp) / 1.2f;                                   // m97 DrMarchArrival: predkosc / 1.2 = jedn. na godzine, najmniej MinimumSpeed 1
+            float uph = Math.Max(WorldPace.MinSpeed(Settings.Current), sp) / 1.2f;  // m97 DrMarchArrival: predkosc / 1.2 = jedn. na godzine, najmniej podloga gry (MinimumSpeed 1; recenzja 564: x tempo przy WorldPaceWholeSpeed)
             return dist * 1.1f / uph;                                              // trasa 1.1 x linia prosta (m97 RouteFactor)
         }
 

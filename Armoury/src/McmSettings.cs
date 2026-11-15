@@ -2594,7 +2594,11 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "base map speed of EVERY party as a percent of the game's own (100 or more = unchanged, it never speeds the world up) - the whole world travels at one slower rhythm; terrain, cargo, sleep and the column cap still count on top of it", RequireRestart = false)]
+        [SettingPropertyBool("World Pace Whole Speed", HintText = "world pace multiplies the WHOLE final map speed once, after every bonus, penalty, road and column cap (off = old rule: a factor added to the other speed bonuses, column cap scaled on its own)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool WorldPaceWholeSpeed { get; set; } = true;
+
+        [SettingPropertyInteger("World Pace Percent", 0, 200, "0", HintText = "map speed of EVERY party as a percent of the game's own (100 or more, or below 5 = unchanged; it never speeds the world up) - the whole world travels at one slower rhythm. With World Pace Whole Speed on it multiplies the final speed once, after terrain, cargo, sleep, roads and the column cap; with it off it scales the base speed and those count on top of it", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public int WorldPacePercent { get; set; } = 50;
 
@@ -14552,6 +14556,7 @@ namespace Armoury
             s.LongYearEnabled = LongYearEnabled;
             s.WeeksPerSeason = WeeksPerSeason;
             s.MarchPaceEnabled = MarchPaceEnabled;
+            s.WorldPaceWholeSpeed = WorldPaceWholeSpeed;
             s.WorldPacePercent = WorldPacePercent;
             s.TerrainEaseEnabled = TerrainEaseEnabled;
             s.ForestSpeedPenalty = ForestSpeedPenalty;

@@ -5,6 +5,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -48,15 +49,82 @@ namespace Armoury
     {
         private static readonly TextObject _txtPace = new TextObject("{=!}World pace");
 
+        /// <summary>564 (Jeff 15.11, punkt 1 "ok"): modele predkosci z latka FinalPostfix (0 = latka nie weszla - zawsze stary tryb, bo inaczej tempo
+        /// zniknieloby z obu miejsc naraz).</summary>
+        private static int _finalModels;
+
+        /// <summary>564: tempo swiata jako mnoznik CALEJ predkosci (klucz WorldPaceWholeSpeed i latka FinalPostfix wpieta). false = jak przed 564:
+        /// wspolczynnik w predkosci bazowej (BasePostfix) w sumie z innymi premiami, sufit kolumny MarchPace x tempo.</summary>
+        internal static bool Whole(Settings s) { return s != null && s.WorldPaceWholeSpeed && _finalModels > 0; }
+
+        /// <summary>564: mnoznik tempa swiata - ta sama regula co BasePostfix: 5..99 = procent, poza tym 1 (bez zmiany).</summary>
+        internal static float Scale(Settings s)
+        {
+            int p = s != null ? s.WorldPacePercent : 100;
+            return p >= 100 || p < 5 ? 1f : p / 100f;
+        }
+
+        /// <summary>Recenzja 564 (uwaga 2): druzyna skryptu (CustomPartyComponent z wlasnym BaseSpeed - questy sandbox, NavalDLC). Gra zastepuje jej cala
+        /// predkosc (DefaultPartySpeedCalculatingModel.CalculateFinalSpeed), wiec FinalPostfix jej nie rusza; sufit kolumny dostaje wtedy tempo jak przed 564.</summary>
+        internal static bool Skips(MobileParty mp)
+        {
+            if (mp == null || !mp.IsCustomParty) return false;
+            var cc = mp.PartyComponent as CustomPartyComponent;
+            return cc != null && Math.Abs(cc.BaseSpeed) > 1e-5f;
+        }
+
+        /// <summary>Recenzja 564 (uwaga 3): podloga gry (MinimumSpeed 1) na mapie - przy tempie na calej predkosci FinalPostfix mnozy ja x tempo.</summary>
+        internal static float MinSpeed(Settings s) { return Whole(s) ? Scale(s) : 1f; }
+
+        /// <summary>Recenzja 564 (uwaga 1): predkosc bazowa z pamieci gry (MobileParty.LastCalculatedBaseSpeed) w jednostkach mapy - dla NASZYCH szacunkow
+        /// w logu. Przy kluczu WorldPaceWholeSpeed tempo nie siedzi juz w bazie (BasePostfix wychodzi), tylko w predkosci koncowej - tu x tempo.
+        /// Gra (inicjatywa poscigu AI, punkt ucieczki) czyta pole wprost i tego mnoznika NIE dostaje - opisane w CHANGELOG (564, recenzja).</summary>
+        internal static float BaseOnMap(MobileParty mp, Settings s)
+        {
+            float v = mp != null ? mp.LastCalculatedBaseSpeed : 0f;
+            return Whole(s) && !Skips(mp) ? v * Scale(s) : v;
+        }
+
         public static void BasePostfix(ref ExplainedNumber __result)
         {
             try
             {
                 if (!SpeedDepth.OutermostBase) return;          // lancuch modeli: tylko raz
                 var s = Settings.Current;
+                if (Whole(s)) return;                           // 564: tempo idzie mnoznikiem calej predkosci (FinalPostfix), nie wspolczynnikiem bazy
                 int p = s != null ? s.WorldPacePercent : 100;
                 if (p >= 100 || p < 5) return;
                 __result.AddFactor(p / 100f - 1f, _txtPace);
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 564 (Jeff 15.11, punkt 1 "ok"): tempo swiata jako PRAWDZIWY mnoznik calej predkosci koncowej. Dotad BasePostfix dokladal AddFactor(p - 1)
+        /// do sumy wspolczynnikow (wynik = baza x (1 + F - 0.25)), wiec premie i kary szly od pelnej bazy, a sufit kolumny MarchPace mnozyl sie x tempo -
+        /// dwie skale. Teraz: postfiks Priority.Last na kazdym zadeklarowanym CalculateFinalSpeed, wpiety PO MarchPace i NightRest (ten sam priorytet,
+        /// pozniejsza rejestracja = pozniej), raz na lancuch (SpeedDepth.OutermostFinal): wynik bez granic U = B x (1 + F) -> k x U przez
+        /// AddFactor((k - 1) x (1 + F)); granice LimitMin / LimitMax tez x k, wiec wynik = k x clamp(U, min, max). Wszystkie wczesniejsze wpisy
+        /// (sufit kolumny, droga, bloto, woz, sen, nosze, podloga gry 1) licza sie w jednostkach "pelnego tempa", a tempo mnozy je na koncu raz.
+        /// Wpis "World pace" w rozpisce gry = B_koncowe x wspolczynnik = (k - 1) x U - rzeczywisty ubytek predkosci (bez granic).
+        /// Wszyscy rowno (gracz, AI, karawany, wsie, morze) - jak dotad; poza druzynami CustomPartyComponent z wlasnym BaseSpeed (gra zastepuje im
+        /// cala predkosc, wiec stary wspolczynnik bazy do nich nie dochodzil - zostaja jak byly).
+        /// </summary>
+        public static void FinalPostfix(MobileParty __0, ref ExplainedNumber __result)
+        {
+            try
+            {
+                if (!SpeedDepth.OutermostFinal) return;         // lancuch modeli (ROT -> RB -> vanilla): tylko raz, na zewnatrz
+                var s = Settings.Current;
+                if (!Whole(s)) return;
+                float k = Scale(s);
+                if (k >= 1f) return;
+                if (Skips(__0)) return;                         // wlasna predkosc druzyny skryptu - jak przed 564 (sufit kolumny x tempo w MarchPace)
+                float f = 1f + __result.SumOfFactors;
+                __result.AddFactor((k - 1f) * f, _txtPace);
+                float lo = __result.LimitMinValue, hi = __result.LimitMaxValue;
+                if (lo > 0f && lo < float.MaxValue * 0.5f) __result.LimitMin(lo * k);        // podloga gry (MinimumSpeed 1) -> 1 x tempo
+                if (hi > 0f && hi < float.MaxValue * 0.5f) __result.LimitMax(hi * k);        // sufit kolumny / wozu / noszy -> x tempo (raz)
             }
             catch { }
         }
@@ -156,6 +224,41 @@ namespace Armoury
                 catch { }
             }
             catch { }
+        }
+
+        /// <summary>564: FinalPostfix na kazdym zadeklarowanym CalculateFinalSpeed, Priority.Last - wolane w SubModuleMain PO NightRest.ApplyAll
+        /// (ten sam priorytet co MarchPace i NightRest, pozniejsza rejestracja = biegnie po nich). Wpinane zawsze; klucz WorldPaceWholeSpeed czytany na zywo.</summary>
+        internal static void ApplyFinal(Harmony harmony)
+        {
+            try
+            {
+                var post = new HarmonyMethod(typeof(WorldPace).GetMethod("FinalPostfix", BindingFlags.Public | BindingFlags.Static)) { priority = Priority.Last };
+                int done = 0;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    Type[] types;
+                    try { types = asm.GetTypes(); }
+                    catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+                    catch { continue; }
+                    foreach (var t in types)
+                    {
+                        if (t == null || t.IsAbstract || !typeof(PartySpeedModel).IsAssignableFrom(t)) continue;
+                        try
+                        {
+                            var m = t.GetMethod("CalculateFinalSpeed", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                            if (m == null || m.IsAbstract) continue;
+                            harmony.Patch(m, postfix: post);
+                            done++;
+                        }
+                        catch (Exception e) { Log.Error("WorldPace.ApplyFinal(" + t.Name + ")", e); }
+                    }
+                }
+                _finalModels = done;
+                var c = Settings.Current;
+                Log.Info("WorldPace 564: tempo swiata " + (c != null && c.WorldPaceWholeSpeed ? "mnozy CALA predkosc" : "w bazie (klucz WorldPaceWholeSpeed wylaczony)")
+                         + " - latka predkosci koncowej w " + done + " modelach" + (done == 0 ? " (BRAK - zostaje stary tryb)" : "") + ".");
+            }
+            catch (Exception e) { Log.Error("WorldPace.ApplyFinal", e); }
         }
 
         internal static void ApplyAll(Harmony harmony)

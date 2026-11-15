@@ -334,6 +334,8 @@ namespace Armoury
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
                 // kolumny (po suficie marszu), nie teoretyczna baze
                 NightRest.ApplyAll(_harmony);
+                // 564: tempo swiata jako mnoznik CALEJ predkosci - postfiks Priority.Last wpiety PO MarchPace i NightRest (biegnie po nich, na samym koncu)
+                WorldPace.ApplyFinal(_harmony);
                 // E7/O1 (228): sen do switu - prefiksy First na 10 MobileParty.SetMove* (spiacy w obozie / snem dlugu nie dostaje rozkazu ruchu; rozkaz czeka
                 // na swit albo koniec snu dlugu); w menu glownym jak Wayfinder (przed JIT wolajacych), wpiete zawsze, dziala przy SleepersHoldOrders; we wlasnym try
                 try { NightRest.ApplySleepGate(_harmony); } catch (Exception e) { Log.Error("NightRest.ApplySleepGate", e); }

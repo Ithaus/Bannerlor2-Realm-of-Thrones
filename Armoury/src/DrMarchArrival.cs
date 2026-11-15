@@ -26,7 +26,7 @@ namespace Armoury
     /// ostatnia predkosc z mapy (_lastCalculatedSpeed - to, czym gra przesuwa partie; czlonek armii doczepiony - predkosc wodza) / 1.2 (4320 s gry
     /// na jednostke dt, jak NightMarch.UnitsPerHour); zaloga i milicja (oddzial wychodzi z murow pieszo) - wzor gry dla pieszych:
     /// BaseSpeed x (200 / (200 + ludzi))^0.4 x tempo swiata (WorldPacePercent), noc i snieg jak w grze (TerrainEase: plaska kara Jeffa, bez niej
-    /// procent gry), najmniej 1 (MinimumSpeed), / 1.2. Partia, ktora od wczytania zapisu stoi (_lastCalculatedSpeed = 0 - pole [CachedData], obiekt
+    /// procent gry), najmniej 1 (MinimumSpeed; przy WorldPaceWholeSpeed 1 x tempo - wynik i podloga x tempo na koncu), / 1.2. Partia, ktora od wczytania zapisu stoi (_lastCalculatedSpeed = 0 - pole [CachedData], obiekt
     /// z zapisu bez inicjalizatora pol): ten sam wzor z ludzi calej kolumny (wodz + doczepieni, jak CalculateLandBaseSpeed).
     /// Czas w bitwie = DrDeploySeconds + godziny x DrSecondsPerMarchHour.
     /// Ponad DrMaxMarchHours godzin marszu oddzial NIE przychodzi: odrzucony z powodem DR "DR_refuse_far" (komunikat DR przy ExplainRefusals).
@@ -344,16 +344,19 @@ namespace Armoury
         }
 
         /// <summary>Wzor gry dla pieszych (DefaultPartySpeedCalculatingModel.CalculateBaseSpeedForParty) x tempo swiata (WorldPace) z noca i sniegiem
-        /// jak CalculateFinalSpeed + TerrainEase.SpeedPostfix, najmniej MinimumSpeed (1), / 1.2. ExplainedNumber: wynik = baza x (1 + suma wspolczynnikow);
+        /// jak CalculateFinalSpeed + TerrainEase.SpeedPostfix, najmniej MinimumSpeed (1; przy WorldPaceWholeSpeed wynik i podloga x tempo - 564), / 1.2. ExplainedNumber: wynik = baza x (1 + suma wspolczynnikow);
         /// WorldPace dodaje wspolczynnik (p - 1), gra noc -0.25 i snieg -0.1; TerrainEase oddaje te procenty i odejmuje plaska kare od bazy.</summary>
         private static float FootUph(int men, float baseSpeed, Settings s, bool night, bool snow)
         {
             float b = baseSpeed * (float)Math.Pow(200.0 / (200.0 + Math.Max(1, men)), 0.4);
-            float f = Pace(s) / 100f;
+            float k = Pace(s) / 100f;
+            bool whole = WorldPace.Whole(s);   // 564: tempo mnozy cala predkosc (z podloga 1) zamiast wspolczynnika w sumie z noca i sniegiem
+            float f = whole ? 1f : k;
             bool ease = s != null && s.TerrainEaseEnabled;
             if (night) { if (ease) b -= NightPen(s); else f -= 0.25f; }
             if (snow) { if (ease) b -= SnowPen(s); else f -= 0.1f; }
             float v = Math.Max(1f, b * f);   // finalSpeed.LimitMin(MinimumSpeed = 1) - granica trzyma tez po latkach TerrainEase
+            if (whole) v *= k;               // 564: WorldPace.FinalPostfix - wynik i podloga x tempo
             return v / HoursPerDt;
         }
 

@@ -195,8 +195,7 @@ namespace Armoury
             else r.Foot += r.Walk;
             bool v2 = !HorsePace.Dry;   // 311d2: jak ColumnPostfix (probka "bez 311d" w linii doby - bez regul 311d2)
             r.CapRaw = Cap(c, mp, v2, r.Men, r.Foot, r.Horses, r.Train, r.Prisoners, r.MulRider, r.MulFoot, out r.Kind, out r.N, out r.Double, out r.RidingFoot, out r.Walkers, r.RideCap);
-            int pace = Math.Max(5, Math.Min(100, c.WorldPacePercent));
-            r.Scale = pace / 100f;
+            r.Scale = WorldPace.Scale(c);   // 564 + recenzja (uwaga 6): sufit na mapie = surowy x ten sam mnoznik co BasePostfix / FinalPostfix (ponizej 5% - bez zmiany, nie x0.05)
             r.Cap = r.CapRaw * r.Scale;
             r.Applies = r.Cap > 0.25f;
             // podzial ludzi (piechurzy na luzakach, idacy, na drugiego) - z Cap, ten sam co sufit (311d2: przy jezdzie na drugiego luzaki najpierw pod jencow)
@@ -270,8 +269,13 @@ namespace Armoury
                 float cap = Cap(c, mp, v2, men, footK, horsesK, train, prisoners, mulR, mulF, out kind, out n, out dbl, out rfx, out wx, rideCap);
                 // sufity kolumny zyja w jednostkach mapy - przy zwolnionym
                 // swiecie (WorldPacePercent) skaluja sie tym samym mnoznikiem
-                int pace = Math.Max(5, Math.Min(100, c.WorldPacePercent));
-                float scale = pace / 100f;
+                // recenzja 564 (uwaga 6): ta sama regula co WorldPace.BasePostfix - 5..99 = procent, poza tym 1 (dotad ponizej 5% sufit szedl x0.05 przy bazie bez zmiany)
+                float scale = WorldPace.Scale(c);
+                // 564 (Jeff 15.11 "ok"): tempo swiata mnozy CALA predkosc na samym koncu (WorldPace.FinalPostfix, LimitMax tez x tempo) - sufit kolumny
+                // zostaje tu w jednostkach pelnego tempa (colScale 1), inaczej tempo weszloby dwa razy; scale - sufit na mapie (log, prog 0.25).
+                // Recenzja 564 (uwaga 2): druzyna skryptu z wlasnym BaseSpeed - FinalPostfix jej nie rusza, wiec sufit x tempo tutaj (jak przed 564)
+                bool whole = WorldPace.Whole(c) && !WorldPace.Skips(mp);
+                float colScale = whole ? 1f : scale;
                 if (k0 && mp != MobileParty.MainParty)
                 {
                     // sufit tempa AI bez K0 (bez wolnych koni zbrojowni) na sucho w tym samym wywolaniu - prog linii: z K0 nigdy nizszy
@@ -287,8 +291,8 @@ namespace Armoury
                     int k3, n3, d3, r3, w3;
                     HorsePace.NoteCap(Cap(c, mp, v2, men, footK, horsesK, train, prisoners, 1f, 1f, out k3, out n3, out d3, out r3, out w3, rideCap) * scale, cap * scale);
                 }
-                cap *= scale;
-                if (cap <= 0.25f) return;
+                if (cap * scale <= 0.25f) return;   // prog na suficie na mapie (jak przed 564)
+                cap *= colScale;
                 // czapka WIDOCZNA w rozpisce predkosci: gole LimitMax cielo tempo
                 // bez zadnego sladu i gracz nie wiedzial, CZEMU wlecze sie 4.0
                 // (Jeff 27.08: "cos jest nie tak z mechanika predkosci").
@@ -314,7 +318,7 @@ namespace Armoury
                                    : kind == 2 ? new TextObject("{=!}Marching column: {N} footmen on spare horses").SetTextVariable("N", n)
                                    : kind == 3 ? new TextObject("{=!}Marching column: baggage train")
                                    : kind == 4 ? new TextObject("{=!}Marching column: riding double - {N} footmen behind riders (-{P}%)").SetTextVariable("N", n)
-                                                 .SetTextVariable("P", RideDoubleCut(c, capKind / scale, mulR).ToString("0", System.Globalization.CultureInfo.InvariantCulture))
+                                                 .SetTextVariable("P", RideDoubleCut(c, capKind / colScale, mulR).ToString("0", System.Globalization.CultureInfo.InvariantCulture))
                                    : new TextObject("{=!}Marching column: all riders");
                     float f = 1f + __result.SumOfFactors;
                     __result.Add(f > 0.01f ? (cap - current) / f : (cap - current), why);
