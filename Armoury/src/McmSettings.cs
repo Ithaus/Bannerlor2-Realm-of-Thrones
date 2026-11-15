@@ -8633,7 +8633,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool CamelsOnlyQarth { get; set; } = true;
 
-        [SettingPropertyBool("No Magic Mounts For Living", HintText = "unicorns are beasts of legend and nobody keeps them: they are never on sale, no army rides them, and the Skagosi riders whose kit had one ride mountain horses instead; wight horses belong to the dead alone - only the Others keep and ride them. Any that turn up on a market shelf, in a living lord's baggage or armoury, or under a living rider are gone (the unicorn runs off into the wild, the wight horse crumbles) with no pay; counted in the Armoury log (line 561). Off = they count as plain horses, as before", RequireRestart = false)]
+        [SettingPropertyBool("No Magic Mounts For Living", HintText = "unicorns are beasts of legend and nobody keeps them: they are never on sale, no army rides them, and the Skagosi riders whose kit had one ride mountain horses instead; wight horses belong to the dead alone - only the Others keep and ride them. Any that turn up on a market shelf, in a living lord's baggage or armoury, or under a living rider are gone (the unicorn runs off into the wild, the wight horse crumbles) with no pay; counted in the Armoury log (line 561). Off = they count as plain horses, as before Turning it off mid-game takes full effect only after reloading the save (troop kits and the horse classification are set at load).", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool NoMagicMountsForLiving { get; set; } = true;
 

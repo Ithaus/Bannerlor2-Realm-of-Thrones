@@ -17,7 +17,7 @@ Dowod z logu (linia cen koni Armoury-2026-11-*.log, sztuki na polkach swiata): s
 - Klucz `NoMagicMountsForLiving` (domyslnie tak), MCM "No Magic Mounts For Living" w grupie "Crafts, raw materials and horses (stage 6)", recznie w Settings.cs, McmSettings.cs (wlasciwosc + ApplyTo).
 
 **Ryzyko / co sprawdzic:**
-- Kontrola calosci: IsPlainMount czyta ok. 60 miejsc - wszystkie jako filtr "wez zwykly kon" (zadne nie traktuje nie-zwyklego jako smiecia do sprzedania), wiec wylaczenie tylko zawęza. Linie "Konie AI (175)", "Konie (E6/0)" i HorsePace spadna o te sztuki. Partie Innych: ich wight przestaje byc "zwyklym koniem" - Stajnia nie kupuje im koni pod beastbound (i tak nie mialy skad), SaddleLaw nie paruje uprzezy z wight.
+- Kontrola calosci: IsPlainMount czyta ok. 60 miejsc - wszystkie jako filtr "wez zwykly kon" (zadne nie traktuje nie-zwyklego jako smiecia do sprzedania), wiec wylaczenie tylko zaweza. Linie "Konie AI (175)", "Konie (E6/0)" i HorsePace spadna o te sztuki. Partie Innych: ich wight przestaje byc "zwyklym koniem" - Stajnia nie kupuje im koni pod beastbound (i tak nie mialy skad), SaddleLaw nie paruje uprzezy z wight.
 - NotMerchandise NIE ustawiane (ArmsPricing.IsUnique buforuje - UniqueLaw/ColdStart traktowalyby je jak unikaty: dwie zasady na jedno zjawisko).
 - Nie zrobione (osobne wgrania, jedna zmiana naraz): drzwi DTE (UniqueLaw.IntakeAi/IntakePlayer), CrashScribe Mends.UniqueWard (DTE w bitwie wciaz moze posadzic zywego jezdzca Skagosu na jednorozcu z puli kultury - po bitwie lup zejdzie przy czystce doby), konwoje DTE i nagroda turniejowa, DragonUnmount slot 10, stajnia piechoty gracza (FootStable) i wozy w drodze (zejda przy nastepnej czystce po powrocie do ladunku / na polke), uprzaz white_walker_saddle (zostaje w handlu).
 - W logu po wczytaniu: linia szablonow (oczekiwane 3 jednostki Skagosu: skagosi_rider, skagosi_stoneborn, skagosi_stoneborn_champion; beastbound_wight NIE - umarly), linia czystki "wczytanie" (polki ok. 11 jednorozcow i 3 wight), potem w dobie 0 nowych na polkach. Sprawdzic, czy beastbound wight w bitwie z Innymi nadal jedzie konno.
@@ -25,6 +25,16 @@ Dowod z logu (linia cen koni Armoury-2026-11-*.log, sztuki na polkach swiata): s
 - Build: 0 bledow. Nie wgrane.
 
 **Status:** DO SPRAWDZENIA
+
+### Recenzja 561
+
+Przeglad tylko-odczyt (01d41ddd): brak uwag krytycznych (Inni zachowuja konie wight, szablony beastbound nietkniete, ksiega koni domknieta, CTD - zmiany tylko na mapie). Cztery drobne luki sprawdzone w kodzie - wszystkie prawdziwe:
+- **R561/1 (przyjete):** czystka nie ruszala `Settlement.Stash` (schowek gracza) - jednorozec / kon wight odlozony do schowka zostawal na zawsze. Teraz `SweepWorld` czysci schowki (holder = partia gracza, wiec oba schodza), miejsce "schowek gracza" w linii 561, komunikat gracza jak przy taborze. Ksiega (`ArmsBook.ForEachRoster`) liczy schowki, wiec bilans bez zmian.
+- **R561/2 (przyjete):** polka czyszczona tylko przy wejsciu gracza i raz na dobe - gracz czekajacy w miescie mogl zobaczyc w oknie handlu konia sprzedanego tam przez AI w ciagu doby. Dodany `HourlyTick` (`DayProfile.Hr`): gdy `MainParty.CurrentSettlement != null`, czystka tylko tej polki (`SweepShelfOnEntry(st, "gracz w osadzie")`). Koszt: jeden roster na godzine. Czas mapy stoi w misji i przy otwartym oknie handlu, wiec bez zmiany pod otwartym ekranem.
+- **R561/3 (przyjete tylko tekst):** wylaczenie klucza w trakcie gry dziala czesciowo do wczytania (szablony Skagosu podmienione w pamieci sesji, `SaddleLaw._itemKind` buforuje klasyfikacje). Kodu nie zmieniam (czyszczenie bufora SaddleLaw = nowa sciezka dla jednego przelacznika); HintText MCM i komentarz `Settings.cs`: "Turning it off mid-game takes full effect only after reloading the save (...)".
+- **R561/4 (przyjete):** czystka dobowa opakowana w `DayProfile.Dx("DeadMounts561.SweepWorld", ...)` - widac ja w linii profilu doby E8/0 (tylko pomiar).
+- Polski znak "zawęza" we wpisie poprawiony.
+- Ryzyko: schowek gracza - tylko konie jednorozec/wight (inne sztuki nietkniete); godzinna czystka polki wola te sama `CleanRoster` (od tylu), potkniecia liczone per wywolanie (`Stumble("Hourly")`), bez wylacznika. Build: 0 bledow. Nie wgrane.
 
 ## 559: kusze - pulap energii beltu 190 J (latka na predkosc RBM), zasieg 469 z tym samym pulapem, waga bolt_a w linii startu - Armoury (XbowCap559.cs nowy, FireRange469.cs, NightHooks.cs; nowy klucz CrossbowBoltEnergyCap w Settings.cs + McmSettings.cs recznie)
 

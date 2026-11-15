@@ -89,14 +89,27 @@ namespace Armoury
                 _stumbles = 0; _errSites.Clear();
                 try { SweepWorld("wczytanie"); } catch (Exception e) { Log.Error("DeadMounts561.SweepWorld", e); }
             });
-            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, () =>
+            // R561/4: czystka dobowa w pomiarze profilu doby (E8/0, jak LegendaryLaw) - tylko log
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("DeadMounts561.SweepWorld", () =>
             {
                 try { SweepWorld("dzien"); } catch (Exception e) { Log.Error("DeadMounts561.SweepWorld", e); }
-            });
+            }));
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, (mp, st, h) =>
             {
                 try { if (mp != null && mp == MobileParty.MainParty) SweepShelfOnEntry(st); } catch (Exception e) { Stumble("Entry", e); }
             });
+            // R561/2: gracz czeka w osadzie (menu oczekiwania) - partia AI moze tam sprzedac lup po Innych; co godzine czystka tylko tej jednej polki,
+            // zeby zakazany kon nie stal w oknie handlu do konca doby. Godzina mapy (czas stoi w misji i przy otwartym oknie handlu) - bezpieczna chwila.
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("DeadMounts561.PlayerShelf", () =>
+            {
+                try
+                {
+                    var mp = MobileParty.MainParty;
+                    var st = mp != null ? mp.CurrentSettlement : null;
+                    if (st != null) SweepShelfOnEntry(st, "gracz w osadzie");
+                }
+                catch (Exception e) { Stumble("Hourly", e); }
+            }));
         }
 
         public override void SyncData(IDataStore dataStore) { }
@@ -208,6 +221,21 @@ namespace Armoury
             {
                 try { if (st != null) CleanRoster(st.ItemRoster, null, t, "polki", shelfList, st.Name != null ? st.Name.ToString() : st.StringId); }
                 catch (Exception e) { Stumble("Shelf", e); }
+            }
+            // R561/1: schowek gracza (Settlement.Stash) - gracz jest zywy: jednorozec i kon umarlych schodza i stad (ksiega ArmsBook.ForEachRoster i tak go liczy)
+            foreach (var st in Settlement.All)
+            {
+                try
+                {
+                    if (st == null) continue;
+                    ItemRoster stash = null;
+                    try { stash = st.Stash; } catch { }
+                    if (stash == null || ReferenceEquals(stash, st.ItemRoster)) continue;
+                    int u0 = t.Uni, w0 = t.Wight;
+                    CleanRoster(stash, MobileParty.MainParty, t, "schowek gracza", shelfList, (st.Name != null ? st.Name.ToString() : st.StringId) + " (schowek)");
+                    t.PlayerUni |= t.Uni > u0; t.PlayerWight |= t.Wight > w0;
+                }
+                catch (Exception e) { Stumble("Stash", e); }
             }
             // tabory partii (takze gracza) - Inni trzymaja konie umarlych
             foreach (var mp in MobileParty.All)
@@ -335,15 +363,15 @@ namespace Armoury
             return pick;
         }
 
-        /// <summary>Wejscie gracza do osady: czystka tylko tej polki - sztuka, ktora przyszla w ciagu doby, nie trafi do okna handlu.</summary>
-        private static void SweepShelfOnEntry(Settlement st)
+        /// <summary>Wejscie gracza do osady (i co godzine, gdy w niej stoi - R561/2): czystka tylko tej polki - sztuka, ktora przyszla w ciagu doby, nie trafi do okna handlu.</summary>
+        private static void SweepShelfOnEntry(Settlement st, string why = "wejscie gracza")
         {
             if (!On || st == null || st.ItemRoster == null) return;
             var t = new Tally();
             var list = new List<string>();
-            CleanRoster(st.ItemRoster, null, t, "polka przy wejsciu gracza", list, st.Name != null ? st.Name.ToString() : st.StringId);
+            CleanRoster(st.ItemRoster, null, t, "polka: " + why, list, st.Name != null ? st.Name.ToString() : st.StringId);
             if (t.Uni + t.Wight > 0)
-                Log.Info("Zakazane wierzchowce (561): wejscie gracza | jednorozce uwolnione " + t.Uni + ", konie umarlych rozpadly sie " + t.Wight
+                Log.Info("Zakazane wierzchowce (561): " + why + " | jednorozce uwolnione " + t.Uni + ", konie umarlych rozpadly sie " + t.Wight
                          + " [" + string.Join(", ", list.ToArray()) + "] wartosc " + (t.UniVal + t.WightVal).ToString(CultureInfo.InvariantCulture) + " | bez zaplaty (ujscie).");
         }
     }
