@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 16.11 - WGRANIE 271 (karawana gracza: 584 statki z nadwyzki ponad kapital, 585 konie gabki BK tylko z zyskiem osiagalnym, 586 dziennik wydatkow + 'nieznane X', 587 prawdziwy komunikat zoldu + krotsze teksty karawan; test at-270b czysty)
+
+- Armoury.dll 8a380e1b = noc/scal-perki c6e4f9d3 (270 + 584-587 po recenzjach; Jeff: '1. tak 2. tak 3. tak 4. tak i ogolnie te teksty skroc'). Kopie: .bak-2026-11-16-przed-wgranie271, Backup C: i D:. Nowe klucze m.in. PlayerCaravanShipsFromSurplus, Player Caravan Horses Need Profit; zapis arm_584_statki.
+- at-270b: 220/220, 21.8 s/dobe, 23 bledy cudze, NIEZGODNE 0, musztra 581 ZGODNE. Gracz testu nie ma karawany - 584-587 sprawdzone tylko jako wpiete (585: latka wpieta, AI na sucho). Do sprawdzenia u Jeffa: Convoy of Amanda - linie 259/305a 'dziennik kiesy' i 'nieznane X', 584 'zakup statku wstrzymany', 585 cofniete konie, komunikaty po angielsku krotkie. Statek kupiony przed 584 (~9.4 tys.) bez rekordu - liczony 0 (wyplat 259 nie bedzie, dopoki karawana nie odrobi).
+
 ## STAN 16.11 - WGRANIE 270 (582 armia AI nie wybiera wsi chronionej okupem/przeprawa; 583 haki testu musztry; test at-269b czysty)
 
 - Armoury.dll e6f8997c = noc/scal-perki a12a5523 (269 + 582 + 583 po recenzjach). Kopie: .bak-2026-11-16-przed-wgranie270, Backup C: i D:. Testowy CrashScribe cs/CrashScribe-at-n393-hs.dll (c02cc975; zrodlo bannerlord-autotest/src/cs-at393 701d125) = aktualny CS z Mends.IsPreview + harness n392-hs.
