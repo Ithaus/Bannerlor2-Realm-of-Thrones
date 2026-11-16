@@ -575,7 +575,8 @@ namespace Armoury
                 var pn = new List<string>();
                 foreach (var st in _msgPorts) pn.Add(st.Name.ToString());
                 string cn = party.Name != null ? party.Name.ToString() : "your caravan";
-                txt = sold > 0 ? paid + " denars for the ships of " + cn + (disb ? " (disbanded)" : " (lost)") + " from " + string.Join(", ", pn.ToArray())
+                // 587 recenzja: port jest kupcem ("sold in"), kwota z separatorem tysiecy
+                txt = sold > 0 ? paid.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " denars for the ships of " + cn + (disb ? " (disbanded)" : " (lost)") + ", sold in " + string.Join(", ", pn.ToArray())
                                  + (scrapped > 0 ? "; " + scrapped + " unsold." : ".")
                                : "No port could buy the ships of " + cn + (disb ? " (disbanded)." : " (lost).");
                 MBInformationManager.AddQuickInformation(new TextObject("{=!}" + txt));

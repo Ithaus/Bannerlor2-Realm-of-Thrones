@@ -1439,7 +1439,7 @@ namespace Armoury
                 if (__0.ActualClan == Clan.PlayerClan) CaravanSettle.NoteDeposit(__0, CaravanSettle.DepE39, moved);   // 259: linia majatku gracza
                 // te same skutki co wplata BK: komunikat dla gracza, doswiadczenie handlu dowodcy, slawa za perk Great Investor
                 if (pn) PayNotes.Got("caravan", moved, ": profit of " + __0.Name + " in " + __1.Name + ".");   // 587: krotko
-                else if (owner == Hero.MainHero) Log.Player(moved + " denars profit from " + __0.Name + " in " + __1.Name + ".");
+                else if (owner == Hero.MainHero) Log.Player(moved.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " denars profit from " + __0.Name + " in " + __1.Name + ".");
                 if (__0.LeaderHero != null) SkillLevelingManager.OnTradeProfitMade(__0.LeaderHero, moved);
                 var leader = owner.Clan.Leader;
                 if (leader != null && leader.GetPerkValue(DefaultPerks.Trade.GreatInvestor)) owner.Clan.AddRenown(DefaultPerks.Trade.GreatInvestor.PrimaryBonus, true);

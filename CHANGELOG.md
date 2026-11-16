@@ -27,6 +27,17 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 587
+
+Dwie recenzje (1: szesc uwag, 2: brak bledow + dwie uwagi kosmetyczne pokrywajace sie z 1). Wszystkie sprawdzone w kodzie - prawdziwe, poprawione (tylko napisy w grze, logi bez zmian, liczby te same):
+  - Wyplata zysku przy jednej karawanie powtarzala kwote ("You received 1,234: caravan profit - Convoy of Amanda 1,234.") -> przy jednej karawanie sama nazwa: "You received 1,234: caravan profit from Convoy of Amanda." / "1,234 denars caravan profit from Convoy of Amanda."; przy kilku - lista z kwotami jak dotad (CaravanSettle.Player.cs, nowa lista payNames obok pays; linia logu "komunikat - wyplata" bez zmian).
+  - "G goods lost" brzmialo jak liczba sztuk -> "C coin and G in goods lost: ..." (305a rozbita i zniknieta, CaravanSettle.P305.cs).
+  - Ponizej kapitalu: "T top-up" -> "T purse top-up".
+  - Statki 181: "... (lost) from S" -> "... (lost), sold in S" (port jest kupcem); kwota z separatorem tysiecy (N0).
+  - Separatory tysiecy (N0, InvariantCulture): E3/9 bez PayNotes (Seal31B), Insurance Plans pay/due (Perk510Gold), 286 zold a -> b (CaravanGuards285.Road).
+  - Tydzien: ", workshops +W" tylko gdy warsztaty cos daly (wsp > 0 albo zwrot kapitalu > 0) - dawniej zawsze "workshops +0"; linia logu "komunikat - tydzien" nadal ma pelne liczby.
+Odrzucone: brak. Nierozstrzygniete: katalog autotestu (C:\Users\GAME\bannerlord-autotest) nie przeszukany pod katem parsowania starych napisow (recenzja 2) - sprawdzone tylko src; autotest czyta log, a linie logu "komunikat - ..." maja te same naglowki.
+
 ## 586: dziennik kiesy karawany gracza - kazdy ruch kiesy z nazwa, kontrola "nieznane X", sumy wedlug rodzaju w linii 259; "(-1 dob temu)" w 305a - Armoury (CaravanSettle.Ledger586.cs nowy, CaravanSettle.Player.cs, CaravanSettle.P305.cs, CaravanSettle.cs, CaravanBuy307.cs, ShipsToPort181.cs, CaravanEscort.cs, RealPayer.cs, Perk510Gold.cs, CaravanGuards285.cs, CaravanSilver492.cs, CaravanGoods.cs, ArmouryBehavior.cs)
 
 **Problem:** Jeff 16.11 "i jak moja karawana? zarabia" -> zgoda "3. tak" (propozycja: "Dziennik: zapisuje kazdy wydatek (statek, oplaty) i pokazuje 'nieznane X', zeby nic nie znikalo po cichu"). Log `Armoury-2026-11-15_23-13-58.log`, Convoy of Amanda: bilans kiesy z linii 259 (kiesa poprzedniej doby + sprzedaz - myto - zakupy) nie zgadza sie o 10 799 w czterech dobach z handlem - 109232 Pebbleton 9544 (l. 20563; statek, linia 181 l. 20906 "karawany 4 / 9749"), 109233 Blacktyde 848 (l. 21336), 109235 Pebbleton 114 (l. 23319), 109239 Lonely Light 293 (l. 27221); dziennik 305a pokazywal tylko handel. Linia 21336 (doba 109233): "ostatnio w miescie Blacktyde w dobie 109234 (-1 dob temu)".

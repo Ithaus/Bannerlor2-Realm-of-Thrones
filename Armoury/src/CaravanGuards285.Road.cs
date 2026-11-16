@@ -217,7 +217,7 @@ namespace Armoury
                 var inv = CultureInfo.InvariantCulture;
                 // 587: krotko, liczby na poczatku; sila drogi i karawany - do logu (po polsku)
                 string cn = mp.Name != null ? mp.Name.ToString() : "Your caravan";
-                Log.Player(got + " guards paid off: " + cn + " in " + st.Name + ", wages " + wage0 + " -> " + wage1 + " a day.", false, PlayerNews.NotArmy);
+                Log.Player(got + " guards paid off: " + cn + " in " + st.Name + ", wages " + wage0.ToString("N0", inv) + " -> " + wage1.ToString("N0", inv) + " a day.", false, PlayerNews.NotArmy);
                 Log.Info("Straz karawan (286): karawana gracza '" + cn + "' zwolnila " + got + " najdrozszych w " + st.Name + " | droga do " + (tgt != null ? tgt.Name.ToString() : "nastepnego miasta")
                          + " wymaga sily " + need.ToString("0", inv) + " (najsilniejsza banda przy drodze), karawana zostaje z sila " + mp.Party.EstimatedStrength.ToString("0", inv)
                          + " | zold " + wage0 + " -> " + wage1 + " zl na dobe.");

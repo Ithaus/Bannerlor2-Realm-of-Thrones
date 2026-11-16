@@ -463,7 +463,7 @@ namespace Armoury
             var sb = new StringBuilder(2048);
             sb.Append(PP).Append("dzien ").Append(day);
             long t259 = 0, tBk = 0, tE39 = 0, tEnd = 0, tVan = 0, tWage = 0, tTop = 0, tShort = 0, tWs = 0, tTax = 0, tWsRet = 0;
-            var pays = new List<string>(); var caps = new SortedSet<int>();
+            var pays = new List<string>(); var payNames = new List<string>(); var caps = new SortedSet<int>();
             int lowMsgs = 0;
             bool rep = s.CaravanReports;
             foreach (var mp in cur)
@@ -506,7 +506,7 @@ namespace Armoury
                     try { DiaryLine(sb, mp, r, now, day); } catch (Exception e) { Stumble305("DiaryLine", e); }   // 305a: gdzie / cel / zachowanie / transakcje dnia
                     try { LedLine586(sb, r); } catch (Exception e) { Stumble586("LedLine", e); }   // 586: ruchy kiesy wedlug rodzaju - dzis i od doby LedDay
                     t259 += r.DPay259; tBk += r.DPayBk; tE39 += r.DPayE39; tEnd += r.DPayEnd; tVan += r.DPayVan; tWage += r.DWage; tTop += r.DTop; tShort += r.DShort;
-                    if (r.DPay259 > 0) { pays.Add(r.Name + " " + N(r.DPay259)); caps.Add(basis.Capital); }
+                    if (r.DPay259 > 0) { pays.Add(r.Name + " " + N(r.DPay259)); payNames.Add(r.Name); caps.Add(basis.Capital); }
                     if (rep && low >= LowDays && (r.LastLowMsg < 0 || day - r.LastLowMsg >= LowDays))
                     {
                         r.LastLowMsg = day; lowMsgs++;
@@ -517,7 +517,7 @@ namespace Armoury
                         // dawny tekst "your clan paid its wages, 0" byl nieprawda; sprzedaz/zakupy/myto i warunek wyplaty zostaja w linii 259 (log)
                         string txt = N(basis.Worth) + " / " + N(basis.Capital) + ": " + r.Name + " is below its capital (coin " + N(basis.Purse) + ", goods " + N(basis.Goods)
                                      + (basis.ShipsN > 0 ? ", ships " + N(basis.Ships) : "") + ")"
-                                     + (wg > 0 ? "; clan paid " + N(wg) + " wages" : "") + (tp > 0 ? (wg > 0 ? ", " : "; ") + N(tp) + " top-up" : "") + ".";
+                                     + (wg > 0 ? "; clan paid " + N(wg) + " wages" : "") + (tp > 0 ? (wg > 0 ? ", " : "; ") + N(tp) + " purse top-up" : "") + ".";
                         Log.Player(txt);
                         Log.Info(PP + "komunikat - ponizej kapitalu: karawana '" + r.Name + "' ponizej kapitalu " + low + " dob | " + txt);
                     }
@@ -554,9 +554,11 @@ namespace Armoury
                 try
                 {
                     // 587: krotko - kapital, ktory karawany zatrzymuja, zostaje w logu (ponizej)
+                    // 587 recenzja: przy jednej karawanie sama nazwa (kwota juz na poczatku napisu - bez powtorzenia)
                     string list = string.Join(", ", pays.ToArray());
-                    if (PayNotes.On) { PayNotes.Got("caravans", (int)Math.Min(int.MaxValue, t259), ": caravan profit - " + list + "."); payMsg = "PayNotes"; }
-                    else { Log.Player(N(t259) + " denars caravan profit: " + list + "."); payMsg = "ekran"; }
+                    string shown = pays.Count == 1 ? "caravan profit from " + payNames[0] : "caravan profit - " + list;
+                    if (PayNotes.On) { PayNotes.Got("caravans", (int)Math.Min(int.MaxValue, t259), ": " + shown + "."); payMsg = "PayNotes"; }
+                    else { Log.Player(N(t259) + " denars " + shown + "."); payMsg = "ekran"; }
                     Log.Info(PP + "komunikat - wyplata (" + payMsg + ") " + t259 + " | " + list + " | kapital zatrzymany w karawanach (kiesa i towar) " + string.Join(" / ", Fmt(caps)) + ".");
                 }
                 catch (Exception e) { Stumble("PlayerDaily(komunikat)", e); }
@@ -571,7 +573,7 @@ namespace Armoury
                     long car = WkSum(_wk, _wkDay, 0, out n), wg = WkSum(_wk, _wkDay, 1, out n), tp = WkSum(_wk, _wkDay, 2, out n), wsp = WkSum(_wk, _wkDay, 3, out n), tx = WkSum(_wk, _wkDay, 4, out n);
                     long wsr = WkSum(_wk, _wkDay, 5, out n);   // 305b: zwrot kapitalu warsztatow (0 przy wylaczonym kluczu)
                     // 587: krotko, liczby na poczatku; zold i doplaty tylko gdy rod naprawde zaplacil (> 0), podatek tylko gdy byl
-                    string txt = "7 days: caravans +" + N(car) + ", workshops +" + N(wsp) + (wsr > 0 ? " (+" + N(wsr) + " capital back)" : "")
+                    string txt = "7 days: caravans +" + N(car) + (wsp > 0 || wsr > 0 ? ", workshops +" + N(wsp) + (wsr > 0 ? " (+" + N(wsr) + " capital back)" : "") : "")
                                  + (wg > 0 ? ", caravan wages -" + N(wg) : "") + (tp > 0 ? ", purse top-ups -" + N(tp) : "") + (tx > 0 ? ", workshop tax -" + N(tx) : "") + ".";
                     Log.Player(txt);
                     Log.Info(PP + "komunikat - tydzien | " + txt + " | pelne: karawany do rodu " + car + ", zold rodu " + wg + ", doplaty " + tp + ", warsztaty " + wsp

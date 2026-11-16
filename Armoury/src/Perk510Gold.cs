@@ -334,7 +334,7 @@ namespace Armoury
                 }
                 amount = (int)pay;                                               // 0 - zdarzenie z 0 (ksiega pomija), nic z niczego
                 if (recipient == Hero.MainHero && pay < due)
-                    Log.Player(ins ? pay + " of " + due + " denars paid: your caravan's home guild is short (Insurance Plans)."   // 587: krotko, liczby na poczatku
+                    Log.Player(ins ? pay.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " of " + due.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " denars paid: your caravan's home guild is short (Insurance Plans)."   // 587: krotko, liczby na poczatku
                                    : "The new lord of the town could pay only " + pay + " of " + due + " denars (Rapid Development).", true);
                 return true;
             }

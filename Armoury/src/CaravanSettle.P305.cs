@@ -392,7 +392,7 @@ namespace Armoury
                 {
                     long coin = Math.Max(purse, r.LastPurse), gd = Math.Max(goods, r.LastGoods);
                     // 587: krotko, liczby na poczatku; wodz i frakcja zostaja w linii "koniec (305a)" w logu
-                    string txt = N(coin) + " coin, " + N(gd) + " goods lost: " + name + " destroyed by " + dName + (at != null ? " near " + StName(at) : "") + ".";
+                    string txt = N(coin) + " coin and " + N(gd) + " in goods lost: " + name + " destroyed by " + dName + (at != null ? " near " + StName(at) : "") + ".";
                     Log.Player(txt, true);
                     r.EndMsg = true;
                     Log.Info(PP + "komunikat - karawana rozbita | " + txt + " | podzial reszty kiesy ustala BeatenPurse 3.2 (zwyciezca, osada albo miasto)");
@@ -414,7 +414,7 @@ namespace Armoury
                     // 587: krotko, liczby na poczatku
                     string txt = r.DPayEnd > 0
                         ? N(r.DPayEnd) + " denars back to your clan: " + r.Name + " disbanded."
-                        : N(r.LastPurse) + " coin, " + N(r.LastGoods) + " goods lost: " + r.Name + " gone without a battle, purse not returned.";
+                        : N(r.LastPurse) + " coin and " + N(r.LastGoods) + " in goods lost: " + r.Name + " gone without a battle, purse not returned.";
                     Log.Player(txt, r.DPayEnd <= 0);
                     r.EndMsg = true;
                     Log.Info(PP + "komunikat - karawana zakonczona | " + txt);
