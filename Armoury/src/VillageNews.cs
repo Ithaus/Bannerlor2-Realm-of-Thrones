@@ -140,6 +140,8 @@ namespace Armoury
                     if (sessBurned) { _same++; return; }           // ta sama sesja spalila wioske - "has been burned" juz w kolejce
                     if (wasBurned) { _old++; return; }             // recenzja: wioska spalona w ksiedze wczesniej - "plundered" tylko przy niespalonej (projekt pkt 2, R10, T5)
                     _j++;
+                    // 588 recenzja: rabunek gracza-wodza z podsumowaniem (DistrictRaid.Summary) - jeden komunikat; ten liczyl spalone z ksiegi (wszystkie dotad), podsumowanie - z sesji
+                    if (raider != null && raider.IsMainParty && DistrictRaid.SummaryCovers(comp)) return;
                     if (Mode(s) == 0) return;
                     if (_q.Count >= QMax) { _qLost++; return; }
                     _q.Add(new Note { Kind = KPlundered, V = village, Hears = Hears(village), Raider = RaiderName(raider), Player = raider != null && raider.IsMainParty,

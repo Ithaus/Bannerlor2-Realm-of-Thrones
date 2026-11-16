@@ -129,6 +129,7 @@ namespace Armoury
             public double TFoodEat, TFoodBurn;               // racje spichlerza zjedzone / spalone w sesji
             public long TGold, TPort, TTake, TTakeVal, TBurn, TMine;   // zloto z kiesy wsi, z nabrzeza portu (WW1), sztuki do taborow (wartosc), spalone, do taboru gracza
             public int Nights;                               // noce postoju (577/578) w sesji
+            public bool SumsRestored;                        // 588 recenzja: sumy sesji odtworzone z sekcji s: zapisu (bez niej po wczytaniu - od wczytania)
             public bool Watch { get { return Player || PlayerIn; } }
         }
 
@@ -146,6 +147,7 @@ namespace Armoury
         private static readonly Dictionary<RaidEventComponent, Sess> _sess = new Dictionary<RaidEventComponent, Sess>();
         private static readonly HashSet<RaidEventComponent> _notMine = new HashSet<RaidEventComponent>();
         private static readonly Dictionary<string, string> _pendingR = new Dictionary<string, string>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> _pendingS = new Dictionary<string, string>(StringComparer.Ordinal);   // 588 recenzja: sumy podsumowania gracza z zapisu (s:)
         private static readonly Dictionary<string, int> _alert = new Dictionary<string, int>(StringComparer.Ordinal);   // id wsi -> doba konca czujnosci
         private static readonly Dictionary<string, Mem> _mem = new Dictionary<string, Mem>(StringComparer.Ordinal);    // 580: id wsi -> zrobiona czesc przerwanego kroku
         private static readonly Dictionary<string, Pair> _pairs = new Dictionary<string, Pair>(StringComparer.Ordinal); // 580: wodz|wies -> starty (petle)
@@ -181,7 +183,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _sess.Clear(); _notMine.Clear(); _pendingR.Clear(); _alert.Clear(); _mem.Clear(); _pairs.Clear(); _pendingDays = 0; _offLogged = false;
+            _sess.Clear(); _notMine.Clear(); _pendingR.Clear(); _pendingS.Clear(); _alert.Clear(); _mem.Clear(); _pairs.Clear(); _pendingDays = 0; _offLogged = false;
             _ask = null; _askOpen = false;
             lock (_errSites) _errSites.Clear();
             NewDay();
@@ -396,6 +398,7 @@ namespace Armoury
                 // recenzja 578: zegar kroku od pierwszego ticku sesji (krok zaczety w nocy stoi przed Start - bez tego pierwsza noc wypadala z "dni zegara na osade")
                 if (!ss.Started && double.IsNaN(ss.StartH)) ss.StartH = CampaignTime.Now.ToHours;
                 var def = __instance.DefenderSide; var att = __instance.AttackerSide;
+                if (!ss.Player) ss.PlayerIn = PlayerInSide(__instance);                 // 588 recenzja: gracz dolaczyl do armii / odszedl w trakcie (koniec - EndPre, bez zerowania)
                 if (def == null || att == null || def.TroopCount > 0) return true;       // walka (milicja, odsiecz) - gra i MapEvent
                 var v = ss.V; var st = v.Settlement;
                 me.WasEverInLootingPhase = true;                                          // jak G :164 (odsiecz -> bitwa polowa, rabunek z morza)
@@ -877,6 +880,7 @@ namespace Armoury
             if (__instance == null || !_sess.TryGetValue(__instance, out ss)) return;
             try
             {
+                if (!ss.Player && !ss.PlayerIn) { try { ss.PlayerIn = PlayerInSide(__instance); } catch { } }   // 588 recenzja: gracz w armii od ostatniego ticku (rabunek przegrany - bez Loot)
                 if (ss.Started && !ss.Done)
                 {
                     // przerwany krok (AI, odsiecz, pokoj): czesc kroku w ksiedze, lup za zrobiona czesc - gdy napastnik nie przegral; bez czujnosci (punkty > 0 -> Normal)
@@ -1152,14 +1156,33 @@ namespace Armoury
                   .Append('/').Append(F(m.LootDays, "R")).Append('/').Append(F(m.Hit, "R"));
                 nk++;
             }
+            // 588 recenzja: sumy podsumowania rabunku gracza "|s:id=kiesa0/godz0/zloto/port/towar/wartosc/spalone/gracza/zjedz/sspal/noce/wArmii;..." (starsze DLL sekcje pomijaja)
+            sb.Append("|s:"); first = true;
+            foreach (var ss in _sess.Values)
+            {
+                if (ss == null || !ss.Started || !ss.Watch || ss.V == null || ss.V.Settlement == null || BadId(ss.V.Settlement.StringId)) continue;
+                if (!first) sb.Append(';');
+                first = false;
+                sb.Append(ss.V.Settlement.StringId).Append('=').Append(F(ss.Purse0, "R")).Append('/').Append(F(ss.SessH0, "R")).Append('/').Append(ss.TGold.ToString(Inv))
+                  .Append('/').Append(ss.TPort.ToString(Inv)).Append('/').Append(ss.TTake.ToString(Inv)).Append('/').Append(ss.TTakeVal.ToString(Inv)).Append('/').Append(ss.TBurn.ToString(Inv))
+                  .Append('/').Append(ss.TMine.ToString(Inv)).Append('/').Append(F(ss.TFoodEat, "R")).Append('/').Append(F(ss.TFoodBurn, "R")).Append('/').Append(ss.Nights.ToString(Inv))
+                  .Append('/').Append(ss.PlayerIn ? "1" : "0");
+            }
+            foreach (var kv in _pendingS)                                       // wczytane, a nieodebrane - razem z wpisem r: (inaczej zgubione)
+            {
+                if (BadId(kv.Key) || !_pendingR.ContainsKey(kv.Key)) continue;
+                if (!first) sb.Append(';');
+                first = false;
+                sb.Append(kv.Key).Append('=').Append(kv.Value);
+            }
             try { var s = Settings.Current; if (s != null && s.LogEnabled) Log.Info("Rabunek osada po osadzie (E7/R1): zapis - sesji " + nr + ", czujnosc " + nc + " wsi, pamiec krokow (580) " + nk + " wsi."); }
             catch { }
         }
 
         /// <summary>Wczytanie (VillageBook.ApplyPending - po Reset konstruktora): sesje czekaja na swoj rabunek (pierwsze wywolanie prefiksu przy tej wsi), czujnosc od razu.</summary>
-        internal static void Import(string sr, string sc, string sk = null)
+        internal static void Import(string sr, string sc, string sk = null, string sm588 = null)
         {
-            _pendingR.Clear(); _alert.Clear(); _mem.Clear(); _pairs.Clear(); _pendingDays = 0;
+            _pendingR.Clear(); _pendingS.Clear(); _alert.Clear(); _mem.Clear(); _pairs.Clear(); _pendingDays = 0;
             int bad = 0;
             if (!string.IsNullOrEmpty(sr))
                 foreach (var item in sr.Split(';'))
@@ -1177,6 +1200,14 @@ namespace Armoury
                     int eq = item.IndexOf('='), end;
                     if (eq <= 0 || !int.TryParse(item.Substring(eq + 1), NumberStyles.Integer, Inv, out end)) { if (item.Length > 0) bad++; continue; }
                     _alert[item.Substring(0, eq)] = end;
+                }
+            // 588 recenzja: sumy podsumowania gracza (s:) - 12 pol; zepsuty wpis pominiety (podsumowanie od wczytania)
+            if (!string.IsNullOrEmpty(sm588))
+                foreach (var item in sm588.Split(';'))
+                {
+                    int eq = item.IndexOf('=');
+                    if (eq <= 0 || item.Substring(eq + 1).Split('/').Length != 12) { if (item.Length > 0) bad++; continue; }
+                    _pendingS[item.Substring(0, eq)] = item.Substring(eq + 1);
                 }
             // 580: pamiec przerwanych krokow (k:) - zepsuty wpis pominiety (krok od zera jak przed 580)
             if (!string.IsNullOrEmpty(sk))
@@ -1209,6 +1240,8 @@ namespace Armoury
             string body;
             if (st == null || st.StringId == null || !_pendingR.TryGetValue(st.StringId, out body)) return;
             _pendingR.Remove(st.StringId);
+            string sbody;                                                // 588 recenzja: sumy podsumowania gracza - odbierane razem z wpisem r:
+            if (_pendingS.TryGetValue(st.StringId, out sbody)) _pendingS.Remove(st.StringId); else sbody = null;
             var a = body.Split('/');
             var x = new double[18];
             for (int i = 0; i < 18; i++)
@@ -1243,6 +1276,7 @@ namespace Armoury
             else { ss.SHit = ss.Hit; ss.SDead = ss.Dead; ss.SFled = ss.Fled; ss.SRef = ss.Ref; ss.SCap = Math.Max(0.0, x[14]); }
             ss.Done0 = Math.Max(0.0, Math.Min(ss.Work, z[0])); ss.DmgOff = Clamp01(z[1]); ss.HitPrev = Math.Max(0.0, z[2]);   // 580 (zero bez pol)
             ss.Started = true; ss.Restored = true;
+            if (sbody != null) { try { RestoreSums(ss, sbody); } catch (Exception e) { Stumble("RestoreSums588", e); } }
             if (ss.Rs != null) { ss.Rs.Hit = ss.Hit; ss.Rs.Dead = ss.Dead; ss.Rs.CapWould = Math.Max(0.0, x[14]); }   // stan rabunku bez zapisu - odtworzony z sesji (jency E4/9, Inni)
             _dRestored++;
         }
@@ -1288,7 +1322,7 @@ namespace Armoury
                     foreach (var k in drop) _pairs.Remove(k);
                 }
                 int unclaimed = 0;
-                if (_pendingR.Count > 0 && ++_pendingDays >= 2) { unclaimed = _pendingR.Count; _pendingR.Clear(); }   // sesje z zapisu bez rabunku po wczytaniu
+                if (_pendingR.Count > 0 && ++_pendingDays >= 2) { unclaimed = _pendingR.Count; _pendingR.Clear(); _pendingS.Clear(); }   // sesje z zapisu bez rabunku po wczytaniu
                 Line(today, unclaimed);
                 LineR2(today);
             }

@@ -22,6 +22,21 @@
 
 **Status:** DO SPRAWDZENIA (zbudowane, niewgrane).
 
+### Recenzja 588 (dwie recenzje kodu, 16.11)
+
+**Poprawione:**
+- Po wczytaniu komunikat mieszal okresy (zloto i kiesa od wczytania, ludzie i osady cala sesja; zapis miedzy Win a konsekwencja menu dawal "took 0"): sumy podsumowania zapisywane w NOWEJ sekcji `|s:` klucza arm_district (12 pol: kiesa na starcie, godzina startu, zloto, port, towar, wartosc, spalone, czesc gracza, spichlerz x2, noce, gracz w armii) - tylko sesje gracza; `Restore` odtwarza je razem z wpisem r: (`RestoreSums`), `SumBegin` ich nie nadpisuje. Format r: bez zmian; starsze DLL sekcje s: pomijaja (VillageBook: nieznana litera). Zapis bez s: (DLL 271) - dopisek "(since loading)" stoi przy zlocie, nie na koncu.
+- Gracz dolaczyl do cudzej armii po Decide, a rabunek przegrany (bez Loot) - bez podsumowania: `PlayerIn` odswiezany w prefiksie Update co tick (odsiew po `MainParty.MapEvent == comp.MapEvent`, potem lista stron) i jeszcze raz w `EndPre` (tylko ustawia). Przy okazji gracz, ktory odszedl z armii w trakcie, nie dostaje "the army took".
+- Dwa sprzeczne komunikaty przy spaleniu ("Your men have plundered X: 5 of 196" z ksiegi i "1 of 196" z sesji): `VillageNews` pomija "plundered" gracza-wodza, gdy sesja DistrictRaid z podsumowaniem trwa (`DistrictRaid.SummaryCovers`) - jeden komunikat. Przy kluczu off albo sesji oddanej grze - dawny komunikat.
+- Wioska poboczna: pusty rabunek (Hit <= 0.5) znow "Your men found nothing in X." (podsumowanie tylko przy Hit > 0.5); flaga bad = true jak dawny komunikat; w logu "noce postoju (od startu albo wczytania)".
+- Dlugosc i jasnosc: zera zabitych/uciekl./uchodzcow pomijane, "+N from the port", "(ended early)" gdy gracz/wodz skonczyl sam (End Raiding, Stop raiding), "(raid broken off)" tylko przy przegranej walce.
+
+**Odrzucone:** EndFin wymaga Started (rabunek zaczety noca i przerwany przed switem) - bez lupu, nie ma czego podsumowac; zostaje.
+
+**Ryzyko / co sprawdzic:** nowa sekcja s: w zapisie (tylko odczyt przy wczytaniu, zepsuty wpis pominiety i liczony w "zepsute wpisy"); prefiks Update robi teraz porownanie MapEvent dla kazdego rabunku AI co tick (O(1), lista stron tylko gdy gracz w tym zdarzeniu). VillageNews: licznik _j nadal liczy pominiety komunikat. Najdluzszy mozliwy komunikat (cudza armia, port, jency, stary zapis) ok. 200 znakow - typowy ok. 120. Sprawdzic: zapis w trakcie rabunku -> wczytanie -> koniec: linia "sumy z zapisu (s:)" i ten sam procent co przed zapisem; przy spaleniu tylko jeden komunikat.
+
+**Status:** DO SPRAWDZENIA (zbudowane, niewgrane).
+
 ## 587: komunikaty karawan gracza - prawdziwy zold (bez "your clan paid its wages, 0") i krotkie napisy, liczby na poczatku - Armoury (CaravanSettle.Player.cs, CaravanSettle.P305.cs, CaravanGoods.cs, CaravanGuards285.Road.cs, EnemyCaravans.cs, Perk510Gold.cs, Seal31B.cs, ShipsToPort181.cs)
 
 **Problem:** Jeff 16.11 -> zgoda "4. tak i oglnie te teksty sroc aby dalo sie je czytac szybciej". Log `Armoury-2026-11-15_23-13-58.log`, Convoy of Amanda: kazda doba rozliczenia na morzu, 305a `'Caravan wages' 0`, 259 "zold 0 zaplacil rod" (np. l. 20563/20564, 27221/27222), a komunikat ponizej kapitalu mowil "your clan paid its wages, 0" - nieprawda (rod nic nie zaplacil). Napisy karawan mialy 200-400 znakow (wycena, okno 7 dob, warunek wyplaty w jednym zdaniu).

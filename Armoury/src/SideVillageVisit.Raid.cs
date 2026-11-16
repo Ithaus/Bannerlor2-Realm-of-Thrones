@@ -502,7 +502,7 @@ namespace Armoury
                          + ", sztuki do taboru " + take + ", spalone " + burn + " | wioska: " + state + (alive ? "" : " | bez lupu (partia gracza nieaktywna albo w niewoli)") + ".");
                 Example(rd.Name + " " + rd.Hit.ToString("0", Inv) + " lud., " + gold + " zl");
                 // 588 (PlayerRaidSummary): podsumowanie jak rabunek wsi gry - zloto z ilu w kiesie wsi okregu (kiesa tuz przed lupem; bez lupu - teraz) i procent
-                bool sum = alive && DistrictRaid.SummaryOn && st != null && st.Village != null;
+                bool sum = alive && rd.Hit > 0.5 && DistrictRaid.SummaryOn && st != null && st.Village != null;   // recenzja 588: pusty rabunek - dawne "found nothing"
                 if (sum)
                 {
                     long p1 = Math.Max(0, st.Village.Gold);
@@ -513,8 +513,8 @@ namespace Armoury
                     Log.Info(P + "rabunek gracza (588): " + rd.Name + " | kiesa wsi okregu " + Txt(st.Name) + ": przed lupem " + p0.ToString("0", Inv) + ", wziete " + gold + " ("
                              + (p0 >= 1 ? (100.0 * gold / p0).ToString("0.0", Inv) : "-") + "%), po " + p1 + " | towar " + take + " szt., spalone " + burn + ", stado " + herd
                              + " | osady wioski spalone " + br + " z " + nw + " | zabici " + rd.Dead.ToString("0.0", Inv) + ", las " + rd.Fled.ToString("0.0", Inv) + ", uchodzcy " + refg.ToString("0.0", Inv)
-                             + " | noce postoju " + rd.Nights + ", doby od startu " + Math.Max(0, Today() - rd.Day) + ", godziny pracy " + rd.HoursDone.ToString("0.0", Inv) + ".");
-                    Log.Player(DistrictRaid.SummaryText(rd.Name, false, how != 0, gold, p0, 0, take + herd, 0, br, nw, rd.Dead, rd.Fled, refg, 0, false), rd.Hit <= 0.5);
+                             + " | noce postoju " + rd.Nights + " (od startu albo wczytania)" + ", doby od startu " + Math.Max(0, Today() - rd.Day) + ", godziny pracy " + rd.HoursDone.ToString("0.0", Inv) + ".");
+                    Log.Player(DistrictRaid.SummaryText(rd.Name, false, how == 2 ? 2 : how == 1 ? 1 : 0, gold, p0, 0, take + herd, 0, br, nw, rd.Dead, rd.Fled, refg, 0, false), true);   // jak dawny komunikat rabunku wioski (bad = true)
                 }
                 else if (alive)
                     Log.Player(rd.Hit > 0.5
