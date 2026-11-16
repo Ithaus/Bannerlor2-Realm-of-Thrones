@@ -15,7 +15,7 @@ namespace Armoury
     ///
     /// Pomiar: co 0.1 h czasu gry (watek glowny, TickEvent) wrogie partie lordow w promieniu SearchR od gracza. Dla kazdej zapamietane: pierwszy pomiar,
     /// gdy gracz widzi lorda (SeeingRange gracza), gdy lord widzi gracza (SeeingRange lorda), gdy wejda w 3R (promien szukania inicjatywy gry), i ostatni pomiar.
-    /// Przy "lord widzi" i "3R": sily obu stron (wlasna i z sojusznikami tej samej frakcji w 2R - jak liczy gra), stan armii lorda, krotki rozkaz AI (wynik
+    /// Przy "lord widzi" i "3R": sily obu stron (wlasna i ze swoimi w 2R od GRACZA - przyblizenie num4/num7 gry), stan armii lorda, krotki rozkaz AI (wynik
     /// inicjatywy gry - modelu NIE wolamy: GetBestInitiativeBehavior czysci statyczna liste MobilePartyAi.DangerousPartiesAndTheirVecs wspolna z watkami AI).
     /// Wpis znika, gdy lord wyjdzie poza SearchR (nowe podejscie = nowy wpis). NewLordKit.Describe (strona "wrog") dopisuje to do linii "Bitwa gracza (159 P0)".
     /// </summary>
@@ -24,7 +24,13 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const float SearchR = 40f;      // promien pomiaru wokol gracza (jedn. mapy); SeeingRange lordow jest mniejszy - wpis "lord widzi" przed SearchR
         private const double StepH = 0.1;       // co ile godzin gry pomiar
-        private const float R = 3f;             // DefaultEncounterModel.GetEncounterJoiningRadius (1.4.8)
+        private const float RDef = 3f;          // DefaultEncounterModel.GetEncounterJoiningRadius (1.4.8) - gdy modelu nie ma
+
+        /// <summary>R jak w GetBestInitiativeBehavior: Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius (recenzja 589: nie na stale).</summary>
+        private static float R
+        {
+            get { try { var m = Campaign.Current?.Models?.EncounterModel; float r = m != null ? m.GetEncounterJoiningRadius : RDef; return r > 0f ? r : RDef; } catch { return RDef; } }
+        }
 
         private sealed class Snap
         {
@@ -131,23 +137,55 @@ namespace Armoury
             return p.Army != null && (p.AttachedTo != null || p.Army.LeaderParty == p) ? p.Army.EstimatedStrength : p.Party.EstimatedStrength;
         }
 
-        /// <summary>Sila strony: partia "center" (Own) plus partie tej samej frakcji w 2R od niej (niedoczepione, bez garnizonu/milicji, bez innej bitwy) - przyblizenie
-        /// num4/num7 gry (bez wagi odleglosci). Watek glowny.</summary>
-        private static float Side(MobileParty center)
+        /// <summary>Sila strony "ze swoimi w 2R" - przyblizenie num4 (lord) / num7 (gracz) z DefaultMobilePartyAIModel.GetBestInitiativeBehavior (1.4.8, ok. :260-345).
+        /// Recenzja 589: gra liczy wsparcie OBU stron wokol pozycji celu (gracza): num8 = odleglosc partii od gracza, brane gdy num8 &lt;= 2R (num = 2).
+        /// Lord: Own(lord) + partie frakcji lorda (nie gracz) z agresja &gt; 0.01 albo w tym samym miescie co gracz, waniliowe ShouldConsiderAttacking(partia, gracz) (Considers), nie w kryjowce
+        /// - albo w tej samej bitwie co gracz. Gracz: Own(gracz) + partie frakcji gracza z agresja &gt; 0.01 albo w tej samej bitwie. Jak w grze: bez doczepionych,
+        /// garnizonu, milicji, innej bitwy, innego zywiolu (morze/lad) niz lord, tratwy, partii w oblezonym miescie, nieprowadzacych obozu oblezniczego; wodz armii
+        /// liczony Army.EstimatedStrength (takze gdy lord jest doczepiony do tej armii - gra wtedy liczy armie drugi raz). Przyblizenie: bez wagi odleglosci (b),
+        /// bez obozow oblezniczych, bez odciecia promieniem szukania wokol lorda (3R) - przy progu "lord widzi" lord moze byc dalej, niz gra w ogole szuka.
+        /// W linii misji ("teraz") partie juz w bitwie gracza sa liczone (flag4 gry) - to sklad bitwy, nie stan sprzed spotkania. Watek glowny.</summary>
+        private static float Side(MobileParty lord, bool lordSide)
         {
-            float sum = Own(center);
-            var f = center.MapFaction;
-            var data = MobileParty.StartFindingLocatablesAroundPosition(center.Position.ToVec2(), 2f * R);
+            var main = MobileParty.MainParty;
+            if (main == null) return -1f;
+            var self = lordSide ? lord : main;
+            var f = self.MapFaction;
+            float r2 = 2f * R;
+            float sum = Own(self);
+            var pos = main.Position;
+            var me = main.MapEvent;
+            var data = MobileParty.StartFindingLocatablesAroundPosition(pos.ToVec2(), r2);
             for (var p = MobileParty.FindNextLocatable(ref data); p != null; p = MobileParty.FindNextLocatable(ref data))
             {
-                if (p == center || !p.IsActive || p.AttachedTo != null || p.IsGarrison || p.IsMilitia || p.MapFaction != f) continue;
-                if (center.Army != null && p.Army == center.Army && (center.AttachedTo != null || center.Army.LeaderParty == center)) continue;   // juz w Army.EstimatedStrength
-                if (p.MapEvent != null && p.MapEvent != center.MapEvent) continue;
-                if (p.IsCurrentlyAtSea != center.IsCurrentlyAtSea) continue;
-                if (p.Position.Distance(center.Position) > 2f * R) continue;
+                if (p == lord || p == main || !p.IsActive || p.AttachedTo != null || p.IsGarrison || p.IsMilitia || p.MapFaction != f) continue;
+                if (p.MapEvent != null && p.MapEvent != me) continue;
+                if (p.BesiegedSettlement != null || p.IsInRaftState) continue;
+                if (p.CurrentSettlement != null && p.CurrentSettlement.SiegeEvent != null) continue;
+                if (p.BesiegerCamp != null) continue;   // oboz obleznicy - gra liczy inaczej (sklad obozu); pomijamy
+                if (p.IsCurrentlyAtSea != lord.IsCurrentlyAtSea) continue;
+                if (p.Position.Distance(pos) > r2) continue;
+                bool sameBattle = me != null && p.MapEvent == me;
+                if (lordSide)
+                {
+                    bool agg = p.Aggressiveness > 0.01f || (p.CurrentSettlement != null && p.CurrentSettlement == main.CurrentSettlement);
+                    bool hide = p.CurrentSettlement != null && p.CurrentSettlement.IsHideout;
+                    if (!sameBattle && !(agg && !hide && Considers(p, main))) continue;
+                }
+                else if (!sameBattle && p.Aggressiveness <= 0.01f) continue;
                 sum += Own(p);
             }
             return sum;
+        }
+
+        /// <summary>Waniliowy DefaultMobilePartyAIModel.ShouldConsiderAttacking(p, gracz) przepisany na odczyt (1.4.8, :38-48). Modelu NIE wolamy: nasze postfiksy
+        /// (ArmsFirst/LordEscort/FreeFolkRaids AttackPostfix) licza weta w statystykach dob - log nie moze ich nabijac. Przyblizenie: bez tych wet.</summary>
+        private static bool Considers(MobileParty p, MobileParty main)
+        {
+            if (main.ShouldBeIgnored || !p.Ai.DoNotAttackMainPartyUntil.IsPast) return false;
+            bool sea = p.IsCurrentlyAtSea == main.IsCurrentlyAtSea;
+            bool port = p.CurrentSettlement != null && p.CurrentSettlement.IsFortification && p.CurrentSettlement.HasPort && p.HasNavalNavigationCapability;
+            return (sea || port) && p.Morale > 0f;
         }
 
         /// <summary>Stan armii lorda wobec gracza: brak / wodz / doczepiony / NIEDOCZEPIONY (odleglosc do wodza, sila armii, slepa plamka gry - :205).</summary>
@@ -168,8 +206,8 @@ namespace Armoury
         private static string Forces(MobileParty mp)
         {
             var main = MobileParty.MainParty;
-            string pl = main != null ? "gracz " + F(Own(main)) + " (ze swoimi w 2R " + F(Side(main)) + ")" : "gracz ?";
-            return pl + " / lord " + F(mp.Party.EstimatedStrength) + " (jak liczy gra " + F(Own(mp)) + ", ze swoimi w 2R " + F(Side(mp)) + "); armia lorda: " + ArmyOf(mp);
+            string pl = main != null ? "gracz " + F(Own(main)) + " (ze swoimi w 2R od gracza " + F(Side(mp, false)) + ")" : "gracz ?";
+            return pl + " / lord " + F(mp.Party.EstimatedStrength) + " (jak liczy gra " + F(Own(mp)) + ", ze swoimi w 2R od gracza " + F(Side(mp, true)) + "); armia lorda: " + ArmyOf(mp);
         }
 
         private static string Snp(string label, Snap s, double now)
@@ -195,7 +233,7 @@ namespace Armoury
                 {
                     sb.Append(Snp("gracz widzi lorda", r.PSee, now)).Append("; ")
                       .Append(Snp("lord widzi gracza (zasieg lorda " + F(r.LSeeR) + ")", r.LSee, now)).Append("; ")
-                      .Append(Snp("w 3R (" + F(3f * R) + ")", r.In3R, now)).Append("; ")
+                      .Append(Snp("w 3R (" + F(3f * R) + ", promien szukania gry - przyblizenie)", r.In3R, now)).Append("; ")
                       .Append(Snp("ostatni pomiar", r.Last, now));
                 }
                 else sb.Append("brak pomiaru (lord poza ").Append(F(SearchR)).Append(" jedn. przy ostatnim pomiarze albo spotkanie przed pierwszym pomiarem co ").Append(StepH.ToString("0.0", Inv)).Append(" h)");

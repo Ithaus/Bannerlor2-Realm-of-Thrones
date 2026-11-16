@@ -19,6 +19,14 @@
 - Granice pomiaru: lord z SeeingRange > 40 jedn. dostanie wpis "lord widzi" dopiero przy 40 (w logu widac jego zasieg); spotkanie w pierwszych 0.1 h po wczytaniu - "brak pomiaru". Sila "ze swoimi w 2R" to przyblizenie (gra wazy odlegloscia i liczy innych kandydatow), nie liczba z modelu.
 - Sprawdzic w logu: przy nastepnej bitwie z lordem linia "Bitwa gracza (159 P0, start spotkania)" ma "589 podejscie" z trzema progami i "589 teraz"; u czlonka armii w drodze - "NIEDOCZEPIONY ... gra POMIJA gracza" (przypadek Mylesa); brak bledow "PlayerApproach589." w logu.
 
+### Recenzja 589
+
+- POPRAWIONE (recenzja 1): "ze swoimi w 2R" lorda liczone bylo wokol LORDA, a gra (`DefaultMobilePartyAIModel.GetBestInitiativeBehavior` 1.4.8, num8 = `v2.Distance(v)`, v = pozycja celu) liczy wsparcie OBU stron wokol GRACZA. `Side(lord, lordSide)` szuka teraz w 2R od gracza dla obu stron; filtry jak w grze: strona lorda - agresja > 0.01 albo to samo miasto co gracz, waniliowe ShouldConsiderAttacking(partia, gracz) (flag7), nie w kryjowce, albo ta sama bitwa; strona gracza - agresja > 0.01 albo ta sama bitwa (karawany/chlopi odpadaja); pomijane tez tratwa, partia w oblezonym miescie, oboz obleznicy. Wodz armii doczepionego lorda liczony jak w grze (Army.EstimatedStrength drugi raz - stary wyjatek usuniety). Etykiety w logu: "ze swoimi w 2R od gracza", "w 3R (9.0, promien szukania gry - przyblizenie)".
+- ShouldConsiderAttacking NIE wolany przez model: postfiksy ArmsFirst/LordEscort AttackPostfix nabijaja liczniki wet (`_vAttackCalls`, `_vAtkCalls`) - log by je falszowal. Przepisany waniliowy warunek (`Considers`: ShouldBeIgnored, DoNotAttackMainPartyUntil, morze/port, morale > 0) - bez wet naszych latek (przyblizenie, opisane w komentarzu).
+- POPRAWIONE (recenzja 2, uwaga 1): R czytany z `Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius` (3 gdy brak), nie na stale.
+- ODRZUCONE (recenzja 2, uwaga 2): w linii misji "teraz" partie juz w bitwie gracza wchodza do sily - tak samo robi gra (flag4: ta sama bitwa co cel); to opis stanu "teraz", progi "lord widzi"/"3R" sa sprzed spotkania. Dopisane w komentarzu `Side`, bez zmiany kodu.
+- Nierozstrzygniete: sila "w 2R" dalej bez wagi odleglosci (b) i bez obozow oblezniczych; przy progu "lord widzi" lord bywa dalej niz promien szukania gry (3R) - wtedy gra jeszcze nie ocenia gracza wcale.
+
 **Status:** DO SPRAWDZENIA (zbudowane, niewgrane).
 
 ## 588: podsumowanie rabunku gracza - ile wzial, z ilu w kiesie wsi, jaki procent - Armoury (DistrictRaid.cs, DistrictRaid.Summary588.cs, SideVillageVisit.Raid.cs, Settings.cs, McmSettings.cs)
