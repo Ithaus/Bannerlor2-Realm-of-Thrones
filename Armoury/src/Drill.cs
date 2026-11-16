@@ -218,6 +218,7 @@ namespace Armoury
             HudKitReset();       // 541: pamiec paska mapy
             CampDrill.Reset();   // m97-szkolenie
             VetReset();          // 319b
+            T581Reset();         // 581: autotest musztry gracza
         }
 
         private static void ClearDay()
@@ -1758,6 +1759,7 @@ namespace Armoury
             {
                 _dailyN++;
                 ReleaseIfOff();   // recenzja 562 (2): zapas wylaczony - caly do zbrojowni ludzi (Daily biegnie zawsze, Hourly tylko przy czynnej musztrze; nie rzuca)
+                if (_dailyN >= 2) { try { T581Feed(day); } catch (Exception e) { Stumble("T581Feed", e); } }   // 581: tylko autotest - oddzial i sztuki do testu musztry gracza (przed 562, wylacza je)
                 if (_dailyN >= 2 && !_fed) { try { AutotestFeed(); } catch (Exception e) { Stumble("AutotestFeed", e); } }
                 int w, a; GivenCounts(out w, out a);
                 int given = w + a;
@@ -1781,6 +1783,7 @@ namespace Armoury
                     try { HeroLine(day, s); } catch (Exception e) { Stumble("HeroLine", e); }   // 558
                     if (day % 5 == 0) KingdomLine(day, s);
                 }
+                try { T581Line(day); } catch (Exception e) { Stumble("T581Line", e); }   // 581: tylko autotest - aserty musztry gracza (liczniki doby przed ClearDay)
                 CampDrill.Daily();   // m97-szkolenie: linia AI i strony gracza (zasada obozu wobec dawnej reguly; wlasny try, zeruje liczniki)
             }
             catch (Exception e) { Stumble("Daily", e); }
