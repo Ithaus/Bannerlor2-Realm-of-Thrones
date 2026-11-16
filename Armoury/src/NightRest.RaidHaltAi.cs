@@ -36,6 +36,7 @@ namespace Armoury
         {
             public bool On;           // postoj nocny czynny (ocena godziny); RaidHaltHolds dodatkowo: zegar w nocy obozu i faza lupienia
             public bool Cut;          // recenzja 578: ostatnie zdjecie postoju przez zagrozenie albo ucieczke (komunikat gracza w cudzej armii: alarm tylko wtedy)
+            public bool Held;         // 579: postoj liczony - ostatnia ocena godziny bez walki (DefenderSide.TroopCount == 0); tylko liczniki, On bez zmian
             public double From = -1;  // poczatek postoju (godzina kampanii) - do linii
             public string Name, Lead;
             public int Parties;
@@ -48,6 +49,8 @@ namespace Armoury
         // liczniki doby (linia switu NocnyMarsz): postoje, przerwane przez zagrozenie, wznowione o swicie, skonczone w postoju, maks. rabunkow/partii w postoju naraz,
         // partio-godziny ksiegi AI: sen z postoju, rabunek jako praca
         private static int _rhStarts, _rhThreat, _rhResumes, _rhEnds, _rhMaxRaids, _rhMaxParties, _rhSleepH, _rhWorkH, _rhExN;
+        // 579: rabunko-godziny oceny w walce (wpis On, ale DefenderSide.TroopCount > 0 - postoju nie ma, AiHaltHolds falszywe), postoje przerwane walka
+        private static int _rhFightH, _rhFightCut;
         private static float _rhSleepRest;
         // gracz w cudzej armii (3)
         private static RaidEventComponent _follow;
@@ -63,6 +66,7 @@ namespace Armoury
         {
             _aiHalt.Clear(); _aiHaltSeen.Clear(); _aiHaltDrop.Clear(); _aiHaltLive = false;
             _rhStarts = _rhThreat = _rhResumes = _rhEnds = _rhMaxRaids = _rhMaxParties = _rhSleepH = _rhWorkH = _rhExN = 0; _rhSleepRest = 0f;
+            _rhFightH = _rhFightCut = 0;
             _follow = null; _followName = null; _followFrom = -1;
             _sideHalt = false; _sideOff = false; _sideName = null; _sideFrom = -1; _sideStumbles = 0;
         }
@@ -102,11 +106,20 @@ namespace Armoury
             return def != null && def.TroopCount == 0;
         }
 
-        /// <summary>578: postoj AI tego rabunku czynny teraz (bez warunku walki) - komunikaty gracza w cudzej armii.</summary>
+        /// <summary>578: postoj AI tego rabunku czynny teraz - komunikaty gracza w cudzej armii. 579: w walce (DefenderSide.TroopCount > 0) postoju nie ma - jak AiHaltHolds.</summary>
         private static bool AiHaltNight(RaidEventComponent comp)
         {
             AiHalt h;
-            return comp != null && _aiHalt.Count > 0 && _aiHalt.TryGetValue(comp, out h) && h.On && BedNight(CampaignTime.Now.GetHourOfDay);
+            if (comp == null || _aiHalt.Count == 0 || !_aiHalt.TryGetValue(comp, out h) || !h.On || !BedNight(CampaignTime.Now.GetHourOfDay)) return false;
+            var def = comp.DefenderSide;
+            return def != null && def.TroopCount == 0;
+        }
+
+        /// <summary>579: rabunek w fazie walki (obroncy w polu) - postoj nie trzyma.</summary>
+        private static bool RaidFighting(RaidEventComponent comp)
+        {
+            try { var def = comp != null ? comp.DefenderSide : null; return def != null && def.TroopCount > 0; }
+            catch { return false; }
         }
 
         /// <summary>578: ksiega snu AI - partia lorda w rabunku po stronie napastnika: 0 - nie (albo regula nieczynna), 1 - postoj trzyma (sen), 2 - rabunek idzie (praca).</summary>
@@ -176,7 +189,7 @@ namespace Armoury
             if (!window && _aiHalt.Count == 0) return;
             double now = CampaignTime.Now.ToHours;
             var main = MobileParty.MainParty;
-            int raids = 0, held = 0, parties = 0, threat = 0, flee = 0, undead = 0, noLedger = 0, playerKey = 0, fight = 0, starts = 0, cuts = 0;
+            int raids = 0, held = 0, parties = 0, threat = 0, flee = 0, undead = 0, noLedger = 0, playerKey = 0, fight = 0, starts = 0, cuts = 0, fightCuts = 0;
             _aiHaltSeen.Clear();
             if (window)
             {
@@ -221,19 +234,29 @@ namespace Armoury
                     }
                     if (ok)
                     {
-                        if (!h.On) { h.On = true; h.Cut = false; if (h.From < 0) h.From = now; starts++; _rhStarts++; }
-                        int np = 1; try { np = att.Parties != null ? att.Parties.Count : 1; } catch { }
-                        h.Parties = np;
-                        held++; parties += np;
-                        try { var def = comp.DefenderSide; if (def != null && def.TroopCount > 0) fight++; } catch { }
+                        if (!h.On) { h.On = true; h.Cut = false; }
+                        // 579: wpis On jak dotad (AiHaltHolds sprawdza walke przy kazdym kroku), ale liczniki postoju tylko przy prawdziwym postoju - walka osobno
+                        if (RaidFighting(comp))
+                        {
+                            fight++; _rhFightH++;
+                            if (h.Held) { h.Held = false; fightCuts++; _rhFightCut++; }
+                        }
+                        else
+                        {
+                            if (!h.Held) { h.Held = true; if (h.From < 0) h.From = now; starts++; _rhStarts++; }
+                            int np = 1; try { np = att.Parties != null ? att.Parties.Count : 1; } catch { }
+                            h.Parties = np;
+                            held++; parties += np;
+                        }
                     }
                     else if (h.On)
                     {
                         h.On = false;
                         h.Cut = isThreat;
+                        bool was = h.Held; h.Held = false;   // 579: zagrozenie liczone jako przerwany postoj tylko, gdy postoj byl (nie walka)
                         if (isThreat)
                         {
-                            cuts++; _rhThreat++;
+                            if (was) { cuts++; _rhThreat++; }
                             if (_rhExN++ < 3)
                                 Log.Info("Rabunek AI - postoj nocny (578): " + h.Lead + " przy " + h.Name + " - zagrozenie: " + (how ?? "?") + " - postoj zdjety, AI decyduje jak dotad"
                                          + " (ucieczka albo rabunek dalej, godziny jako praca).");
@@ -248,7 +271,7 @@ namespace Armoury
             for (int i = 0; i < _aiHaltDrop.Count; i++)
             {
                 AiHalt h;
-                if (_aiHalt.TryGetValue(_aiHaltDrop[i], out h) && h.On) { if (window) { ends++; _rhEnds++; } else { resumes++; _rhResumes++; } }
+                if (_aiHalt.TryGetValue(_aiHaltDrop[i], out h) && h.On && h.Held) { if (window) { ends++; _rhEnds++; } else { resumes++; _rhResumes++; } }
                 _aiHalt.Remove(_aiHaltDrop[i]);
             }
             _aiHaltDrop.Clear(); _aiHaltSeen.Clear();
@@ -256,8 +279,9 @@ namespace Armoury
             if (parties > _rhMaxParties) _rhMaxParties = parties;
             if (raids > 0 || resumes > 0 || ends > 0)
                 Log.Info("Rabunek AI - postoj nocny (578): " + Hm(CampaignTime.Now.CurrentHourInDay) + (window ? (BedNight(hc) ? " (noc obozu)" : " (godzina przed zmierzchem - postoj od " + BedNightStart + ":00)") : " (swit)")
-                         + " | rabunkow AI " + raids + ": w postoju " + held + " (partii " + parties + (fight > 0 ? ", w walce teraz " + fight : "") + "), nowe " + starts
-                         + " | bez postoju: zagrozenie " + threat + ", ucieczka " + flee + " (zdjete teraz " + cuts + "), Nieumarli " + undead + ", bez ksiegi snu " + noLedger
+                         + " | rabunkow AI " + raids + ": w postoju " + held + " (partii " + parties + "), nowe " + starts
+                         + " | bez postoju: w walce " + fight + (fightCuts > 0 ? " (postoj przerwany walka teraz " + fightCuts + ")" : "")
+                         + ", zagrozenie " + threat + ", ucieczka " + flee + " (zdjete teraz " + cuts + "), Nieumarli " + undead + ", bez ksiegi snu " + noLedger
                          + ", gracz w armii bez Raid Night Halt " + playerKey + " | wznowione o swicie " + resumes + ", skonczone w postoju " + ends + ".");
         }
 
@@ -266,9 +290,10 @@ namespace Armoury
         {
             string t = " | postoj nocny przy rabunku AI (578, Raid Night Halt AI " + (AiHaltOn(Settings.Current) ? "[WL]" : "[wyl]") + "): postojow " + _rhStarts
                        + ", maks. naraz rabunkow " + _rhMaxRaids + " (partii " + _rhMaxParties + "), przerwane przez zagrozenie " + _rhThreat + ", wznowione o swicie " + _rhResumes
-                       + ", skonczone w postoju " + _rhEnds + "; ksiega AI: partio-godzin snu z postoju " + _rhSleepH + " (odpoczynek " + F1(_rhSleepRest) + " h, sr. "
+                       + ", skonczone w postoju " + _rhEnds + ", przerwane walka " + _rhFightCut + "; w walce (bez postoju) rabunko-godzin " + _rhFightH + "; ksiega AI: partio-godzin snu z postoju " + _rhSleepH + " (odpoczynek " + F1(_rhSleepRest) + " h, sr. "
                        + (_rhSleepH > 0 ? F1(_rhSleepRest / _rhSleepH) : "-") + "), partio-godzin rabunku jako praca " + _rhWorkH;
             _rhStarts = _rhThreat = _rhResumes = _rhEnds = _rhMaxRaids = _rhMaxParties = _rhSleepH = _rhWorkH = _rhExN = 0; _rhSleepRest = 0f;
+            _rhFightH = _rhFightCut = 0;
             return t;
         }
 
@@ -316,13 +341,16 @@ namespace Armoury
                     bool night = BedNight(CampaignTime.Now.GetHourOfDay);
                     // recenzja 578: alarm tylko przy zdjeciu przez zagrozenie albo ucieczke (Cut); klucz wylaczony, ksiega, potkniecie - zwykle wznowienie
                     AiHalt ch; bool cut = s.RaidNightHalt && _aiHalt.TryGetValue(cur, out ch) && ch.Cut;
+                    bool fightNow = !cut && RaidFighting(cur);   // 579: walka przy wsi - postoju nie ma (AiHaltNight falszywe)
                     string name = _followName; double from = _followFrom;
                     _follow = null; _followName = null; _followFrom = -1;
                     if (night)
                     {
                         _haltEndsDay++;
-                        Msg(cut ? "Alarm in the night - the army is roused at " + name + ": enemies are near." : "The army takes up the raid on " + name + " again.", Colors.White);
-                        Log.Info("Nocleg: gracz - postoj nocny armii przy rabunku (578, cudza armia) przerwany w nocy: " + name + (cut ? " (wodz: zagrozenie albo ucieczka)" : " (klucz Raid Night Halt / Raid Night Halt AI, ksiega snu albo potkniecie oceny)") + "; postoj "
+                        Msg(cut ? "Alarm in the night - the army is roused at " + name + ": enemies are near."
+                            : fightNow ? "Fighting breaks out at " + name + " - the army is roused from its night halt."
+                            : "The army takes up the raid on " + name + " again.", Colors.White);
+                        Log.Info("Nocleg: gracz - postoj nocny armii przy rabunku (578, cudza armia) przerwany w nocy: " + name + (cut ? " (wodz: zagrozenie albo ucieczka)" : fightNow ? " (579: walka przy wsi - obroncy w polu)" : " (klucz Raid Night Halt / Raid Night Halt AI, ksiega snu albo potkniecie oceny)") + "; postoj "
                                  + F1((float)(CampaignTime.Now.ToHours - from)) + " h, " + HaltNightCounts() + ".");
                     }
                     else
