@@ -12961,6 +12961,10 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public int AiAttackEdgePercent { get; set; } = 130;
 
+        [SettingPropertyBool("Army Member Sees Own Strength", HintText = "An AI lord riding to join his army, before he reaches its leader, judges an enemy on his road by his own strength and the friends close to him (the leader and the parties with him count only within about two encounter radii), not by the whole army far away, and flees from a stronger enemy as the game would; his order to join the army stays, and he rides on when the road is clear. Off = the game's own rule: such a lord does not see any enemy weaker than his whole army", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool ArmyMemberSeesOwnStrength { get; set; } = true;
+
         [SettingPropertyBool("New Lord Party Armed Men Only", HintText = "When a lord takes the field again with a new party (after captivity, ransom or a lost battle) and his clan's warband would come from the free hands of his villages, he calls up only the men he can arm: their kit is priced at the nearest friendly town within AI Arms Trip Max Days and paid from his gold above his reserve (and, with New Lord Party Kit Loan, by an Iron Bank loan up to his house's credit limit) - first one weapon for every man, then the rest of the kit as far as the money goes. Every man who gets a weapon comes; men who would get no weapon come only up to Unarmed Men Allowed (%) of the party, the rest stay at home in their villages. He rides to that town and buys the kit off the shelf as lords already do, weapons first. Your clan, the Night's Watch and the dead are untouched. Off = he takes the full warband even with no kit for them", RequireRestart = false)]
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool NewLordPartyArmedMenOnly { get; set; } = true;
@@ -17270,6 +17274,7 @@ namespace Armoury
             s.AiArmsBlockBanditAttacks = AiArmsBlockBanditAttacks;
             s.AiAttackOdds = AiAttackOdds;
             s.AiAttackEdgePercent = AiAttackEdgePercent;
+            s.ArmyMemberSeesOwnStrength = ArmyMemberSeesOwnStrength;
             s.NewLordPartyArmedMenOnly = NewLordPartyArmedMenOnly;
             s.NewLordPartyKitLoan = NewLordPartyKitLoan;
             s.UnarmedMenSentHome = UnarmedMenSentHome;

@@ -827,6 +827,9 @@ namespace Armoury
         private static bool P500bReset() { try { AiWounded500b.Reset(); } catch (Exception e) { Log.Error("P500bReset", e); } return true; }
         private readonly bool _p530Reset = P530Reset();
         private static bool P530Reset() { try { AttackOdds530.Reset(); } catch (Exception e) { Log.Error("P530Reset", e); } return true; }
+        // 590: liczniki doby i lista wcielonych przez 223 od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak 530)
+        private readonly bool _p590Reset = P590Reset();
+        private static bool P590Reset() { try { ArmyBlind590.Reset(); } catch (Exception e) { Log.Error("P590Reset", e); } return true; }
         // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
         private readonly bool _p6a7Reset = P6a7Reset();
         private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
@@ -1791,6 +1794,7 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("Perk513.Hourly", delegate { Perk513.Hourly(); }));   // 513: linia doby "Perki leczenia (513)" (wyjatki liczy sam)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("AiWounded500b.Hourly", delegate { try { AiWounded500b.Hourly(); } catch (Exception e) { Log.Error("AiWounded500b.Hourly", e); } }));   // 500-b: stan poturbowanych partii AI (postoj / twierdza), migawka ostroznosci, linia doby
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("AttackOdds530.Hourly", delegate { try { AttackOdds530.Hourly(); } catch (Exception e) { Log.Error("AttackOdds530.Hourly", e); } }));   // 530: nowa pamiec sil co godzine, linia doby "Przewaga lokalna (530)"
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("ArmyBlind590.Hourly", delegate { try { ArmyBlind590.Hourly(); } catch (Exception e) { Log.Error("ArmyBlind590.Hourly", e); } }));   // 590: linia doby "Martwe pole armii (590)"
             CampaignEvents.OnPlayerBattleEndEvent.AddNonSerializedListener(this, Litter501.OnPlayerBattleEnd);   // 501: HP gracza po bitwie - nosze od razu, nie po godzinie (tylko bitwy gracza)
             CampaignEvents.PlayerInventoryExchangeEvent.AddNonSerializedListener(this, TownInns.OnPlayerExchange);   // KA: handel gracza w miescie noclegu przy premii cen (tylko licznik linii doby)
             // sw-zajazdy: dojazd do zajazdu przy szlaku (4 razy na sekunde, jedna partia - klucz RoadsideInns) i ksiega plotek (zdarzenia swiata - klucz InnGossip)
@@ -2759,6 +2763,7 @@ namespace Armoury
             try { Perk513.EnsureHooks(); } catch (Exception e) { Log.Error("Perk513.EnsureHooks", e); }   // 513: perki leczenia - latki w kampanii (raz na proces), linia startu "Perki leczenia (513)"
             try { AiWounded500b.SessionStart(); } catch (Exception e) { Log.Error("AiWounded500b.SessionStart", e); }   // 500-b: latki (postoj High, ostroznosc 55, inicjatywa) raz na proces, linia startu "AI ranni (500-b)"
             try { AttackOdds530.SessionStart(); } catch (Exception e) { Log.Error("AttackOdds530.SessionStart", e); }   // 530: atak AI tylko z przewaga, sojusznicy celu z innych krolestw liczeni (inicjatywa VeryLow, mysl 52), linia startu "Przewaga lokalna (530)"
+            try { ArmyBlind590.SessionStart(); } catch (Exception e) { Log.Error("ArmyBlind590.SessionStart", e); }   // 590: niedoczepiony czlonek armii widzi wroga swoja sila (postfiks Low GetBestInitiativeBehavior czynnego modelu, przed 335 Last), linia startu "Martwe pole armii (590)"
             try { DteMapBar533.SessionStart(); } catch (Exception e) { Log.Error("DteMapBar533.SessionStart", e); }   // 533: podpowiedz paska DTE na mapie = liczba meldunku QM (postfiks MapArmoryReadinessMixin.OnRefresh, raz na proces), linia startu "Pasek DTE na mapie (533)"
             try { MarchHud.SessionStart(); } catch (Exception e) { Log.Error("MarchHud.SessionStart", e); }   // 537 E1: pary marszowe na pasku mapy (postfiksy MapInfoVM.RefreshValues / UpdatePlayerInfo, raz na proces), linia startu "Pasek mapy - pary marszowe (537 E1)"
             try { SiegePhantomLift.SessionStart(); } catch (Exception e) { Log.Error("SiegePhantomLift.SessionStart", e); }   // OB6 (noc-drobne): linia "Oboz bez sily (OB6): start sesji", pamiec serii od zera

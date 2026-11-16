@@ -477,7 +477,11 @@ namespace Armoury
                 if (!s.LordsAvoidDanger) return;
                 // wpis z zapisu: wazny tylko w pierwszej mysli po wczytaniu - partia poza regula albo w armii zuzywa go od razu (recenzja 223: stary SinceH zwalnial na miejscu)
                 if (!Covered(party)) { ForgetSaved(party); if (_st.Count > 0) Drop(party); return; }
-                if (party.Army != null) { ForgetSaved(party); if (_st.Count > 0) Drop(party); return; }   // w armii bezpieczny - koniec stanu
+                // w armii - koniec stanu 223. 590 (decyzja): NIEDOCZEPIONY czlonek NIE jest bezpieczny w drodze do wodza - ale ochrona w drodze to inicjatywa
+                // (ArmyBlind590: widzi wroga swoja sila, ucieka wzorem gry, rozkaz do wodza zostaje), nie stan 223. Stan 223 dla niedoczepionego dawalby Aim do
+                // twierdzy 1.2 x wynik EscortParty armii (AiArmyMemberBehavior) + 0.01 - lord porzucalby cel armii (AiPartyThinkBehavior: czlonek armii bierze
+                // najlepsza opcje), a _joinQ tej samej 223 wcielil go tam celowo - wahadlo; cel X (dojechac do wodza) ma zostac (Jeff 16.11)
+                if (party.Army != null) { ForgetSaved(party); if (_st.Count > 0) Drop(party); return; }
                 // 281: termin postoju (AiArmsWaitMaxDays) takze przy wczesnym wyjsciu mysli - dotad zwolnienie bylo tylko po pelnej mysli, a SinceH biegl dalej
                 // (autotest 130a: 27.1 doby w stanie, zwolnieni 0); przed terminem kolejka dolaczenia do armii zdjeta (bez oceny tej mysli)
                 var st0 = _st.Count > 0 ? StateOf(party) : null;
@@ -879,6 +883,7 @@ namespace Armoury
                                       && p.GetPosition2D.Distance(a.LeaderParty.GetPosition2D) <= Range;
                             if (!ok) { _dJoinDrop++; continue; }
                             p.Army = a;   // jak gra przy wezwaniu (Army.Gather: item.Army = this) - koszt wplywu wodza i RethinkAtNextHourlyTick w OnAddPartyInternal
+                            ArmyBlind590.NoteJoined223(p);   // 590: do doczepienia martwe pole czlonka armii - licznik ucieczek 590 "wcieleni przez 223"
                             _dJoined++;
                             Log.Info("Eskorta lordow (223): do armii - " + Hn(p.LeaderHero) + " dolaczyl do armii " + Nm(a.LeaderParty) + " (" + a.Parties.Count + " partii, sila "
                                      + F0(a.EstimatedStrength) + ").");
