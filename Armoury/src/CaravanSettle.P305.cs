@@ -391,9 +391,8 @@ namespace Armoury
                 if (battle)
                 {
                     long coin = Math.Max(purse, r.LastPurse), gd = Math.Max(goods, r.LastGoods);
-                    string txt = "Your caravan " + name + (leader != null ? " led by " + ldr : "") + " was destroyed by " + dName + (df != null ? " of " + dFac : "")
-                                 + (at != null ? " near " + StName(at) : "") + ". At its last count it carried " + N(coin) + " denars in coin and goods worth about " + N(gd)
-                                 + "; your clan has lost them.";
+                    // 587: krotko, liczby na poczatku; wodz i frakcja zostaja w linii "koniec (305a)" w logu
+                    string txt = N(coin) + " coin, " + N(gd) + " goods lost: " + name + " destroyed by " + dName + (at != null ? " near " + StName(at) : "") + ".";
                     Log.Player(txt, true);
                     r.EndMsg = true;
                     Log.Info(PP + "komunikat - karawana rozbita | " + txt + " | podzial reszty kiesy ustala BeatenPurse 3.2 (zwyciezca, osada albo miasto)");
@@ -412,9 +411,10 @@ namespace Armoury
                 if (LossOn && !r.EndMsg && (string.IsNullOrEmpty(r.Name) || r.Name == "?")) { r.EndMsg = true; Log.Info(PP + "komunikat pominiety - karawana bez imienia (nie widziana w dobie) | przyczyna " + cause); }
                 if (LossOn && !r.EndMsg)
                 {
+                    // 587: krotko, liczby na poczatku
                     string txt = r.DPayEnd > 0
-                        ? "Your caravan " + r.Name + " was disbanded without a fight; its purse of " + N(r.DPayEnd) + " denars came back to your clan."
-                        : "Your caravan " + r.Name + " is gone without a battle; its purse did not come back to your clan (at its last count it held " + N(r.LastPurse) + " denars and goods worth about " + N(r.LastGoods) + ").";
+                        ? N(r.DPayEnd) + " denars back to your clan: " + r.Name + " disbanded."
+                        : N(r.LastPurse) + " coin, " + N(r.LastGoods) + " goods lost: " + r.Name + " gone without a battle, purse not returned.";
                     Log.Player(txt, r.DPayEnd <= 0);
                     r.EndMsg = true;
                     Log.Info(PP + "komunikat - karawana zakonczona | " + txt);

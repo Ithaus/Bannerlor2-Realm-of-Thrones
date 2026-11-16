@@ -1599,8 +1599,9 @@ namespace Armoury
                 catch (Exception e) { OStumble("ProfitToOwners(karawana)", e); }
             }
             LastOwnerPaid = paid; LastOwnerNot = pNot; LastOwnerLord = pLord; LastOwnerPlayer = pPl; LastOwnerN = paidN;
-            if (pPl > 0 && pPlOne >= pPl) Log.Player("Your caravans handed you " + pPl + " denars - what their coin and goods together are worth above their working capital.");   // 434
-            else if (pPl > 0) Log.Player("Your caravans handed you " + pPl + " denars - all they held above what they keep for trade and a month of wages.");
+            // 587: krotko, liczby na poczatku
+            if (pPl > 0 && pPlOne >= pPl) Log.Player(pPl.ToString("N0", CultureInfo.InvariantCulture) + " denars from your caravans: value above their working capital.");   // 434
+            else if (pPl > 0) Log.Player(pPl.ToString("N0", CultureInfo.InvariantCulture) + " denars from your caravans: coin above trade stock and a month of wages.");
             sb.Append(" | CZYNNE | karawan ").Append(n).Append(", oddaly ").Append(paidN).Append(" za ").Append(paid).Append(" zl (notablom ").Append(notN).Append('/').Append(pNot)
               .Append(", lordom i innym ").Append(lordN).Append('/').Append(pLord).Append(", graczowi ").Append(plN).Append('/').Append(pPl).Append(')')
               .Append(" | rozliczane przez rod (259) ").Append(sClan)

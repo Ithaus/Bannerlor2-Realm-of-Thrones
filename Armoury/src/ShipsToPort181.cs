@@ -568,8 +568,20 @@ namespace Armoury
 
         private static void Message1(MobileParty party, bool disb, long paid, int sold, int scrapped)
         {
-            string head = party.Owner.Name + (disb ? "'s party has disbanded." : "'s party was lost.");
             string txt;
+            // 587: karawana gracza - krotko, liczby na poczatku, nazwa karawany (dawniej "<wlasciciel>'s party", czyli imie gracza zamiast karawany)
+            if (party.IsCaravan)
+            {
+                var pn = new List<string>();
+                foreach (var st in _msgPorts) pn.Add(st.Name.ToString());
+                string cn = party.Name != null ? party.Name.ToString() : "your caravan";
+                txt = sold > 0 ? paid + " denars for the ships of " + cn + (disb ? " (disbanded)" : " (lost)") + " from " + string.Join(", ", pn.ToArray())
+                                 + (scrapped > 0 ? "; " + scrapped + " unsold." : ".")
+                               : "No port could buy the ships of " + cn + (disb ? " (disbanded)." : " (lost).");
+                MBInformationManager.AddQuickInformation(new TextObject("{=!}" + txt));
+                return;
+            }
+            string head = party.Owner.Name + (disb ? "'s party has disbanded." : "'s party was lost.");
             if (sold > 0)
             {
                 var names = new List<string>();

@@ -619,9 +619,9 @@ namespace Armoury
             try
             {
                 if (playerN > 0)
-                    Log.Player(Nm(st) + " has fallen to " + Nm(sn.WinF) + ": " + (playerN == 1 ? "your caravan there was" : playerN + " of your caravans there were") + " seized - "
-                               + playerGold.ToString("N0", Inv) + " denars and " + playerUnits + " items of cargo and pack animals are lost"
-                               + (playerLeaders.Count > 0 ? "; " + string.Join(", ", playerLeaders.ToArray()) + (playerLeaders.Count == 1 ? " is" : " are") + " now held prisoner" : "") + ".", true);
+                    // 587: krotko, liczby na poczatku (karawany gracza zajete w zdobytym miescie)
+                    Log.Player(playerGold.ToString("N0", Inv) + " denars, " + playerUnits + " items lost: " + (playerN == 1 ? "your caravan" : playerN + " caravans") + " seized as " + Nm(st)
+                               + " fell to " + Nm(sn.WinF) + (playerLeaders.Count > 0 ? "; " + string.Join(", ", playerLeaders.ToArray()) + " captive" : "") + ".", true);
                 if (cap != null && cap.IsMainParty && seized > 0)
                     Log.Player("In " + Nm(st) + " your men seized " + (seized == 1 ? "an enemy caravan" : seized + " enemy caravans") + ": " + goldOn.ToString("N0", Inv) + " denars go to your purse"
                                + CitySack.CrownNinthText(lead, goldOn) + " and "

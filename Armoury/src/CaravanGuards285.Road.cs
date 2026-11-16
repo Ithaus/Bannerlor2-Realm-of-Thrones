@@ -197,8 +197,8 @@ namespace Armoury
                 if (_noticeDay < 0)
                 {
                     _noticeDay = today; _r6Notice++; _relDay[mp] = today;
-                    Log.Player("Caravan guards: from tomorrow your caravan masters keep only the guards their road needs - enough to match the strongest bandit band near the road "
-                        + "to their next town - and pay off the costliest of the rest in town, like any merchant. (Armoury option: Player Caravans Follow Road Guard Rule)", false, PlayerNews.NotArmy);
+                    // 587: krotko; regula opisana w MCM (Player Caravans Follow Road Guard Rule)
+                    Log.Player("From tomorrow your caravans pay off guards their road does not need (option: Player Caravans Follow Road Guard Rule).", false, PlayerNews.NotArmy);
                     Log.Info("Straz karawan (286): komunikat graczowi w dobie " + today + " - zwolnienia strazy karawan gracza od doby " + (today + 1) + ".");
                     return false;
                 }
@@ -215,9 +215,12 @@ namespace Armoury
             {
                 _r6PlRel += got;
                 var inv = CultureInfo.InvariantCulture;
-                Log.Player((mp.Name != null ? mp.Name.ToString() : "Your caravan") + ": the caravan master paid off " + got + " of the costliest guards in " + st.Name
-                    + " - the road to " + (tgt != null ? tgt.Name.ToString() : "the next town") + " needs strength " + need.ToString("0", inv) + " (strongest bandit band near it), the caravan keeps "
-                    + mp.Party.EstimatedStrength.ToString("0", inv) + ". Wages " + wage0 + " -> " + wage1 + " denars a day.", false, PlayerNews.NotArmy);
+                // 587: krotko, liczby na poczatku; sila drogi i karawany - do logu (po polsku)
+                string cn = mp.Name != null ? mp.Name.ToString() : "Your caravan";
+                Log.Player(got + " guards paid off: " + cn + " in " + st.Name + ", wages " + wage0 + " -> " + wage1 + " a day.", false, PlayerNews.NotArmy);
+                Log.Info("Straz karawan (286): karawana gracza '" + cn + "' zwolnila " + got + " najdrozszych w " + st.Name + " | droga do " + (tgt != null ? tgt.Name.ToString() : "nastepnego miasta")
+                         + " wymaga sily " + need.ToString("0", inv) + " (najsilniejsza banda przy drodze), karawana zostaje z sila " + mp.Party.EstimatedStrength.ToString("0", inv)
+                         + " | zold " + wage0 + " -> " + wage1 + " zl na dobe.");
             }
             return false;
         }

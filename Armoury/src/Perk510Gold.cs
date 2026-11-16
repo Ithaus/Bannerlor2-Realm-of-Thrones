@@ -334,7 +334,8 @@ namespace Armoury
                 }
                 amount = (int)pay;                                               // 0 - zdarzenie z 0 (ksiega pomija), nic z niczego
                 if (recipient == Hero.MainHero && pay < due)
-                    Log.Player((ins ? "Your caravan's home guild" : "The new lord of the town") + " could pay only " + pay + " of " + due + " denars (" + (ins ? "Insurance Plans" : "Rapid Development") + ").", true);
+                    Log.Player(ins ? pay + " of " + due + " denars paid: your caravan's home guild is short (Insurance Plans)."   // 587: krotko, liczby na poczatku
+                                   : "The new lord of the town could pay only " + pay + " of " + due + " denars (Rapid Development).", true);
                 return true;
             }
             catch (Exception e) { Stumble("TradeGiftPayer", e); return false; }

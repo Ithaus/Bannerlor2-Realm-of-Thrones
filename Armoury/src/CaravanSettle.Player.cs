@@ -512,19 +512,12 @@ namespace Armoury
                         r.LastLowMsg = day; lowMsgs++;
                         int nd;
                         int wf = WkFrom(r);   // 307a: od doby utworzenia wlacznie (klucz NIE - dzis - 7, jak dotad)
-                        long sold = WkSum(r.Wk, r.WkDay, 0, wf, out nd), bought = WkSum(r.Wk, r.WkDay, 1, wf, out nd), toll = WkSum(r.Wk, r.WkDay, 2, wf, out nd);
                         long wg = WkSum(r.Wk, r.WkDay, 3, wf, out nd), tp = WkSum(r.Wk, r.WkDay, 4, wf, out nd);
-                        int days = 0; for (int i = 0; i < r.WkDay.Length; i++) if (r.WkDay[i] >= Today - 7) days++;
-                        string span = days >= 7 ? "Last 7 days" : "Since the game was loaded";
-                        if (wf < Today - 7) span = "Since it was formed";   // recenzja 307a / 307d: tylko okno z doba utworzenia tuz przed oknem 7 dob (WkFrom)
-                        // recenzja 259: kapital - to, co karawana dostala (E3/7) albo kapital modelu; towar - nizsza z ceny zakupu i rynku; warunek wyplaty - oba warunki reguly
-                        string capTxt = basis.CapE37 ? "the " + N(basis.Capital) + " it was given to trade with" : "its trading capital of " + N(basis.Capital);
-                        // 584: statki po cenie odkupu portu w wartosci - w napisie tez (tylko gdy sa)
-                        string txt = r.Name + " is worth " + N(basis.Worth) + " (coin " + N(basis.Purse) + ", goods " + N(basis.Goods) + " valued at the lower of what it paid and the market"
-                                     + (basis.ShipsN > 0 ? ", ships " + N(basis.Ships) + " at what a port would pay" : "") + ") - less than "
-                                     + capTxt + ". " + span + " it sold " + N(sold) + ", bought " + N(bought) + ", paid " + N(toll) + " in tolls; your clan paid its wages, "
-                                     + N(wg) + ", and topped up its purse with " + N(tp) + ". It sends you profit only once its coin and goods" + (basis.ShipsN > 0 ? " and ships" : "") + " are worth more than " + N(basis.Capital)
-                                     + " and it holds more than " + N(basis.Floor) + " in coin for its wages.";
+                        // 587: krotko (liczby na poczatku); zold rodu tylko gdy rod naprawde zaplacil (> 0) - na morzu NavalDLC zeruje zold konwoju,
+                        // dawny tekst "your clan paid its wages, 0" byl nieprawda; sprzedaz/zakupy/myto i warunek wyplaty zostaja w linii 259 (log)
+                        string txt = N(basis.Worth) + " / " + N(basis.Capital) + ": " + r.Name + " is below its capital (coin " + N(basis.Purse) + ", goods " + N(basis.Goods)
+                                     + (basis.ShipsN > 0 ? ", ships " + N(basis.Ships) : "") + ")"
+                                     + (wg > 0 ? "; clan paid " + N(wg) + " wages" : "") + (tp > 0 ? (wg > 0 ? ", " : "; ") + N(tp) + " top-up" : "") + ".";
                         Log.Player(txt);
                         Log.Info(PP + "komunikat - ponizej kapitalu: karawana '" + r.Name + "' ponizej kapitalu " + low + " dob | " + txt);
                     }
@@ -560,12 +553,11 @@ namespace Armoury
             {
                 try
                 {
-                    string keep = caps.Count == 1 ? "They keep " + N(caps.Min) + " in coin and goods to trade with."
-                                                  : "Each keeps what you put in (" + string.Join(" / ", Fmt(caps)) + ") in coin and goods to trade with.";
-                    string why = ": your caravans sent you their profit - " + string.Join(", ", pays.ToArray()) + ". " + keep;
-                    if (PayNotes.On) { PayNotes.Got("caravans", (int)Math.Min(int.MaxValue, t259), why); payMsg = "PayNotes"; }
-                    else { Log.Player("Your caravans sent you " + N(t259) + " denars of profit" + why.Substring(why.IndexOf(" - ", StringComparison.Ordinal))); payMsg = "ekran"; }
-                    Log.Info(PP + "komunikat - wyplata (" + payMsg + ") " + t259 + " | " + string.Join(", ", pays.ToArray()) + ".");
+                    // 587: krotko - kapital, ktory karawany zatrzymuja, zostaje w logu (ponizej)
+                    string list = string.Join(", ", pays.ToArray());
+                    if (PayNotes.On) { PayNotes.Got("caravans", (int)Math.Min(int.MaxValue, t259), ": caravan profit - " + list + "."); payMsg = "PayNotes"; }
+                    else { Log.Player(N(t259) + " denars caravan profit: " + list + "."); payMsg = "ekran"; }
+                    Log.Info(PP + "komunikat - wyplata (" + payMsg + ") " + t259 + " | " + list + " | kapital zatrzymany w karawanach (kiesa i towar) " + string.Join(" / ", Fmt(caps)) + ".");
                 }
                 catch (Exception e) { Stumble("PlayerDaily(komunikat)", e); }
             }
@@ -578,11 +570,12 @@ namespace Armoury
                     int n;
                     long car = WkSum(_wk, _wkDay, 0, out n), wg = WkSum(_wk, _wkDay, 1, out n), tp = WkSum(_wk, _wkDay, 2, out n), wsp = WkSum(_wk, _wkDay, 3, out n), tx = WkSum(_wk, _wkDay, 4, out n);
                     long wsr = WkSum(_wk, _wkDay, 5, out n);   // 305b: zwrot kapitalu warsztatow (0 przy wylaczonym kluczu)
-                    string txt = "Your caravans and workshops, last 7 days: caravans sent you " + N(car) + "; your clan paid their wages " + N(wg) + " and " + N(tp)
-                                 + " to top up their purses; workshops paid you " + N(wsp) + (CapSplit ? " in profit" : "") + (wsr > 0 ? " and gave back " + N(wsr) + " of your own working capital" : "")
-                                 + " and you paid " + N(tx) + " in workshop tax.";
+                    // 587: krotko, liczby na poczatku; zold i doplaty tylko gdy rod naprawde zaplacil (> 0), podatek tylko gdy byl
+                    string txt = "7 days: caravans +" + N(car) + ", workshops +" + N(wsp) + (wsr > 0 ? " (+" + N(wsr) + " capital back)" : "")
+                                 + (wg > 0 ? ", caravan wages -" + N(wg) : "") + (tp > 0 ? ", purse top-ups -" + N(tp) : "") + (tx > 0 ? ", workshop tax -" + N(tx) : "") + ".";
                     Log.Player(txt);
-                    Log.Info(PP + "komunikat - tydzien | " + txt);
+                    Log.Info(PP + "komunikat - tydzien | " + txt + " | pelne: karawany do rodu " + car + ", zold rodu " + wg + ", doplaty " + tp + ", warsztaty " + wsp
+                             + (CapSplit ? " (zysk)" : "") + ", zwrot kapitalu " + wsr + ", podatek warsztatow " + tx + ".");
                     week = true;
                 }
                 catch (Exception e) { Stumble("PlayerDaily(tydzien)", e); }
