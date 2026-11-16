@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 16.11 - WGRANIE 269 (579 liczniki 578, 580 pamiec przerwanego kroku rabunku, 580b armia AI nie porzuca rabunku, 581 autotest musztry gracza; test zbiorczy at-268b czysty)
+
+- Armoury.dll 7851fbbd = noc/scal-perki dd6b31a6 (268 + 579-581 po recenzjach). Kopie: .bak-2026-11-16-przed-wgranie269, Backup C: i D:. Nowy klucz RaidKeepsStepProgress (domyslnie true).
+- Decyzja domyslna (noc 16.11, Jeff: 'testuj przez noc, naprawiaj'): at-268 (WGRANIE 268): 220/220 dob, 22.0 s/dobe, 23 bledy cudze, 0 potkniec; analiza znalazla petle rabunku armii AI (Edmure->Pennytree 19 startow, Ferrego->Lysia 14; u Jeffa Renly->Hook 12) - przyczyna w 334e (armia dostawala ocene rabunku tylko na start, po godzinie wodz wybieral GoToSettlement i porzucal wies) -> 580/580b. at-268b: 220/220, 21.8 s/dobe, 0 potkniec, petli 0 (starty armii 33 -> 5), 580b podtrzymane 56, puszczone 0; trzy werdykty WGRAC.
+- Niesprawdzone autotestem: 573, 576 (sytuacje nie wystapily), strona gracza 571/575 (testowy CrashScribe n392-hs nie ma Mends.IsPreview -> podglad 'na papierze', 581 daje falszywe NIEZGODNE; w grze Jeffa 575 dziala: 'wymieniono na tansze 100 ... sr. cena 8 d -> 2 d'). Do zrobienia: testowy CS z aktualnego zrodla + n392-hs; 581 asert 'za trudne' liczy globalnie, brak kopii F1H w dokladce; ArmyRaid (334e) oferuje wies chroniona okupem (brak SvLater/SparedNow) - wada sprzed 580; 580b nie patrzy na oblezona wlasna twierdze (obserwowac); flaga armoury-ks-przerwij.flag z at-268 przeniesiona do autotest-kopie/flagi-2026-11-16.
+
 ## STAN 16.11 - WGRANIE 268 (576 dzialka lupu bez ekranu do zbrojowni gracza, 577 nocny postoj przy rabunku gracza, 578 postoj takze AI / wioski poboczne / cudza armia / 'about N days' z nocami), bez autotestu
 
 - Armoury.dll b1462113 = noc/scal-perki 00a613d0 (267 + 576 + 577 + 578 po recenzjach). Kopie: .bak-2026-11-16-przed-wgranie268, Backup C: i D:. Nowe klucze: LootShareToArmouryNoScreen, RaidNightHalt, RaidNightHaltAi (domyslnie true).
