@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 580b: armia AI nie porzuca rabunku po pierwszej mysli - wodz w rabunku wsi dostaje ocene tej wsi (334e ArmyRaidKeep) - Armoury (LocalFront334e.Score.cs, LocalFront334e.Siege.cs, LocalFront334e.Log.cs)
+
+**Problem:** ten sam co 580 (at-268 P-B1): Edmure Tully -> Pennytree 19 startow w 108844-108868, Ferrego Antaryon -> Lysia 14 w 108681-108697, u Jeffa (577) Renly -> Hook 12 w 109297-109310; wszystkie 33 starty "armia TAK" w at-268 to te petle, zaden nie dal pelnego kroku. Rabunek konczy sie w ciagu godzin od startu (noc 108857: start 20:1x, 21:26 "skonczone w postoju 1", armia rusza 73 jedn. dalej).
+
+**Przyczyna (dowod z kodu i logu):** gra mysli o wodzu rabunku co godzine (`AiPartyThinkBehavior.PartyHourlyAiTick`, ROT `AIThinkPatch` l. 347/392-401 - ta sama kopia; wodz armii num = 1) i wola `MapEvent.FinalizeEvent()`, gdy najlepsza mysl nie jest RaidSettlement tej wsi, a jej ocena przekracza prog (GoToSettlement: 0.03 x 0.33 = 0.010). Gra nie daje armiom opcji Raider (334e: `FindBestTargetAndItsValueForFaction` - Army != null -> break), rabunek armii proponuje tylko nasze `ArmyRaid` (334e, klucz ArmyRaid334e) - a ono wychodzi przy `party.MapEvent != null` i pomija wsie ze zdarzeniem / nie Normal; `ThinkField` w trakcie rabunku wola tylko `RaidBreak` (zdejmuje oceny, ktorych u armii nie ma). Log: mysl Edmure'a w dniach rabunku bez RaidSettlement w trojce ("1. GoToSettlement Wayfarer's Rest 0.298, 2. Acorn Hall 0.281 ... prog gry 0.010" - 171714, 172596, 175209, 177979, 179838, 181647, 184428), w dniach startu "1. RaidSettlement Pennytree 4.602" = wynik oferty 334e "armia rabuje ... wynik 4.602" (169433). Blad naszego kodu: 334e (wpis "ARMIE LUPIA") ma sprawic, ze armie rabuja, a rabunek trwal do pierwszej mysli.
+
+**Zmiana:**
+- `ThinkField` (SiegeWalls2.ThinkPost, Last): wodz armii AI w rabunku wsi (MapEvent.IsRaid, wodz strony napastnika, klucz ArmyRaid334e, nie RescueHunt.HostKeeps) - po `RaidBreak` nowa `ArmyRaidKeep`.
+- `ArmyRaidKeep`: gdy w mysli nie ma oceny RaidSettlement tej wsi, dopisuje ja z tego samego modelu co oferta `ArmyRaid`: `TargetScoreCalculatingModel.GetTargetScoreForFaction(wies, Raider, wodz, GetTotalLandStrengthWithFollowers)` x odleglosc jak GetDistanceScoreForRaiding (przy wsi 0.775), `_inOwn` (ScorePost nie liczy q drugi raz - jak ArmyRaid). Bez oceny (wodz konczy rabunek jak dotad): spojnosc < 2 x prog rozwiazania (ten sam warunek co start), weto teatru (`VetoedFor334e`), blokada po `RaidBreak` / odwrocie (`Blocked` - silniejszy wrog zdazy, 2 godziny z rzedu), ocena modelu 0 (model gry: za slabi wobec obroncow i wroga w poblizu). Ocena tej wsi juz w mysli (gra albo -1 z RaidBreak) - nic.
+- Linia doby 334e: "armie rabunek opcji N (weta W), w toku podtrzymane (580b) K (puszczone: spojnosc a, weto b, blokada po przerwaniu c, model 0 d)" (K = godziny mysli wodzow z dopisana ocena).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Zachowanie AI: armie rabuja teraz do konca kroku R1 (1-3 doby pracy, z nocami 578 ok. x4/3) zamiast godzin - tak zaprojektowano 334e i E7/R1. Wies Looted + czujnosc, lup R1 za caly krok, jency E4/9 przy koncu, spadek spojnosci armii w trakcie (ten sam model gry; przy spojnosci < 2 x prog rabunek puszczony). Wiecej czasu na odsiecz (334e RaidBreak dalej dziala - teraz skutecznie, bo blokada zdejmuje nasza ocene).
+- Pojedynczy lordowie: bez zmian (gra daje im Raider sama; ArmyRaidKeep tylko dla wodza armii). Gracz-wodz armii: bez zmian (ThinkField pomija gracza i WithPlayer).
+- Prog ponownej mysli: ocena ~4.4-6 (jak oferta startu) wobec GoToSettlement 0.3 - wodz trzyma rabunek; obrona wlasnej twierdzy / bitwa z wyzsza ocena wygrywa jak w grze. `DisbandArmyAction` przy RaidSettlement nie wchodzi (flag4).
+- Koszt: jedna ocena modelu + droga na wodza armii w rabunku na godzine (kilka armii naraz) - w linii "czasy ms (334f) model gry (poza)".
+- Watki: liczniki pod `_lk`, `Blocked` pod `_lk` (jak w ArmyRaid); zerowanie w `ZeroScoreDay`.
+- Razem z 580 (pamiec kroku): przerwanie przez odsiecz / RaidBreak zostawia zrobiona czesc - powrot tej frakcji konczy krok.
+- Test: linia 334e "w toku podtrzymane" > 0; linia E7/R1: kroki armii (krokow ponad lordow), "petle" bez par armii; mysl wladcy w dniu rabunku z "RaidSettlement <wies>" na 1. miejscu przez caly rabunek.
+- Build Armoury 0 bledow (Release). NIE wgrane.
+
+**Status:** DO SPRAWDZENIA
+
 ## 580: przerwany krok rabunku zostawia przy wsi zrobiona czesc - nastepna sesja tej samej frakcji zaczyna od niej (petla rabunku armii AI) - Armoury (DistrictRaid.cs, VillageBook.cs; nowy klucz RaidKeepsStepProgress w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** autotest at-268 (`Armoury-2026-11-16_03-16-32.log`, analiza B + weryfikacja, P-B1): armie AI w kolko zaczynaja rabunek jednej wsi, a krok E7/R1 nigdy sie nie konczy. Linie 334e "rabunek start" (dedup 24 h): Edmure Tully -> Pennytree 19 razy w dobach 108844-108868 (do konca testu), Ferrego Antaryon -> Lysia 14 razy w 108681-108697; gra Jeffa na 577 (`Armoury-2026-11-16_01-02-50.log`): Renly -> Hook 12 razy w 109297-109310. Kruki "Pennytree is raided by the army led by Edmure Tully" po kilka razy na dobe (173730/173753/173765 - doba 108855), wiec rabunek startuje kilka razy dziennie. Noc 108857 (175440-175530): start ok. 20:1x z 7 partiami, o 21:26 "skonczone w postoju 1", armia rusza (m118: baza szyku 73 jedn. od wodza). W at-268 WSZYSTKIE 33 starty "armia TAK" to te dwie petle; przerwanych sesji od 108844 89% (33/37).

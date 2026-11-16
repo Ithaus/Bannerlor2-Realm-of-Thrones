@@ -68,6 +68,8 @@ namespace Armoury
         // licznik doby: opcje > 0 po naszej ocenie (krolestwo -> [Raider, Besieger]), cofniecia SCA, oceny
         private static readonly Dictionary<string, int[]> _dOpts = new Dictionary<string, int[]>(StringComparer.Ordinal);
         private static int _dScoreN, _dZero, _dUp, _dDown, _dScaUndo, _dDefLow, _dDefFort, _dHomeCap, _dNoSnap, _dArmyRaidOffers, _dArmyRaidLog, _dArmyRaidVeto;
+        // 580b: rabunek armii w toku - podtrzymany (oferta tej wsi w mysli wodza) i puszczony: 0 spojnosc, 1 weto, 2 blokada (RaidBreak / odwrot), 3 model 0
+        private static int _dArmyKeep; private static readonly int[] _dArmyKeepX = new int[4];
         private static readonly HashSet<string> _dArmyRaidSaid = new HashSet<string>(StringComparer.Ordinal);
         private static float _raidRange = -1f;
 
@@ -119,6 +121,7 @@ namespace Armoury
         {
             _dAsk.Clear(); _dM0.Clear();
             _dOpts.Clear(); _dScoreN = _dZero = _dUp = _dDown = _dScaUndo = _dDefLow = _dDefFort = _dHomeCap = _dNoSnap = _dArmyRaidOffers = _dArmyRaidLog = _dArmyRaidVeto = 0;
+            _dArmyKeep = 0; Array.Clear(_dArmyKeepX, 0, _dArmyKeepX.Length);   // 580b
             _dArmyRaidSaid.Clear();
             _dGather = _dGatherOk = 0; _dGatherRatio = 0;
             _dSvThink = _dSvEntries = _dSvEval = _dSvCut = 0;
@@ -747,6 +750,59 @@ namespace Armoury
             return false;
         }
         private static int _dBkVeto, _dBkVetoFallback;
+
+        // ================================================================ 580b: armia lupi dalej (z ThinkField, wodz w zdarzeniu rabunku)
+        /// <summary>
+        /// 580b: gra nie daje armiom opcji Raider, a ArmyRaid oferuje rabunek tylko wodzowi bez MapEvent i tylko wsi bez zdarzenia - w trakcie rabunku mysl wodza
+        /// (co godzine, AiPartyThinkBehavior.PartyHourlyAiTick / ROT AIThinkPatch) nie miala rabunku wcale i pierwsza ocena GoToSettlement ponad prog (0.010) konczyla
+        /// zdarzenie (FinalizeEvent) - petla Edmure -> Pennytree (at-268). Tu wodz armii AI w rabunku wsi dostaje ocene RaidSettlement TEJ wsi z tego samego modelu co
+        /// oferta ArmyRaid (Raider, sila armii, odleglosc jak GetDistanceScoreForRaiding). Te same warunki co start: spojnosc &gt;= 2 x prog rozwiazania, bez weta teatru;
+        /// po RaidBreak / odwrocie (blokada _block) i przy ocenie modelu 0 - nic (wodz konczy jak dotad). Ocena tej wsi juz w mysli (gra, RaidBreak -1) - nie ruszamy.
+        /// </summary>
+        private static void ArmyRaidKeep(MobileParty party, TaleWorlds.CampaignSystem.MapEvents.MapEvent me, PartyThinkParams pt)
+        {
+            var army = party.Army;
+            var v = me.MapEventSettlement;
+            if (army == null || army.LeaderParty != party || v == null || !v.IsVillage || v.Village == null || party.IsCurrentlyAtSea) return;
+            var scores = pt.AIBehaviorScores;
+            if (scores == null) return;
+            for (int i = 0; i < scores.Count; i++)
+            {
+                var e = scores[i];
+                if (e.Item1.AiBehavior == AiBehavior.RaidSettlement && ReferenceEquals(e.Item1.Party, v)) return;
+            }
+            int disp = 10;
+            try { disp = Campaign.Current.Models.ArmyManagementCalculationModel.CohesionThresholdForDispersion; } catch { }
+            if (army.Cohesion < 2f * disp) { KeepX(0); return; }
+            var k = party.MapFaction as Kingdom;
+            if (k == null) return;
+            string why;
+            if (WarFront334.VetoedFor334e(k, v, out why)) { KeepX(1); return; }
+            bool blocked;
+            long w0 = Ts();
+            lock (_lk) { _tWait += Ts() - w0; blocked = Blocked(party, v); }
+            if (blocked) { KeepX(2); return; }
+            if (_raidRange < 0f) _raidRange = 5f * Campaign.Current.GetAverageDistanceBetweenClosestTwoTownsWithNavigationType(MobileParty.NavigationType.Default);
+            float range = _raidRange;
+            MobileParty.NavigationType nav; float dist; bool fromPort;
+            long m0 = Ts();
+            AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, v, false, out nav, out dist, out fromPort);
+            float strength = party.GetTotalLandStrengthWithFollowers(false);
+            _modelT += Ts() - m0;
+            if (nav == MobileParty.NavigationType.None) { nav = MobileParty.NavigationType.Default; dist = 0f; fromPort = false; }   // stoi przy wsi
+            float ds = MBMath.Map(0.75f - Math.Min(Math.Max(0f, dist), range) / range, 0f, 1f, 0.1f, 1f);
+            float s;
+            long m1 = Ts();
+            _inOwn = true;
+            try { s = Campaign.Current.Models.TargetScoreCalculatingModel.GetTargetScoreForFaction(v, Army.ArmyTypes.Raider, party, strength) * ds; }
+            finally { _inOwn = false; _modelT += Ts() - m1; }
+            if (!(s > 0f)) { KeepX(3); return; }
+            pt.AddBehaviorScore((new AIBehaviorData(v, AiBehavior.RaidSettlement, nav, false, fromPort, false), s));
+            long w1 = Ts();
+            lock (_lk) { _tWait += Ts() - w1; _dArmyKeep++; }
+        }
+
+        private static void KeepX(int i) { long w = Ts(); lock (_lk) { _tWait += Ts() - w; _dArmyKeepX[i]++; } }
 
         // ================================================================ 3.6 armie lupia (z ThinkField)
         private static void ArmyRaid(MobileParty party, PartyThinkParams pt)

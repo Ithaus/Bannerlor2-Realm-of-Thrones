@@ -263,7 +263,13 @@ namespace Armoury
                 int g0 = GcN();
                 _modelT = 0; _tWait = 0;
                 var me = party.MapEvent;
-                if (me != null) { if (BreakOn && me.IsRaid && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party) RaidBreak(party, me, partyThinkParams); }
+                if (me != null)
+                {
+                    if (BreakOn && me.IsRaid && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party) RaidBreak(party, me, partyThinkParams);
+                    // 580b: wodz armii AI w rabunku wsi - ocena tej wsi w mysli (bez niej pierwsza mysl konczyla rabunek); po RaidBreak (blokada) - nie
+                    if (ArmyRaidOn && me.IsRaid && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party && party.Army != null && party.Army.LeaderParty == party && !RescueHunt.HostKeeps(party))
+                        ArmyRaidKeep(party, me, partyThinkParams);
+                }
                 else
                 {
                     // 376: armia ratunkowa regenta (RescueHunt, klucz RescueHuntHostKeepsTarget) - bez dokladanego rabunku, cel zostaje lowom
