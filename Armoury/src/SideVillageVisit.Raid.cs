@@ -302,7 +302,7 @@ namespace Armoury
                 if (why != null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
                 double s0 = home0 > 0 ? Math.Min(1.0, work / home0) : 0;
                 double sg = Math.Max(s0, RaidCache.Share(Hero.MainHero, 1.0) * share);   // 362: zloto - z ukrytym (skrytki wedlug Roguery x udzial wioski), towar - s0
-                a.Tooltip = new TextObject("{=!}" + (DefOn ? DefTip(def, men) + " " : "") + "Burn and plunder " + NameOf(r) + " alone - " + Math.Round(work).ToString("N0", Inv) + " people to drive off, about " + FmtHours(hours)
+                a.Tooltip = new TextObject("{=!}" + (DefOn ? DefTip(def, men) + " " : "") + "Burn and plunder " + NameOf(r) + " alone - " + Math.Round(work).ToString("N0", Inv) + " people to drive off, about " + FmtHours(NightRest.RaidWallDays(hours / 24.0) * 24.0)
                                            + ". You take its share of the purse and the store of " + Txt(st.Name) + " (about " + Math.Round(100 * s0).ToString("0", Inv) + "%: "
                                            + Math.Round(sg * Math.Max(0, st.Village.Gold)).ToString("N0", Inv) + " denars" + (sg > s0 + 1e-9 ? ", with the coin your men will force the villagers to give up" : "") + "). " + Txt(st.Name) + " itself is not raided. Its lord will hate you for it.");
                 return true;
@@ -407,6 +407,12 @@ namespace Armoury
                     try { rd.Rs.Slaver = Hero.MainHero != null && Hero.MainHero.MapFaction != null && LosersFlee.SlaveCulture(Hero.MainHero.MapFaction.Culture); } catch { rd.Rs.Slaver = false; }
                 }
                 if (rd.Stop) { FinishRaid("przerwany przez gracza (Stop raiding)", 1); GameMenu.SwitchToMenu(Menu); return; }
+                // 578 (Raid Night Halt): noc obozu - postep stoi (bez godzin, uderzen i lupu), ludzie spia przy wiosce; o swicie dalej sam ("Stop raiding" w nocy dziala wyzej)
+                if (NightRest.SideRaidNight(rd.Name, rd.HoursDone / Math.Max(0.01, rd.Hours)))
+                {
+                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu((float)Math.Min(1.0, rd.HoursDone / Math.Max(0.01, rd.Hours)));
+                    return;
+                }
                 double h = Math.Max(0.0, dt.ToHours);
                 rd.HoursDone += h; rd.Pend += h;
                 bool end = rd.HoursDone >= rd.Hours;

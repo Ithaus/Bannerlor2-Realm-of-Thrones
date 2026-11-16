@@ -6684,9 +6684,13 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool RaidCountsAsWork { get; set; } = true;
 
-        [SettingPropertyBool("Raid Night Halt", HintText = "Raid stops at night: when the camp hours begin (nightfall) while your party is raiding a village of the map - alone or leading an army - the men stop raiding and sleep by the village; the raid bar stands still and those hours count as sleep, as in camp. At dawn the raid goes on by itself. You stay at the village through the night, so its defenders or a relief force can still fall on you. If you end the raid yourself, nothing resumes. Not during a forced march. Off = the raid goes on through the night (with Raid Counts As Work the men get no sleep)", RequireRestart = false)]
+        [SettingPropertyBool("Raid Night Halt", HintText = "Raid stops at night: when the camp hours begin (nightfall) while your party is raiding - a village of the map (alone, leading an army, or in a lord's army whose leader halts for the night) or a hamlet from its own menu - the men stop raiding and sleep by the village; the raid bar stands still and those hours count as sleep, as in camp. At dawn the raid goes on by itself. You stay at the village through the night, so its defenders or a relief force can still fall on you. If you end the raid yourself, nothing resumes. Not during a forced march. Off = the raid goes on through the night (with Raid Counts As Work the men get no sleep), and a lord's army you march with raids on through the night too", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool RaidNightHalt { get; set; } = true;
+
+        [SettingPropertyBool("Raid Night Halt AI", HintText = "AI lords halt their raids at night too: in the camp hours a raid led by an AI lord stands still and his men sleep by the village; by day, with Raid Counts As Work, the hours of raiding are work for them as for you, so lords raid at your pace and pay the same price in sleep. A lord who is fleeing or has a stronger enemy coming at him does not halt - he raids on or runs as before. Off = AI lords raid through the night and resting by the village counts as rest for them (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RaidNightHaltAi { get; set; } = true;
 
         [SettingPropertyBool("Forced March", HintText = "a forced march for your column: pick 'Forced march' with the O key or when night falls - your party (and the army you lead) moves this much faster, but nobody sleeps while it lasts (halts do not count as rest and no camp is pitched on its own), and on top of the nights they miss, every 24 hours of it costs one more sleepless night - so the sleep debt grows every 12 hours instead of once a day, and its penalties soon eat the gain. A shorter dash leaves weariness that counts toward the next one and fades by 2 hours a day of proper rest. It ends when you make camp, bed down, enter a settlement or put to sea. Needs Night Rest. Off = only the old 'March on'", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -15686,6 +15690,7 @@ namespace Armoury
             s.NightMarchNotice = NightMarchNotice;
             s.RaidCountsAsWork = RaidCountsAsWork;
             s.RaidNightHalt = RaidNightHalt;
+            s.RaidNightHaltAi = RaidNightHaltAi;
             s.ForcedMarch = ForcedMarch;
             s.ForcedMarchSpeedPercent = ForcedMarchSpeedPercent;
             s.TownInns = TownInns;

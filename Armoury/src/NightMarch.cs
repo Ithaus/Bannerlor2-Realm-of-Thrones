@@ -645,6 +645,8 @@ namespace Armoury
             bool catchUp = NightClock.CatchUp;
             _lastTickH = nowH;
             if (catchUp) _day.CatchUps++;
+            // 578: postoj nocny przy rabunkach lordow AI - PRZED ksiega (godzina ksiegi czyta stan postoju teraz, jak gracz w 577)
+            try { AiRaidHaltHour(s); } catch (Exception e) { Log.Error("NightRest.AiRaidHaltHour", e); }
             try { AiSleepLedger(s, h, catchUp); } catch (Exception e) { Log.Error("NightRest.AiSleepLedger", e); }
             long t0 = Stopwatch.GetTimestamp();
             try { AiDebtCamp(s, h); } catch (Exception e) { Log.Error("NightRest.AiDebtCamp", e); }
@@ -1045,6 +1047,10 @@ namespace Armoury
                         // morze, oboz swiata (_bedPos) i sen dlugu to zasady snu - dochodza tylko tutaj
                         bool resting = Drill.RestHour(mp, step) || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
                                        || _bedPos.ContainsKey(mp) || _debtSleep.ContainsKey(mp);
+                        // 578 (Raid Night Halt AI): partia w rabunku po stronie napastnika - postoj nocny trzyma = sen (stoi przy wsi, jak dotad); rabunek idzie = praca
+                        // (RaidCountsAsWork - ta sama regula co gracz; tylko przy czynnym postoju AI, inaczej jak dotad). Przed powtorka ticku nadrabianego (LastRest)
+                        int raidK = AiRaidKind(mp, s);
+                        if (raidK == 2) resting = false;
                         // T10-R (R7): tick nadrabiany w tej samej klatce - pozycja sie nie zmienila, wiec krok 0 dalby darmowy odpoczynek;
                         // ta godzina wyglada jak poprzednia
                         if (catchUp && known) resting = e.LastRest;
@@ -1064,6 +1070,7 @@ namespace Armoury
                             e.Rest += inc;
                             if (e.Acc >= 0f) e.Acc += inc;
                         }
+                        if (raidK != 0) AiRaidCount(raidK == 1 && !resting ? 0 : raidK, resting ? (night ? 1f : dayF) : 0f);   // 578: linia switu
                         // A16 (poz. 7): los w tym takcie lorda zapisanego w poprzednim jako "bez powodu"
                         long a16w;
                         if (_a16Watch.Count > 0 && _a16Watch.TryGetValue(mp, out a16w))
@@ -1304,6 +1311,7 @@ namespace Armoury
               .Append(d.MoveExit).Append(", obudzeni cudza reka ").Append(d.MoveWoken).Append(", alarm bez ucieczki ").Append(d.MoveAlarmStay)
               .Append(", dluznicy obudzeni ").Append(d.MoveDebtWoken).Append(", inne ").Append(d.MoveOther).Append("); wodzowie armii ")
               .Append(d.MoveLead).Append(" (bez powodu ").Append(d.MoveLeadNoReason).Append("); na morzu (W2, poza P2) ").Append(d.SeaMove)
+              .Append(RaidHaltAiDawnText())   // 578: postoj nocny przy rabunkach lordow AI (liczniki doby od zera)
               .Append(NightClock.DawnText())   // noc 15/16.10: zrodlo godziny ksiegi, tick switu (termin / zegar), godziny pomieszane przez zegar, doby bez switu
               .Append(" | stoper ksiegi: sr. ").Append((_ledgerCalls > 0 ? _ledgerMsSum / _ledgerCalls : 0).ToString("0.000", ci))
               .Append(" ms, maks. ").Append(_ledgerMsMax.ToString("0.000", ci)).Append(" ms (").Append(_ledgerCalls).Append(" tikow)")

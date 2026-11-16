@@ -90,6 +90,7 @@ namespace Armoury
             public double Struck;                            // ludzie kroku juz oddani do StrikePeople
             public double Hit, Dead, Fled, Ref;              // wynik uderzen tej sesji
             public double PdPend, EatDays, LootDays;         // osobodni od uderzenia, doby od posilku, doby lupienia razem
+            public double StartH = double.NaN;               // 578: godzina kampanii poczatku kroku (Start) - doby zegara kroku z nocnym postojem (linia doby); bez zapisu
             public double F = 1.0;                           // ostatni znany mnoznik tempa z modelu rabunku
             public int Stumbles;
             // E7/R2 (236): krok po kroku u gracza. Liczby S* dotycza BIEZACEGO kroku (u AI jedyny krok = sesja): udzial lupu kroku i tresc okienka
@@ -120,7 +121,8 @@ namespace Armoury
         private static bool _ready;
         /// <summary>577: prefiks kroku rabunku (UpdatePrefix) wpiety - bez niego postoj nocny przy rabunku nie zaczyna sie (NightRest.RaidHaltFrame).</summary>
         internal static bool UpdWired { get; private set; }
-        private static long _dHaltTicks;   // 577: tykniecia rabunku zatrzymane postojem nocnym (linia doby)
+        private static long _dHaltTicks, _dHaltTicksAi;   // 577: tykniecia rabunku zatrzymane postojem nocnym gracza; 578: lordow AI (linia doby)
+        private static readonly List<double> _dWallPer = new List<double>();   // 578: doby ZEGARA na osade krokow lordow AI (z nocami) - obok dob pracy (_dDaysPer)
         private static Action<Settlement, float> _setHp;
         private static Action<RaidEventComponent, float> _setDmg;
         private static Action<MapEvent, BattleState> _setBs;
@@ -157,8 +159,8 @@ namespace Armoury
             _dSettl = _dHit = _dDead = _dFled = _dRef = _dRaidDead = _dCheckDead = 0.0;
             _dCap = _dGold = _dTake = _dTakeValue = _dBurn = _dBurnValue = _dEat = 0;
             _dBal1 = _dBal2 = _dBal3 = 0.0;
-            _dTicks = 0; _dHaltTicks = 0;
-            _dDaysPer.Clear();
+            _dTicks = 0; _dHaltTicks = 0; _dHaltTicksAi = 0;
+            _dDaysPer.Clear(); _dWallPer.Clear();
             _dPStarted = _dPEnded = _dPWon = _dPCalled = _dPBroken = _dPSteps = _dAsk = _dShown = _dShownAgain = _dNoNext = _dNext = _dEndPopup = _dEndMenu = _dEndMenu0 = _dAutoEnd = _dAskFail = 0;
             _dPSettl = 0.0;
         }
@@ -258,7 +260,7 @@ namespace Armoury
             {
                 if (!NightRest.RaidHaltHolds(__instance)) return true;
                 try { var me0 = __instance.MapEvent; if (me0 != null) me0.WasEverInLootingPhase = true; } catch { }
-                _dHaltTicks++;
+                if (NightRest.RaidHaltIsPlayer(__instance)) _dHaltTicks++; else _dHaltTicksAi++;
                 return false;
             }
             long t0 = Stopwatch.GetTimestamp();
@@ -281,7 +283,8 @@ namespace Armoury
                     return false;
                 }
                 // 577 (Raid Night Halt): noc - postep kroku stoi (bez Prog, uderzen, spichlerza, LootDays i dni na osade); wybor z okienka E7/R2 wyzej dziala od reki
-                if (NightRest.RaidHaltHolds(__instance)) { _dHaltTicks++; return false; }
+                // 578: takze rabunek lorda AI stojacy na noc (ten sam prefiks; AI decyduje dalej - postoj blokuje tylko postep)
+                if (NightRest.RaidHaltHolds(__instance)) { if (ss.Player) _dHaltTicks++; else _dHaltTicksAi++; return false; }
                 if (!ss.Started) { Start(ss, __instance, men); if (ss.Player) _dPStarted++; }
                 double dt = TickDays();
                 if (men > 0 && dt > 0.0)
@@ -388,6 +391,7 @@ namespace Armoury
         {
             var v = ss.V;
             ss.Started = true;
+            ss.StartH = CampaignTime.Now.ToHours;   // 578: doby zegara kroku (linia doby)
             ss.Hp0 = Math.Max(0.01f, Math.Min(1f, v.Settlement.SettlementHitPoints));
             ss.MainOnly = ss.Player && PlayerMainOnly;   // m97-wioski: klucz czytany na kazdy krok
             var p = Plan(v, men, ss.MainOnly, ss.Fid);
@@ -766,6 +770,8 @@ namespace Armoury
                         {
                             _dSteps++; _dSettl += ss.M;
                             if (ss.Lord && ss.M >= 1.0 && _dDaysPer.Count < 4096) _dDaysPer.Add(ss.LootDays / ss.M);
+                            // 578: doby zegara kroku (z nocnym postojem i walka) - kroki zaczete w tej sesji gry (StartH bez zapisu)
+                            if (ss.Lord && ss.M >= 1.0 && !double.IsNaN(ss.StartH) && _dWallPer.Count < 4096) _dWallPer.Add(Math.Max(0.0, CampaignTime.Now.ToHours - ss.StartH) / 24.0 / ss.M);
                         }
                         var v = ss.V;
                         if (v != null && v.VillageState == Village.VillageStates.Looted && v.Settlement != null && v.Settlement.StringId != null)
@@ -875,7 +881,8 @@ namespace Armoury
             if (next)
             {
                 int pm = Math.Max(1, (int)Math.Round(p.M));
-                nxt = VillageTexts.Make(pm >= 2 ? VillageTexts.RaidNextMany : VillageTexts.RaidNext, "M", pm, "DAYS", DaysText(p.Work / rate)).ToString();
+                // 578 (4): doby zegara - noce obozu bez postepu (nocny postoj 577), dokladnie godzina po godzinie od teraz (srednio x 24/18 przy nocy 21-3)
+                nxt = VillageTexts.Make(pm >= 2 ? VillageTexts.RaidNextMany : VillageTexts.RaidNext, "M", pm, "DAYS", DaysText(NightRest.RaidWallDays(p.Work / rate))).ToString();
                 // n20-napisy: przycisk okna ma 164 px - dawny napis ("Raid the next settlement (about N days)") idzie do tekstu okna, na przycisku "Raid on"
                 if (ShortLabels.On) { body += "\n\n" + nxt + "."; nxt = VillageTexts.Make(VillageTexts.RaidNextShort).ToString(); }
             }
@@ -1127,7 +1134,10 @@ namespace Armoury
                 sb.Append(": ");
                 for (int i = 0; i < _dDaysPer.Count && i < MaxDaysList; i++) sb.Append(i > 0 ? "/" : "").Append(F(_dDaysPer[i], "0.00"));
             }
-            sb.Append(')')
+            sb.Append(')');
+            // 578: doby zegara na osade (z nocnym postojem AI) - dni na osade wyzej to doby samej pracy (LootDays)
+            double medW = Median(_dWallPer);
+            sb.Append(", dni zegara na osade (z nocami, 578) mediana ").Append(double.IsNaN(medW) ? "-" : F(medW, "0.00")).Append(" (krokow ").Append(_dWallPer.Count).Append(')')
               .Append(", przerwanych ").Append(_dInterrupted).Append(" (").Append(_dEnded > 0 ? F(100.0 * _dInterrupted / _dEnded, "0") : "0").Append("%)");
             sb.Append(" | trafieni ").Append(F(_dHit, "0.##")).Append(" = zabici ").Append(F(_dDead, "0.##")).Append(" + las ").Append(F(_dFled, "0.##"))
               .Append(" + jency 0 + uchodzcy ").Append(F(_dRef, "0.##")).Append(" (kontrola ").Append(F(check, "0.000")).Append("; uderzen ").Append(_dStrikes).Append(')');
@@ -1144,6 +1154,7 @@ namespace Armoury
             if (_dAbandoned > 0) sb.Append(", porzucone bez konca rabunku ").Append(_dAbandoned);
             sb.Append(" | czas ").Append(F(_dTicks * 1000.0 / Stopwatch.Frequency, "0.0")).Append(" ms");
             if (_dHaltTicks > 0) sb.Append(" | postoj nocny gracza (577): tykniec rabunku bez postepu ").Append(_dHaltTicks);
+            if (_dHaltTicksAi > 0) sb.Append(" | postoj nocny lordow AI (578): tykniec rabunku bez postepu ").Append(_dHaltTicksAi);
             sb.Append(" | potkniecia ").Append(_dStumbles).Append('.');
             Log.Info(sb.ToString());
         }

@@ -21,7 +21,7 @@ namespace Armoury
     ///  - KONIEC BEZ WZNOWIENIA: rabunek skonczony (End Raiding, bitwa, koniec zdarzenia), klucz zdjety, ksiega snu wylaczona - postoj znika, nic sie nie wznawia.
     ///  - NIE STAJE: marsz forsowny (ForcedMarch.Active - kolumna i tak nie spi), Nieumarli, gracz nie jest wodzem rabunku (cudza armia - regula AI), latka kroku
     ///    rabunku DistrictRaid niewpieta (DistrictRaid.UpdWired). Wioski poboczne (SideVillageVisit, wlasne menu bez MapEvent) - poza 577.
-    ///  - AI bez zmian: lord AI rabuje cala dobe, a ksiega AI liczy postoj przy wsi jako odpoczynek (bez RaidCountsAsWork).
+    ///  - AI: od 578 - NightRest.RaidHaltAi.cs (postoj nocny lorda AI, gracz w cudzej armii, wioski poboczne, szacunek czasu).
     /// Tylko pamiec (wczytanie w nocy - postoj od nowa w pierwszej klatce). Wyjatek liczony; po MaxHaltStumbles postoj zdjety (rabunek idzie), funkcja dalej czynna.
     /// </summary>
     internal static partial class NightRest
@@ -47,11 +47,19 @@ namespace Armoury
         /// Wolane z RaidEventComponent.Update kazdego rabunku swiata - sam odczyt, bez alokacji.</summary>
         internal static bool RaidHaltHolds(RaidEventComponent comp)
         {
+            if (comp == null) return false;
             var hc = _haltComp;
-            if (hc == null || comp == null || !ReferenceEquals(comp, hc)) return false;
-            var def = comp.DefenderSide;
-            return def != null && def.TroopCount == 0;
+            if (hc != null && ReferenceEquals(comp, hc))
+            {
+                var def = comp.DefenderSide;
+                return def != null && def.TroopCount == 0;
+            }
+            // 578: rabunek lorda AI stojacy na noc (NightRest.RaidHaltAi.cs) - slownik pusty poza noca i bez rabunkow AI (jedno porownanie)
+            return _aiHalt.Count > 0 && AiHaltHolds(comp);
         }
+
+        /// <summary>578: ten rabunek stoi postojem gracza (577), nie AI - do licznika linii doby E7/R1.</summary>
+        internal static bool RaidHaltIsPlayer(RaidEventComponent comp) { return comp != null && ReferenceEquals(comp, _haltComp); }
 
         /// <summary>577: rabunek wsi gry, ktory prowadzi druzyna gracza (sama albo jako wodz armii); null - brak.</summary>
         private static RaidEventComponent PlayerLedRaid()
@@ -69,6 +77,7 @@ namespace Armoury
             _haltComp = null; _haltName = null; _haltFrom = -1; _haltHp0 = 0f; _haltStumbles = 0; _haltErrLogged = 0; _haltOff = false;
             _haltTicksPrev = 0; _haltRestPrev = 0f;
             _haltTicksDay = _haltStartsDay = _haltResumesDay = _haltEndsDay = 0; _haltRestDay = 0f;
+            ResetRaidHaltAi();   // 578
         }
 
         private static void RaidHaltDawnReset()

@@ -113,7 +113,7 @@ namespace Armoury
         internal static bool PlayerRaidingNow(out bool side)
         {
             side = SideVillageVisit.RaidActive;
-            if (side) return true;
+            if (side) return !_sideHalt;   // 578: wioska poboczna stojaca na noc - ludzie spia (jak 577)
             var mp = MobileParty.MainParty;
             var me = mp != null ? mp.MapEvent : null;
             if (me == null || !me.IsRaid || mp.MapEventSide == null || mp.MapEventSide != me.AttackerSide) return false;
@@ -321,7 +321,8 @@ namespace Armoury
                 // 577 (Raid Night Halt): godzina ksiegi z nocnym postojem przy rabunku (postoj trwa w chwili ticku) to sen jak w obozie - nie praca, takze gdy poczatek
                 // godziny jeszcze rabowal (zmierzch w srodku godziny; jak oboz rozbity o 21:00). Godzina wznowienia o swicie (postoj juz zdjety) - jak dotad.
                 // Recenzja 577: walka w nocy (milicja/odsiecz, DefenderSide.TroopCount > 0) to nie sen - wtedy godzina jak rabunek (praca), sen przerwany
-                bool raidHalt = RaidHaltNow && RaidHaltHolds(_haltComp) && !enl;
+                // 578: takze rabunek wodza AI w cudzej armii stojacy na noc i wioska poboczna stojaca na noc (PlayerRaidHeld)
+                bool raidHalt = !enl && PlayerRaidHeld();
                 if (raidHalt) { raided = false; _haltTicksDay++; }
                 bool work = drilled || raided;
                 if (raided && resting && !forced && !drilled)
@@ -2209,6 +2210,7 @@ namespace Armoury
                 // m103-drobne (RaidCountsAsWork): klatka z rabunkiem druzyny gracza - chwila do ksiegi snu (rabunek skonczony w srodku godziny i tak czyni ja godzina pracy)
                 // 577 (Raid Night Halt): postoj nocny przy rabunku - PRZED odczytem rabunku (rabunek stojacy na noc nie jest praca tej klatki)
                 RaidHaltFrame(s);
+                RaidHaltAiFrame(s);   // 578: wylacznik postoju AI, gracz w cudzej armii, koniec wioski pobocznej w postoju
                 if (s.RaidCountsAsWork && Campaign.Current != null) { bool sideR; if (PlayerRaidingNow(out sideR)) { _lastRaidAt = CampaignTime.Now.ToHours; _lastRaidSide = sideR; } }
 
                 // straznik co klatke: namiot nie jezdzi po mapie - gracz ruszyl,
