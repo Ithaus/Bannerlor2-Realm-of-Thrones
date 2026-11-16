@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 582: oferta rabunku armii AI pomija wies po okupie tej frakcji i cel zablokowany przy przeprawie (334e ArmyRaid, ArmyRaidKeep) - Armoury (LocalFront334e.Score.cs, LocalFront334e.Log.cs)
+
+**Problem:** autotest at-268b (`Armoury-2026-11-16_06-00-24.log`, analiza + weryfikacja, B1): linia "Okup okolicy (R3-03a)" doby 108866 - `Orea Talordis <- Ryona 7195 zl`, a w dobach 108866 i 108867 linie "armia rabuje" Orea Talordis -> Ryona z wynikiem 5.2 (l. 178046, 178943), bez nowego startu. Armia dostaje oferte rabunku wsi, ktorej rabowac nie moze, i w tej mysli nie rabuje wcale (czesciowo tlumaczy 241 ofert / 5 startow). Wada sprzed 580/580b.
+
+**Przyczyna:** `ArmyRaid` (334e) odrzucal kandydatow tylko przez `VetoedFor334e` i `Blocked` (q). Nie pytal `RaidTribute.SparedNow` ani `CrossingLaw.AimBlocks`, choc odsiew 342r ma oba w `SvLater`. Najlepsza byla wies chroniona okupem, `ArmyRaid` dopisuje tylko JEDNA oferte (najlepsza), a `RaidTribute.ThinkPostfix` (AiHourlyTick, VeryLow) dawal jej -1 - armia tracila rabunek w tej mysli zamiast wziac nastepna wies. To samo dla celu zablokowanego przy przeprawie (`CrossingLaw.AimPostfix` -1).
+
+**Zmiana:**
+- `ArmyRaid` (LocalFront334e.Score.cs ok. l. 876-879): po wecie teatru, PRZED `tried++` (nie zjadaja 6 prob) - `RaidTribute.SparedNow(v, party.MapFaction)` -> pominiety (okup), `CrossingLaw.AimBlocks(party, v)` -> pominiety (przeprawa); petla bierze nastepna wies. Te same funkcje co `SvLater` (342r) - nie wolam `SvLater` wprost, bo weto jest juz liczone osobno wyzej (`_dArmyRaidVeto`), a linia doby rozdziela przyczyny. Liczniki doby pod `_lk` po petli (l. 907).
+- `ArmyRaidKeep` 580b (l. 786): ten sam filtr po wecie - wies po okupie / cel zablokowany nie jest podtrzymywany (`KeepX(4)`, tablica `_dArmyKeepX` 5 pol). Zachowanie bez zmian wzgledem dotad (sluchacze i tak dawali -1, wodz konczyl rabunek) - tylko nie dopisujemy oceny skazanej na -1 i liczymy przypadek.
+- Linia doby 334e: "armie rabunek opcji N (weta W, pominiete: okup A, przeprawa B), w toku podtrzymane (580b) K (puszczone: ..., model 0 d, okup/przeprawa e)". Zerowanie w `ZeroScoreDay`.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Inne miejsca ofert rabunku: pojedynczy lordowie dostaja Raider od gry (wiele wpisow RaidSettlement w mysli) - `ThinkPostfix`/`AimPostfix` daja -1 tylko zablokowanemu wpisowi, wybor gry bierze nastepny; odsiew 342r (`SievePost`) juz uzywa `SvLater`, wiec wies zablokowana nie jest "najlepsza" i nie zeruje reszty. Inne `AddBehaviorScore(RaidSettlement)` w Armoury: tylko `ArmyRaid` i `ArmyRaidKeep` (grep). `RaidBreak` (Siege l. 753) tylko daje -1. Wiec luka byla tylko w 334e.
+- Kolizje: `SparedNow` - odczyt migawki `Volatile` (bezpieczny z watku mysli, jak w SievePost); `AimBlocks` - odczyt slownika `_aimBlock`, ten sam co w SievePost w tej samej mysli. Nic nie pisze stanu poza licznikami.
+- Koszt: dwa odczyty na kandydata (najwyzej kilkanascie wsi w zasiegu) - pomijalny. Wiecej prob modelu na mysl: pominiete nie zjadaja limitu 6, wiec przy wsiach po okupie model ocenia do 6 innych (jak przy braku okupu).
+- Skutek w grze: armie AI czesciej rabuja (dostaja nastepna wies zamiast zadnej) - oczekiwane dzialanie 334e. Okup chroni dalej (EncounterPrefix i ThinkPostfix bez zmian).
+- Okup a pamiec kroku 580 - decyzja domyslna (noc 16.11): okup NIE skresla pamieci. Pamiec to praca juz wykonana (ludzie trafieni, lup wziety przed okupem), okup kupuje spokoj na RaidTributeSpareDays (30) - przy domyslnych pamiec (RaidAlertMaxDays 17) wygasa wczesniej, wiec wznowienia po okupie i tak nie bedzie. Przy SpareDays < AlertMaxDays powrot tej frakcji po ochronie dokonczylby krok bez ponownego uderzenia - zgodne z "nic z niczego". Okup w trakcie trwajacego rabunku nie zachodzi (`EncounterPrefix` wymaga `st.Party.MapEvent == null`) - filtr w ArmyRaidKeep jest zabezpieczeniem (np. ochrona gracza / z zapisu).
+- Build Armoury 0 bledow (Release). NIE wgrane. Test: linia 334e "pominiete: okup" > 0 tam, gdzie R3-03a ma okupy armii; brak linii "armia rabuje" do wsi z "Okup okolicy" tej frakcji; wiecej startow armii na oferte.
+
+**Status:** DO SPRAWDZENIA
+
 ## 581: autotest zasila musztre gracza - staly mieszany oddzial i sztuki na liscie gracza, linia asertow "Musztra (autotest 581)" (tylko tryb autotestu) - Armoury (nowy DrillAutotest581.cs, Drill.cs)
 
 **Problem:** autotest at-268 (`Armoury-2026-11-16_03-16-32.log`, analiza A + weryfikacja, P-A1): strona gracza w 574/575 (i 562/571) nie byla sprawdzona ani razu. Gracz nowej kampanii testu (CrashScribe: kreator postaci, Damon, kultura vlandia) nie ma zolnierzy - ludzie dokladani do bitew 1 i 2 (59 x vlandian_champion, 49 x vlandian_recruit, "tylko test, po bitwie wracaja") znikaja przed pierwsza doba musztry. 220/220 linii "Musztra (gracz)" z samymi zerami ("574: za trudne - oddane 0, pominiete przy braniu 0", "575: wymieniono na tansze 0", T1..T6 0/0/0/0/0/0), 210 prob "Musztra (autotest): ... druzyna bez zolnierzy, nic do zasilenia". Kontrole ZGODNE przy pustym zapasie niczego nie dowodza.

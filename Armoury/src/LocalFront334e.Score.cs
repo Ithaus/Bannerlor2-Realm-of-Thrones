@@ -68,8 +68,11 @@ namespace Armoury
         // licznik doby: opcje > 0 po naszej ocenie (krolestwo -> [Raider, Besieger]), cofniecia SCA, oceny
         private static readonly Dictionary<string, int[]> _dOpts = new Dictionary<string, int[]>(StringComparer.Ordinal);
         private static int _dScoreN, _dZero, _dUp, _dDown, _dScaUndo, _dDefLow, _dDefFort, _dHomeCap, _dNoSnap, _dArmyRaidOffers, _dArmyRaidLog, _dArmyRaidVeto;
-        // 580b: rabunek armii w toku - podtrzymany (oferta tej wsi w mysli wodza) i puszczony: 0 spojnosc, 1 weto, 2 blokada (RaidBreak / odwrot), 3 model 0
-        private static int _dArmyKeep; private static readonly int[] _dArmyKeepX = new int[4];
+        // 580b: rabunek armii w toku - podtrzymany (oferta tej wsi w mysli wodza) i puszczony: 0 spojnosc, 1 weto, 2 blokada (RaidBreak / odwrot), 3 model 0,
+        // 4 (582) okup / przeprawa (RaidTribute -1 / CrossingLaw -1 i tak)
+        private static int _dArmyKeep; private static readonly int[] _dArmyKeepX = new int[5];
+        // 582: kandydaci ArmyRaid pominieci, bo sluchacze mysli i tak dalyby -1: wies po okupie tej frakcji (RaidTribute), cel zablokowany przy przeprawie (CrossingLaw)
+        private static int _dArmyRaidTrib, _dArmyRaidAim;
         private static readonly HashSet<string> _dArmyRaidSaid = new HashSet<string>(StringComparer.Ordinal);
         private static float _raidRange = -1f;
 
@@ -122,6 +125,7 @@ namespace Armoury
             _dAsk.Clear(); _dM0.Clear();
             _dOpts.Clear(); _dScoreN = _dZero = _dUp = _dDown = _dScaUndo = _dDefLow = _dDefFort = _dHomeCap = _dNoSnap = _dArmyRaidOffers = _dArmyRaidLog = _dArmyRaidVeto = 0;
             _dArmyKeep = 0; Array.Clear(_dArmyKeepX, 0, _dArmyKeepX.Length);   // 580b
+            _dArmyRaidTrib = _dArmyRaidAim = 0;                                 // 582
             _dArmyRaidSaid.Clear();
             _dGather = _dGatherOk = 0; _dGatherRatio = 0;
             _dSvThink = _dSvEntries = _dSvEval = _dSvCut = 0;
@@ -778,6 +782,8 @@ namespace Armoury
             if (k == null) return;
             string why;
             if (WarFront334.VetoedFor334e(k, v, out why)) { KeepX(1); return; }
+            // 582: wies po okupie tej frakcji / cel zablokowany przy przeprawie - ThinkPostfix RaidTribute / AimPostfix CrossingLaw i tak daja -1, nie podtrzymujemy
+            if (RaidTribute.SparedNow(v, party.MapFaction) || CrossingLaw.AimBlocks(party, v)) { KeepX(4); return; }
             bool blocked;
             long w0 = Ts();
             lock (_lk) { _tWait += Ts() - w0; blocked = Blocked(party, v); }
@@ -861,11 +867,16 @@ namespace Armoury
             foreach (var ap in army.Parties) if (ap != null && ap.IsActive && ap.Party != null) qStr += PStr(ap.Party);
             var model = Campaign.Current.Models.TargetScoreCalculatingModel;
             Settlement bestV = null; float bestS = 0f; double bestQ = -1; MobileParty.NavigationType bestNav = MobileParty.NavigationType.None; bool bestPort = false;
+            int skTrib = 0, skAim = 0;
             for (int i = 0, tried = 0; i < cand.Count && tried < 6; i++)
             {
                 var v = cand[i].Key;
                 string why;
                 if (WarFront334.VetoedFor334e(k, v, out why)) { _dArmyRaidVeto++; continue; }   // teatr Polnocy / Wysp, 274, 326b - ThinkPost (Last) idzie po wetach
+                // 582: te same warunki co SvLater (342r) poza wetem wyzej - wies po okupie tej frakcji (RaidTribute.ThinkPostfix) i cel zablokowany przy przeprawie
+                // (CrossingLaw.AimPostfix) dostalyby -1 po tej ofercie i armia tracila rabunek w tej mysli; pomijamy przed tried++ (nie zjadaja 6 prob), bierzemy nastepna wies
+                if (RaidTribute.SparedNow(v, party.MapFaction)) { skTrib++; continue; }
+                if (CrossingLaw.AimBlocks(party, v)) { skAim++; continue; }
                 tried++;
                 double q;
                 long w1 = Ts();
@@ -893,6 +904,7 @@ namespace Armoury
                 finally { _inOwn = false; _modelT += Ts() - m1; }
                 if (s > bestS) { bestS = s; bestV = v; bestQ = q; bestNav = nav; bestPort = fromPort; }
             }
+            if (skTrib + skAim > 0) { long w3 = Ts(); lock (_lk) { _tWait += Ts() - w3; _dArmyRaidTrib += skTrib; _dArmyRaidAim += skAim; } }   // 582
             if (bestV == null || !(bestS > 0f)) return;
             pt.AddBehaviorScore((new AIBehaviorData(bestV, AiBehavior.RaidSettlement, bestNav, false, bestPort, false), bestS));
             long w2 = Ts();
