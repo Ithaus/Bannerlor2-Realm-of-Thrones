@@ -1773,6 +1773,7 @@ namespace Armoury
                     int expect = _givenYday + inToday + _pTaken - backAll - _pWornN;
                     bal = "bilans zapasu musztry " + (expect == given ? "ZGODNY" : "NIEZGODNY") + " (wczoraj " + _givenYday + " + przyjete " + inToday + " + wziete ze zbrojowni " + _pTaken
                           + " - zwrocone i stracone " + backAll + " - zuzyte " + _pWornN + " = dzis " + given + (expect == given ? "" : ", oczekiwane " + expect) + ")";
+                    if (expect != given && _t581Set) _t581BalBad++;   // recenzja 581 (2): prawdziwy bilans sztuk zapasu do asertu testu (tylko po dokladce 581)
                 }
                 _givenYday = given;
                 if (s.DrillLog)

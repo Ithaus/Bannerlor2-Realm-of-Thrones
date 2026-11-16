@@ -25,6 +25,25 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 581
+
+Dwie recenzje commitu `b3e8ddcf` (bezpieczenstwo / skutecznosc testu), zweryfikowane w kodzie. Recenzja 1 (bramka, zapis, kolizje w grze Jeffa): bez bledow - potwierdzone (`T581Feed` l. 53, `T581Line` przy `!_t581Set`; jedyne nowe wejscie w `Drill.Daily` ponizej tez tylko przy `_t581Set`).
+
+**Poprawione (build 0 bledow):**
+- **Asert "1H u jazdy" niczego nie sprawdzal (recenzja 2, uwaga 1 - przyjete w czesci).** Potwierdzone: przy dostawie 1H razem z kopiami w dobie dokladki pobor mieczy szedl przy pustym zapasie (Short(K1H) = caly popyt), a linia liczyla `FitMatch` na samych mieczach - scenariusz recenzji 574 (kopia zajmuje miejsce 1H, pobor mieczy staje) nie mial jak wystapic ani sie pokazac. Zmiana: 1H (2 x popyt + 2 i T6) idzie na liste gracza dopiero w dobie +3 (`T581One`, w logu "1H po kopiach ... kopie / wlocznie F1H w zapasie N"); linia liczy `FitMatch` na CALYM zapasie (jedna pula jak `ClaimTake`) i asert to "co najmniej jedna doba po dostawie, w ktorej miejsca 1H jazdy sa pelne (cav1 == cavNeed) przy kopiach F1H i mieczach w zapasie". Odrzucone z propozycji: `cav1 == cavNeed` codziennie - zuzycie zdejmuje sztuki w ciagu doby, a pobor uzupelnia nastepnej, wiec scisla rownosc co dobe dawalaby falszywe NIEZGODNE.
+- **Kontrola "bilans 1:1" byla tautologia (recenzja 2, uwaga 2 - przyjete).** Potwierdzone: `_pSwapOutT`, `_pSwapInT` i `_pSwapN` rosna w tej samej petli `SwapCheaper` (DrillKit.cs l. 1015/1022). Zmiana: `Drill.Daily` liczy `_t581BalBad` przy "bilans zapasu musztry NIEZGODNY" (expect != given; tylko przy `_t581Set`), linia 581 pokazuje "bilans zapasu ZGODNY / NIEZGODNY xN" i dolicza go do NIEZGODNE; tautologia usunieta z `bad` i z tekstu (oddane / wziete zostaja tylko jako opis). Bilans jest wiarygodny: gra Jeffa 01-02-50 - 6/6 ZGODNY, at-268 219/219.
+- **T6 moglo sie nie pojawic (recenzja 2, uwaga 4 - przyjete w czesci).** Gdy zadna T6 nie pasuje wszystkim typom, `T581AddT6` bierze najtansza T6 rodzaju z calej listy (dopisek "nie dla wszystkich" w linii dokladki). Linia 581 pokazuje "T6 w zapasie N (najwiecej M)" - tylko opis, BEZ asertu: przy zuzyciu tanich sztuk pobor legalnie bierze drozsza, gdy tanszej nie ma (wymiana 575 oddaje ja przy nastepnej tanszej), wiec "0 T6 w zapasie" nie jest niezmiennikiem.
+- **`Math.Max(6, room)` przy room < 6 (recenzja 2, uwaga 5 - przyjete).** Potwierdzone: wspolczynnik > room/want dodawal ludzi ponad limit druzyny. Zmiana: room < 6 - bez dokladki, `_t581Off` z linia w logu; inaczej `room / want` (minimum 2 na rodzaj = 6 <= room).
+
+**Odrzucone:**
+- Luka "oddane pod bitwe" (575 `ReturnForUpgrade`, recenzja 2, uwaga 3): poza specyfikacja 581 (aserty: za trudne, wymiana na tansze, 1H u jazdy, ZGODNE) - nie dodane (zasada "nie dodawaj przy okazji"); zapisane jako nierozstrzygniete.
+
+**Nierozstrzygniete / do testu:**
+- `ReturnForUpgrade` nadal niesprawdzony w autotescie (`_pUpgBack` = 0 oczekiwane przy tym ukladzie zbrojowni).
+- Ryzyko harnessu n391 (obrona oblezonego Hornvale, menu spotkania / niewola przy 40 ludziach) - patrzec na "ludzi X/Y" i zawieszenie testu.
+- Doplata zboza i zlota `T581Upkeep` - w ksiegach rodu gracza testu odjac (sumy w linii 581).
+- Asserty bez dowodu z logu - potrzebny autotest z tym DLL.
+
 ## 580b: armia AI nie porzuca rabunku po pierwszej mysli - wodz w rabunku wsi dostaje ocene tej wsi (334e ArmyRaidKeep) - Armoury (LocalFront334e.Score.cs, LocalFront334e.Siege.cs, LocalFront334e.Log.cs)
 
 **Problem:** ten sam co 580 (at-268 P-B1): Edmure Tully -> Pennytree 19 startow w 108844-108868, Ferrego Antaryon -> Lysia 14 w 108681-108697, u Jeffa (577) Renly -> Hook 12 w 109297-109310; wszystkie 33 starty "armia TAK" w at-268 to te petle, zaden nie dal pelnego kroku. Rabunek konczy sie w ciagu godzin od startu (noc 108857: start 20:1x, 21:26 "skonczone w postoju 1", armia rusza 73 jedn. dalej).

@@ -36,14 +36,16 @@ namespace Armoury
         private const string T581P = "Musztra (autotest 581): ";
         private static bool _t581Set, _t581Off;
         private static int _t581Day0 = -1, _t581NextDrop, _t581Drops, _t581DropN, _t581Pcs, _t581Grain, _t581Gold, _t581Men0, _t581Rk = -1;
-        private static long _t581HardSkip, _t581HardBack, _t581Swap, _t581SwapOut, _t581SwapIn, _t581SwapOutV, _t581SwapInV, _t581CovDrop, _t581Bad, _t581Taken, _t581TakenBook;
+        private static long _t581HardSkip, _t581HardBack, _t581Swap, _t581SwapOut, _t581SwapIn, _t581SwapOutV, _t581SwapInV, _t581CovDrop, _t581Bad, _t581Taken, _t581TakenBook, _t581BalBad;
+        private static int _t581OneDay = -1, _t581OnePole, _t581CavFull, _t581T6Max;   // recenzja 581 (1, 4): 1H po kopiach, doby z pelnym 1H jazdy, T6 w zapasie
         private static ItemObject _t581Hard;
         private static List<ItemObject> _t581Items;
 
         private static void T581Reset()
         {
             _t581Set = _t581Off = false; _t581Day0 = -1; _t581NextDrop = _t581Drops = _t581DropN = _t581Pcs = _t581Grain = _t581Gold = _t581Men0 = 0; _t581Rk = -1;
-            _t581HardSkip = _t581HardBack = _t581Swap = _t581SwapOut = _t581SwapIn = _t581SwapOutV = _t581SwapInV = _t581CovDrop = _t581Bad = _t581Taken = _t581TakenBook = 0;
+            _t581HardSkip = _t581HardBack = _t581Swap = _t581SwapOut = _t581SwapIn = _t581SwapOutV = _t581SwapInV = _t581CovDrop = _t581Bad = _t581Taken = _t581TakenBook = _t581BalBad = 0;
+            _t581OneDay = -1; _t581OnePole = _t581CavFull = _t581T6Max = 0;
             _t581Hard = null; _t581Items = null;
         }
 
@@ -55,6 +57,7 @@ namespace Armoury
             if (main == null || Hero.MainHero == null) return;
             if (!_t581Set) { T581Setup(day, main); return; }
             T581Upkeep(main);
+            if (_t581OneDay < 0 && day >= _t581Day0 + T581DropEvery) T581One(day);   // recenzja 581 (1): 1H dopiero, gdy kopie sa juz w zapasie
             if (day >= _t581NextDrop && _t581Drops < T581DropMax) T581Drop(day);
         }
 
@@ -129,7 +132,8 @@ namespace Armoury
             if (rng == null) { rng = T581Troop(null, RXbow) ?? T581Troop(null, RBow); fall += " dystans spoza kultury gracza;"; }
             if (cav == null) { cav = T581Troop(null, RCav); fall += " jazda spoza kultury gracza;"; }
             int room = main.Party.PartySizeLimit - main.Party.NumberOfAllMembers, want = T581Rec + T581Rng + T581Cav;
-            float f = room >= want ? 1f : Math.Max(6, room) / (float)want;
+            if (room < 6) { _t581Off = true; Log.Info(T581P + "miejsce w druzynie " + room + " (< 6) - bez dokladki, test musztry gracza pominiety."); return; }   // recenzja 581 (5): ponad limit gra zwolni ludzi
+            float f = room >= want ? 1f : room / (float)want;
             int nR = rec != null ? Math.Max(2, (int)(T581Rec * f)) : 0, nX = rng != null ? Math.Max(2, (int)(T581Rng * f)) : 0, nC = cav != null ? Math.Max(2, (int)(T581Cav * f)) : 0;
             if (nR + nX + nC == 0) { _t581Off = true; Log.Info(T581P + "brak typow zolnierzy do dokladki - test pominiety."); return; }
             if (nR > 0) main.MemberRoster.AddToCounts(rec, nR);
@@ -148,6 +152,7 @@ namespace Armoury
             for (int k = 0; k < NK; k++)
             {
                 if (k == KCape || m.Need[k] <= 0) continue;
+                if (k == K1H) { sb.Append(KindPl[k]).Append(": po kopiach (doba +").Append(T581DropEvery).Append("); "); continue; }   // recenzja 581 (1)
                 int need = m.Need[k];
                 if (k == _t581Rk)
                 {
@@ -183,11 +188,7 @@ namespace Armoury
                 }
                 add.Add(new KeyValuePair<ItemObject, int>(pick, cnt));
                 sb.Append(KindPl[k]).Append(' ').Append(T581Name(pick)).Append(" x").Append(cnt);
-                if (k == KBody || k == K1H)
-                {
-                    var t6 = l.Find(x => TierIx(x) == 6);
-                    if (t6 != null) { add.Add(new KeyValuePair<ItemObject, int>(t6, T581T6)); sb.Append(" + ").Append(T581Name(t6)).Append(" x").Append(T581T6); }
-                }
+                if (k == KBody) T581AddT6(k, l, add, sb);
                 sb.Append("; ");
             }
             foreach (var kv in add)
@@ -203,6 +204,60 @@ namespace Armoury
                      + ", " + nC + " x " + (cav != null ? cav.StringId + " T" + cav.Tier : "-") + " (kultura gracza " + (cul != null ? cul.StringId : "-") + ";" + fall + " miejsce w druzynie " + room
                      + "); do zbrojowni DTE na liste gracza " + _t581Pcs + " szt.: " + sb + "za trudne (574): " + hardNote + "; zasilenie 562 wylaczone; klucze Skill Check "
                      + (SkillOn ? "tak" : "nie") + ", Cheapest Swap " + (CheapOn ? "tak" : "nie") + ", Takes Player Stash " + (BookOn ? "tak" : "nie") + ", ludzi na sztuke " + MenPerPiece + ".");
+        }
+
+        /// <summary>Recenzja 581 (4): 3 sztuki T6 rodzaju k - najpierw takie, ktore udzwigna wszyscy (l), inaczej najtansza T6 rodzaju (z dopiskiem; do zapasu
+        /// nie wejdzie - nikt jej nie udzwignie - ale lezy na liscie gracza jak drogi sprzet gracza).</summary>
+        private static void T581AddT6(int k, List<ItemObject> l, List<KeyValuePair<ItemObject, int>> add, StringBuilder sb)
+        {
+            var t6 = l.Find(x => TierIx(x) == 6);
+            string note = "";
+            if (t6 == null)
+            {
+                foreach (var it in _t581Items) if (KindOf(it) == k && TierIx(it) == 6 && (t6 == null || it.Value < t6.Value || (it.Value == t6.Value && string.CompareOrdinal(it.StringId, t6.StringId) < 0))) t6 = it;
+                note = " - nie dla wszystkich";
+            }
+            if (t6 == null) { sb.Append(" + T6: brak"); return; }
+            add.Add(new KeyValuePair<ItemObject, int>(t6, T581T6));
+            sb.Append(" + ").Append(T581Name(t6)).Append(" x").Append(T581T6).Append(note);
+        }
+
+        /// <summary>Recenzja 581 (1): bron 1H (2 x popyt + 2 najtanszych, ktore udzwigna wszyscy, i 3 x T6) na liste gracza dopiero po T581DropEvery dobach -
+        /// kopie F1H jazdy leza juz w zapasie, wiec pobor mieczy idzie przy zajetych miejscach drzewc (scenariusz bledu recenzji 574).</summary>
+        private static void T581One(int day)
+        {
+            _t581OneDay = day;
+            var arm = QuartermasterLaw.DteArmory();
+            var main = MobileParty.MainParty;
+            if (arm == null || main == null || _t581Items == null) { Log.Info(T581P + "1H - brak zbrojowni DTE / druzyny, bez dostawy."); return; }
+            var m = Groups(main, Settings.Current, true);
+            for (int i = 0; i < _stock.Count; i++)
+            {
+                var el = _stock.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (el.Amount > 0 && it != null && KindOf(it) == KPole && (KindInfo(it) & F1H) != 0) _t581OnePole += el.Amount;
+            }
+            var sb = new StringBuilder();
+            var add = new List<KeyValuePair<ItemObject, int>>();
+            var l = T581ByKind(m, K1H);
+            if (m.Need[K1H] <= 0 || l.Count == 0) sb.Append("brak popytu albo sztuki, ktora udzwigna wszyscy");
+            else
+            {
+                int cnt = 2 * m.Need[K1H] + 2;
+                add.Add(new KeyValuePair<ItemObject, int>(l[0], cnt));
+                sb.Append(T581Name(l[0])).Append(" x").Append(cnt);
+                T581AddT6(K1H, l, add, sb);
+            }
+            int n = 0;
+            foreach (var kv in add)
+            {
+                var el = new EquipmentElement(kv.Key);
+                arm.AddToCounts(el, kv.Value);
+                ArmouryBehavior.StockDepositKey(el, kv.Value);   // lista gracza (jak 576)
+                n += kv.Value;
+            }
+            if (n > 0) { ArmouryBehavior.StockVersion++; _hudDirty = true; _t581Pcs += n; }
+            Log.Info(T581P + "1H po kopiach (doba " + (day - _t581Day0) + ") - " + n + " szt. na liste gracza: " + sb + "; kopie / wlocznie F1H w zapasie " + _t581OnePole + ".");
         }
 
         /// <summary>Jedzenie i zold oddzialu testu (bez tego glod i niezaplacony zold obnizaja morale - DefaultPartyDesertionModel zwalnia ludzi).</summary>
@@ -269,23 +324,30 @@ namespace Armoury
         private static void T581Line(int day)
         {
             if (!_t581Set || !AutotestActive()) return;
-            _t581HardSkip += _pHardSkip; _t581HardBack += _pBackHard; _t581Swap += _pSwapN; _t581CovDrop += _pSwapCovDrop; _t581Bad += _settleBad;
+            _t581HardSkip += _pHardSkip; _t581HardBack += _pBackHard; _t581Swap += _pSwapN; _t581CovDrop += _pSwapCovDrop; _t581Bad += _settleBad;   // _t581BalBad liczy Daily (bilans zapasu NIEZGODNY)
             _t581Taken += _pTaken; _t581TakenBook += _pTakenBook; _t581SwapOutV += _pSwapOutV; _t581SwapInV += _pSwapInV;
-            for (int i = 1; i <= 6; i++) { _t581SwapOut += _pSwapOutT[i]; _t581SwapIn += _pSwapInT[i]; }
+            for (int i = 1; i <= 6; i++) { _t581SwapOut += _pSwapOutT[i]; _t581SwapIn += _pSwapInT[i]; }   // tylko opis - rosna razem z _pSwapN (recenzja 581 (2))
             var main = MobileParty.MainParty;
             var s = Settings.Current;
             if (main == null || s == null) return;
-            // 1H u jazdy: FitMatch na samych sztukach 1H zapasu - miejsca 1H typow jazdy zajete prawdziwa bronia 1H (nie drzewcem jako zastepstwem)
+            // recenzja 581 (1): 1H u jazdy - FitMatch na CALYM zapasie (jedna pula jak ClaimTake: kopie najpierw do drzewc, potem miecze do 1H); miejsca 1H typow
+            // jazdy pelne po dostawie 1H przy kopiach w zapasie (blad recenzji 574 - kopia zajmuje miejsce 1H i pobor mieczy staje - zostawilby je puste)
             var mm = Groups(main, s, true);
             var pcs = new Dictionary<ItemObject, int>();
-            int sw = 0, cavNeed = 0, cav1 = 0, men = mm.Men;
+            int sw = 0, lance = 0, t6 = 0, cavNeed = 0, cav1 = 0, men = mm.Men;
             for (int i = 0; i < _stock.Count; i++)
             {
                 var el = _stock.GetElementCopyAtIndex(i);
                 var it = el.EquipmentElement.Item;
-                if (el.Amount <= 0 || it == null || KindOf(it) != K1H) continue;
-                int v; pcs.TryGetValue(it, out v); pcs[it] = v + el.Amount; sw += el.Amount;
+                if (el.Amount <= 0 || it == null) continue;
+                int k = KindOf(it);
+                if (k < 0) continue;
+                int v; pcs.TryGetValue(it, out v); pcs[it] = v + el.Amount;
+                if (k == K1H) sw += el.Amount;
+                else if (k == KPole && (KindInfo(it) & F1H) != 0) lance += el.Amount;
+                if (TierIx(it) == 6) t6 += el.Amount;
             }
+            _t581T6Max = Math.Max(_t581T6Max, t6);
             for (int t = 0; t < mm.Types.Count; t++) if (RoleClass(mm.Types[t].Mask) == RCav && (mm.Types[t].Mask & (1 << K1H)) != 0) cavNeed += mm.Types[t].Cap;
             if (mm.Skill)
             {
@@ -294,21 +356,22 @@ namespace Armoury
                     if (RoleClass(mm.Types[t].Mask) == RCav && (mm.Types[t].Mask & (1 << K1H)) != 0) cav1 += mm.Types[t].Cap - mm.Resid[K1H][t];
             }
             else cav1 = Math.Min(sw, cavNeed);   // bez 574 nie ma dopasowania do typow - przyblizenie
+            if (_t581OneDay >= 0 && day > _t581OneDay && cavNeed > 0 && cav1 >= cavNeed && sw > 0 && lance > 0) _t581CavFull++;
             long hard = _t581HardSkip + _t581HardBack;
-            bool bad = _t581Bad > 0 || _t581CovDrop > 0 || _t581SwapOut != _t581Swap || _t581SwapIn != _t581Swap || (_t581Swap > 0 && _t581SwapInV >= _t581SwapOutV);
+            bool bad = _t581Bad > 0 || _t581BalBad > 0 || _t581CovDrop > 0 || (_t581Swap > 0 && _t581SwapInV >= _t581SwapOutV);   // recenzja 581 (2): bilans sztuk z Daily zamiast tautologii liczb wymian
             var miss = new List<string>();
             if (_t581Hard != null && hard <= 0) miss.Add("za trudne");
             if (_t581Swap <= 0) miss.Add("wymiana na tansze");
-            if (cavNeed > 0 && cav1 <= 0) miss.Add("1H u jazdy");
+            if (cavNeed > 0 && _t581CavFull <= 0) miss.Add("1H u jazdy (pelne przy kopiach w zapasie)");
             string skip = (_t581Hard == null ? " (za trudne nie do sprawdzenia - brak sztuk ponad umiejetnosc)" : "") + (cavNeed <= 0 ? " (1H u jazdy nie do sprawdzenia - brak jazdy)" : "");
-            string verdict = bad ? "NIEZGODNE (kontrola sztuk / pokrycie / bilans wymian)"
+            string verdict = bad ? "NIEZGODNE (kontrola sztuk / bilans zapasu / pokrycie / wartosc wymian)"
                 : miss.Count == 0 ? "ZGODNE" + skip
                 : (day - _t581Day0 >= T581Deadline ? "NIEZGODNE (po " + T581Deadline + " dobach brak: " : "CZEKA (brak: ") + string.Join(", ", miss.ToArray()) + ")" + skip;
             Log.Info(T581P + "dzien " + day + " (doba " + (day - _t581Day0) + " od dokladki), ludzi " + men + "/" + _t581Men0 + " | 574 za trudne " + hard + " (pominiete przy braniu " + _t581HardSkip
-                     + ", oddane " + _t581HardBack + ") | 575 wymieniono na tansze " + _t581Swap + " (oddane " + _t581SwapOut + ", wziete " + _t581SwapIn + " - bilans 1:1 " + (_t581SwapOut == _t581SwapIn && _t581SwapIn == _t581Swap ? "TAK" : "NIE")
-                     + "; wartosc oddanych " + _t581SwapOutV + " d, wzietych " + _t581SwapInV + " d; spadek pokrycia " + _t581CovDrop + ") | 1H w zapasie " + sw + ", u jazdy " + cav1 + "/" + cavNeed
+                     + ", oddane " + _t581HardBack + ") | 575 wymieniono na tansze " + _t581Swap + " (oddane " + _t581SwapOut + ", wziete " + _t581SwapIn
+                     + "; wartosc oddanych " + _t581SwapOutV + " d, wzietych " + _t581SwapInV + " d; spadek pokrycia " + _t581CovDrop + ") | 1H w zapasie " + sw + (_t581OneDay < 0 ? " (dostawa 1H po kopiach jeszcze nie)" : "") + ", kopie F1H " + lance + ", 1H u jazdy " + cav1 + "/" + cavNeed + " (pelne przy kopiach " + _t581CavFull + " dob)"
                      + (mm.Skill ? "" : " (bez 574 - przyblizenie)") + " | wzieto ze zbrojowni " + _t581Taken + " (z listy gracza " + _t581TakenBook + "), kontrola sztuk zbrojownia + zapas "
-                     + (_t581Bad == 0 ? "ZGODNE" : "NIEZGODNE x" + _t581Bad) + " | test dolozyl: sztuk " + _t581Pcs + " (tansze " + _t581Drops + "x, " + _t581DropN + " szt.), zboza " + _t581Grain + ", zlota " + _t581Gold
+                     + (_t581Bad == 0 ? "ZGODNE" : "NIEZGODNE x" + _t581Bad) + ", bilans zapasu " + (_t581BalBad == 0 ? "ZGODNY" : "NIEZGODNY x" + _t581BalBad) + " | T6 w zapasie " + t6 + " (najwiecej " + _t581T6Max + ") | test dolozyl: sztuk " + _t581Pcs + " (tansze " + _t581Drops + "x, " + _t581DropN + " szt.), zboza " + _t581Grain + ", zlota " + _t581Gold
                      + " | " + verdict + ".");
         }
     }
