@@ -25,6 +25,14 @@
 - Watpliwosc: hard[0]/hard[1] moga nie trafic do proby, jesli tansze pasujace kusze z puli ludzi pokryja brak wczesniej (575 cena rosnaco) - wtedy po 30 dobach "brak: za trudne" bedzie prawdziwa obserwacja testu, nie gry.
 - Build Armoury 0 bledow, CrashScribe testu 0 bledow (16 ostrzezen FrameProfiler jak w n392-hs). NIE wgrane (Armoury z 581 jest w grze; ta zmiana dotyczy linii testu).
 
+### Recenzja 583
+
+- Recenzja 1 (harness n393-hs): bez bledow - komplet latek n392-hs, IsPreview 1, CrashScribe w grze nietkniety (32cb75a3).
+- Recenzja 2 (1) PRZYJETE: `lance` / `_t581OnePole` liczyly kopie F1H w calym zapasie; `Claim` daje sztuke najpierw typowi z najnizsza umiejetnoscia, wiec kopia mogla pojsc do rekruta (maska KPole) i asercja "1H u jazdy" dawala ZGODNE na pusto. Poprawka: `T581CavLance` (FitMatch na samych drzewcach F1H zapasu, miejsca KPole typow RCav); dostawa 1H czeka na kopie U JAZDY (`_t581OneCavOk`), `_t581CavFull` i `noLance` licza kopie u jazdy; linia doby "kopie F1H x (u jazdy y)". Bez 574 (Skill) - jak dotad zapas.
+- Recenzja 2 (2) PRZYJETE: sztuka testu z listy gracza z brakiem do pokrycia, ale `Avail` 0 (Keep nastepnej bitwy / brak w zbrojowni) - 574 nie sprawdzane. Poprawka: hak w `DrillKit.TakePlayer` (`T581HardKeepNote`, poza testem `_t581HardIds` null - nic), licznik `_t581HardIdKeep` w linii doby; przy `hard` 0 i Keep > 0 - "za trudne nie do sprawdzenia (Keep bitwy / brak w zbrojowni)" zamiast braku.
+- Recenzja 2 (3) PRZYJETE: uscislenie - trzy haki w `DrillKit.cs` (ReturnExcess l.738, TakePlayer Keep i ClaimTake) sa w kodzie gry i wejda z nastepnym wgraniem Armoury; poza autotestem nic nie robia.
+- Build Armoury Release 0 bledow. n393-hs bez zmian.
+
 **Status:** DO SPRAWDZENIA
 
 ## 582: oferta rabunku armii AI pomija wies po okupie tej frakcji i cel zablokowany przy przeprawie (334e ArmyRaid, ArmyRaidKeep) - Armoury (LocalFront334e.Score.cs, LocalFront334e.Log.cs)

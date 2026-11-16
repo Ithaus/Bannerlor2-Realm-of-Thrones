@@ -922,7 +922,7 @@ namespace Armoury
                 foreach (var x in Candidates(k, c))
                 {
                     int n = Math.Min(Avail(x, c), want);
-                    if (n <= 0) continue;
+                    if (n <= 0) { if (x.Book && !x.Dead && x.P.Sell > 0) T581HardKeepNote(x.El.Item); continue; }   // recenzja 583: autotest 581 - sztuka testu zablokowana (poza testem nic)
                     int hs0 = _pHardSkip;
                     n = ClaimTake(m, k, x.El.Item, n, false);   // 574
                     if (x.Book && _pHardSkip != hs0) T581HardNote(x.El.Item, _pHardSkip - hs0, false);   // 583: autotest 581 - pominiete z listy gracza (poza testem nic)

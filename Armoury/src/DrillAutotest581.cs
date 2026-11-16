@@ -41,8 +41,8 @@ namespace Armoury
         private static ItemObject _t581Hard;
         // 583 (P2): "za trudne" tylko dla sztuk testu (hard[0], hard[1]) - pominiete przy braniu Z LISTY GRACZA i oddane; rozne sztuki, nie proby
         private static HashSet<ItemObject> _t581HardIds, _t581HardSeen;
-        private static long _t581HardIdSkip, _t581HardIdBack;
-        private static bool _t581OneWaitSaid;   // 583 (P3): dostawa 1H czeka na kopie F1H w zapasie - linia raz
+        private static long _t581HardIdSkip, _t581HardIdBack, _t581HardIdKeep;   // recenzja 583 (2): Keep - sztuka testu na liscie gracza zablokowana (Avail 0)
+        private static bool _t581OneWaitSaid, _t581OneCavOk;   // recenzja 583 (1): przy dostawie 1H kopie F1H byly u jazdy   // 583 (P3): dostawa 1H czeka na kopie F1H w zapasie - linia raz
         private static List<ItemObject> _t581Items;
 
         private static void T581Reset()
@@ -51,7 +51,7 @@ namespace Armoury
             _t581HardSkip = _t581HardBack = _t581Swap = _t581SwapOut = _t581SwapIn = _t581SwapOutV = _t581SwapInV = _t581CovDrop = _t581Bad = _t581Taken = _t581TakenBook = _t581BalBad = 0;
             _t581OneDay = -1; _t581OnePole = _t581CavFull = _t581T6Max = 0;
             _t581Hard = null; _t581Items = null;
-            _t581HardIds = _t581HardSeen = null; _t581HardIdSkip = _t581HardIdBack = 0; _t581OneWaitSaid = false;
+            _t581HardIds = _t581HardSeen = null; _t581HardIdSkip = _t581HardIdBack = _t581HardIdKeep = 0; _t581OneWaitSaid = _t581OneCavOk = false;
         }
 
         /// <summary>583 (P2): DrillKit - sztuka "za trudna" oddana z zapasu (back) albo pominieta przy braniu z listy gracza. Liczy tylko sztuki testu 581
@@ -61,6 +61,34 @@ namespace Armoury
             if (_t581HardIds == null || it == null || n <= 0 || !_t581HardIds.Contains(it)) return;
             if (back) _t581HardIdBack += n; else _t581HardIdSkip += n;
             _t581HardSeen.Add(it);
+        }
+
+        /// <summary>Recenzja 583 (2): DrillKit.TakePlayer - sztuka testu z listy gracza ma brak do pokrycia, ale Avail 0 (Keep nastepnej bitwy / brak w zbrojowni):
+        /// 574 przy niej nie bylo sprawdzane. Poza autotestem _t581HardIds == null - nic.</summary>
+        private static void T581HardKeepNote(ItemObject it)
+        {
+            if (_t581HardIds == null || it == null || !_t581HardIds.Contains(it)) return;
+            _t581HardIdKeep++;
+        }
+
+        /// <summary>Recenzja 583 (1): ile miejsc drzewc typow JAZDY zajmuja kopie / wlocznie F1H z zapasu (FitMatch na samych drzewcach F1H - Claim daje
+        /// najpierw typom z najnizsza umiejetnoscia, wiec kopia moze pojsc do rekruta, a nie do jazdy). Bez 574 (Skill) -1. Zmienia m.Resid / m.Fit.</summary>
+        private static int T581CavLance(KitM m)
+        {
+            if (m == null || !m.Skill) return -1;
+            var pcs = new Dictionary<ItemObject, int>();
+            for (int i = 0; i < _stock.Count; i++)
+            {
+                var el = _stock.GetElementCopyAtIndex(i);
+                var it = el.EquipmentElement.Item;
+                if (el.Amount <= 0 || it == null || KindOf(it) != KPole || (KindInfo(it) & F1H) == 0) continue;
+                int v; pcs.TryGetValue(it, out v); pcs[it] = v + el.Amount;
+            }
+            FitMatch(m, pcs);
+            int n = 0;
+            for (int t = 0; t < m.Types.Count; t++)
+                if (RoleClass(m.Types[t].Mask) == RCav && (m.Types[t].Mask & (1 << KPole)) != 0) n += m.Types[t].Cap - m.Resid[KPole][t];
+            return n;
         }
 
         /// <summary>583 (P4): najtansze drzewce z uzyciem 1H (F1H - bron biala bez NotUsableWithOneHand: kopia jednoreczna z couch, wlocznia 1H) z wlasnych
@@ -281,11 +309,16 @@ namespace Armoury
                 if (el.Amount > 0 && it != null && KindOf(it) == KPole && (KindInfo(it) & F1H) != 0) _t581OnePole += el.Amount;
             }
             // 583 (P3): 1H dopiero przy kopiach F1H w zapasie (scenariusz recenzji 574); bez nich czeka do doby +T581OneWait, potem dostawa z dopiskiem
-            if (_t581OnePole <= 0 && day < _t581Day0 + T581OneWait)
+            // recenzja 583 (1): kopie maja byc U JAZDY (FitMatch drzewc F1H), nie tylko w zapasie - bez 574 (Skill) jak dotad zapas
+            var mc = MobileParty.MainParty != null && Settings.Current != null ? Groups(MobileParty.MainParty, Settings.Current, true) : null;
+            int cavL = T581CavLance(mc);
+            bool ready = cavL >= 0 ? cavL > 0 : _t581OnePole > 0;
+            if (!ready && day < _t581Day0 + T581OneWait)
             {
-                if (!_t581OneWaitSaid) { _t581OneWaitSaid = true; Log.Info(T581P + "1H po kopiach (doba " + (day - _t581Day0) + ") - kopii / wloczni F1H w zapasie 0, dostawa 1H czeka (najdluzej do doby +" + T581OneWait + ")."); }
+                if (!_t581OneWaitSaid) { _t581OneWaitSaid = true; Log.Info(T581P + "1H po kopiach (doba " + (day - _t581Day0) + ") - kopii / wloczni F1H w zapasie " + _t581OnePole + ", u jazdy " + cavL + ", dostawa 1H czeka (najdluzej do doby +" + T581OneWait + ")."); }
                 return;
             }
+            _t581OneCavOk = ready;
             _t581OneDay = day;
             var arm = QuartermasterLaw.DteArmory();
             var main = MobileParty.MainParty;
@@ -311,8 +344,8 @@ namespace Armoury
                 n += kv.Value;
             }
             if (n > 0) { ArmouryBehavior.StockVersion++; _hudDirty = true; _t581Pcs += n; }
-            Log.Info(T581P + "1H po kopiach (doba " + (day - _t581Day0) + ") - " + n + " szt. na liste gracza: " + sb + "; kopie / wlocznie F1H w zapasie " + _t581OnePole
-                     + (_t581OnePole <= 0 ? " - SCENARIUSZ KOPII NIE ZASZEDL (dostawa bez kopii po " + T581OneWait + " dobach)" : "") + ".");
+            Log.Info(T581P + "1H po kopiach (doba " + (day - _t581Day0) + ") - " + n + " szt. na liste gracza: " + sb + "; kopie / wlocznie F1H w zapasie " + _t581OnePole + ", u jazdy " + cavL + (cavL < 0 ? " (bez 574)" : "")
+                     + (!ready ? " - SCENARIUSZ KOPII NIE ZASZEDL (dostawa bez kopii u jazdy po " + T581OneWait + " dobach)" : "") + ".");
         }
 
         /// <summary>Jedzenie i zold oddzialu testu (bez tego glod i niezaplacony zold obnizaja morale - DefaultPartyDesertionModel zwalnia ludzi).</summary>
@@ -404,6 +437,8 @@ namespace Armoury
             }
             _t581T6Max = Math.Max(_t581T6Max, t6);
             for (int t = 0; t < mm.Types.Count; t++) if (RoleClass(mm.Types[t].Mask) == RCav && (mm.Types[t].Mask & (1 << K1H)) != 0) cavNeed += mm.Types[t].Cap;
+            int cavLance = T581CavLance(mm);   // recenzja 583 (1): kopie F1H u jazdy (przed pelnym FitMatch - ten liczy Resid od nowa); -1 bez 574
+            if (cavLance < 0) cavLance = lance;
             if (mm.Skill)
             {
                 FitMatch(mm, pcs);
@@ -411,25 +446,26 @@ namespace Armoury
                     if (RoleClass(mm.Types[t].Mask) == RCav && (mm.Types[t].Mask & (1 << K1H)) != 0) cav1 += mm.Types[t].Cap - mm.Resid[K1H][t];
             }
             else cav1 = Math.Min(sw, cavNeed);   // bez 574 nie ma dopasowania do typow - przyblizenie
-            if (_t581OneDay >= 0 && day > _t581OneDay && cavNeed > 0 && cav1 >= cavNeed && sw > 0 && lance > 0) _t581CavFull++;
+            if (_t581OneDay >= 0 && day > _t581OneDay && cavNeed > 0 && cav1 >= cavNeed && sw > 0 && cavLance > 0) _t581CavFull++;   // recenzja 583 (1): kopie u jazdy, nie w zapasie
             long hard = _t581HardIdSkip + _t581HardIdBack;   // 583 (P2): tylko sztuki testu - pominiete z listy gracza albo oddane (nie globalne proby)
             bool pvOk = KitPreview.CsQuiet;   // 583 (P1): bez podgladu (CrashScribe testu sprzed 133a) lista gracza i 575 martwe - nie do sprawdzenia
-            bool noLance = _t581OneDay >= 0 && _t581OnePole <= 0 && lance <= 0;   // 583 (P3): dostawa 1H poszla bez kopii i kopii dalej nie ma
+            bool noLance = _t581OneDay >= 0 && !_t581OneCavOk && cavLance <= 0;   // 583 (P3), recenzja (1): dostawa 1H poszla bez kopii u jazdy i dalej ich tam nie ma
             bool bad = _t581Bad > 0 || _t581BalBad > 0 || _t581CovDrop > 0 || (_t581Swap > 0 && _t581SwapInV >= _t581SwapOutV);   // recenzja 581 (2): bilans sztuk z Daily zamiast tautologii liczb wymian
             var miss = new List<string>();
-            if (_t581Hard != null && hard <= 0) miss.Add("za trudne");
+            bool hardKeep = _t581Hard != null && hard <= 0 && _t581HardIdKeep > 0;   // recenzja 583 (2): sztuki testu tylko blokowane (Keep / brak w zbrojowni) - 574 nie sprawdzane
+            if (_t581Hard != null && hard <= 0 && !hardKeep) miss.Add("za trudne");
             if (_t581Swap <= 0) miss.Add("wymiana na tansze");
             if (cavNeed > 0 && _t581CavFull <= 0 && !noLance) miss.Add("1H u jazdy (pelne przy kopiach w zapasie)");
-            string skip = (_t581Hard == null ? " (za trudne nie do sprawdzenia - brak sztuk ponad umiejetnosc)" : "") + (cavNeed <= 0 ? " (1H u jazdy nie do sprawdzenia - brak jazdy)" : "")
+            string skip = (_t581Hard == null ? " (za trudne nie do sprawdzenia - brak sztuk ponad umiejetnosc)" : "") + (hardKeep ? " (za trudne nie do sprawdzenia - sztuki testu zablokowane Keep bitwy / brak w zbrojowni x" + _t581HardIdKeep + ")" : "") + (cavNeed <= 0 ? " (1H u jazdy nie do sprawdzenia - brak jazdy)" : "")
                           + (cavNeed > 0 && _t581CavFull <= 0 && noLance ? " (1H u jazdy nie do sprawdzenia - kopii F1H w zapasie nie bylo)" : "");
             string verdict = bad ? "NIEZGODNE (kontrola sztuk / bilans zapasu / pokrycie / wartosc wymian)"
                 : !pvOk && miss.Count > 0 ? "nie do sprawdzenia (CrashScribe testu bez podgladu) - brak: " + string.Join(", ", miss.ToArray()) + "; kontrola sztuk i bilans zapasu ZGODNE" + skip
                 : miss.Count == 0 ? "ZGODNE" + skip
                 : (day - _t581Day0 >= T581Deadline ? "NIEZGODNE (po " + T581Deadline + " dobach brak: " : "CZEKA (brak: ") + string.Join(", ", miss.ToArray()) + ")" + skip;
             Log.Info(T581P + "dzien " + day + " (doba " + (day - _t581Day0) + " od dokladki), ludzi " + men + "/" + _t581Men0 + " | 574 za trudne sztuk testu " + hard + " (pominiete z listy gracza " + _t581HardIdSkip + ", oddane " + _t581HardIdBack + ", rozne sztuki "
-                     + (_t581HardSeen != null ? _t581HardSeen.Count : 0) + "/" + (_t581HardIds != null ? _t581HardIds.Count : 0) + "; wszystkie proby: pominiete przy braniu " + _t581HardSkip
+                     + (_t581HardSeen != null ? _t581HardSeen.Count : 0) + "/" + (_t581HardIds != null ? _t581HardIds.Count : 0) + ", zablokowane Keep " + _t581HardIdKeep + "; wszystkie proby: pominiete przy braniu " + _t581HardSkip
                      + ", oddane " + _t581HardBack + ") | 575 wymieniono na tansze " + _t581Swap + " (oddane " + _t581SwapOut + ", wziete " + _t581SwapIn
-                     + "; wartosc oddanych " + _t581SwapOutV + " d, wzietych " + _t581SwapInV + " d; spadek pokrycia " + _t581CovDrop + ") | 1H w zapasie " + sw + (_t581OneDay < 0 ? " (dostawa 1H po kopiach jeszcze nie)" : "") + ", kopie F1H " + lance + ", 1H u jazdy " + cav1 + "/" + cavNeed + " (pelne przy kopiach " + _t581CavFull + " dob)"
+                     + "; wartosc oddanych " + _t581SwapOutV + " d, wzietych " + _t581SwapInV + " d; spadek pokrycia " + _t581CovDrop + ") | 1H w zapasie " + sw + (_t581OneDay < 0 ? " (dostawa 1H po kopiach jeszcze nie)" : "")  + ", kopie F1H " + lance + " (u jazdy " + cavLance + "), 1H u jazdy " + cav1 + "/" + cavNeed + " (pelne przy kopiach " + _t581CavFull + " dob)"
                      + (mm.Skill ? "" : " (bez 574 - przyblizenie)") + " | wzieto ze zbrojowni " + _t581Taken + " (z listy gracza " + _t581TakenBook + "), kontrola sztuk zbrojownia + zapas "
                      + (_t581Bad == 0 ? "ZGODNE" : "NIEZGODNE x" + _t581Bad) + ", bilans zapasu " + (_t581BalBad == 0 ? "ZGODNY" : "NIEZGODNY x" + _t581BalBad) + " | T6 w zapasie " + t6 + " (najwiecej " + _t581T6Max + ") | test dolozyl: sztuk " + _t581Pcs + " (tansze " + _t581Drops + "x, " + _t581DropN + " szt.), zboza " + _t581Grain + ", zlota " + _t581Gold
                      + (pvOk ? "" : " | podglad bitwy BRAK (CrashScribe testu sprzed 133a)") + " | " + verdict + ".");
