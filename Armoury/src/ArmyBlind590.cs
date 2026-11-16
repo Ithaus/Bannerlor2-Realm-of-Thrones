@@ -32,7 +32,7 @@ namespace Armoury
     ///    rodu gracza wygrywa: przed partia objeta paktem nie ucieka, chyba ze ta naprawde wystepuje przeciw niej - decyzja 386);
     ///  - sila wlasna = partia + sojusznicy (ta sama MapFaction, agresja &gt; 0.01, nie gracz, nie doczepieni, poza bitwa / obozem oblezenia / garnizonem /
     ///    milicja) w 2R od wroga z waga b jak gra (num3 / num8) + wodz z doczepionymi (Army.EstimatedStrength) z waga 1 TYLKO gdy wodz blizej niz 2R od partii,
-    ///    inaczej jak zwykly sojusznik (waga b wzgledem wroga); sojusznik przeciw graczowi tylko z waniliowym warunkiem ShouldConsiderAttacking (bez naszych
+    ///    dalej wodz nie liczy sie wcale (recenzja 590); sojusznik przeciw graczowi tylko z waniliowym warunkiem ShouldConsiderAttacking (bez naszych
     ///    wet - model nie jest wolany, jak w 589);
     ///  - sila wroga = wrog (armia od wodza) + 0.9 x jego sojusznicy (ta sama MapFaction co wrog, agresja &gt; 0.01) w 2R od niego z waga b - jak gra (num6/num7);
     ///  - przewaga lokalna a = wlasna / wroga; ucieczka gdy a &lt; 1 (gra: atak 0 ponizej 1) z wynikiem wedlug wzoru gry (CalculateInitiativeScoresForEnemy):
@@ -57,7 +57,7 @@ namespace Armoury
 
         private sealed class Ex
         {
-            internal string Who, Foe, Leader;
+            internal MobileParty Who, Foe, Leader;   // recenzja 590: referencje - nazwy (TextObject) dopiero w linii doby, w watku glownym
             internal float D, Own, FoeStr, ArmyStr, FoeRaw, LeadD, Avoid, Game;
             internal bool J223;
         }
@@ -196,6 +196,9 @@ namespace Armoury
                     Vec2 ep = e.GetPosition2D;
                     float d = pp.Distance(ep);
                     if (d >= r * 3f) continue;   // gra: num2 >= R x 2 x 3 odrzuca (promien szukania 3R)
+                    // recenzja 590: gra (linia ok. 170) pomija wroga, do ktorego nie ma drogi (rzeka, morze) - tak samo, ta sama funkcja i limit
+                    float dn, lr;
+                    if (!DistanceHelper.FindClosestDistanceFromMobilePartyToMobileParty(p, e, p.NavigationCapability, r * 2f * 10f, out dn, out lr)) continue;
                     Interlocked.Increment(ref _iSeen);
                     if (!model.ShouldConsiderAvoiding(p, e)) { Interlocked.Increment(ref _iPact); continue; }   // 386 AvoidPact (pakt rodu gracza) i bramki gry
 
@@ -207,12 +210,9 @@ namespace Armoury
                     float foeAllies = 0f;
                     var fe = e.MapFaction;
                     bool vsPlayer = e.IsMainParty;
-                    // wodz i doczepieni: waga 1 tylko blisko partii (2R), inaczej jak sojusznik wzgledem wroga
-                    if (lead.MapEvent == null && !lead.IsCurrentlyAtSea && (!vsPlayer || VanillaAttacksPlayer(lead)))
-                    {
-                        float wl = leadNear ? 1f : W(lp.Distance(ep), num3, r);
-                        if (wl > 0f && (lead.Aggressiveness > 0.01f || leadNear)) own += armyStr * wl;
-                    }
+                    // wodz i doczepieni: TYLKO gdy wodz blizej niz 2R od partii (waga 1); dalej - nie liczy sie wcale (recenzja 590: wodz stojacy
+                    // za wrogiem na drodze czeka na zbiorke i nie idzie na pomoc - to jest wlasnie przypadek Mylesa i Marbranda)
+                    if (leadNear && (!vsPlayer || VanillaAttacksPlayer(lead))) own += armyStr;
                     var d2 = MobileParty.StartFindingLocatablesAroundPosition(pp, r * 3f);
                     for (var a = MobileParty.FindNextLocatable(ref d2); a != null; a = MobileParty.FindNextLocatable(ref d2))
                     {
@@ -287,7 +287,7 @@ namespace Armoury
             lock (ExGate)
             {
                 if (_ex.Count >= ExMax || !_exLords.Add(p)) return;
-                _ex.Add(new Ex { Who = Nm(p), Foe = e.IsMainParty ? "GRACZ" : Nm(e), Leader = Nm(lead), D = d, Own = own, FoeStr = foe, ArmyStr = armyStr, FoeRaw = raw,
+                _ex.Add(new Ex { Who = p, Foe = e, Leader = lead, D = d, Own = own, FoeStr = foe, ArmyStr = armyStr, FoeRaw = raw,
                                  LeadD = leadD, Avoid = avoid, Game = game, J223 = j223 });
             }
         }
@@ -359,8 +359,8 @@ namespace Armoury
                     for (int i = 0; i < _ex.Count; i++)
                     {
                         var x = _ex[i];
-                        sb.Append(" | przyklad: ").Append(x.Who).Append(" (do wodza ").Append(x.Leader).Append(" ").Append(F1(x.LeadD)).Append(" jedn.")
-                          .Append(x.J223 ? ", wcielony przez 223" : "").Append(") ucieka przed ").Append(x.Foe).Append(" z ").Append(F1(x.D))
+                        sb.Append(" | przyklad: ").Append(Nm(x.Who)).Append(" (do wodza ").Append(Nm(x.Leader)).Append(" ").Append(F1(x.LeadD)).Append(" jedn.")
+                          .Append(x.J223 ? ", wcielony przez 223" : "").Append(") ucieka przed ").Append(x.Foe != null && x.Foe.IsMainParty ? "GRACZ" : Nm(x.Foe)).Append(" z ").Append(F1(x.D))
                           .Append(" jedn. - sily: swoi w poblizu ").Append(F0(x.Own)).Append(" / wrog z sojusznikami ").Append(F0(x.FoeStr))
                           .Append(" (gra porownywala wroga ").Append(F0(x.FoeRaw)).Append(" z cala armia ").Append(F0(x.ArmyStr)).Append(")")
                           .Append(", wynik ucieczki ").Append(F2(x.Avoid)).Append(" (gra ").Append(F2(x.Game)).Append(")");
