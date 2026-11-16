@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 583: narzedzia testu - testowy CrashScribe n393-hs z aktualnego zrodla (z podgladem 133a) + poprawki asercji autotestu musztry 581 (DrillAutotest581.cs, 2 haki w DrillKit.cs)
+
+**Problem:** autotest at-268b (`Armoury-2026-11-16_06-00-24.log`, analiza + sceptyk, A-P1..P4): linia "Musztra (autotest 581)" od doby 30 daje NIEZGODNE (189 linii) - "wymiana na tansze" 0, "1H u jazdy 0/9", "kopie F1H 0", "z listy gracza 0" przy 338 sztukach testu na liscie gracza; linia 848 "CrashScribe sprzed 133a - podglad ... WYLACZONE (papier)", 218 rozliczen "bez podgladu 1". Do tego "574 za trudne" rosnie rowno o 19 na dobe (proby z puli ludzi, nie kusze testu crossbow_e/crossbow_d), oddane 0; "1H po kopiach (doba 3) ... kopie F1H w zapasie 0"; dokladka dala na drzewca widly `peasant_pitchfork_1_t1` (crafting_template TwoHandedPolearm - bez F1H).
+
+**Przyczyna:**
+- P1: testowy `cs/CrashScribe-at-n392-hs.dll` (i wszystkie n39x) ma stary `Mends.cs` sprzed 133a - `grep -a -c IsPreview` = 0 (CrashScribe Jeffa 32cb75a3 = 1). `KitPreview.CsState` -> `CsQuiet` false -> `ForArmoury()` null -> `NewTakeCtx`: Keep null, Book/KeepMen false -> pobor z listy gracza (571) i wymiana 575 martwe w kazdym autotescie. "hs" = n392 + Mend 481 `HsBanners.cs` (Heraldry Studio nie przycina herbow ROT; wpis 481), zbudowane z drzewa harnessu `src/cs-at390` (kopia produkcyjnego CrashScribe z ok. 8.11 + pliki autotestu).
+- P2: `T581Line` sumowal globalne `_pHardSkip` (kazda proba `ClaimTake` z puli ludzi co dobe) zamiast sztuk testu.
+- P3: `T581One` liczyl `_t581OnePole`, ale dostarczal 1H bezwarunkowo w dobie +3.
+- P4: `T581Setup` dla drzewc bral F1H tylko z listy "udzwigna wszyscy" (`T581FitsAll`: ItemReq, MountOk dla konnych, kultura); dla casterly_squire zadne F1H nie przeszlo, wiec poszly najtansze drzewca w ogole (widly 2H).
+
+**Zmiana:**
+- Narzedzie testu (poza repo, `C:\Users\GAME\bannerlord-autotest\src\cs-at393`, git lokalny): zrodla produkcyjnego CrashScribe z tego worktree (= WGRANIE 264, 32cb75a3: Mends.IsPreview 133a, OthersSteel 563, HsBanners 481, SaiStrength 353, OnGameEnd) + latki harnessu przeniesione z n392-hs: pliki `Autotest*.cs` (7), `Census.cs`, `FrameProfiler.cs`; haki `SubModuleMain` (Autotest.Arm, Install, Tick+FrameProfiler, AutotestBattle.OnMissionInit, AutotestBehavior), `Fabula` (Autotest.Note przy starcie wydarzenia), `Scribe` (Autotest.NoteError), `Watchdog` (NoteOffThread), `Config.AutotestHeroShooter` (pole + klucz), `System.Drawing` w csproj. Wynik `cs/CrashScribe-at-n393-hs.dll`; `IsPreview` w DLL 1. CrashScribe w grze NIE ruszany.
+- `DrillAutotest581.cs` (tylko autotest):
+  - P2: `_t581HardIds` = {hard[0], hard[1]} (kusze/luki testu ponad umiejetnosc); `T581HardNote` liczy tylko te sztuki - oddane z zapasu (`ReturnExcess`, `DrillKit.cs:738`) i pominiete przy braniu Z LISTY GRACZA (`TakePlayer`, `DrillKit.cs:926-928`: roznica `_pHardSkip` przy `x.Book`). Asert "za trudne": oddane + pominiete z listy > 0. Linia doby: "za trudne sztuk testu N (pominiete z listy gracza A, oddane B, rozne sztuki x/y; wszystkie proby: ...)". Poza autotestem `_t581HardIds == null` - haki nic nie robia.
+  - P3: `T581One` liczy kopie F1H w zapasie co dobe; dostawa 1H dopiero przy kopiach > 0, najdluzej czeka do doby +12 (`T581OneWait`), potem dostawa z dopiskiem "SCENARIUSZ KOPII NIE ZASZEDL"; wtedy (i gdy kopii dalej nie ma) asert "1H u jazdy" -> "(nie do sprawdzenia - kopii F1H w zapasie nie bylo)" zamiast braku.
+  - P4: gdy zadne drzewce F1H nie przechodzi `T581FitsAll` - najtansze drzewce F1H z WLASNYCH zestawow bitewnych typu jazdy (`T581OwnLance`; typ jazdy i tak wybrany po takim drzewcu w `T581Lance`; wlasny wzorzec przechodzi MountOk i kulture przez `TemplateHas`), z dopiskiem w linii dokladki. F1H = bron biala bez `WeaponFlags.NotUsableWithOneHand` (`KindInfo`) - kopia jednoreczna z couch i wlocznia 1H maja F1H, TwoHandedPolearm (widly) nie.
+  - P1: przy `!KitPreview.CsQuiet` brakujace asercje -> "nie do sprawdzenia (CrashScribe testu bez podgladu) - brak: ...; kontrola sztuk i bilans zapasu ZGODNE" zamiast NIEZGODNE (kontrola sztuk / bilans / pokrycie / wartosc wymian dalej daja NIEZGODNE); dopisek "podglad bitwy BRAK".
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Gra Jeffa: dwa haki w `DrillKit.cs` sa na sciezce rozliczenia gracza; poza autotestem `_t581HardIds` null -> jedno porownanie (TakePlayer: odczyt int przed/po ClaimTake). Liczniki `_pHardSkip/_pBackHard` i linia "Musztra (gracz)" bez zmian. `TakePlayer`/`ReturnExcess` wolane tylko z rozliczenia (DrillKit.cs:565/576), nie z podgladu.
+- n393-hs a gra Jeffa: od teraz autotest idzie sciezka podgladu jak u Jeffa (Keep/Book/KeepMen), wiec liczby meldunku kwatermistrza, K15 w misji i zbrojowni beda inne niz w at-26x (tam "papier") - to nie regresja, tylko pierwszy test prawdziwej sciezki.
+- Harness n393 przeniesiony z n392-hs bez zmian logiki; roznice n392-hs wobec produkcji (stary Mends bez 133a, brak OnGameEnd 353) NIE przeniesione - zostala wersja produkcyjna.
+- Watpliwosc: hard[0]/hard[1] moga nie trafic do proby, jesli tansze pasujace kusze z puli ludzi pokryja brak wczesniej (575 cena rosnaco) - wtedy po 30 dobach "brak: za trudne" bedzie prawdziwa obserwacja testu, nie gry.
+- Build Armoury 0 bledow, CrashScribe testu 0 bledow (16 ostrzezen FrameProfiler jak w n392-hs). NIE wgrane (Armoury z 581 jest w grze; ta zmiana dotyczy linii testu).
+
+**Status:** DO SPRAWDZENIA
+
 ## 582: oferta rabunku armii AI pomija wies po okupie tej frakcji i cel zablokowany przy przeprawie (334e ArmyRaid, ArmyRaidKeep) - Armoury (LocalFront334e.Score.cs, LocalFront334e.Log.cs)
 
 **Problem:** autotest at-268b (`Armoury-2026-11-16_06-00-24.log`, analiza + weryfikacja, B1): linia "Okup okolicy (R3-03a)" doby 108866 - `Orea Talordis <- Ryona 7195 zl`, a w dobach 108866 i 108867 linie "armia rabuje" Orea Talordis -> Ryona z wynikiem 5.2 (l. 178046, 178943), bez nowego startu. Armia dostaje oferte rabunku wsi, ktorej rabowac nie moze, i w tej mysli nie rabuje wcale (czesciowo tlumaczy 241 ofert / 5 startow). Wada sprzed 580/580b.

@@ -735,7 +735,7 @@ namespace Armoury
                     var it = el.EquipmentElement.Item;
                     int v = KindInfo(it), give;
                     if (v < 0) { if (pass != 0) continue; give = left[i]; _pBackOther += give; }
-                    else if (m.Skill && !UsableAny(m, it)) { if (pass != 0) continue; give = left[i]; _pBackHard += give; }   // 574
+                    else if (m.Skill && !UsableAny(m, it)) { if (pass != 0) continue; give = left[i]; _pBackHard += give; T581HardNote(it, give, true); }   // 574; 583: autotest 581 - sztuki testu (poza testem nic)
                     else
                     {
                         if (pass == 0) continue;
@@ -923,7 +923,9 @@ namespace Armoury
                 {
                     int n = Math.Min(Avail(x, c), want);
                     if (n <= 0) continue;
+                    int hs0 = _pHardSkip;
                     n = ClaimTake(m, k, x.El.Item, n, false);   // 574
+                    if (x.Book && _pHardSkip != hs0) T581HardNote(x.El.Item, _pHardSkip - hs0, false);   // 583: autotest 581 - pominiete z listy gracza (poza testem nic)
                     if (n <= 0) continue;
                     Move(x, n, c);
                     want -= n; took += n;
