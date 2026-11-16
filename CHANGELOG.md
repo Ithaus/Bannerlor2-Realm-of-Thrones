@@ -32,6 +32,26 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 578
+
+Trzy niezalezne recenzje: BRAK BLEDOW blokujacych (postoj AI blokuje tylko postep - `RaidEventComponent.Update` to sam postep, `AiPartyThinkBehavior` mysli co godzine i moze skonczyc rabunek; NocnyMarsz/HoldSleepers/HoldDebtSleepers/SleepersHoldOrders/ArmyRestDay pomijaja partie z MapEvent; ta sama `AlarmThreat` co NocnyMarsz; wzor "about N days" = D x 24/18).
+
+**Poprawione:**
+- Cudza armia pod kluczem gracza (recenzja 1.1, spec. 5): przy Raid Night Halt WL i Raid Night Halt AI wyl gracz w rabujacej armii lorda AI pracowal cala noc (brak wpisu `_aiHalt`). Teraz `FollowHaltOn` (RaidNightHalt + NightRestEnabled + ksiega snu AI + latka kroku) trzyma ocene godzinowa tylko dla tej armii (`AiRaidHaltHour`: `only = PlayerFollowedRaid()`, inne rabunki AI pomijane); `DropAiHaltExcept` w ocenie i w klatce zdejmuje reszte wpisow, wpis armii gracza zostaje. `_aiHaltLive` dalej = klucz AI (dzien rabunku jako praca lordow AI tylko przy kluczu AI). Wymaga ksiegi snu AI (AiCampsAtNight), bo ocena biegnie z AiHourly.
+- Falszywy komunikat "Alarm in the night ... enemies are near" (recenzja 3.1): pole `AiHalt.Cut` (true tylko przy zdjeciu postoju przez zagrozenie albo ucieczke, kasowane przy ponownym postoju); klatka gracza w cudzej armii pisze alarm tylko przy `Cut`, w innym razie (klucz wylaczony, ksiega, potkniecie oceny) "The army takes up the raid on X again."; linia logu nazywa przyczyne.
+- "Dni zegara na osade" zanizone (recenzje 1.2, 2.2): `StartH` ustawiany przy pierwszym ticku sesji w prefiksie (przed testem postoju i walki), `Start` nadpisuje tylko NaN, `NextStep` (gracz) zeruje go na nowy krok - krok AI zaczety w nocy liczy pierwsza noc.
+- Podpowiedzi MCM (recenzja 3.2, do wiadomosci Jeffa): Raid Night Halt - "its lords then lose that sleep as well" (gracz z kluczem wyl w armii lorda AI: cala armia rabuje noc, jej lordowie lapia dlug); Raid Night Halt AI - "a lord's army you march with still halts under Raid Night Halt". Settings.cs i McmSettings.cs recznie.
+
+**Odrzucone / bez zmiany:**
+- `_dWallPer` liczy kroki gracza (recenzja 3.3) - nieprawda: dopisywany w galezi `else` od `if (ss.Player)` (DistrictRaid, koniec kroku), tylko kroki AI; komentarz poprawny.
+- Przesuniecie o godzine ksiega AI (termin ticku) wobec zegara postoju (recenzje 1.3, 2.1) - suma 6 h snu na noc = baza, ta sama konwencja co gracz w 577; dotyczy tylko podzialu w liczniku. Bez zmiany.
+- `AlarmThreat` lapie jednego silniejszego wroga, nie sume slabszych (recenzja 2.3) - celowo ta sama ocena co NocnyMarsz (spec.); reakcja AI i tak w think. Bez zmiany.
+- `raidK==2` ginie przy ticku nadrabianym (recenzja 2.4) - zgodne z regula R7 (`LastRest`). Bez zmiany.
+
+**Nierozstrzygniete (decyzja Jeffa):** gracz z Raid Night Halt wyl w armii lorda AI zatrzymuje caly nocny postoj tej armii (lordowie AI pracuja noc) - zostawione wedlug spec. 3/5, opisane w podpowiedzi. Skutki wojenne (rabunek AI ok. 1/3 dluzej zegarowo, wiecej odsieczy, wiecej rozpadow armii) - do KRONIKI WOJEN.
+
+Build Armoury 0 bledow (Release). NIE wgrane.
+
 ## 576: dzialka lupu bez ekranu lupow do zbrojowni gracza (na jego liste) z komunikatem - wymuszenie zaopatrzenia, kryjowka, rabunek, szturm, wypad... - Armoury (BattlefieldLaw.cs, ArmouryBehavior.cs, SiegeSpoils380.cs; nowy klucz LootShareToArmouryNoScreen w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 16.11: "poknalem obroncow wioski gdzie jest ich sprzet?". Log Armoury-2026-11-15_23-13-58.log: 23:50:40 "BattlefieldLaw: 59 szt. ... z magazynu wojska czeka na ekran lupow", 23:52:01 "Straty bitwy (312f): ... typ IsForcingSupplies pod Ashemark Mines", 23:52:08 menu force_supplies_village, a dopiero godzine gry pozniej 23:52:56 "BattlefieldLaw: kolejka lupow wysypana do sakw (67 szt.) - ekran lupow nie przyszedl". Dzialka trafila do sakw, nie do zbrojowni, a jedyny komunikat ("packed into your baggage") przyszedl godzine po bitwie, juz poza wsia.

@@ -268,6 +268,8 @@ namespace Armoury
             {
                 var me = __instance.MapEvent;
                 if (me == null) return true;
+                // recenzja 578: zegar kroku od pierwszego ticku sesji (krok zaczety w nocy stoi przed Start - bez tego pierwsza noc wypadala z "dni zegara na osade")
+                if (!ss.Started && double.IsNaN(ss.StartH)) ss.StartH = CampaignTime.Now.ToHours;
                 var def = __instance.DefenderSide; var att = __instance.AttackerSide;
                 if (def == null || att == null || def.TroopCount > 0) return true;       // walka (milicja, odsiecz) - gra i MapEvent
                 var v = ss.V; var st = v.Settlement;
@@ -391,7 +393,7 @@ namespace Armoury
         {
             var v = ss.V;
             ss.Started = true;
-            ss.StartH = CampaignTime.Now.ToHours;   // 578: doby zegara kroku (linia doby)
+            if (double.IsNaN(ss.StartH)) ss.StartH = CampaignTime.Now.ToHours;   // 578: doby zegara kroku (linia doby); pierwszy krok - od pierwszego ticku (prefiks), nastepny - NextStep
             ss.Hp0 = Math.Max(0.01f, Math.Min(1f, v.Settlement.SettlementHitPoints));
             ss.MainOnly = ss.Player && PlayerMainOnly;   // m97-wioski: klucz czytany na kazdy krok
             var p = Plan(v, men, ss.MainOnly, ss.Fid);
@@ -445,6 +447,7 @@ namespace Armoury
             ss.SHit = ss.SDead = ss.SFled = ss.SRef = ss.SCap = ss.SFoodBurn = ss.SFoodEat = 0.0;
             ss.SGold = ss.STake = ss.SBurn = 0;
             _setHp(st, 1f);
+            ss.StartH = double.NaN;   // recenzja 578: zegar nowego kroku od teraz (Start)
             Start(ss, comp, men);
         }
 

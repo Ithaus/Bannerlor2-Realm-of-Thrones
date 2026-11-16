@@ -35,6 +35,7 @@ namespace Armoury
         private sealed class AiHalt
         {
             public bool On;           // postoj nocny czynny (ocena godziny); RaidHaltHolds dodatkowo: zegar w nocy obozu i faza lupienia
+            public bool Cut;          // recenzja 578: ostatnie zdjecie postoju przez zagrozenie albo ucieczke (komunikat gracza w cudzej armii: alarm tylko wtedy)
             public double From = -1;  // poczatek postoju (godzina kampanii) - do linii
             public string Name, Lead;
             public int Parties;
@@ -70,6 +71,25 @@ namespace Armoury
         private static bool AiHaltOn(Settings s)
         {
             return s != null && s.RaidNightHaltAi && s.NightRestEnabled && LedgerOn(s) && DistrictRaid.UpdWired;
+        }
+
+        /// <summary>Recenzja 578 (spec. 5: "cudza armia pod istniejacym RaidNightHalt"): postoj armii lorda AI, w ktorej jest gracz, czynny w ustawieniach - klucz gracza
+        /// zamiast klucza AI. Ocena godzinowa biegnie z AiHourly, wiec dalej wymaga ksiegi snu AI (LedgerOn) i latki kroku rabunku.</summary>
+        private static bool FollowHaltOn(Settings s)
+        {
+            return s != null && s.RaidNightHalt && s.NightRestEnabled && LedgerOn(s) && DistrictRaid.UpdWired;
+        }
+
+        /// <summary>Recenzja 578: zdejmuje wpisy postoju AI poza keep (null - wszystkie); zwraca liczbe zdjetych, on - w tym czynnych.</summary>
+        private static int DropAiHaltExcept(RaidEventComponent keep, out int on)
+        {
+            on = 0;
+            _aiHaltDrop.Clear();
+            foreach (var kv in _aiHalt) if (!ReferenceEquals(kv.Key, keep)) { _aiHaltDrop.Add(kv.Key); if (kv.Value.On) on++; }
+            for (int i = 0; i < _aiHaltDrop.Count; i++) _aiHalt.Remove(_aiHaltDrop[i]);
+            int n = _aiHaltDrop.Count;
+            _aiHaltDrop.Clear();
+            return n;
         }
 
         /// <summary>578: RaidHaltHolds - czesc AI (wolane tylko przy niepustym slowniku). Zegar w nocy obozu i faza lupienia.</summary>
@@ -132,18 +152,22 @@ namespace Armoury
         // ------------------------------------------------------------ (1) ocena godzinowa rabunkow AI (AiHourly, przed ksiega AI)
         private static void AiRaidHaltHour(Settings s)
         {
-            if (!AiHaltOn(s))
+            bool aiOn = AiHaltOn(s);
+            _aiHaltLive = aiOn;
+            // recenzja 578: klucz AI wylaczony - postoj zostaje tylko dla armii lorda AI, w ktorej jest gracz z Raid Night Halt (spec. 5)
+            RaidEventComponent only = null;
+            if (!aiOn)
             {
-                _aiHaltLive = false;
+                only = FollowHaltOn(s) ? PlayerFollowedRaid() : null;
                 if (_aiHalt.Count > 0)
                 {
-                    int n = 0; foreach (var kv in _aiHalt) if (kv.Value.On) n++;
-                    _aiHalt.Clear();
-                    Log.Info("Rabunek AI - postoj nocny (578): wylaczony (klucz Raid Night Halt AI, ksiega snu, oboz swiata albo latka kroku rabunku) - " + n + " rabunkow rusza od reki.");
+                    int n; int gone = DropAiHaltExcept(only, out n);
+                    if (gone > 0)
+                        Log.Info("Rabunek AI - postoj nocny (578): wylaczony (klucz Raid Night Halt AI, ksiega snu, oboz swiata albo latka kroku rabunku) - " + n + " rabunkow rusza od reki"
+                                 + (only != null ? " (zostaje armia gracza - klucz Raid Night Halt)." : "."));
                 }
-                return;
+                if (only == null) return;
             }
-            _aiHaltLive = true;
             var c = Campaign.Current;
             var mgr = c != null ? c.MapEventManager : null;
             if (mgr == null) return;
@@ -166,6 +190,7 @@ namespace Armoury
                     var lp = att != null ? att.LeaderParty : null;
                     var lead = lp != null ? lp.MobileParty : null;
                     if (comp == null || lead == null || lead == main) continue;   // rabunek gracza - 577 (RaidHaltFrame)
+                    if (!aiOn && !ReferenceEquals(comp, only)) continue;        // recenzja 578: klucz AI wylaczony - tylko armia z graczem
                     raids++;
                     _aiHaltSeen.Add(comp);
                     AiHalt h;
@@ -196,7 +221,7 @@ namespace Armoury
                     }
                     if (ok)
                     {
-                        if (!h.On) { h.On = true; if (h.From < 0) h.From = now; starts++; _rhStarts++; }
+                        if (!h.On) { h.On = true; h.Cut = false; if (h.From < 0) h.From = now; starts++; _rhStarts++; }
                         int np = 1; try { np = att.Parties != null ? att.Parties.Count : 1; } catch { }
                         h.Parties = np;
                         held++; parties += np;
@@ -205,6 +230,7 @@ namespace Armoury
                     else if (h.On)
                     {
                         h.On = false;
+                        h.Cut = isThreat;
                         if (isThreat)
                         {
                             cuts++; _rhThreat++;
@@ -254,7 +280,14 @@ namespace Armoury
             {
                 if (Campaign.Current == null) { ResetRaidHaltAi(); return; }
                 // klucz albo ksiega wylaczone w trakcie gry - postoj AI zdjety od reki (OnHourly konczy sie przed AiHourly przy wylaczonej ksiedze)
-                if (_aiHalt.Count > 0 && !AiHaltOn(s)) { _aiHalt.Clear(); _aiHaltLive = false; Log.Info("Rabunek AI - postoj nocny (578): klucz albo ksiega snu wylaczone - postoje AI zdjete od reki."); }
+                // recenzja 578: armia lorda AI z graczem zostaje pod kluczem gracza Raid Night Halt (spec. 5); wpis bez zmian - bez logu co klatke
+                if (_aiHalt.Count > 0 && !AiHaltOn(s))
+                {
+                    _aiHaltLive = false;
+                    int on; int gone = DropAiHaltExcept(FollowHaltOn(s) ? PlayerFollowedRaid() : null, out on);
+                    if (gone > 0) Log.Info("Rabunek AI - postoj nocny (578): klucz albo ksiega snu wylaczone - postoje AI zdjete od reki (" + gone + ", czynnych " + on + ")"
+                                           + (_aiHalt.Count > 0 ? "; zostaje armia gracza (klucz Raid Night Halt)." : "."));
+                }
                 // (2) wioska poboczna skonczona w postoju (Stop raiding, przerwanie, koniec) - bez wznowienia
                 if (_sideHalt && !SideVillageVisit.RaidActive) EndSide("rabunek wioski pobocznej skonczony (Stop raiding albo przerwany) - bez wznowienia");
                 // (3) gracz w cudzej armii
@@ -281,13 +314,15 @@ namespace Armoury
                 else if (!held)
                 {
                     bool night = BedNight(CampaignTime.Now.GetHourOfDay);
+                    // recenzja 578: alarm tylko przy zdjeciu przez zagrozenie albo ucieczke (Cut); klucz wylaczony, ksiega, potkniecie - zwykle wznowienie
+                    AiHalt ch; bool cut = s.RaidNightHalt && _aiHalt.TryGetValue(cur, out ch) && ch.Cut;
                     string name = _followName; double from = _followFrom;
                     _follow = null; _followName = null; _followFrom = -1;
                     if (night)
                     {
                         _haltEndsDay++;
-                        Msg(s.RaidNightHalt ? "Alarm in the night - the army is roused at " + name + ": enemies are near." : "The army takes up the raid on " + name + " again.", Colors.White);
-                        Log.Info("Nocleg: gracz - postoj nocny armii przy rabunku (578, cudza armia) przerwany w nocy: " + name + " (wodz: zagrozenie albo ucieczka, albo klucz Raid Night Halt wylaczony); postoj "
+                        Msg(cut ? "Alarm in the night - the army is roused at " + name + ": enemies are near." : "The army takes up the raid on " + name + " again.", Colors.White);
+                        Log.Info("Nocleg: gracz - postoj nocny armii przy rabunku (578, cudza armia) przerwany w nocy: " + name + (cut ? " (wodz: zagrozenie albo ucieczka)" : " (klucz Raid Night Halt / Raid Night Halt AI, ksiega snu albo potkniecie oceny)") + "; postoj "
                                  + F1((float)(CampaignTime.Now.ToHours - from)) + " h, " + HaltNightCounts() + ".");
                     }
                     else
