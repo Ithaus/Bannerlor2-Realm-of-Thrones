@@ -79,6 +79,7 @@ namespace Armoury
             lock (_funded) { _funded.Clear(); _fundImp = _fundImpBad = 0; _fundHad = false; }
             _sSt = _sDup = 0; _err.Clear(); _startDone = false;
             _s584Buy = _s584Held = _s584First = 0;   // 584
+            Reset584();   // recenzja 584: rekordy kupionych statkow (przed SyncData)
             lock (_lk) { _d434BkN = 0; _d434BkV = 0; }   // 434
             LastPaid = LastPaidPlayer = 0;
             PlayerReset();
@@ -660,9 +661,11 @@ namespace Armoury
         /// <summary>Raz na dobe: rekordy karawan, ktorych juz nie ma.</summary>
         private static void FundPrune()
         {
-            lock (_funded) { if (_funded.Count == 0) return; }
+            bool any584; lock (_bought) any584 = _bought.Count > 0;   // recenzja 584: rekordy kupionych statkow czyszczone ta sama doba
+            lock (_funded) { if (_funded.Count == 0 && !any584) return; }
             var live = new HashSet<string>(StringComparer.Ordinal);
             foreach (var mp in MobileParty.AllCaravanParties) if (mp != null && mp.IsActive && mp.StringId != null) live.Add(mp.StringId);
+            if (any584) { try { Prune584(live); } catch (Exception e) { Stumble("Prune584", e); } }
             lock (_funded)
             {
                 var gone = new List<string>();
@@ -703,7 +706,7 @@ namespace Armoury
                      + " | latki: AddIncomeFromParty (First, przed BK) " + Tn(_wIncome && first) + ", BK AddRealisticIncome " + Tn(_wBkIncome)
                      + ", BK OnWeeklyCaravanLedger " + Tn(_wBkWeek) + ", DailyTickClan gracza " + Tn(_wTick) + " (kolejnosc prefiksow: " + fn + "; brak: " + _hookMiss + ")"
                      + " | BK zwrot zoldu karawan rodu (PartyExpensesPrefix) " + Tn(_bkRefund)
-                     + " | 584 statki karawan gracza z nadwyzki ponad kapital: klucz " + (s.PlayerCaravanShipsFromSurplus ? "tak" : "nie") + ", latka AdjustConvoyShips " + Tn(_w584)
+                     + " | 584 statki karawan gracza z nadwyzki ponad kapital: klucz " + (s.PlayerCaravanShipsFromSurplus ? "tak" : "nie") + ", latka AdjustConvoyShips " + Tn(_w584) + ", rekordy kupionych statkow z zapisu " + _boughtImp + " (bledne " + _boughtImpBad + "; w wartosci tylko kupione, nie z szablonu)"
                      + " | Optym m105: latka na liscie znanych " + Tn(KingdomTreasury.KtKnows("Armoury:CaravanSettle.IncomePrefix"))
                      + " | rekordy z zapisu: karawan " + _impCars + ", warsztatow " + _impWs + " (bledne " + _impBad + (_impHad ? "" : "; brak klucza arm_259_majatek - liczniki od wczytania") + ")"
                      + " | regula: wyplata = min(wartosc - kapital, kiesa - podloga); kapital z CaravanModel.GetInitialTradeGold; podloga = PartyGoldLowerThreshold + zold doby"

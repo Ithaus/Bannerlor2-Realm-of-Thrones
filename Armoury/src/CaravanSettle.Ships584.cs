@@ -54,24 +54,134 @@ namespace Armoury
             return ShipsSurplusOn && mp != null && mp.IsCaravan && mp.ActualClan == Clan.PlayerClan;
         }
 
-        /// <summary>Statki karawany po cenie odkupu przez port (regula 181: GetShipTradeValue(statek, karawana, port) = 1.5 x wartosc x 0.3 - naprawa; ujemna = 0).
-        /// Port wyceny: siedziba karawany (miasto), inaczej biezaca osada; bez portu - 0. Tylko odczyt.</summary>
+        // ------------------------------------------------------------ recenzja 584 (blad 1, obie recenzje): w wartosci tylko statki KUPIONE przez karawane
+        // Statki z szablonu karawana dostaje za darmo (CaravanPartyComponent.CreateCaravanParty :244-247 - kiesa = GetInitialTradeGold, statki bez oplaty),
+        // a kapital 259 to sama moneta - liczenie ich w wartosci kazaloby 259 wyplacic graczowi kapital za statek, ktorego nikt nie kupil. Ship nie ma trwalego
+        // id (nie MBObjectBase) - rekord: karawana -> lista (kadlub, zaplacone); w wartosci kazdy rekord paruje sie z jednym statkiem tego kadluba u karawany
+        // (najtanszym jeszcze nie sparowanym) po min(cena odkupu, zaplacone). Rekord bez statku (zatopiony, porzucony) - nie liczony, kasowany raz na dobe.
+        // Darmowa naprawa (RepairShipAction.ApplyForFree) tylko przywraca cene odkupu kupionego statku (uszkodzenie ja wczesniej obnizylo) - bilans zerowy.
+        // Zapis: klucz arm_584_statki (linie "karawana|kadlub|zaplacone").
+        private struct Bought { public string Hull; public int Paid; }
+        private static readonly Dictionary<string, List<Bought>> _bought = new Dictionary<string, List<Bought>>(StringComparer.Ordinal);
+        private static int _boughtImp, _boughtImpBad;
+
+        private static void NoteBought(MobileParty mp, Ship sh, int paid)
+        {
+            if (mp == null || mp.StringId == null || sh == null || sh.ShipHull == null || paid <= 0) return;
+            lock (_bought)
+            {
+                List<Bought> l;
+                if (!_bought.TryGetValue(mp.StringId, out l)) { l = new List<Bought>(); _bought[mp.StringId] = l; }
+                l.Add(new Bought { Hull = sh.ShipHull.StringId, Paid = paid });
+            }
+        }
+
+        /// <summary>Kupione statki karawany po min(cena odkupu przez port, zaplacone) (regula 181: GetShipTradeValue(statek, karawana, port) = 1.5 x wartosc x 0.3
+        /// - naprawa; ujemna = 0). Statki z szablonu i bez rekordu - 0. Port wyceny: siedziba karawany (miasto), inaczej biezaca osada; bez portu - 0. Tylko odczyt.</summary>
         internal static long ShipsValue(MobileParty mp, out int count)
         {
             count = 0;
-            if (mp == null || mp.Ships == null || mp.Ships.Count == 0) return 0;
+            if (mp == null || mp.StringId == null || mp.Ships == null || mp.Ships.Count == 0) return 0;
+            List<Bought> recs;
+            lock (_bought)
+            {
+                List<Bought> l;
+                if (!_bought.TryGetValue(mp.StringId, out l) || l.Count == 0) return 0;
+                recs = new List<Bought>(l);
+            }
             var port = mp.HomeSettlement != null && mp.HomeSettlement.IsTown ? mp.HomeSettlement
                      : mp.CurrentSettlement != null && mp.CurrentSettlement.IsTown ? mp.CurrentSettlement : null;
             if (port == null) return 0;
             var model = Campaign.Current.Models.ShipCostModel;
-            long v = 0;
+            var pool = new List<KeyValuePair<string, long>>();   // statki karawany: kadlub, cena odkupu
             foreach (var sh in mp.Ships)
             {
-                if (sh == null) continue;
+                if (sh == null || sh.ShipHull == null) continue;
+                pool.Add(new KeyValuePair<string, long>(sh.ShipHull.StringId, Math.Max(0L, (long)model.GetShipTradeValue(sh, mp.Party, port.Party))));
+            }
+            long v = 0;
+            foreach (var r in recs)
+            {
+                int bi = -1;
+                for (int i = 0; i < pool.Count; i++)
+                    if (string.Equals(pool[i].Key, r.Hull, StringComparison.Ordinal) && (bi < 0 || pool[i].Value < pool[bi].Value)) bi = i;
+                if (bi < 0) continue;   // statku tego kadluba juz nie ma u karawany
+                v += Math.Min(pool[bi].Value, (long)r.Paid);
                 count++;
-                v += Math.Max(0L, (long)model.GetShipTradeValue(sh, mp.Party, port.Party));
+                pool.RemoveAt(bi);
             }
             return v;
+        }
+
+        /// <summary>Raz na dobe (z FundPrune): rekordy karawan, ktorych juz nie ma, i rekordy ponad liczbe statkow danego kadluba (statek stracony).</summary>
+        private static void Prune584(HashSet<string> live)
+        {
+            lock (_bought)
+            {
+                if (_bought.Count == 0) return;
+                var gone = new List<string>();
+                foreach (var k in _bought.Keys) if (!live.Contains(k)) gone.Add(k);
+                foreach (var k in gone) _bought.Remove(k);
+            }
+            foreach (var mp in MobileParty.AllCaravanParties)
+            {
+                if (mp == null || !mp.IsActive || mp.StringId == null) continue;
+                lock (_bought)
+                {
+                    List<Bought> l;
+                    if (!_bought.TryGetValue(mp.StringId, out l)) continue;
+                    var have = new Dictionary<string, int>(StringComparer.Ordinal);
+                    if (mp.Ships != null)
+                        foreach (var sh in mp.Ships)
+                            if (sh != null && sh.ShipHull != null) { int n; have.TryGetValue(sh.ShipHull.StringId, out n); have[sh.ShipHull.StringId] = n + 1; }
+                    var keep = new List<Bought>();
+                    for (int i = l.Count - 1; i >= 0; i--)   // od najnowszych: zostaja ostatnio kupione
+                    {
+                        int n; have.TryGetValue(l[i].Hull, out n);
+                        if (n > 0) { have[l[i].Hull] = n - 1; keep.Insert(0, l[i]); }
+                    }
+                    if (keep.Count == 0) _bought.Remove(mp.StringId); else _bought[mp.StringId] = keep;
+                }
+            }
+        }
+
+        internal static string ExportBought()
+        {
+            var sb = new System.Text.StringBuilder(128);
+            lock (_bought)
+                foreach (var kv in _bought)
+                    foreach (var b in kv.Value)
+                        sb.Append(kv.Key).Append('|').Append(b.Hull).Append('|').Append(b.Paid.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append('\n');
+            return sb.ToString();
+        }
+
+        internal static void ImportBought(string s)
+        {
+            lock (_bought)
+            {
+                _bought.Clear(); _boughtImp = _boughtImpBad = 0;
+                if (string.IsNullOrEmpty(s)) return;
+                foreach (var line in s.Split('\n'))
+                {
+                    if (line.Length == 0) continue;
+                    var p = line.Split('|');
+                    int v;
+                    if (p.Length == 3 && p[0].Length > 0 && p[1].Length > 0
+                        && int.TryParse(p[2], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out v) && v > 0)
+                    {
+                        List<Bought> l;
+                        if (!_bought.TryGetValue(p[0], out l)) { l = new List<Bought>(); _bought[p[0]] = l; }
+                        l.Add(new Bought { Hull = p[1], Paid = v });
+                        _boughtImp++;
+                    }
+                    else _boughtImpBad++;
+                }
+            }
+        }
+
+        private static void Reset584()
+        {
+            lock (_bought) { _bought.Clear(); _boughtImp = _boughtImpBad = 0; }
         }
 
         private static string ShipName(Ship sh)
@@ -141,10 +251,10 @@ namespace Armoury
                         surplus = c.Worth - c.Capital; floor = c.Floor;
                         if (price > surplus || purse - price < floor)
                         {
-                            _s584Held++;
                             if (!heldNoted)
                             {
                                 heldNoted = true;
+                                _s584Held++;   // recenzja 584 (drobny 3): jedno wstrzymanie na wjazd, nie na kazdego kandydata
                                 Diary584(caravan, "zakup statku wstrzymany (brak nadwyzki ponad kapital) w " + townName + ": " + ShipName(sh) + " za " + (long)price
                                                   + ", nadwyzka " + surplus + " (wartosc " + c.Worth + " - kapital " + c.Capital + "), kiesa " + purse + ", podloga " + floor);
                             }
@@ -155,6 +265,7 @@ namespace Armoury
                     ChangeShipOwnerAction.ApplyByTrade(caravan.Party, sh);
                     if (sh.Owner != caravan.Party) continue;   // 181 / inna latka odrzucila transakcje - statek zostal w porcie
                     int paid = purse - caravan.PartyTradeGold;
+                    NoteBought(caravan, sh, paid);   // recenzja 584: w wartosci tylko statki kupione (z rekordu), nie z szablonu
                     _s584Buy++; if (first) _s584First++;
                     Diary584(caravan, "statek kupiony " + ShipName(sh) + " za " + paid + " w " + townName + (first ? " (pierwszy statek)" : " (z nadwyzki " + surplus + ")"));
                     if (sh.ShipHull.Type == ShipHull.ShipType.Medium) flag = false;

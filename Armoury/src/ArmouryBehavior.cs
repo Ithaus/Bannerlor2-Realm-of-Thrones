@@ -1589,6 +1589,8 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_259_majatek", e); }
             try { string kp = dataStore.IsSaving ? CaravanSettle.ExportFunded() : null; SaveText.Sync(dataStore, "arm_259_kapital", ref kp); if (dataStore.IsLoading) CaravanSettle.ImportFunded(kp); }   // recenzja 259: kapital dany karawanom przez E3/7
             catch (Exception e) { Log.Error("SyncData.arm_259_kapital", e); }
+            try { string sk = dataStore.IsSaving ? CaravanSettle.ExportBought() : null; SaveText.Sync(dataStore, "arm_584_statki", ref sk); if (dataStore.IsLoading) CaravanSettle.ImportBought(sk); }   // recenzja 584: statki kupione przez karawany gracza
+            catch (Exception e) { Log.Error("SyncData.arm_584_statki", e); }
             // 306b (sondy autotestu): znacznik karawany testu (armoury-karawana305.flag) - klucz zapisywany tylko, gdy sonda utworzyla karawane; brak klucza = brak znacznika
             try { Probes306.Sync(dataStore); } catch (Exception e) { Log.Error("SyncData.arm_306_sondy", e); }
             // KS r4 (r4-ceny): stan cen i sterowania rynku (doba restartu srednich cen, czynnik popytu targu do 1.25, brak miast C1) - osobny klucz, starsza DLL go pomija;
