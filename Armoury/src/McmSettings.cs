@@ -13053,7 +13053,7 @@ namespace Armoury
         [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
         public bool PlayerCaravanShipsFromSurplus { get; set; } = true;
 
-        [SettingPropertyBool("Player Caravan Horses Need Profit", HintText = "Your caravans keep horses and cattle bought cheap on leaving a town only if some town would pay more after toll and road costs; the rest is returned for a refund. They also stop selling horses below cost (unless short of coin, disbanding or held over 30 days). Pack animals and AI caravans unaffected. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Player Caravan Horses Need Profit", HintText = "Your caravans keep cheap horses and cattle bought on leaving a town only if some town pays more after toll and travel; the rest is refunded. With Caravans Never Sell Below Cost on, horses are not sold below cost (except when short of coin, disbanding or stuck 30+ days). Pack animals and AI caravans unaffected. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
         public bool PlayerCaravanHorsesNeedProfit { get; set; } = true;
 

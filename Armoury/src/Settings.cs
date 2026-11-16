@@ -6081,7 +6081,7 @@ namespace Armoury
         // 584 (16.11, Jeff "1. tak"): CaravanSettle.Ships584.cs - karawana gracza kupuje statek tylko z nadwyzki ponad kapital albo gdy nie ma zadnego; statki w wartosci 259 po cenie odkupu portu.
         public bool PlayerCaravanShipsFromSurplus = true;   // Your caravans buy a ship only with coin above their trading capital, or when they have no ship at all. Without this, a sea caravan with a large purse could spend half of it on a ship as soon as it reached a port. Ships count toward a caravan's worth at the price a port would pay for them. AI caravans are not affected. Off = as before
         // 585 (16.11, Jeff "2. tak"): CaravanHorse585.cs - zwierzeta z gabki BK w karawanach gracza tylko z zyskiem osiagalnym; konie nie ponizej kosztu.
-        public bool PlayerCaravanHorsesNeedProfit = true;   // Your caravans keep horses and cattle bought cheap on leaving a town only if some town would pay more after toll and road costs; the rest is returned for a refund. They also stop selling horses below cost (unless short of coin, disbanding or held over 30 days). Pack animals and AI caravans unaffected. Off = as before
+        public bool PlayerCaravanHorsesNeedProfit = true;   // Your caravans keep cheap horses and cattle bought on leaving a town only if some town pays more after toll and travel; the rest is refunded. With Caravans Never Sell Below Cost on, horses are not sold below cost (except when short of coin, disbanding or stuck 30+ days). Pack animals and AI caravans unaffected. Off = as before
 
         // --- Battle: fighting for life (305c) ---
         // 305c (Jeff 31.10: "sprawdz bitwe ... jak mozesz podkrec AI i trudnosc zachowania AI"; zasada 25.10: kazdy walczy o zycie w granicach umiejetnosci

@@ -26,7 +26,9 @@ namespace Armoury
     ///     na JAKIMS miescie (nie wrogim) po cenie po mycie (CaravanGoods.MaxAtCost - ta sama miara ceny k-tej sztuki i myta co straz 284) nie nizszej niz koszt sztuki
     ///     + koszt dni drogi (CaravanWait139.Carry: udzial sztuki w koszcie dnia karawany x dni drogi CaravanWait139.Days - ta sama miara co regula 139 A/C), w kolejce
     ///     za sztukami tego zwierzecia juz w jukach. Reszta wraca na polke, zloto z kasy miasta do kiesy (cena polki po zwrocie - wzor cofniecia gabki 284; niezwrocone
-    ///     przy pustej kasie - SpongeUndo307). Koszt sztuki = cena polki tuz przed gabka (prefiks). Ksiega 307a (SpongePost, Priority.Last) widzi tylko to, co zostalo.
+    ///     przy pustej kasie - SpongeUndo307). Koszt sztuki = cena polki tuz przed gabka (prefiks).
+    ///     Recenzja 585: koszt sztuki i zwrot po cenie, ktora BK naprawde zaplacil za element (PaidPrices - odtworzenie na polce w kolejnosci petli BK); bydlo
+    ///     zostaje najwyzej do granicy stada BK (0.6 x ludzie), ktorej nadmiar BK SellGoods zrzuca bez wzgledu na cene. Ksiega 307a (SpongePost, Priority.Last) widzi tylko to, co zostalo.
     ///  B) sprzedaz: kon (bez jucznych i bez bydla - BK sprzedaje nadmiar bydla ponad 0.6 x ludzi bez wzgledu na cene, przeciazenie stada) z kosztem z ksiegi (nie
     ///     z oszacowania) nie schodzi w sprzedazy BK / gry ponizej kosztu po mycie (MaxAtCost, Withhold jak towar); wyjscia na stracie T1 (LossReason: rozwiazanie,
     ///     brak na zold, ponad udzwig, > 30 dob bez rynku z zyskiem) - bez zmian. Konie juz w jukach (Amanda 14762) zostaja i schodza tam, gdzie placa ponad koszt.
@@ -47,7 +49,8 @@ namespace Armoury
             public MobileParty Mp; public Settlement St; public int Gold0;
             public Dictionary<EquipmentElement, int> El0;          // zwierzeta w jukach przed gabka (wedlug elementu)
             public Dictionary<ItemObject, int> N0;                  // ... wedlug przedmiotu (kolejka sprzedazy)
-            public Dictionary<EquipmentElement, int> Price0;        // cena polki przed gabka (koszt sztuki)
+            public Dictionary<EquipmentElement, int> Price0;        // zwierzeta na polce przed gabka (cena przy pelnej polce - tylko zapas, gdy odtworzenie zawiedzie)
+            public List<EquipmentElement> Order;                    // recenzja 585: kolejnosc zwierzat na polce = kolejnosc zakupow petli BK (ToList polki)
         }
 
         internal static void Reset()
@@ -108,12 +111,14 @@ namespace Armoury
                 if (pl)
                 {
                     st.Price0 = new Dictionary<EquipmentElement, int>();
+                    st.Order = new List<EquipmentElement>();
                     var shelf = __1.Town.Owner.ItemRoster;
                     for (int i = 0; i < shelf.Count; i++)
                     {
                         var el = shelf.GetElementCopyAtIndex(i);
                         if (!TradeAnimal(el.EquipmentElement.Item) || el.Amount <= 0 || st.Price0.ContainsKey(el.EquipmentElement)) continue;
                         st.Price0[el.EquipmentElement] = __1.Town.GetItemPrice(el.EquipmentElement, __0, false);
+                        st.Order.Add(el.EquipmentElement);
                     }
                     if (st.Price0.Count == 0) return;                // na polce nie ma zwierzat - gabka ich nie kupi
                 }
@@ -158,7 +163,21 @@ namespace Armoury
                     return;
                 }
                 _visits++;
-                // grupy wedlug przedmiotu: sztuki przybyle, sredni koszt (cena polki przed gabka)
+                // recenzja 585 (B1/B2): cena, ktora BK naprawde zaplacil za kazdy element (odtworzona na polce - PaidPrices); koszt sztuki i zwrot po tej cenie
+                var paidAt = PaidPrices(__state, town, mp, got);
+                long budget = Math.Max(0L, (long)__state.Gold0 - mp.PartyTradeGold);   // zwrot nigdy ponad zloto, ktore w tym wyjezdzie zeszlo z kiesy netto
+                // bydlo (recenzja 585 B3): BK SellGoods zrzuca bez wzgledu na cene nadmiar stada (int)(bydlo - 0.6 x ludzie) > 0 - zostaje najwyzej do tej granicy
+                int liveCap = int.MaxValue, liveBase = 0, liveKept = 0;
+                try
+                {
+                    float m6 = mp.Party.NumberOfAllMembers * 0.6f;
+                    int cap = Math.Max(0, (int)m6);
+                    while ((int)((float)(cap + 1) - m6) <= 0) cap++;
+                    liveCap = cap;
+                    foreach (var a in __state.N0) if (a.Key != null && a.Key.HorseComponent != null && a.Key.HorseComponent.IsLiveStock) liveBase += a.Value;
+                }
+                catch (Exception e) { Stumble("LiveCap", e); }
+                // grupy wedlug przedmiotu: sztuki przybyle, sredni koszt (cena zaplacona przez BK)
                 var items = new Dictionary<ItemObject, List<KeyValuePair<EquipmentElement, int>>>();
                 foreach (var kv in got)
                 {
@@ -175,8 +194,7 @@ namespace Armoury
                     int extra = 0; double costSum = 0;
                     foreach (var p in kv.Value)
                     {
-                        int pr;
-                        if (!__state.Price0.TryGetValue(p.Key, out pr) || pr <= 0) pr = Math.Max(1, town.GetItemPrice(p.Key, mp, false));
+                        int pr = PaidOf(__state, paidAt, town, mp, p.Key);
                         extra += p.Value; costSum += (double)pr * p.Value;
                     }
                     if (extra <= 0) continue;
@@ -187,15 +205,17 @@ namespace Armoury
                         dayCost = CaravanWait139.DayCost(mp);
                         cargo = CaravanWait139.CargoRO(mp);
                         foreach (var a in __state.N0) if (a.Key != null) cargo += CaravanGoods.HeldCost(mp, a.Key, a.Value);   // zwierzeta sprzed gabki po koszcie z ksiegi
-                        foreach (var g in got) { int pr; if (!__state.Price0.TryGetValue(g.Key, out pr)) pr = 0; cargo += (double)Math.Max(0, pr) * g.Value; }
+                        foreach (var g in got) cargo += (double)PaidOf(__state, paidAt, town, mp, g.Key) * g.Value;
                         days = new Dictionary<Town, double>();
                     }
                     Town best;
                     int keep = Keep(mp, town, it, was, extra, unit, dayCost, cargo, days, out best);
+                    bool live = it.HorseComponent != null && it.HorseComponent.IsLiveStock;
+                    if (live) { keep = Math.Max(0, Math.Min(keep, liveCap - liveBase - liveKept)); liveKept += keep; }
                     int back = extra - keep;
                     _keepN += keep; _keepG += (long)Math.Round(keep * unit);
                     if (back <= 0) continue;
-                    // zwrot: od ostatniego elementu (kolejnosc bez znaczenia - ta sama pozycja z polki)
+                    // zwrot: od ostatniego elementu, po cenie zaplaconej przez BK za ten element (nie cenie polki po zwrocie - recenzja 585 B1)
                     int left = back; long refundAll = 0;
                     for (int q = kv.Value.Count - 1; q >= 0 && left > 0; q--)
                     {
@@ -204,7 +224,8 @@ namespace Armoury
                         if (n <= 0) continue;
                         pack.AddToCounts(ee, -n);
                         town.Owner.ItemRoster.AddToCounts(ee, n);
-                        int due = (int)(n * (float)town.GetItemPrice(ee, mp, false));   // ta sama cena co cofniecie gabki 284 (polka po zwrocie)
+                        int due = (int)Math.Min(budget, (long)(int)((float)n * (float)PaidOf(__state, paidAt, town, mp, ee)));   // jak BK: (int)(n x cena)
+                        budget -= due;
                         int refund = Math.Min(town.Gold, due);
                         CaravanGoods.SpongeUndo307(mp, due, refund);   // 307d: niezwrocona czesc - strata gabki, nie koszt zwierzat, ktore zostaly
                         if (refund > 0)
@@ -230,6 +251,50 @@ namespace Armoury
                              + " (bez zysku osiagalnego) - " + sb + "; kiesa teraz " + mp.PartyTradeGold + ".");
             }
             catch (Exception e) { Stumble("LeftPostfix", e); }
+        }
+
+        /// <summary>Recenzja 585 (B1/B2): cena, ktora BK zaplacil za kazdy element zwierzecia z gabki. BK liczy cene elementu na polce pomniejszonej o elementy kupione
+        /// wczesniej w tej samej petli (kolejnosc polki - Order z prefiksu), wiec kolejne konie tej samej kategorii sa drozsze niz cena przy pelnej polce. Odtworzenie:
+        /// elementy wracaja NA CHWILE na polke w odwrotnej kolejnosci petli BK (po kazdym polka kategorii = stan, ktory BK widzial przed zakupem tego elementu;
+        /// TownMarketData liczy sie od razu przy AddToCounts - Town.OnInventoryUpdated) i cena jest czytana; finally zdejmuje je z powrotem (stan polki bez zmian).
+        /// Inne kategorie (towar cofany przez 284 / Bulk / Ammo) ceny zwierzat nie ruszaja.</summary>
+        private static Dictionary<EquipmentElement, int> PaidPrices(State s, Town town, MobileParty mp, List<KeyValuePair<EquipmentElement, int>> got)
+        {
+            var res = new Dictionary<EquipmentElement, int>();
+            if (s.Order == null || s.Order.Count == 0) return res;
+            var shelf = town.Owner.ItemRoster;
+            var map = new Dictionary<EquipmentElement, int>();
+            foreach (var g in got) map[g.Key] = g.Value;
+            var added = new List<KeyValuePair<EquipmentElement, int>>();
+            try
+            {
+                for (int i = s.Order.Count - 1; i >= 0; i--)
+                {
+                    var ee = s.Order[i]; int n;
+                    if (!map.TryGetValue(ee, out n) || n <= 0) continue;
+                    shelf.AddToCounts(ee, n);
+                    added.Add(new KeyValuePair<EquipmentElement, int>(ee, n));
+                    res[ee] = town.GetItemPrice(ee, mp, false);
+                }
+            }
+            catch (Exception e) { Stumble("PaidPrices", e); }
+            finally
+            {
+                for (int i = added.Count - 1; i >= 0; i--)
+                {
+                    try { shelf.AddToCounts(added[i].Key, -added[i].Value); } catch (Exception e) { Stumble("PaidPricesUndo", e); }
+                }
+            }
+            return res;
+        }
+
+        /// <summary>Cena zaplacona przez BK za element (PaidPrices); zapas: cena polki przed gabka, potem cena dzisiejsza.</summary>
+        private static int PaidOf(State s, Dictionary<EquipmentElement, int> paidAt, Town town, MobileParty mp, EquipmentElement ee)
+        {
+            int pr;
+            if (paidAt != null && paidAt.TryGetValue(ee, out pr) && pr > 0) return pr;
+            if (s.Price0 != null && s.Price0.TryGetValue(ee, out pr) && pr > 0) return pr;
+            return Math.Max(1, town.GetItemPrice(ee, mp, false));
         }
 
         /// <summary>Sztuki z `extra` (przybyle z gabki), ktore jakies miasto (nie wrogie, nie to) kupi po cenie po mycie >= koszt + koszt dni drogi, w kolejce za `was`
