@@ -79,6 +79,7 @@ namespace Armoury
             lock (_funded) { _funded.Clear(); _fundImp = _fundImpBad = 0; _fundHad = false; }
             _sSt = _sDup = 0; _err.Clear(); _startDone = false;
             _s584Buy = _s584Held = _s584First = 0;   // 584
+            lock (_lk) { _s586FeeN = _s586FeePl = _s586St = _s586StSess = 0; _s586FeeG = 0; }   // 586
             Reset584();   // recenzja 584: rekordy kupionych statkow (przed SyncData)
             lock (_lk) { _d434BkN = 0; _d434BkV = 0; }   // 434
             LastPaid = LastPaidPlayer = 0;
@@ -542,6 +543,7 @@ namespace Armoury
             catch (Exception e) { Stumble("EnsureHooks(PartyExpensesPrefix)", e); }
             EnsureHooks305(miss);   // 305a: osobna linia zoldu karawan gracza (prefiks / postfiks wydatkow rodu, postfiks CalculatePartyWage) - po wykryciu _bkRefund
             EnsureHooks584(miss);   // 584: statki karawany gracza tylko z nadwyzki ponad kapital (prefiks AdjustConvoyShips)
+            EnsureHooks586(miss);   // 586: dziennik kiesy karawany gracza - oplata BK za wjazd (prefiks / postfiks AddCaravanFees, tylko pomiar)
             _hookMiss = miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-";
         }
 

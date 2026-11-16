@@ -739,7 +739,7 @@ namespace Armoury
             if (!on) GiveGoldAction.ApplyForPartyToCharacter(giverParty, recipient, amount, disableNotification);
             else GiveGoldAction.ApplyForPartyToSettlement(giverParty, c.Port, amount, disableNotification);
             if (!mine) return;
-            try { int taken = g0 - giverParty.MobileParty.PartyTradeGold; _buyN[c.Who]++; _buyGold[c.Who] += taken; if (on) _buyViaPort += taken; else _toNothing += taken; }
+            try { int taken = g0 - giverParty.MobileParty.PartyTradeGold; _buyN[c.Who]++; _buyGold[c.Who] += taken; if (on) _buyViaPort += taken; else _toNothing += taken; CaravanSettle.Flow586(giverParty.MobileParty, CaravanSettle.LedShip, -taken); }   // 586: kupno statku - dziennik kiesy karawany gracza
             catch (Exception e) { Stumble("T_PartyToChar", e); }
         }
 

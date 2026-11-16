@@ -301,6 +301,7 @@ namespace Armoury
                 if (__1.Town.TradeTaxAccumulated - __state.C0 < toll) { _tollNotSeen++; return; }   // gra myta nie dopisala - bez zmian
                 int x = Math.Min(toll, Math.Max(0, __0.PartyTradeGold));
                 __0.PartyTradeGold -= x;
+                CaravanSettle.Flow586(__0, CaravanSettle.LedTollgates, -x);   // 586: dziennik kiesy karawany gracza
                 if (x < toll) { __1.Town.TradeTaxAccumulated -= (toll - x); _tollShort += toll - x; }
                 CW.ToCounterRun += x;                                                            // okno O46: przelew karawana -> licznik cel, nie zloto z niczego
                 _due[KToll] += toll; _paid[KToll] += x; _n[KToll]++;

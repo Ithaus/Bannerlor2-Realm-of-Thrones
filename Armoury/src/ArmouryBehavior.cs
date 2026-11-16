@@ -2205,6 +2205,7 @@ namespace Armoury
             // 305a: karawana gracza - wjazd do miasta (doby od ostatniej wizyty w linii 259) i koniec karawany (przyczyna, komunikat). Nasluch zniszczenia dopisany
             // OSTATNI w RegisterEvents (MbEvent: dopisany pozniej = wolany wczesniej) - widzi kiese i towar przed BeatenPurse i CaravanCapital.RoutePurse (Seal31).
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CaravanSettle.OnEntered305", CaravanSettle.OnEntered305));
+            CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, CaravanSettle.OnLeft586);   // 586: punkt kontrolny kiesy karawany gracza przy wyjezdzie (tylko odczyt)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("CaravanSettle.OnDestroyed305", CaravanSettle.OnDestroyed305));
         }
 

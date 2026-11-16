@@ -448,6 +448,7 @@ namespace Armoury
                         {
                             try { mp.PartyTradeGold += paid; }
                             catch (Exception e) { Stumble("Sell(doplata)", e); TakeBack(t, paid); paid = 0; }
+                            if (paid > 0) CaravanSettle.Flow586(mp, CaravanSettle.LedBonus, paid);   // 586: dziennik kiesy karawany gracza
                         }
                         if (paid > 0) { _pSales++; _pPcs += moved; _pGold += paid; CaravanTrade284.NoteBonus(mp, paid); }   // 554 (recenzja 1): doplata do ksiegi zysku karawany
                         if (paid < dueI) _pShort++;

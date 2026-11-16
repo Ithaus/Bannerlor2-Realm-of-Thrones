@@ -240,7 +240,7 @@ namespace Armoury
                   .Append(", linia partii i zalog BK razem ").Append(_pApplyBk).Append(", pominiete przez BK (Lordship / glowa rodu) ").Append(_pSkipN).Append(" (zold z kiesy ").Append(_pSkipWage).Append(')')
                   .Append(" | podglad (podpowiedz zlota): wywolan z opisem ").Append(_pViewN).Append(", rozbite ").Append(_pSplitN).Append(", bez linii BK albo za mala ").Append(_pNoLineN)
                   .Append(", zmiana sumy ").Append(_pDiffN).Append(" (max ").Append(_pDiffMax.ToString("0.0", Inv)).Append(')')
-                  .Append(" | samotest: ").Append(test)
+                  .Append(" | samotest: ").Append(test).Append(Daily586())
                   .Append(" | potkniecia ").Append(_pSt).Append(" (sesja ").Append(_sPSt).Append(").");
                 _pApplyN = _pViewN = _pSplitN = _pNoLineN = _pDiffN = _pSkipN = _pSt = 0;
                 _pApplyWage = _pApplyTop = _pApplyBk = _pViewWage = _pSkipWage = 0; _pDiffMax = 0f;
@@ -302,6 +302,7 @@ namespace Armoury
                 if (r == null) return;
                 if (r.Name == "?") r.Name = NameOf(mp);
                 r.LastTownDay = Today; r.LastTownName = Nm(st.Name, st.StringId);
+                Check586(mp, r, "wjazd do " + r.LastTownName);   // 586: punkt kontrolny kiesy
             }
             catch (Exception e) { Stumble305("OnEntered305", e); }
         }
@@ -330,10 +331,12 @@ namespace Armoury
             r.LastPurse = now.Purse; r.LastGoods = now.Goods;
             if (!DiaryOn) return;
             bool traded = r.DSold > 0 || r.DBought > 0;
-            if (traded) { r.NoTradeRun = 0; r.LastTradeDay = day; } else r.NoTradeRun++;
+            // 586: linia doby day = Today - 1, a wpisy handlu i wjazdu po polnocy (przed linia) maja doba Today - nie cofac ich do day (dowod: l.21336
+            // "ostatnio w miescie Blacktyde w dobie 109234 (-1 dob temu)" w linii doby 109233)
+            if (traded) { r.NoTradeRun = 0; r.LastTradeDay = Math.Max(r.LastTradeDay, day); } else r.NoTradeRun++;
             if (r.NoTradeRun > r.MaxNoTradeRun) r.MaxNoTradeRun = r.NoTradeRun;
             var cur = mp.CurrentSettlement;
-            if (cur != null && cur.IsTown) { r.LastTownDay = day; r.LastTownName = StName(cur); }
+            if (cur != null && cur.IsTown) { r.LastTownDay = Math.Max(r.LastTownDay, day); r.LastTownName = StName(cur); }
             var tg = mp.TargetSettlement;
             sb.Append(" | gdzie (305a): ").Append(cur != null ? "w " + StName(cur) + (cur.IsTown ? " (miasto)" : cur.IsCastle ? " (zamek)" : cur.IsVillage ? " (wies)" : "") : (mp.IsCurrentlyAtSea ? "na morzu" : "w drodze"))
               .Append(", cel ").Append(StName(tg));
@@ -348,7 +351,7 @@ namespace Armoury
             }
             sb.Append(", zachowanie ").Append(mp.DefaultBehavior).Append('/').Append(mp.ShortTermBehavior)
               .Append(mp.MapEvent != null ? ", W BITWIE" : "").Append(mp.IsDisbanding ? ", ROZWIAZYWANA" : "")
-              .Append(", ostatnio w miescie ").Append(r.LastTownDay >= 0 ? r.LastTownName + " w dobie " + r.LastTownDay + " (" + (day - r.LastTownDay) + " dob temu)" : "- (od wczytania nie)")
+              .Append(", ostatnio w miescie ").Append(r.LastTownDay >= 0 ? r.LastTownName + " w dobie " + r.LastTownDay + " (" + Math.Max(0, day - r.LastTownDay) + " dob temu)" : "- (od wczytania nie)")
               .Append(", ostatni handel ").Append(r.LastTradeDay >= 0 ? "w dobie " + r.LastTradeDay : "- (od wczytania)")
               .Append(", bez handlu z rzedu ").Append(r.NoTradeRun).Append(" dob (najdluzej od wczytania ").Append(r.MaxNoTradeRun).Append(')');
             sb.Append(" | transakcje dnia (305a) ").Append(r.DTx.Count + r.DTxDrop);

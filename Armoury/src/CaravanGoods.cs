@@ -1584,6 +1584,7 @@ namespace Armoury
                     int g0 = mp.PartyTradeGold, h0 = owner.Gold;
                     GiveGoldAction.ApplyForPartyToCharacter(mp.Party, owner, amt, true);
                     int moved = g0 - mp.PartyTradeGold, got = owner.Gold - h0;
+                    CaravanSettle.Flow586(mp, CaravanSettle.LedDep, -moved);   // 586: E3-T2 kiesa -> wlasciciel (dziennik kiesy karawany gracza)
                     ctlFrom += moved; ctlTo += got;
                     if (one) { o4Due += amt; o4Paid += moved; if (moved > 0) o4PaidN++; }
                     if (moved <= 0) continue;

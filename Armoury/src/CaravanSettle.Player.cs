@@ -47,6 +47,10 @@ namespace Armoury
             // 307a (sesja, bez zapisu; tylko pomiar sondy 306b): sprzedaz koni i zwierzat, pierwsza partia towaru (kupiona w dobie FirstDay i nastepnej)
             public long HorseSold, HorseReal, FirstSold, FirstReal, FirstBought;
             public readonly Dictionary<ItemObject, int> FirstLot = new Dictionary<ItemObject, int>();
+            // 586 (dziennik kiesy, klucz CaravanPlayerDiary): ruchy kiesy wedlug rodzaju (znak wzgledem kiesy) - od doby LedDay (zapis arm_259_majatek "l586") i dzis;
+            // kontrola: kiesa w punkcie kontrolnym (wjazd, wyjazd, rozliczenie rodu, linia doby) - suma zapisanych ruchow od poprzedniego = nieznane
+            public readonly long[] LedAll = new long[LedN], LedDayV = new long[LedN];
+            public long Unk, DUnk, RecSum, CkRec, TickRec; public int UnkN, LedDay = -1, CkPurse = int.MinValue; public string CkWhere = "-";
         }
 
         private sealed class WsRec
@@ -140,7 +144,7 @@ namespace Armoury
             if (_cars.TryGetValue(mp.StringId, out r)) return r;
             if (!create) return null;
             EnsureAtLoad();
-            r = new CarRec { Id = mp.StringId, FirstDay = Today, FromLoad = _atLoad.Contains("c" + mp.StringId) };
+            r = new CarRec { Id = mp.StringId, FirstDay = Today, FromLoad = _atLoad.Contains("c" + mp.StringId), LedDay = Today };
             _cars[mp.StringId] = r;
             return r;
         }
@@ -173,13 +177,17 @@ namespace Armoury
         internal static void NoteTrade(MobileParty mp, int kind, long gold, int toll, double costRm) { NoteTrade(mp, kind, gold, toll, costRm, null, null, 0); }
 
         /// <summary>305a: to samo z towarem, miastem i liczba sztuk - wpis transakcji do dziennika karawany gracza (klucz CaravanPlayerDiary, tylko log).</summary>
-        internal static void NoteTrade(MobileParty mp, int kind, long gold, int toll, double costRm, ItemObject it, Settlement st, int units)
+        internal static void NoteTrade(MobileParty mp, int kind, long gold, int toll, double costRm, ItemObject it, Settlement st, int units) { NoteTrade(mp, kind, gold, toll, costRm, it, st, units, true); }
+
+        /// <summary>586: led = false - zakup z ksiegi gabki 307a (BookBuy307); ruch kiesy calego okna gabki zapisuje SpongePost (LedSponge), nie kazda pozycja.</summary>
+        internal static void NoteTrade(MobileParty mp, int kind, long gold, int toll, double costRm, ItemObject it, Settlement st, int units, bool led)
         {
             try
             {
                 var r = Car(mp, true);
                 if (r == null) return;
                 try { Tx305(r, kind, gold, toll, costRm, it, st, units); } catch (Exception e) { Stumble305("Tx305", e); }
+                if (led) { if (kind == 1) Rec586(r, LedBuy, -gold); else { Rec586(r, LedSale, gold); Rec586(r, LedToll, -toll); } }   // 586: ruch kiesy (sprzedaz przed mytem, myto osobno)
                 if (kind == 1) { r.DBought += gold; r.Bought += gold; WkAdd(r.Wk, r.WkDay, 1, gold); }
                 else
                 {
@@ -201,6 +209,7 @@ namespace Armoury
                 var r = Car(mp, true);
                 if (r == null) return;
                 if (kind == DepBk) r.DPayBk += amt; else if (kind == DepE39) r.DPayE39 += amt; else r.DPayEnd += amt;
+                Rec586(r, LedDep, -amt);   // 586: kiesa -> wlasciciel
                 r.Paid += amt;
                 if (kind != DepEnd) WkAdd(_wk, _wkDay, 0, amt);
             }
@@ -247,6 +256,7 @@ namespace Armoury
                 if (r == null) return;
                 r.Last = c; r.HaveCalc = true; r.LastBusy = busy;
                 r.DPay259 += moved; r.Paid += moved;
+                Rec586(r, LedPay259, -moved);   // 586: kiesa -> rod (rozliczenie 259, w oknie DailyTickClan)
                 WkAdd(_wk, _wkDay, 0, moved);
                 if (_inTick) { int p0; _tickPay.TryGetValue(mp, out p0); _tickPay[mp] = p0 + moved; }
             }
@@ -269,7 +279,11 @@ namespace Armoury
             {
                 if (__0 == null || __0 != Clan.PlayerClan || !Live) return;
                 _tickPurse.Clear(); _tickPay.Clear(); _tickCap.Clear(); _tickProfit.Clear();
-                foreach (var mp in ClanCaravans(__0)) _tickPurse[mp] = mp.PartyTradeGold;
+                foreach (var mp in ClanCaravans(__0))
+                {
+                    _tickPurse[mp] = mp.PartyTradeGold;
+                    try { var r = Car(mp, true); Check586(mp, r, "przed rozliczeniem rodu"); if (r != null) r.TickRec = r.RecSum; } catch (Exception e) { Stumble586("TickPre", e); }   // 586
+                }
                 var ld = __0.Leader;
                 if (ld != null && ld.OwnedWorkshops != null)
                     foreach (var w in ld.OwnedWorkshops) if (w != null) { _tickCap[w] = w.Capital; _tickProfit[w] = w.ProfitMade; }
@@ -311,6 +325,14 @@ namespace Armoury
                         r.WageGuess |= !known; r.DTick = true;
                         WkAdd(r.Wk, r.WkDay, 3, cw); WkAdd(r.Wk, r.WkDay, 4, top);
                         WkAdd(_wk, _wkDay, 1, cw); WkAdd(_wk, _wkDay, 2, top);
+                        // 586: reszta zmiany kiesy w oknie rozliczenia rodu (poza wyplata 259 zapisana w PlayerCalc) - zold z kiesy albo doplata BK do 5 000
+                        try
+                        {
+                            long res = (long)mp.PartyTradeGold - kv.Value - (r.RecSum - r.TickRec);
+                            Rec586(r, res < 0 ? LedClanOut : LedClanIn, res);
+                            Check586(mp, r, "po rozliczeniu rodu");
+                        }
+                        catch (Exception e) { Stumble586("TickPost", e); }
                     }
                     catch (Exception e) { Stumble("TickPost(karawana)", e); }
                 }
@@ -422,7 +444,7 @@ namespace Armoury
             foreach (var r in gone)
             {
                 Log.Info(PP + "karawana '" + r.Name + "' zakonczona (" + (r.DPayEnd > 0 ? "rozwiazana - kiesa do rodu " + r.DPayEnd : "rozbita albo zniknela") + ") | "
-                         + Since(r.FirstDay, r.FromLoad, day) + ": " + Totals(r) + EndText305(r) + ".");   // 305a: przyczyna konca i komunikat (rozwiazana / zniknela)
+                         + Since(r.FirstDay, r.FromLoad, day) + ": " + Totals(r) + EndText305(r) + LedEnd586(r) + ".");   // 305a: przyczyna konca i komunikat (rozwiazana / zniknela)
                 _cars.Remove(r.Id);
             }
             var ld = pc.Leader;
@@ -480,7 +502,9 @@ namespace Armoury
                       .Append(", rozwiazanie ").Append(r.DPayEnd)
                       .Append(" | ponizej kapitalu ").Append(low).Append(" dob")
                       .Append(" | ").Append(Since(r.FirstDay, r.FromLoad, day)).Append(": ").Append(Totals(r));
+                    try { Check586(mp, r, "linia doby"); } catch (Exception e) { Stumble586("PlayerDaily", e); }   // 586: kontrola kiesy przed linia (nieznane trafia do transakcji dnia)
                     try { DiaryLine(sb, mp, r, now, day); } catch (Exception e) { Stumble305("DiaryLine", e); }   // 305a: gdzie / cel / zachowanie / transakcje dnia
+                    try { LedLine586(sb, r); } catch (Exception e) { Stumble586("LedLine", e); }   // 586: ruchy kiesy wedlug rodzaju - dzis i od doby LedDay
                     t259 += r.DPay259; tBk += r.DPayBk; tE39 += r.DPayE39; tEnd += r.DPayEnd; tVan += r.DPayVan; tWage += r.DWage; tTop += r.DTop; tShort += r.DShort;
                     if (r.DPay259 > 0) { pays.Add(r.Name + " " + N(r.DPay259)); caps.Add(basis.Capital); }
                     if (rep && low >= LowDays && (r.LastLowMsg < 0 || day - r.LastLowMsg >= LowDays))
@@ -599,6 +623,8 @@ namespace Armoury
             // 305b: kapital wlasny i zwroty w osobnym wierszu (stary format "w" bez zmian - starsza DLL wiersz "wb" odrzuci jako zly, reszta zostaje)
             foreach (var w in _wss.Values)
                 sb.Append("wb|").Append(w.Key).Append('|').Append(w.Basis).Append('|').Append(w.PaidRet).Append('|').Append(w.CapRet).Append('|').Append(w.CapAdd).Append('\n');
+            // 586: ruchy kiesy karawan wedlug rodzaju (po wierszach "c"; starsza DLL wiersz "l586" odrzuci jako zly, reszta zostaje)
+            foreach (var r in _cars.Values) sb.Append("l586|").Append(r.Id).Append('|').Append(LedExport(r)).Append('\n');
             return sb.ToString();
         }
 
@@ -628,6 +654,11 @@ namespace Armoury
                         w.FirstDay = I(p[2]); w.Paid = L(p[3]); w.Tax = L(p[4]); w.FromLoad = I(p[5]) != 0;
                         if (w.Key.Length == 0) throw new FormatException("klucz");
                         _wss[w.Key] = w; _impWs++;
+                    }
+                    else if (p[0] == "l586" && p.Length == 3)
+                    {
+                        CarRec r;
+                        if (_cars.TryGetValue(p[1], out r)) LedImport(r, p[2]);
                     }
                     else if (p[0] == "wb" && p.Length == 6)
                     {

@@ -375,7 +375,7 @@ namespace Armoury
                 {
                     int due = MathF.Round(_pSalvage.SecondaryBonus);
                     int pay = Math.Max(0, Math.Min(due, mp.PartyTradeGold));
-                    if (pay > 0) { mp.PartyTradeGold -= pay; st.Town.TradeTaxAccumulated += pay; }
+                    if (pay > 0) { mp.PartyTradeGold -= pay; st.Town.TradeTaxAccumulated += pay; CaravanSettle.Flow586(mp, CaravanSettle.LedSalvage, -pay); }   // 586: dziennik kiesy karawany gracza
                     _salvN++; _salvDue += due; _salvPaid += pay; if (pay < due) _salvShort++;
                 }
                 if (gov.GetPerkValue(_pHand) && st.MapFaction != null && st.MapFaction.BasicTroop != null)

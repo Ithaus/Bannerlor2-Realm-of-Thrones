@@ -99,6 +99,7 @@ namespace Armoury
                 var mp = __state.Mp; var st = __state.St; var town = st.Town;
                 var r = mp.ItemRoster;
                 long paid = (long)__state.Gold0 - mp.PartyTradeGold;
+                CaravanSettle.Flow586(mp, CaravanSettle.LedSponge, -paid);   // 586: cale okno gabki BK netto po zwrotach (kiesa przed - po) - dziennik kiesy karawany gracza
                 long lost = _s307UndoMp == mp ? _s307UndoLost : 0;   // 307d: niezwrocone przy cofnieciach - nie koszt przedmiotow, ktore zostaly
                 _s307UndoMp = null; _s307UndoLost = 0;
                 if (lost > 0)
@@ -171,7 +172,7 @@ namespace Armoury
                 l.Cost += paid; l.N += got;
             }
             _bookBuys++; _bookBuyUnits += got;
-            if (mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 1, paid, 0, 0.0, it, st, got);
+            if (mp.ActualClan == Clan.PlayerClan) CaravanSettle.NoteTrade(mp, 1, paid, 0, 0.0, it, st, got, false);   // 586: ruch kiesy zapisal SpongePost (cale okno)
         }
 
         /// <summary>A17Fix.CrewFin: polow zalogi na morzu (n0 - sztuki przed polowem, d - przybyle) - karawana: wpis ksiegi z kosztem 0 (klucz CaravanCatchAtZeroCost).</summary>

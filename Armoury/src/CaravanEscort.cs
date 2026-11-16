@@ -242,6 +242,7 @@ namespace Armoury
                 if (cost > 0)
                 {
                     mp.PartyTradeGold -= cost;
+                    CaravanSettle.Flow586(mp, CaravanSettle.LedFood, -cost);   // 586: dziennik kiesy karawany gracza
                     town.SettlementComponent.ChangeGold(cost);                        // kiesa karawany -> kasa miasta (kupcy sprzedali strawe na droge)
                     try { TownFolk.Sale(town, cost, TownFolk.MixFood); } catch { }    // sprzedaz kupcow miasta (podstawa robocizny handlu) - jak bandy i zaopatrzenie BK
                 }
