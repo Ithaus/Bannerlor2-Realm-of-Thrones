@@ -22,6 +22,19 @@
 
 **Status:** DO SPRAWDZENIA
 
+### Recenzja 579
+
+Dwie niezalezne recenzje: BRAK BLEDOW (diff ae7eb202 wzgledem 00a613d0). Przypadki: walka cala noc (Held false, "wznowione o swicie" 0 - tego brakowalo w at-268 165819/165884), walka w srodku nocy do switu (postojow 1 = przerwane walka 1, gracz: "Fighting breaks out", bez "takes up the raid again"), walka skonczona przed switem (postojow 2 = przerwane walka 1 + wznowione 1). `h.On`/`h.Cut`, `AiHaltHolds`, `RaidHaltHolds`, `AiRaidKind`, `PlayerRaidHeld` bez zmian - zachowanie postoju i snu takie samo. Weryfikacja (grep): `AiHaltNight` i `RaidFighting` wolane tylko w NightRest.RaidHaltAi.cs; CHANGELOG 51952 -> 51974 bez usunietych linii.
+
+**Poprawione:** nic (brak zgloszen bledow).
+
+**Odrzucone (uwagi kosmetyczne, nie bledy):**
+- `_rhFightH` liczy tez godzine przed zmierzchem (okno oceny obejmuje `BedNight(hc+1)`): w 578 ta sama godzina tak samo liczyla sie do postojow (`held`, `starts`) - jedna miara okna dla obu licznikow, zmiana rozjechalaby bilans postojow i walki. Zostaje.
+- Walka zaczeta i skonczona miedzy ocenami godzinowymi nie trafia do `_rhFightCut`, choc gracz widzi komunikaty z klatki: liczniki maja dokladnosc godziny z zalozenia (jak wszystkie liczniki 578), komunikaty gracza sa z klatki - to dwa rozne zrodla, nie blad.
+- Szybkie skoki `DefenderSide.TroopCount` 0/>0 -> para komunikatow "Fighting breaks out" / "Night falls" na kazde przejscie: przejscie zalezy od dolaczenia/rozbicia strony (prawdziwe zdarzenie), nie od klatki; ta sama wartosc steruje postepem w `AiHaltHolds`, w at-268 stala przez cala noc. Bez spamu.
+- Zagrozenie w trakcie walki bez wczesniejszego postoju nie podnosi "przerwane przez zagrozenie" (przykladowa linia "postoj zdjety" mimo to sie wypisze): zamierzone - przerwac mozna tylko postoj, ktory byl.
+- Nowy komunikat "Fighting breaks out at X - the army is roused from its night halt." (watpliwosc 2 implementatora): obie recenzje za pozostawieniem - bez niego przy walce pokazaloby sie bledne "The army takes up the raid on X again."; po angielsku, w zakresie spec. Zostaje.
+
 ## 578: nocny postoj przy rabunku takze dla lordow AI (wyrownane tempo i sen), wiosek pobocznych i gracza w cudzej armii; szacunek "about N days" z nocami - Armoury (nowy NightRest.RaidHaltAi.cs; NightRest.RaidHalt.cs, NightRest.cs, NightMarch.cs, DistrictRaid.cs, SideVillageVisit.Raid.cs; nowy klucz RaidNightHaltAi w Settings.cs + McmSettings.cs recznie)
 
 **Problem:** Jeff, czat 16.11, odpowiedz na "czego 577 nie obejmuje": "1. wyrownac 2. tez z postojem 3. teraz bedzie 4. to dodaj 1/4 aby bylo dokladnie". Po 577: (1) lord AI rabuje cala dobe, a jego stanie przy wsi liczy sie jako odpoczynek - rabuje o noc szybciej niz gracz i bez kary snu (CHANGELOG 577 "AI (bez zmian, opis)"); (2) wioska poboczna (SideVillageVisit, menu oczekiwania bez MapEvent) w nocy dalej liczona jako praca, bez postoju; (3) gracz w cudzej armii - postoj tylko, gdy gracz prowadzi rabunek; (4) okienko E7/R2 "about N days" liczylo rabunek bez nocy. Log Armoury-2026-11-15_23-13-58.log: lordowie w rabunku nie maja linii nocnych NocnyMarsz (Where "bitwa" - partie z MapEvent pomijane w obozie swiata), ksiega AI liczy krok <= 0.35 jako odpoczynek.
