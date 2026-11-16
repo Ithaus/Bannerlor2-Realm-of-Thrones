@@ -9081,6 +9081,10 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool RaidPlayerStepPopup { get; set; } = true;
 
+        [SettingPropertyBool("Raid Keeps Step Progress", HintText = "when a raid on a village is broken off before its settlements burn, the work already done is kept: the same realm's next raid on that village within Raid Alert Max Days carries on from it instead of starting over (off = every raid starts from nothing)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool RaidKeepsStepProgress { get; set; } = true;
+
         [SettingPropertyBool("Raid Tribute Enabled", HintText = "instead of burning an enemy village, a lord or army may demand tribute from it: the elders pay a share of the village purse (Raid Tribute Share Low when the raiders barely outnumber the militia, up to Raid Tribute Share High at five to one) and the village is not burned - its people and crops stay. The lords weigh it against the loot of a raid: they take tribute when it pays as well as the raid less the wages of the days it would take, and raid anyway when their men are hungry, their house cannot pay its men, the tribute is less than a day's wages, the villagers would fight, or they are Ironborn or Free Folk. You get Demand tribute in the hostile action menu of an enemy village. After paying, the village is spared by that realm (its lords and you) for Raid Tribute Spare Days and does not pay it again; its lord and elders think a little less of the raider, less than after a raid. Off = villages are raided as before", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool RaidTributeEnabled { get; set; } = true;
@@ -16288,6 +16292,7 @@ namespace Armoury
             s.RaidDetachmentMen = RaidDetachmentMen;
             s.RaidAlertMaxDays = RaidAlertMaxDays;
             s.RaidPlayerStepPopup = RaidPlayerStepPopup;
+            s.RaidKeepsStepProgress = RaidKeepsStepProgress;
             s.RaidTributeEnabled = RaidTributeEnabled;
             s.RaidTributeShareLow = RaidTributeShareLow;
             s.RaidTributeShareHigh = RaidTributeShareHigh;

@@ -477,7 +477,7 @@ namespace Armoury
                 _resolveNote = "z zapisu: nieznana wersja klucza arm_district - jak stary zapis";
                 return;
             }
-            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null, sm = null, sr = null, sc = null;
+            uint crc = 0; bool hasCrc = false, wasOff = false; string sn = null, sw = null, sx = null, sy = null, sm = null, sr = null, sc = null, sk = null;
             foreach (var p in parts)
             {
                 if (p.Length < 2 || p[1] != ':') continue;
@@ -494,9 +494,10 @@ namespace Armoury
                     case 'o': wasOff = body == "1"; break;
                     case 'r': sr = body; break;              // E7/R1 (235): sesje rabunku osada po osadzie (po id wsi gry - bez indeksow wiosek, niezalezne od ukladu)
                     case 'c': sc = body; break;              // E7/R1 (235): czujnosc wsi (id wsi gry -> doba konca)
+                    case 'k': sk = body; break;              // 580: pamiec przerwanych krokow rabunku (id wsi gry -> frakcja, zrobiona czesc)
                 }
             }
-            try { DistrictRaid.Import(sr, sc); } catch (Exception e) { Stumble("VillageBook.Import(r/c)", e); }
+            try { DistrictRaid.Import(sr, sc, sk); } catch (Exception e) { Stumble("VillageBook.Import(r/c)", e); }
             _layoutSame = hasCrc && _file != null && crc == _layoutCrc;
             _saveCrc = crc; _saveCrcSet = hasCrc;            // recenzja calosci scalenia6: uklad zapisu dla VillageCrafts.LayoutCheck (n zajec wiosek liczone na tym ukladzie)
             if (!string.IsNullOrEmpty(sn))

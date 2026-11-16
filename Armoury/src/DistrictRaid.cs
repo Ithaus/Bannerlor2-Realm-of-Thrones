@@ -59,6 +59,11 @@ namespace Armoury
     ///    StartWait i bez zadnego SwitchToMenu (CLAUDE.md 7); przy 0 osadach - gra (odwolany, wies Normal, czesc kroku w ksiedze). Po wczytaniu gra sama wznawia
     ///    oczekiwanie (GameMenuVM.Refresh -> RunWaitMenuCondition -> StartWait), sesja wraca z zapisu ze stanem decyzji i liczbami kroku, okienko otwiera sie znowu.
     ///    Klucz zdjety albo latki okienka niewpiete - gracz jak AI (jeden krok i koniec). Wyjatek okienka liczony; po MaxStumbles nieudanych prob - koniec jak AI.
+    ///  - PAMIEC KROKU (580, RaidKeepsStepProgress): wodz AI mysli co godzine (AiPartyThinkBehavior.PartyHourlyAiTick, ROT AIThinkPatch - ta sama regula) i konczy
+    ///    rabunek (FinalizeEvent), gdy najlepsza mysl nie jest rabunkiem tej wsi (u armii brak oferty w trakcie - 580b w LocalFront334e; takze odsiecz, spojnosc,
+    ///    pokoj, gracz "End Raiding" przy 0 osadach). Przerwany krok (EndPre) zostawia przy wsi zrobiona czesc dla tej samej frakcji
+    ///    do Today + RaidAlertMaxDays; nastepna sesja zaczyna pierwszy krok od niej (Prog = Struck = Done0, bez ponownego uderzenia), lup i RaidDamage licza tylko
+    ///    przyrost (DmgOf, u w Loot), punkty osady w skali poprzedniej sesji (Hp0 z pamieci, nigdy wyzej niz teraz). Pelny krok skresla pamiec wsi. Zapis k:.
     /// Zapis: sekcje r: (sesje) i c: (czujnosc) klucza arm_district przez VillageBook.Export/Import (brak = sesja od nowa z punktow gry). Wyjatek per sesja liczony;
     /// po MaxStumbles w jednej sesji - sesja oddana grze (bez globalnego wylacznika, CLAUDE.md 7). Reset w konstruktorze ArmouryBehavior.
     /// </summary>
@@ -73,6 +78,8 @@ namespace Armoury
         private const int MaxDaysList = 40;              // dni na osade w linii doby (lista do mediany okna w sprawdz_logi)
         private const int ChoiceNext = 1, ChoiceEnd = 2; // E7/R2: wybor gracza z okienka (0 = jeszcze nie wybral)
         private const int FieldsR1 = 19, FieldsR2 = 31;  // pola wpisu sesji w zapisie: E7/R1 i z krokiem gracza (E7/R2)
+        private const int FieldsR3 = 34;                 // 580: + Done0, DmgOff, HitPrev (krok wznowiony z pamieci wsi)
+        private const int LoopDays = 10, LoopStarts = 5; // 580: petla = ta sama para wodz-wies >= 5 startow rabunku w 10 dobach (linia doby)
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.RaidBySettlementEnabled && _ready; } }
         /// <summary>E7/R2: okienko gracza po kazdej osadzie czynne (klucz i obie latki menu); nieczynne = gracz jak AI (jeden krok i koniec).</summary>
@@ -106,7 +113,19 @@ namespace Armoury
             // 362: udzial wsi gry w ludziach okregu w domu na poczatku sesji gracza z MainOnly (skrytki: S x udzial - kiesa wspolna dla okregu, wioski poboczne
             // rabuje sie osobno, jak w SideVillageVisit); NaN - nie policzony (AI, po wczytaniu) - Loot liczy wtedy teraz
             public double CacheSh = double.NaN;
+            // 580 (RaidKeepsStepProgress): krok wznowiony z pamieci wsi. Done0 - ludzie przeszukani w poprzednich sesjach, wniesieni do BIEZACEGO kroku (juz uderzeni,
+            // lup i kara relacji za nich wydane wtedy - lup i RaidDamage tej sesji licza tylko przyrost ponad Done0); DmgOff - ta czesc kroku jako ulamek (kara relacji K3
+            // tej sesji = q - DmgOff, po pelnym kroku 1 - DmgOff); HitPrev - trafieni poprzednich sesji (tylko dlugosc czujnosci). Zapis w polach 32-34 wpisu r:.
+            public double Done0, DmgOff, HitPrev;
+            public bool Resumed;                             // krok wznowiony z pamieci w tej sesji gry (bez dni zegara - przerwa miedzy sesjami nie jest praca)
+            public string PairKey;                           // 580: para wodz-wies (licznik petli startow)
         }
+
+        /// <summary>580: zrobiona czesc przerwanego kroku zapamietana przy wsi (id wsi gry) - nastepna sesja TEJ SAMEJ frakcji zaczyna od niej. Zapis k: w arm_district.</summary>
+        private sealed class Mem { public string Fid; public int End; public double Done, Hp0, LootDays, Hit; }
+
+        /// <summary>580: starty rabunku jednej pary wodz-wies (doby kampanii) - linia doby pokazuje petle (>= LoopStarts startow w LoopDays dob). Bez zapisu.</summary>
+        private sealed class Pair { public readonly List<double> Starts = new List<double>(); public string Who, Where; public int Resumed; }
 
         internal sealed class EndCtx { public Sess Ss; public long Cap0; public double RaidDead; }
 
@@ -117,6 +136,10 @@ namespace Armoury
         private static readonly HashSet<RaidEventComponent> _notMine = new HashSet<RaidEventComponent>();
         private static readonly Dictionary<string, string> _pendingR = new Dictionary<string, string>(StringComparer.Ordinal);
         private static readonly Dictionary<string, int> _alert = new Dictionary<string, int>(StringComparer.Ordinal);   // id wsi -> doba konca czujnosci
+        private static readonly Dictionary<string, Mem> _mem = new Dictionary<string, Mem>(StringComparer.Ordinal);    // 580: id wsi -> zrobiona czesc przerwanego kroku
+        private static readonly Dictionary<string, Pair> _pairs = new Dictionary<string, Pair>(StringComparer.Ordinal); // 580: wodz|wies -> starty (petle)
+        private static int _dMemSaved, _dMemResumed, _dMemOther, _dMemExpired, _dMemDropped, _dMemOff;
+        private static double _dMemSavedWork, _dMemResumedWork, _dMemCut, _dMemQ0;
         private static int _pendingDays;
         private static bool _ready;
         /// <summary>577: prefiks kroku rabunku (UpdatePrefix) wpiety - bez niego postoj nocny przy rabunku nie zaczyna sie (NightRest.RaidHaltFrame).</summary>
@@ -147,7 +170,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _sess.Clear(); _notMine.Clear(); _pendingR.Clear(); _alert.Clear(); _pendingDays = 0; _offLogged = false;
+            _sess.Clear(); _notMine.Clear(); _pendingR.Clear(); _alert.Clear(); _mem.Clear(); _pairs.Clear(); _pendingDays = 0; _offLogged = false;
             _ask = null; _askOpen = false;
             lock (_errSites) _errSites.Clear();
             NewDay();
@@ -163,6 +186,16 @@ namespace Armoury
             _dDaysPer.Clear(); _dWallPer.Clear();
             _dPStarted = _dPEnded = _dPWon = _dPCalled = _dPBroken = _dPSteps = _dAsk = _dShown = _dShownAgain = _dNoNext = _dNext = _dEndPopup = _dEndMenu = _dEndMenu0 = _dAutoEnd = _dAskFail = 0;
             _dPSettl = 0.0;
+            _dMemSaved = _dMemResumed = _dMemOther = _dMemExpired = _dMemDropped = _dMemOff = 0;
+            _dMemSavedWork = _dMemResumedWork = _dMemCut = _dMemQ0 = 0.0;
+        }
+
+        /// <summary>580: kara relacji gry (RaidDamage, K3) tej sesji - bez czesci kroku wniesionej z pamieci (za nia kara poszla przy przerwaniu poprzedniej sesji).
+        /// Bez wznowienia (DmgOff 0) dokladnie jak dotad: po >= 1 pelnym kroku gracza 1, inaczej postep kroku q.</summary>
+        private static float DmgOf(Sess ss, double q)
+        {
+            double off = Clamp01(ss.DmgOff);
+            return (float)Clamp01(ss.Steps > 0 ? 1.0 - off : q - off);
         }
 
         private static void Stumble(string where, Exception e)
@@ -197,7 +230,7 @@ namespace Armoury
             if (_sess.TryGetValue(comp, out ss)) return ss;
             if (_notMine.Contains(comp)) return null;
             bool mine = false, player = false;
-            string fid = null;
+            string fid = null, lid = null, lname = null;
             Village v = null;
             try
             {
@@ -217,6 +250,7 @@ namespace Armoury
                     mine = mp != null;
                     player = mp != null && mp == MobileParty.MainParty;
                     try { var lf = lp.MapFaction; fid = lf != null ? lf.StringId : null; } catch { fid = null; }   // m97-wioski: ochrony wiosek po okupie
+                    if (mp != null) { lid = mp.StringId; try { lname = mp.Name != null ? mp.Name.ToString() : lid; } catch { lname = lid; } }   // 580: petle startow
                 }
             }
             catch (Exception e) { mine = false; Stumble("Decide", e); }
@@ -226,6 +260,7 @@ namespace Armoury
             _sess[comp] = ss;
             _dStarted++;
             try { Restore(ss); } catch (Exception e) { Stumble("Restore", e); }
+            if (!ss.Restored) { try { NoteStart(ss, lid, lname); } catch (Exception e) { Stumble("NoteStart", e); } }
             if (ss.Player && ss.Ask && !ss.Done) _ask = ss;       // E7/R2: wczytanie w stanie decyzji - tick menu otworzy okienko znowu
             return ss;
         }
@@ -246,6 +281,76 @@ namespace Armoury
             _sess.Remove(comp);
             _notMine.Add(comp);
             _dReleased++;
+        }
+
+        // ------------------------------------------------------------ 580: pamiec przerwanego kroku i petle startow
+        /// <summary>580: start rabunku pary wodz-wies (nowa sesja, nie z zapisu) - do licznika petli w linii doby. Okno LoopDays, stare starty wypadaja.</summary>
+        private static void NoteStart(Sess ss, string lid, string lname)
+        {
+            var st = ss.V != null ? ss.V.Settlement : null;
+            if (lid == null || st == null || st.StringId == null) return;
+            string key = lid + "|" + st.StringId;
+            Pair p;
+            if (!_pairs.TryGetValue(key, out p)) { p = new Pair(); _pairs[key] = p; }
+            double now = CampaignTime.Now.ToDays;
+            p.Starts.RemoveAll(d => d < now - LoopDays);
+            p.Starts.Add(now);
+            p.Who = lname ?? lid;
+            try { p.Where = st.Name != null ? st.Name.ToString() : st.StringId; } catch { p.Where = st.StringId; }
+            ss.PairKey = key;
+        }
+
+        /// <summary>
+        /// 580: przerwany krok (EndPre, sesja zaczeta, nie zakonczona) - zrobiona czesc kroku zostaje przy wsi dla tej samej frakcji (Fid) do doby Today + RaidAlertMaxDays.
+        /// Zrobiona czesc = min(Prog, Work) - razem z czescia wniesiona z pamieci (Done0), bo krok jest jeden. Ludzie juz uderzeni (EndPre rozlicza reszte przed nami),
+        /// lup i kara relacji za nia wydane - wznowienie ich nie powtarza (Loot i DmgOf licza tylko przyrost). Okreg wypalony / krok bez pracy - nic do pamietania.
+        /// </summary>
+        private static void Remember(Sess ss)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.RaidKeepsStepProgress || ss.BurnedOut || !(ss.Work > 0.0)) return;
+            var st = ss.V != null ? ss.V.Settlement : null;
+            if (st == null || BadId(st.StringId) || BadId(ss.Fid)) return;
+            double done = Math.Min(ss.Prog, ss.Work);
+            if (!(done > 1e-6)) return;
+            int days = Math.Max(1, Math.Min(60, s.RaidAlertMaxDays));
+            _mem[st.StringId] = new Mem { Fid = ss.Fid, End = Today() + days, Done = done, Hp0 = ss.Hp0, LootDays = ss.LootDays, Hit = ss.Hit + ss.HitPrev };
+            _dMemSaved++; _dMemSavedWork += Math.Max(0.0, done - ss.Done0);
+        }
+
+        /// <summary>
+        /// 580: poczatek PIERWSZEGO kroku nowej sesji (Start, po Plan): pamiec tej wsi tej samej frakcji -> krok zaczyna od zrobionej czesci (Prog = Struck = Done0 -
+        /// bez ponownego uderzenia), doby lupienia dodane (mediana dni na osade liczy caly krok), punkty osady w skali poprzedniej sesji (Hp0 z pamieci, nigdy wyzej niz
+        /// punkty teraz - leczenie miedzy sesjami nie podnosi paska). Pamiec innej frakcji zostaje (ta frakcja moze wrocic). Krok mniejszy niz pamiec (okreg sie
+        /// skurczyl) - Done0 = Work (krok konczy sie w pierwszym ticku), nadwyzka w linii jako "przycieta".
+        /// </summary>
+        private static void TryResume(Sess ss)
+        {
+            var s = Settings.Current;
+            if (_mem.Count == 0 || s == null) return;
+            var st = ss.V != null ? ss.V.Settlement : null;
+            Mem m;
+            if (st == null || st.StringId == null || !_mem.TryGetValue(st.StringId, out m)) return;
+            if (!s.RaidKeepsStepProgress) { _dMemOff++; return; }
+            if (m.End <= Today()) { _mem.Remove(st.StringId); _dMemExpired++; return; }
+            if (ss.Fid == null || !string.Equals(m.Fid, ss.Fid, StringComparison.Ordinal)) { _dMemOther++; return; }
+            _mem.Remove(st.StringId);
+            if (ss.BurnedOut || !(ss.Work > 0.0)) { _dMemCut += m.Done; return; }
+            double d = Math.Min(m.Done, ss.Work);
+            if (!(d > 0.0)) return;
+            _dMemCut += m.Done - d;
+            ss.Done0 = d; ss.DmgOff = Clamp01(d / ss.Work);
+            ss.Prog = d; ss.Struck = d;
+            ss.HitPrev = Math.Max(0.0, m.Hit);
+            ss.LootDays += Math.Max(0.0, m.LootDays);
+            ss.Resumed = true;
+            double keep = 1.0 - PointsKeep * ss.DmgOff;
+            double hp0 = Math.Max(0.01, Math.Min(1.0, m.Hp0));
+            if (hp0 * keep > ss.Hp0) hp0 = ss.Hp0 / keep;
+            ss.Hp0 = (float)Math.Max(0.01, Math.Min(1.0, hp0));
+            _dMemResumed++; _dMemResumedWork += d; _dMemQ0 += ss.DmgOff;
+            Pair p;
+            if (ss.PairKey != null && _pairs.TryGetValue(ss.PairKey, out p)) p.Resumed++;
         }
 
         // ------------------------------------------------------------ prefiks RaidEventComponent.Update(ref bool finish) - Priority.First
@@ -312,7 +417,7 @@ namespace Armoury
                     return false;
                 }
                 _setHp(st, ss.Hp0 * (float)(1.0 - PointsKeep * q));
-                _setDmg(__instance, ss.Steps > 0 ? 1f : (float)q);                        // E7/R2: w kolejnym kroku gracza kara relacji zostaje 1 (osada juz spalona)
+                _setDmg(__instance, DmgOf(ss, q));                                        // E7/R2: w kolejnym kroku gracza kara relacji zostaje 1 (osada juz spalona); 580: bez czesci z pamieci
                 return false;
             }
             catch (Exception e)
@@ -405,6 +510,9 @@ namespace Armoury
             if (ss.MainOnly && ss.Steps == 0 && double.IsNaN(ss.CacheSh)) ss.CacheSh = MainShareOf(v);   // 362: przed pierwszym uderzeniem
             try { var lp = comp.AttackerSide.LeaderParty; var h = lp != null ? lp.LeaderHero : null; ss.Lord = h != null && h.IsLord; }
             catch { ss.Lord = false; }
+            ss.Done0 = 0.0;
+            // 580: pierwszy krok sesji - zrobiona czesc przerwanego kroku tej frakcji przy tej wsi (AI i gracz; kolejne kroki gracza - od zera jak dotad)
+            if (ss.Steps == 0 && !ss.Resumed) { try { TryResume(ss); } catch (Exception e) { Stumble("TryResume", e); } }
         }
 
         /// <summary>Koniec sesji tak jak gra konczy pelny rabunek (G RaidEventComponent.cs:307-313): punkty 0, RaidDamage 1, AttackerVictory, maska poziomu wsi.
@@ -415,7 +523,7 @@ namespace Armoury
             ss.Ask = false;
             if (ReferenceEquals(_ask, ss)) _ask = null;
             _setHp(st, 0f);
-            _setDmg(comp, 1f);
+            _setDmg(comp, DmgOf(ss, 1.0));                                   // 580: bez czesci kroku z pamieci (bez wznowienia 1 jak dotad)
             if (me.BattleState != BattleState.AttackerVictory) _setBs(me, BattleState.AttackerVictory);
             st.Party.SetLevelMaskIsDirty();
         }
@@ -433,7 +541,7 @@ namespace Armoury
             ss.Ask = true; ss.Choice = 0; ss.AskFails = 0; ss.Shown = false;
             _ask = ss; _dAsk++;
             _setHp(st, ss.Hp0 * (float)(1.0 - PointsKeep));
-            _setDmg(comp, 1f);
+            _setDmg(comp, DmgOf(ss, 1.0));                                   // 580: po pelnym kroku 1 - DmgOff (bez wznowienia 1 jak dotad)
             return true;
         }
 
@@ -443,7 +551,7 @@ namespace Armoury
         {
             ss.Ask = false; ss.Choice = 0; ss.Shown = false;
             if (ReferenceEquals(_ask, ss)) _ask = null;
-            ss.Prog = 0.0; ss.Struck = 0.0; ss.PdPend = 0.0; ss.LootGiven = false;
+            ss.Prog = 0.0; ss.Struck = 0.0; ss.PdPend = 0.0; ss.LootGiven = false; ss.Done0 = 0.0;   // 580: Done0 tylko w pierwszym kroku (DmgOff zostaje - kara sesji)
             ss.SHit = ss.SDead = ss.SFled = ss.SRef = ss.SCap = ss.SFoodBurn = ss.SFoodEat = 0.0;
             ss.SGold = ss.STake = ss.SBurn = 0;
             _setHp(st, 1f);
@@ -561,7 +669,8 @@ namespace Armoury
             // ludzie w domu) z tego, co zostalo, jak w 63aaaedf; inaczej gracz w jednej sesji bralby 50/75/87.5/94% kiesy za kilka spalonych osad.
             int rg = ReaverLaw.RaidGroup(lp);
             bool first = ss.Steps == 0;
-            double u = ss.Work > 0.0 ? Clamp01(Math.Min(ss.Prog, ss.Work) / ss.Work) : 0.0;
+            // 580: u = czesc kroku zrobiona W TEJ SESJI (bez Done0 z pamieci - za nia zelazna cena / skrytki poszly przy przerwaniu poprzedniej sesji)
+            double u = ss.Work > 0.0 ? Clamp01((Math.Min(ss.Prog, ss.Work) - ss.Done0) / ss.Work) : 0.0;
             double s = first ? ReaverLaw.IronShare(rg, s0, u) : s0;   // towar i stado; zloto ze skrytek (362, RaidCache) - nizej, tylko zloto
             // R3-06c (p5-stada): stado okregu najpierw - ubytek stada za udzial s, zwierzeta do taboru wodza (liczba do okienka gracza); znacznik rabunku takze przy s = 0 (VillageHerds; wlasny try w srodku)
             try { ss.STake += VillageHerds.OnRaid(v, s, lp != null ? lp.MobileParty : null); } catch (Exception e) { Stumble("Loot(stado)", e); }
@@ -747,7 +856,9 @@ namespace Armoury
                     bool lost = __instance.BattleState == BattleState.DefenderVictory || att == null || att.TroopCount <= 0;
                     if (!lost) Loot(ss, __instance);
                     // kara relacji gry za zrobiona czesc (K3); E7/R2: po >= 1 pelnym kroku gracza zostaje 1 (osada juz spalona)
-                    _setDmg(__instance, ss.Steps > 0 ? 1f : (ss.Work > 0.0 ? (float)Math.Min(1.0, ss.Prog / ss.Work) : 0f));
+                    _setDmg(__instance, DmgOf(ss, ss.Work > 0.0 ? Math.Min(1.0, ss.Prog / ss.Work) : 0.0));   // 580: bez czesci z pamieci
+                    // 580: zrobiona czesc kroku zostaje przy wsi (nastepna sesja tej frakcji zaczyna od niej); wlasny try - pamiec nie psuje rozliczenia
+                    try { Remember(ss); } catch (Exception e) { Stumble("Remember", e); }
                 }
                 __state = new EndCtx { Ss = ss, Cap0 = Devastation.CapTakenAll, RaidDead = Devastation.RaidDead(__instance) };
             }
@@ -774,13 +885,16 @@ namespace Armoury
                             _dSteps++; _dSettl += ss.M;
                             if (ss.Lord && ss.M >= 1.0 && _dDaysPer.Count < 4096) _dDaysPer.Add(ss.LootDays / ss.M);
                             // 578: doby zegara kroku (z nocnym postojem i walka) - kroki zaczete w tej sesji gry (StartH bez zapisu)
-                            if (ss.Lord && ss.M >= 1.0 && !double.IsNaN(ss.StartH) && _dWallPer.Count < 4096) _dWallPer.Add(Math.Max(0.0, CampaignTime.Now.ToHours - ss.StartH) / 24.0 / ss.M);
+                            // 580: krok wznowiony z pamieci - bez dni zegara (przerwa miedzy sesjami to nie krok; dni pracy wyzej licza caly krok)
+                            if (ss.Lord && ss.M >= 1.0 && !ss.Resumed && ss.DmgOff <= 0.0 && !double.IsNaN(ss.StartH) && _dWallPer.Count < 4096) _dWallPer.Add(Math.Max(0.0, CampaignTime.Now.ToHours - ss.StartH) / 24.0 / ss.M);
                         }
                         var v = ss.V;
+                        // 580: krok skonczony - pamiec tej wsi juz niepotrzebna (takze pamiec innej frakcji: osady kroku spalone)
+                        if (v != null && v.Settlement != null && v.Settlement.StringId != null && _mem.Remove(v.Settlement.StringId)) _dMemDropped++;
                         if (v != null && v.VillageState == Village.VillageStates.Looted && v.Settlement != null && v.Settlement.StringId != null)
                         {
                             var s = Settings.Current;
-                            double d = ss.L0 > 0.0 ? ss.Hit / ss.L0 : 0.0;
+                            double d = ss.L0 > 0.0 ? (ss.Hit + ss.HitPrev) / ss.L0 : 0.0;   // 580: z trafionymi poprzednich sesji tego kroku (HitPrev)
                             int days = (int)Math.Ceiling(1.0 + 100.0 * d);
                             days = Math.Max(1, Math.Min(Math.Max(1, Math.Min(60, s != null ? s.RaidAlertMaxDays : 17)), days));
                             _alert[v.Settlement.StringId] = Today() + days;
@@ -970,7 +1084,8 @@ namespace Armoury
                   .Append(F(ss.EatDays, "R")).Append('/').Append(F(ss.LootDays, "R")).Append('/').Append(F(ss.F, "R")).Append('/').Append(flags.ToString(Inv))
                   .Append('/').Append(ss.Steps.ToString(Inv)).Append('/').Append(F(ss.Settl, "R")).Append('/').Append(F(ss.SHit, "R")).Append('/').Append(F(ss.SDead, "R"))
                   .Append('/').Append(F(ss.SFled, "R")).Append('/').Append(F(ss.SRef, "R")).Append('/').Append(F(ss.SCap, "R")).Append('/').Append(F(ss.SFoodBurn, "R"))
-                  .Append('/').Append(F(ss.SFoodEat, "R")).Append('/').Append(ss.SGold.ToString(Inv)).Append('/').Append(ss.STake.ToString(Inv)).Append('/').Append(ss.SBurn.ToString(Inv));
+                  .Append('/').Append(F(ss.SFoodEat, "R")).Append('/').Append(ss.SGold.ToString(Inv)).Append('/').Append(ss.STake.ToString(Inv)).Append('/').Append(ss.SBurn.ToString(Inv))
+                  .Append('/').Append(F(ss.Done0, "R")).Append('/').Append(F(ss.DmgOff, "R")).Append('/').Append(F(ss.HitPrev, "R"));   // 580: pola 32-34
                 nr++;
             }
             foreach (var kv in _pendingR)                                       // wczytane, a jeszcze nieodebrane (zapis zaraz po wczytaniu) - nie gubimy
@@ -991,14 +1106,27 @@ namespace Armoury
                 sb.Append(kv.Key).Append('=').Append(kv.Value.ToString(Inv));
                 nc++;
             }
-            try { var s = Settings.Current; if (s != null && s.LogEnabled) Log.Info("Rabunek osada po osadzie (E7/R1): zapis - sesji " + nr + ", czujnosc " + nc + " wsi."); }
+            // 580: pamiec przerwanych krokow "|k:id=frakcja/doba konca/zrobione/hp0/doby lupienia/trafieni;..." (starsze DLL te sekcje pomijaja)
+            int nk = 0;
+            sb.Append("|k:"); first = true;
+            foreach (var kv in _mem)
+            {
+                var m = kv.Value;
+                if (m == null || BadId(kv.Key) || BadId(m.Fid) || m.End <= today) continue;
+                if (!first) sb.Append(';');
+                first = false;
+                sb.Append(kv.Key).Append('=').Append(m.Fid).Append('/').Append(m.End.ToString(Inv)).Append('/').Append(F(m.Done, "R")).Append('/').Append(F(m.Hp0, "R"))
+                  .Append('/').Append(F(m.LootDays, "R")).Append('/').Append(F(m.Hit, "R"));
+                nk++;
+            }
+            try { var s = Settings.Current; if (s != null && s.LogEnabled) Log.Info("Rabunek osada po osadzie (E7/R1): zapis - sesji " + nr + ", czujnosc " + nc + " wsi, pamiec krokow (580) " + nk + " wsi."); }
             catch { }
         }
 
         /// <summary>Wczytanie (VillageBook.ApplyPending - po Reset konstruktora): sesje czekaja na swoj rabunek (pierwsze wywolanie prefiksu przy tej wsi), czujnosc od razu.</summary>
-        internal static void Import(string sr, string sc)
+        internal static void Import(string sr, string sc, string sk = null)
         {
-            _pendingR.Clear(); _alert.Clear(); _pendingDays = 0;
+            _pendingR.Clear(); _alert.Clear(); _mem.Clear(); _pairs.Clear(); _pendingDays = 0;
             int bad = 0;
             if (!string.IsNullOrEmpty(sr))
                 foreach (var item in sr.Split(';'))
@@ -1007,7 +1135,7 @@ namespace Armoury
                     if (eq <= 0) { if (item.Length > 0) bad++; continue; }
                     string id = item.Substring(0, eq), body = item.Substring(eq + 1);
                     int nf = body.Split('/').Length;
-                    if (nf != FieldsR1 && nf != FieldsR2) { bad++; continue; }        // 19 pol = zapis E7/R1, 31 = z krokiem gracza (E7/R2)
+                    if (nf != FieldsR1 && nf != FieldsR2 && nf != FieldsR3) { bad++; continue; }        // 19 pol = zapis E7/R1, 31 = z krokiem gracza (E7/R2), 34 = z pamiecia kroku (580)
                     _pendingR[id] = body;
                 }
             if (!string.IsNullOrEmpty(sc))
@@ -1017,11 +1145,26 @@ namespace Armoury
                     if (eq <= 0 || !int.TryParse(item.Substring(eq + 1), NumberStyles.Integer, Inv, out end)) { if (item.Length > 0) bad++; continue; }
                     _alert[item.Substring(0, eq)] = end;
                 }
+            // 580: pamiec przerwanych krokow (k:) - zepsuty wpis pominiety (krok od zera jak przed 580)
+            if (!string.IsNullOrEmpty(sk))
+                foreach (var item in sk.Split(';'))
+                {
+                    int eq = item.IndexOf('=');
+                    if (eq <= 0) { if (item.Length > 0) bad++; continue; }
+                    var a = item.Substring(eq + 1).Split('/');
+                    int end; double done, hp0, ld, hit;
+                    if (a.Length != 6 || BadId(a[0]) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out end)
+                        || !double.TryParse(a[2], NumberStyles.Float, Inv, out done) || !double.TryParse(a[3], NumberStyles.Float, Inv, out hp0)
+                        || !double.TryParse(a[4], NumberStyles.Float, Inv, out ld) || !double.TryParse(a[5], NumberStyles.Float, Inv, out hit)
+                        || double.IsNaN(done) || double.IsInfinity(done) || !(done > 0.0) || double.IsNaN(hp0) || double.IsNaN(ld) || double.IsInfinity(ld) || double.IsNaN(hit) || double.IsInfinity(hit))
+                    { bad++; continue; }
+                    _mem[item.Substring(0, eq)] = new Mem { Fid = a[0], End = end, Done = done, Hp0 = Math.Max(0.01, Math.Min(1.0, hp0)), LootDays = Math.Max(0.0, ld), Hit = Math.Max(0.0, hit) };
+                }
             try
             {
                 var s = Settings.Current;
                 if (s != null && s.LogEnabled)
-                    Log.Info("Rabunek osada po osadzie (E7/R1): wczytanie - sesji " + _pendingR.Count + ", czujnosc " + _alert.Count + " wsi" + (bad > 0 ? ", zepsute wpisy " + bad : "")
+                    Log.Info("Rabunek osada po osadzie (E7/R1): wczytanie - sesji " + _pendingR.Count + ", czujnosc " + _alert.Count + " wsi, pamiec krokow (580) " + _mem.Count + " wsi" + (bad > 0 ? ", zepsute wpisy " + bad : "")
                              + (sr == null && sc == null ? " (zapis bez sekcji r:/c: - stary zapis albo bez rabunkow)" : "") + ".");
             }
             catch { }
@@ -1045,6 +1188,11 @@ namespace Armoury
             if (r2)
                 for (int i = 0; i < y.Length; i++)
                     if (!double.TryParse(a[FieldsR1 + i], NumberStyles.Float, Inv, out y[i]) || double.IsNaN(y[i]) || double.IsInfinity(y[i])) return;   // zepsuty wpis - sesja od nowa
+            // 580: pola 32-34 (Done0, DmgOff, HitPrev) - zapis sprzed 580 bez nich: krok bez wznowienia (0)
+            var z = new double[FieldsR3 - FieldsR2];
+            if (a.Length >= FieldsR3)
+                for (int i = 0; i < z.Length; i++)
+                    if (!double.TryParse(a[FieldsR2 + i], NumberStyles.Float, Inv, out z[i]) || double.IsNaN(z[i]) || double.IsInfinity(z[i])) return;   // zepsuty wpis - sesja od nowa
             ss.Hp0 = (float)Math.Max(0.01, Math.Min(1.0, x[0])); ss.Prog = Math.Max(0.0, x[1]); ss.Work = Math.Max(0.0, x[2]); ss.M = Math.Max(0.0, x[3]);
             ss.U = Math.Max(UFloor, Math.Min(1.0, x[4])); ss.L0 = x[5]; ss.Home0 = x[6]; ss.Sv = x[7]; ss.Struck = Math.Max(0.0, x[8]); ss.PdPend = Math.Max(0.0, x[9]);
             ss.Hit = x[10]; ss.Dead = x[11]; ss.Fled = x[12]; ss.Ref = x[13];
@@ -1060,6 +1208,7 @@ namespace Armoury
                 ss.Ask = ss.Player && !ss.Done && (flags & 16) != 0;      // stan decyzji tylko u gracza-wodza (Decide ustawia Player przed Restore)
             }
             else { ss.SHit = ss.Hit; ss.SDead = ss.Dead; ss.SFled = ss.Fled; ss.SRef = ss.Ref; ss.SCap = Math.Max(0.0, x[14]); }
+            ss.Done0 = Math.Max(0.0, Math.Min(ss.Work, z[0])); ss.DmgOff = Clamp01(z[1]); ss.HitPrev = Math.Max(0.0, z[2]);   // 580 (zero bez pol)
             ss.Started = true; ss.Restored = true;
             if (ss.Rs != null) { ss.Rs.Hit = ss.Hit; ss.Rs.Dead = ss.Dead; ss.Rs.CapWould = Math.Max(0.0, x[14]); }   // stan rabunku bez zapisu - odtworzony z sesji (jency E4/9, Inni)
             _dRestored++;
@@ -1090,6 +1239,20 @@ namespace Armoury
                     var gone = new List<RaidEventComponent>();
                     foreach (var kv in _sess) { var me = kv.Key != null ? kv.Key.MapEvent : null; if (me == null || me.IsFinalized) gone.Add(kv.Key); }
                     foreach (var c in gone) { _sess.Remove(c); _dAbandoned++; }
+                }
+                // 580: pamiec krokow po terminie; pary bez startu w oknie petli
+                if (_mem.Count > 0)
+                {
+                    var drop = new List<string>();
+                    foreach (var kv in _mem) if (kv.Value == null || kv.Value.End <= today) drop.Add(kv.Key);
+                    foreach (var k in drop) { _mem.Remove(k); _dMemExpired++; }
+                }
+                if (_pairs.Count > 0)
+                {
+                    double now = CampaignTime.Now.ToDays;
+                    var drop = new List<string>();
+                    foreach (var kv in _pairs) { kv.Value.Starts.RemoveAll(d => d < now - LoopDays); if (kv.Value.Starts.Count == 0) drop.Add(kv.Key); }
+                    foreach (var k in drop) _pairs.Remove(k);
                 }
                 int unclaimed = 0;
                 if (_pendingR.Count > 0 && ++_pendingDays >= 2) { unclaimed = _pendingR.Count; _pendingR.Clear(); }   // sesje z zapisu bez rabunku po wczytaniu
@@ -1155,6 +1318,20 @@ namespace Armoury
             sb.Append(" | okreg wypalony ").Append(_dBurnedOut).Append(", u przyciete do ").Append(F(UFloor, "0.00")).Append(' ').Append(_dUClamped)
               .Append(", oddane grze (potkniecia) ").Append(_dReleased);
             if (_dAbandoned > 0) sb.Append(", porzucone bez konca rabunku ").Append(_dAbandoned);
+            // 580: pamiec przerwanych krokow i petle startow
+            sb.Append(" | pamiec krokow (580, ").Append(s.RaidKeepsStepProgress ? "TAK" : "NIE - Raid Keeps Step Progress w MCM").Append("): zapamietane przy przerwaniu ").Append(_dMemSaved)
+              .Append(" (praca tych sesji ").Append(F(_dMemSavedWork, "0.#")).Append(" ludzi), wznowione z pamieci ").Append(_dMemResumed)
+              .Append(" (odzyskana praca ").Append(F(_dMemResumedWork, "0.#")).Append(" ludzi, sr. czesc kroku ").Append(_dMemResumed > 0 ? F(_dMemQ0 / _dMemResumed, "0.00") : "-")
+              .Append(", przycieta - krok mniejszy ").Append(F(_dMemCut, "0.#")).Append("), pamiec innej frakcji (zostaje) ").Append(_dMemOther)
+              .Append(", po terminie ").Append(_dMemExpired).Append(", skreslone po pelnym kroku ").Append(_dMemDropped);
+            if (_dMemOff > 0) sb.Append(", pominiete - klucz NIE ").Append(_dMemOff);
+            sb.Append(", w pamieci ").Append(_mem.Count).Append(" wsi");
+            {
+                int loops = 0, best = 0; Pair bp = null;
+                foreach (var p in _pairs.Values) { int n = p.Starts.Count; if (n >= LoopStarts) { loops++; if (n > best) { best = n; bp = p; } } }
+                sb.Append(" | petle (ta sama para wodz-wies >= ").Append(LoopStarts).Append(" startow w ").Append(LoopDays).Append(" dobach): par ").Append(loops);
+                if (bp != null) sb.Append(", najwiecej ").Append(bp.Who).Append(" -> ").Append(bp.Where).Append(' ').Append(best).Append(" startow (wznowien z pamieci ").Append(bp.Resumed).Append(')');
+            }
             sb.Append(" | czas ").Append(F(_dTicks * 1000.0 / Stopwatch.Frequency, "0.0")).Append(" ms");
             if (_dHaltTicks > 0) sb.Append(" | postoj nocny gracza (577): tykniec rabunku bez postepu ").Append(_dHaltTicks);
             if (_dHaltTicksAi > 0) sb.Append(" | postoj nocny lordow AI (578): tykniec rabunku bez postepu ").Append(_dHaltTicksAi);

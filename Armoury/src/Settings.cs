@@ -3683,6 +3683,9 @@ namespace Armoury
         // gdy wodzem jest gracz, po kazdym pelnym kroku pasek staje na 99% i okienko pyta: nastepna osada (ok. N dni) albo koniec; "End Raiding" po >= 1 osadzie konczy
         // rabunek jako spalony. NK. Off = gracz jak AI (jeden krok i koniec)
         public bool RaidPlayerStepPopup = true;            // your raid stops after each settlement and asks: raid the next one (about N days) or end the raid (off = your raid burns one settlement and ends, as the lords' raids do)
+        // 580 (noc 16.11, petla rabunku armii AI): przerwany krok rabunku (DistrictRaid) zostawia przy wsi zrobiona czesc - nastepna sesja tej samej frakcji przy tej wsi
+        // w ciagu RaidAlertMaxDays dob zaczyna od niej (bez ponownego uderzenia; lup i kara relacji tylko za nowa prace). AI i gracz. Zapis k: w arm_district. Off = kazda sesja od zera
+        public bool RaidKeepsStepProgress = true;          // when a raid on a village is broken off before its settlements burn, the work already done is kept: the same realm's next raid on that village within Raid Alert Max Days carries on from it instead of starting over (off = every raid starts from nothing)
         // p6-okup (R3-03a, noc 20.10; RaidTribute.cs): okup okolicy zamiast palenia wsi (patis) - AI przy przybyciu do wsi z rozkazem rabunku (prefiks
         // EncounterManager.StartSettlementEncounter) wybiera okup albo rabunek z biezacego zysku; gracz - opcja "Demand tribute" w menu wrogiej wsi. Okup = stawka
         // Low..High kiesy wsi wedlug przewagi napastnika nad obroncami (1:1 - Low, 5:1 - High; ponizej 1:1 wies stawia opor), z kiesy wsi do wodza; wies chroniona
