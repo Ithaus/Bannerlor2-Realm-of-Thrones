@@ -53,6 +53,7 @@ namespace Armoury
             public double VShare = double.NaN;   // 362: udzial wioski w ludziach okregu w domu przy starcie (skrytki: S x udzial, jak okup wioski); NaN - stary zapis
             public int Men, Day, Misses;
             public bool Stop, SlaverSet;   // SlaverSet - niewola napastnika policzona (po wczytaniu - przy pierwszym ticku, recenzja 20.10)
+            public int Nights; public bool NightPrev;   // 588: noce postoju (578) w tym rabunku - podsumowanie; bez zapisu (po wczytaniu od wczytania)
             public Devastation.RaidState Rs;
         }
         // Share - udzial wioski w ludziach okregu w domu przy okupie (okup wsi gry tej frakcji jest o niego mniejszy), Dist - wies okregu (StringId; z zapisu bez pola - z ukladu)
@@ -410,9 +411,11 @@ namespace Armoury
                 // 578 (Raid Night Halt): noc obozu - postep stoi (bez godzin, uderzen i lupu), ludzie spia przy wiosce; o swicie dalej sam ("Stop raiding" w nocy dziala wyzej)
                 if (NightRest.SideRaidNight(rd.Name, rd.HoursDone / Math.Max(0.01, rd.Hours)))
                 {
+                    if (!rd.NightPrev) { rd.NightPrev = true; rd.Nights++; }   // 588
                     args.MenuContext.GameMenu.SetProgressOfWaitingInMenu((float)Math.Min(1.0, rd.HoursDone / Math.Max(0.01, rd.Hours)));
                     return;
                 }
+                rd.NightPrev = false;
                 double h = Math.Max(0.0, dt.ToHours);
                 rd.HoursDone += h; rd.Pend += h;
                 bool end = rd.HoursDone >= rd.Hours;
@@ -480,14 +483,14 @@ namespace Armoury
             if (rd == null) return;
             if (rd.Name == null || rd.Name == "?") rd.Name = NameOf(Rec(rd.Uid));
             _dRaidEnd++; if (how == 1) _dRaidStop++; else if (how == 2) _dRaidCut++;
-            long gold = 0, take = 0, burn = 0; int herd = 0;
+            long gold = 0, take = 0, burn = 0, purse0 = -1; int herd = 0;
             var st = Settlement.Find(rd.Dist);
             try
             {
                 var mp = MobileParty.MainParty;
                 bool alive = mp != null && mp.IsActive && Hero.MainHero != null && Hero.MainHero.IsAlive && !PlayerCaptivity.IsCaptive;
                 double s = rd.Home0 > 0 ? Math.Max(0.0, Math.Min(1.0, rd.Hit / rd.Home0)) : 0.0;
-                if (alive && st != null && st.Village != null && s > 0) Loot(st, s, mp, out gold, out take, out burn, out herd, rd);
+                if (alive && st != null && st.Village != null && s > 0) Loot(st, s, mp, out gold, out take, out burn, out herd, out purse0, rd);
                 if (rd.Hit > 0.5 && st != null) Relations(st, RelLordRaid, RelNotableRaid);
                 _lastRaid[rd.Uid] = Today();
                 _dRaidGold += gold; _dRaidTake += take; _dRaidBurn += burn;
@@ -498,7 +501,22 @@ namespace Armoury
                          + ", las " + rd.Fled.ToString("0.0", Inv) + ") | lup (udzial " + (100.0 * s).ToString("0.00", Inv) + "% ludzi okregu w domu): zloto " + gold + " z kiesy wsi, zwierzeta stada " + herd
                          + ", sztuki do taboru " + take + ", spalone " + burn + " | wioska: " + state + (alive ? "" : " | bez lupu (partia gracza nieaktywna albo w niewoli)") + ".");
                 Example(rd.Name + " " + rd.Hit.ToString("0", Inv) + " lud., " + gold + " zl");
-                if (alive)
+                // 588 (PlayerRaidSummary): podsumowanie jak rabunek wsi gry - zloto z ilu w kiesie wsi okregu (kiesa tuz przed lupem; bez lupu - teraz) i procent
+                bool sum = alive && DistrictRaid.SummaryOn && st != null && st.Village != null;
+                if (sum)
+                {
+                    long p1 = Math.Max(0, st.Village.Gold);
+                    double p0 = purse0 >= 0 ? purse0 : p1 + gold;
+                    VillageBook.PartView me2; double h2, n2; int br = 0, nw = 1;
+                    if (PartOf(st, rd.Uid, out me2, out h2, out n2) && me2 != null) { nw = Math.Max(1, (int)Math.Round(me2.Nw)); br = Math.Max(0, Math.Min(nw, (int)Math.Round(me2.Br))); }
+                    double refg = Math.Max(0.0, rd.Hit - rd.Dead - rd.Fled);
+                    Log.Info(P + "rabunek gracza (588): " + rd.Name + " | kiesa wsi okregu " + Txt(st.Name) + ": przed lupem " + p0.ToString("0", Inv) + ", wziete " + gold + " ("
+                             + (p0 >= 1 ? (100.0 * gold / p0).ToString("0.0", Inv) : "-") + "%), po " + p1 + " | towar " + take + " szt., spalone " + burn + ", stado " + herd
+                             + " | osady wioski spalone " + br + " z " + nw + " | zabici " + rd.Dead.ToString("0.0", Inv) + ", las " + rd.Fled.ToString("0.0", Inv) + ", uchodzcy " + refg.ToString("0.0", Inv)
+                             + " | noce postoju " + rd.Nights + ", doby od startu " + Math.Max(0, Today() - rd.Day) + ", godziny pracy " + rd.HoursDone.ToString("0.0", Inv) + ".");
+                    Log.Player(DistrictRaid.SummaryText(rd.Name, false, how != 0, gold, p0, 0, take + herd, 0, br, nw, rd.Dead, rd.Fled, refg, 0, false), rd.Hit <= 0.5);
+                }
+                else if (alive)
                     Log.Player(rd.Hit > 0.5
                         ? "You raided " + rd.Name + ": " + Math.Round(rd.Hit).ToString("N0", Inv) + " people driven off" + (rd.Dead >= 0.5 ? " (" + Math.Round(rd.Dead).ToString("N0", Inv) + " killed)" : "")
                           + ", " + gold.ToString("N0", Inv) + " denars and " + take.ToString("N0", Inv) + " goods taken" + (burn > 0 ? ", " + burn.ToString("N0", Inv) + " burned" : "") + "."
@@ -508,10 +526,11 @@ namespace Armoury
         }
 
         /// <summary>Lup (DistrictRaid.Loot w malym): zloto s x kiesa wsi (SmallGold.PayRaidLoot), stado, towar s z magazynu wsi okregu do taboru gracza w ramce FRaid.</summary>
-        private static void Loot(Settlement st, double s, MobileParty mp, out long gold, out long take, out long burn, out int herd, Raid rd = null)
+        private static void Loot(Settlement st, double s, MobileParty mp, out long gold, out long take, out long burn, out int herd, out long purse0, Raid rd = null)
         {
             gold = take = burn = 0; herd = 0;
             var v = st.Village;
+            purse0 = Math.Max(0, v.Gold);   // 588: kiesa wsi okregu tuz przed lupem (podsumowanie)
             try { herd = VillageHerds.OnRaid(v, s, mp); } catch (Exception e) { Stumble("Loot(stado)", e); }
             try
             {

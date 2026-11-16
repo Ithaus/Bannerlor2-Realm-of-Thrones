@@ -3686,6 +3686,9 @@ namespace Armoury
         // 580 (noc 16.11, petla rabunku armii AI): przerwany krok rabunku (DistrictRaid) zostawia przy wsi zrobiona czesc - nastepna sesja tej samej frakcji przy tej wsi
         // w ciagu RaidAlertMaxDays dob zaczyna od niej (bez ponownego uderzenia; lup i kara relacji tylko za nowa prace). AI i gracz. Zapis k: w arm_district. Off = kazda sesja od zera
         public bool RaidKeepsStepProgress = true;          // when a raid on a village is broken off before its settlements burn, the work already done is kept: the same realm's next raid on that village within Raid Alert Max Days carries on from it instead of starting over (off = every raid starts from nothing)
+        // 588 (Jeff 16.11: "ile spladrowalem, jaka to czesc ich kasy, ile ma wioska"): podsumowanie rabunku GRACZA przy koncu sesji (DistrictRaid, SideVillageVisit) -
+        // komunikat + linia logu; okienko E7/R2 pokazuje kiese wsi i dotychczas wziete. Tylko odczyt, bez zmiany ekonomii. Off = bez podsumowania
+        public bool PlayerRaidSummary = true;              // when your raid ends (a village and its settlements, or a side village), one short message says what you took: denars out of how much the village purse held and what share, goods, settlements burned, people killed, fled and driven off; inside another lord's army it says what the army took. The step window also shows the village purse and what you took so far. Off = no summary
         // p6-okup (R3-03a, noc 20.10; RaidTribute.cs): okup okolicy zamiast palenia wsi (patis) - AI przy przybyciu do wsi z rozkazem rabunku (prefiks
         // EncounterManager.StartSettlementEncounter) wybiera okup albo rabunek z biezacego zysku; gracz - opcja "Demand tribute" w menu wrogiej wsi. Okup = stawka
         // Low..High kiesy wsi wedlug przewagi napastnika nad obroncami (1:1 - Low, 5:1 - High; ponizej 1:1 wies stawia opor), z kiesy wsi do wodza; wies chroniona

@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 588: podsumowanie rabunku gracza - ile wzial, z ilu w kiesie wsi, jaki procent - Armoury (DistrictRaid.cs, DistrictRaid.Summary588.cs, SideVillageVisit.Raid.cs, Settings.cs, McmSettings.cs)
+
+**Problem:** Jeff 16.11: "spladrowalem ruby fd sprawdz czy dostalem odpoweidnia ilsoc zlota" -> "ale ja chce wiem ile spladrowalem jaka to jest czesc ich kasy ile ma wioska?". Log `Armoury-2026-11-16_16-31-45.log`: krok skonczony komunikatem "Your men have plundered Ruby Ford: 1 of 196 settlements burned", nocny postoj dziala, ale nic nie mowi graczowi, ile zlota wzial ani z jakiej kiesy; linia doby E7/R1 sumuje wszystkie sesje swiata (dzien 109371: zloto z kiesy wsi 1495 zl, zabici 47, las 72, uchodzcy 2116 dla 5 sesji) - nie da sie oddzielic gracza od AI.
+
+**Przyczyna:** Sesja rabunku (`DistrictRaid.Sess`) trzymala tylko liczby BIEZACEGO kroku (S*, zerowane w NextStep) do okienka E7/R2; sum sesji, kiesy wsi na starcie ani komunikatu przy koncu nie bylo. Wioska poboczna (`SideVillageVisit.FinishRaid`) mowila "N denars taken" bez kiesy.
+
+**Zmiana (tylko odczyt - ekonomia bez zmian):**
+- `Sess` + sumy sesji (bez zapisu): Purse0 (kiesa wsi przy pierwszym ticku sesji, Decide), TGold (zloto z kiesy wsi: s0 + zelazna cena + skrytki - wszystkie przelewy PayRaidLoot w Loot), TPort (nabrzeze WW1 - kiesa portu, osobno), TTake/TTakeVal/TBurn (towar i stado do taborow, wartosc, spalone), TMine (sztuki do taboru gracza w cudzej armii), TFoodEat/TFoodBurn, Nights (przejscia do postoju 577/578), SessH0, PlayerIn (gracz w armii napastnika, sprawdzane w Decide i w Loot), Lost (EndPre).
+- `EndFin` (kazdy koniec sesji z Started: spalenie, "End the raid", "End Raiding", przerwanie walka/odsiecza/pokojem) dla sesji gracza (wodz albo w cudzej armii) -> `Summary`: linia logu "Rabunek gracza (588)" ze wszystkimi polami (kiesa start/wziete/%/po, nabrzeze, towar szt./wartosc/spalone/gracza, spichlerz, osady spalone z N, krokow, trafieni/zabici/las/uchodzcy/jency E4/9, noce, doby zegara i pracy) + komunikat, np. "Ruby Ford: took 312 of 1,040 denars (30%), 3 goods; 1 of 196 settlements burned; 12 killed, 18 fled, 290 refugees." W cudzej armii "the army took ... (N yours)"; przerwany - "Ruby Ford (raid broken off): ..."; sesja z zapisu - "(since loading)". Uchodzcy w komunikacie bez jencow (E4/9 bierze ich z konta uchodzcow).
+- Okienko E7/R2: dopisek "Village purse: X denars left of Y; you took Z (P%) so far."
+- Wioska poboczna: ten sam ksztalt komunikatu (`DistrictRaid.SummaryText`), kiesa wsi okregu tuz przed lupem (Loot -> out purse0), osady wioski spalone z N (ksiega), noce postoju; linia logu "rabunek gracza (588)". Klucz off - dawny komunikat.
+- MCM: "Player Raid Summary" (PlayerRaidSummary, true) - klucz recznie w Settings.cs i McmSettings.cs (atrybut + kopia).
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: w `StrikeChunk` odczyt spichlerza (`Famine.FoodOf`, tylko odczyt) teraz takze dla gracza w cudzej armii; SFoodBurn liczony takze wtedy (tylko okienko/zapis - okienko jest tylko u wodza-gracza). `Loot`: stado liczone jak dotad (STake), dodatkowa petla po ruchach towaru (tylko sumy). Zaden przelew, uderzenie ani zapis nie zmieniony; pola zapisu r: bez zmian (34).
+- Kolizje: komunikat gry/ksiegi "Your men have plundered X: N of M settlements burned" (VillageNews) zostaje - gracz widzi dwa komunikaty przy spaleniu. N w 588 = osady wioski z `VillageBook.LootNews` (ta sama liczba co tamten komunikat), spalone = osady spalone w TEJ sesji (Settl; u wodza AI - M przy pelnym kroku).
+- Kiesa "na starcie" = kiesa przy pierwszym ticku sesji; doplywy kiesy w trakcie wielodniowej sesji nie sa odejmowane (procent = wziete / kiesa na starcie). Po wczytaniu sumy od wczytania (bez zapisu - swiadomie, by nie zmieniac formatu r:).
+- Sesja oddana grze (Release po 3 potknieciach) - bez podsumowania (lup dalej liczy gra). Gracz bez udzialu w zlocie w cudzej armii (zloto do wodza jak w grze) - komunikat mowi "the army took".
+- Sprawdzic w logu: linia "Rabunek gracza (588)" przy koncu rabunku Jeffa; wziete = przyrost kiesy gracza w ksiedze pieniadza; % = wziete / start; po = start - wziete (+/- doplyw doby).
+
+**Status:** DO SPRAWDZENIA (zbudowane, niewgrane).
+
 ## 587: komunikaty karawan gracza - prawdziwy zold (bez "your clan paid its wages, 0") i krotkie napisy, liczby na poczatku - Armoury (CaravanSettle.Player.cs, CaravanSettle.P305.cs, CaravanGoods.cs, CaravanGuards285.Road.cs, EnemyCaravans.cs, Perk510Gold.cs, Seal31B.cs, ShipsToPort181.cs)
 
 **Problem:** Jeff 16.11 -> zgoda "4. tak i oglnie te teksty sroc aby dalo sie je czytac szybciej". Log `Armoury-2026-11-15_23-13-58.log`, Convoy of Amanda: kazda doba rozliczenia na morzu, 305a `'Caravan wages' 0`, 259 "zold 0 zaplacil rod" (np. l. 20563/20564, 27221/27222), a komunikat ponizej kapitalu mowil "your clan paid its wages, 0" - nieprawda (rod nic nie zaplacil). Napisy karawan mialy 200-400 znakow (wycena, okno 7 dob, warunek wyplaty w jednym zdaniu).

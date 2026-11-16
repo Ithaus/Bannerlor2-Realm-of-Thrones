@@ -9085,6 +9085,10 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool RaidKeepsStepProgress { get; set; } = true;
 
+        [SettingPropertyBool("Player Raid Summary", HintText = "when your raid ends (a village and its settlements, or a side village), one short message says what you took: denars out of how much the village purse held and what share, goods, settlements burned, people killed, fled and driven off; inside another lord's army it says what the army took. The step window also shows the village purse and what you took so far. Off = no summary", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool PlayerRaidSummary { get; set; } = true;
+
         [SettingPropertyBool("Raid Tribute Enabled", HintText = "instead of burning an enemy village, a lord or army may demand tribute from it: the elders pay a share of the village purse (Raid Tribute Share Low when the raiders barely outnumber the militia, up to Raid Tribute Share High at five to one) and the village is not burned - its people and crops stay. The lords weigh it against the loot of a raid: they take tribute when it pays as well as the raid less the wages of the days it would take, and raid anyway when their men are hungry, their house cannot pay its men, the tribute is less than a day's wages, the villagers would fight, or they are Ironborn or Free Folk. You get Demand tribute in the hostile action menu of an enemy village. After paying, the village is spared by that realm (its lords and you) for Raid Tribute Spare Days and does not pay it again; its lord and elders think a little less of the raider, less than after a raid. Off = villages are raided as before", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool RaidTributeEnabled { get; set; } = true;
@@ -16301,6 +16305,7 @@ namespace Armoury
             s.RaidAlertMaxDays = RaidAlertMaxDays;
             s.RaidPlayerStepPopup = RaidPlayerStepPopup;
             s.RaidKeepsStepProgress = RaidKeepsStepProgress;
+            s.PlayerRaidSummary = PlayerRaidSummary;
             s.RaidTributeEnabled = RaidTributeEnabled;
             s.RaidTributeShareLow = RaidTributeShareLow;
             s.RaidTributeShareHigh = RaidTributeShareHigh;

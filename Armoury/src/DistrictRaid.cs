@@ -69,7 +69,7 @@ namespace Armoury
     /// Zapis: sekcje r: (sesje) i c: (czujnosc) klucza arm_district przez VillageBook.Export/Import (brak = sesja od nowa z punktow gry). Wyjatek per sesja liczony;
     /// po MaxStumbles w jednej sesji - sesja oddana grze (bez globalnego wylacznika, CLAUDE.md 7). Reset w konstruktorze ArmouryBehavior.
     /// </summary>
-    internal static class DistrictRaid
+    internal static partial class DistrictRaid
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const double PointsKeep = 0.99;          // punkty osady w kroku: start x (1 - 0.99 x postep) - zero tylko na koniec sesji (K1)
@@ -122,6 +122,14 @@ namespace Armoury
             public double Done0, DmgOff, HitPrev;
             public bool Resumed;                             // krok wznowiony z pamieci w tej sesji gry (bez dni zegara - przerwa miedzy sesjami nie jest praca)
             public string PairKey;                           // 580: para wodz-wies (licznik petli startow)
+            // 588 (PlayerRaidSummary): podsumowanie rabunku gracza - sumy CALEJ sesji (S* to biezacy krok). Bez zapisu: po wczytaniu liczby od wczytania (Restored).
+            public bool PlayerIn, Lost, HaltPrev;            // gracz w armii napastnika (wodzem AI); napastnik przegral / przerwany walka; poprzedni tick stal na noc
+            public double Purse0 = double.NaN;               // kiesa wsi na poczatku sesji (Decide; NaN - nie odczytana, wtedy przy pierwszym lupie)
+            public double SessH0 = double.NaN;               // godzina kampanii poczatku sesji (doby zegara)
+            public double TFoodEat, TFoodBurn;               // racje spichlerza zjedzone / spalone w sesji
+            public long TGold, TPort, TTake, TTakeVal, TBurn, TMine;   // zloto z kiesy wsi, z nabrzeza portu (WW1), sztuki do taborow (wartosc), spalone, do taboru gracza
+            public int Nights;                               // noce postoju (577/578) w sesji
+            public bool Watch { get { return Player || PlayerIn; } }
         }
 
         /// <summary>580: zrobiona czesc przerwanego kroku zapamietana przy wsi (id wsi gry) - nastepna sesja TEJ SAMEJ frakcji zaczyna od niej. Zapis k: w arm_district.</summary>
@@ -260,11 +268,13 @@ namespace Armoury
             catch (Exception e) { mine = false; Stumble("Decide", e); }
             if (!mine) { _notMine.Add(comp); return null; }
             ss = new Sess { Comp = comp, V = v, Player = player, Fid = fid, MainOnly = player && PlayerMainOnly };
+            if (!player) { try { ss.PlayerIn = PlayerInSide(comp); } catch { ss.PlayerIn = false; } }   // 588: gracz w cudzej armii
             ss.Rs = Devastation.StateOf(comp, v, true);           // TEN SAM stan rabunku E4/5 (v2): jency E4/9, Inni, klucz sesji ksiegi wiosek
             _sess[comp] = ss;
             _dStarted++;
             try { Restore(ss); } catch (Exception e) { Stumble("Restore", e); }
             if (!ss.Restored) { try { NoteStart(ss, lid, lname); } catch (Exception e) { Stumble("NoteStart", e); } }
+            SumBegin(ss);                                         // 588: kiesa wsi i zegar na poczatku sesji (po wczytaniu - od wczytania)
             if (ss.Player && ss.Ask && !ss.Done) _ask = ss;       // E7/R2: wczytanie w stanie decyzji - tick menu otworzy okienko znowu
             return ss;
         }
@@ -401,7 +411,8 @@ namespace Armoury
                 }
                 // 577 (Raid Night Halt): noc - postep kroku stoi (bez Prog, uderzen, spichlerza, LootDays i dni na osade); wybor z okienka E7/R2 wyzej dziala od reki
                 // 578: takze rabunek lorda AI stojacy na noc (ten sam prefiks; AI decyduje dalej - postoj blokuje tylko postep)
-                if (NightRest.RaidHaltHolds(__instance)) { if (ss.Player) _dHaltTicks++; else _dHaltTicksAi++; return false; }
+                if (NightRest.RaidHaltHolds(__instance)) { if (ss.Player) _dHaltTicks++; else _dHaltTicksAi++; if (!ss.HaltPrev) { ss.HaltPrev = true; ss.Nights++; } return false; }
+                ss.HaltPrev = false;                                                       // 588: noce postoju w sesji (przejscia do postoju)
                 if (!ss.Started) { Start(ss, __instance, men); if (ss.Player) _dPStarted++; }
                 double dt = TickDays();
                 if (men > 0 && dt > 0.0)
@@ -591,7 +602,8 @@ namespace Armoury
             // E7/R2 (tylko sesja gracza - liczby okienka): plan pojmanych E4/9 i racje spichlerza spalone przy tym uderzeniu (Famine.Burn w rdzeniu Hit) - odczyt przed i po
             double c0 = 0.0, b0 = 0.0, b1;
             bool hasB = false;
-            if (ss.Player) { c0 = ss.Rs != null ? ss.Rs.CapWould : 0.0; hasB = Famine.FoodOf(ss.V, out b0); }
+            if (ss.Player) c0 = ss.Rs != null ? ss.Rs.CapWould : 0.0;
+            if (ss.Watch) hasB = Famine.FoodOf(ss.V, out b0);                       // 588: takze gracz w cudzej armii (podsumowanie)
             // m97-wioski: krok gracza (tylko wies gry) albo napastnik, ktoremu wioski zaplacily okup - uderzenie nie wieksze niz miejsce czesci, ktore wolno palic, TERAZ
             // (ludzie okregu maleja z kazdym uderzeniem, osady zapelniaja sie szybciej niz praca kroku - bez obciecia ludzie szliby z domow innych wiosek bez palenia)
             double ask = people, room, cap, nb, hh, aw, op, rc;
@@ -607,11 +619,8 @@ namespace Armoury
             ss.Struck += people; ss.PdPend = 0.0;
             ss.Hit += h; ss.Dead += d; ss.Fled += f; ss.Ref += r;
             ss.SHit += h; ss.SDead += d; ss.SFled += f; ss.SRef += r;
-            if (ss.Player)
-            {
-                if (ss.Rs != null) ss.SCap += Math.Max(0.0, ss.Rs.CapWould - c0);
-                if (hasB && Famine.FoodOf(ss.V, out b1)) ss.SFoodBurn += Math.Max(0.0, b0 - b1);
-            }
+            if (ss.Player && ss.Rs != null) ss.SCap += Math.Max(0.0, ss.Rs.CapWould - c0);
+            if (hasB && Famine.FoodOf(ss.V, out b1)) { double fb = Math.Max(0.0, b0 - b1); ss.SFoodBurn += fb; ss.TFoodBurn += fb; }
             _dHit += h; _dDead += d; _dFled += f; _dRef += r; _dStrikes++;
             Eat(ss, comp);
         }
@@ -645,6 +654,7 @@ namespace Armoury
                     int g1 = mp.ItemRoster.GetItemNumber(grain);
                     double drop = hasF && Famine.FoodOf(ss.V, out f1) ? f0 - f1 : got * RationsPerGrain;
                     ss.SFoodEat += drop;                                     // E7/R2: zjedzone w tym kroku (okienko gracza)
+                    ss.TFoodEat += drop;                                     // 588: w sesji
                     _dEat += got;
                     _dBal3 += (g1 - g0) * RationsPerGrain - drop;            // niezalezny bilans: zjedzone (zboze w taborze) - ubytek spichlerza
                 }
@@ -683,7 +693,8 @@ namespace Armoury
             double u = ss.Work > 0.0 ? Clamp01((Math.Min(ss.Prog, ss.Work) - ss.Done0) / ss.Work) : 0.0;
             double s = first ? ReaverLaw.IronShare(rg, s0, u) : s0;   // towar i stado; zloto ze skrytek (362, RaidCache) - nizej, tylko zloto
             // R3-06c (p5-stada): stado okregu najpierw - ubytek stada za udzial s, zwierzeta do taboru wodza (liczba do okienka gracza); znacznik rabunku takze przy s = 0 (VillageHerds; wlasny try w srodku)
-            try { ss.STake += VillageHerds.OnRaid(v, s, lp != null ? lp.MobileParty : null); } catch (Exception e) { Stumble("Loot(stado)", e); }
+            if (!ss.Player && !ss.PlayerIn) { try { ss.PlayerIn = PlayerInSide(comp); } catch { } }   // 588: gracz dolaczyl do armii w trakcie
+            try { long hn = VillageHerds.OnRaid(v, s, lp != null ? lp.MobileParty : null); ss.STake += hn; ss.TTake += hn; } catch (Exception e) { Stumble("Loot(stado)", e); }
             if (!(s > 0.0)) return;
             // Recenzja R1-1: rabunek z morza jak w grze i NavalDLC - napastnik na morzu (MapEvent.IsNavalMapEvent dla rabunku jest zawsze false: pozycja wsi na ladzie)
             bool sea = rg >= 0 && first && ReaverLaw.RaiderAtSea(att);
@@ -696,6 +707,7 @@ namespace Armoury
                 if (leader != null)
                 {
                     long g0 = leader.Gold, v0 = v.Gold;
+                    if (double.IsNaN(ss.Purse0)) ss.Purse0 = Math.Max(0L, v0);   // 588: kiesa nieodczytana na starcie - przed pierwszym lupem
                     long due = (long)Math.Round(s0 * Math.Max(0, v.Gold));
                     long paid = SmallGold.PayRaidLoot(v, leader, due);
                     // WW1: przyrost zelaznej ceny ponad s - OSOBNY przelew tym samym platnikiem (kiesa wsi -> wodz), do kosza WW2 (ReaverLaw.NoteIronGold)
@@ -726,13 +738,14 @@ namespace Armoury
                     }
                     long g1 = leader.Gold, v1 = v.Gold;
                     ss.SGold += paid + extra + topUp;
+                    ss.TGold += paid + extra + topUp;                           // 588: z kiesy wsi w sesji
                     _dGold += paid + extra + topUp;
                     _dBal1 += (g1 - g0) - (v0 - v1);                          // niezalezny bilans: przyrost kiesy wodza - ubytek kiesy wsi
                     ReaverLaw.NoteVillageGold(rg, leader, v, paid, extra + topUp, (g1 - g0) - (v0 - v1));
                     if (sRaw > 0.0)
                         RaidCache.After(leader, st, rogS, sRaw, sRaw * u, v0 > 0 ? (paid + extra + topUp) / (double)v0 : 0.0, cacheGold, topUp, ss.Player, false);
                     // WW1 nabrzeze: rabunek z morza wsi portu - Qw x u kiesy W portu ponad zapas dni (kiesa ludu -> wodz); raz na sesje (sea tylko w pierwszym kroku)
-                    if (sea) ss.SGold += ReaverLaw.Waterfront(rg, leader, v, u);
+                    if (sea) { long wf = ReaverLaw.Waterfront(rg, leader, v, u); ss.SGold += wf; ss.TPort += wf; }   // 588: nabrzeze osobno (kiesa portu, nie wsi)
                 }
             }
             catch (Exception e) { Stumble("Loot(zloto)", e); }
@@ -817,6 +830,13 @@ namespace Armoury
                 if (rg >= 0) { long tv = 0; for (int k = 0; k < mvP.Count; k++) tv += (long)mvEl[k].Item.Value * mvN[k]; ReaverLaw.NoteGoods(rg, take, tv); }   // WW1: towar najezdzcow
                 _dTake += take; _dBurn += burn;
                 ss.STake += take; ss.SBurn += burn;
+                ss.TTake += take; ss.TBurn += burn;                             // 588: sesja; wartosc i czesc gracza (tabor druzyny gracza w armii)
+                var mainP = MobileParty.MainParty;
+                for (int k = 0; k < mvP.Count; k++)
+                {
+                    ss.TTakeVal += (long)mvEl[k].Item.Value * mvN[k];
+                    if (mainP != null && ReferenceEquals(parties[mvP[k]], mainP)) ss.TMine += mvN[k];
+                }
                 _dBal2 += (p1 - p0) + burn - (v0 - v1);                          // niezalezny bilans: towar napastnika + spalone - ubytek magazynu
                 for (int k = 0; k < mvP.Count; k++) got[mvP[k]].AddToCounts(mvEl[k], mvN[k]);   // lista zdarzenia - juz poza ramka FRaid
                 for (int p = 0; p < parties.Count; p++)
@@ -865,6 +885,7 @@ namespace Armoury
                     var att = __instance.AttackerSide;
                     bool lost = __instance.BattleState == BattleState.DefenderVictory || att == null || att.TroopCount <= 0;
                     if (!lost) Loot(ss, __instance);
+                    ss.Lost = lost;                                                // 588: podsumowanie - przerwany walka
                     // RaidDamage za zrobiona czesc (kara relacji gry K3 idzie tylko przy AttackerVictory - tu nie placi, recenzja 580); E7/R2: po >= 1 pelnym kroku 1
                     _setDmg(__instance, DmgOf(ss, ss.Work > 0.0 ? Math.Min(1.0, ss.Prog / ss.Work) : 0.0));   // 580: bez czesci z pamieci
                     // 580: zrobiona czesc kroku zostaje przy wsi (nastepna sesja tej frakcji zaczyna od niej); wlasny try - pamiec nie psuje rozliczenia
@@ -887,6 +908,7 @@ namespace Armoury
                     _dRaidDead += __state.RaidDead; _dCheckDead += ss.Dead;
                     _dCap += Devastation.CapTakenAll - __state.Cap0;              // jency E4/9 z tej sesji (BK ExecuteCapture na RaidCompleted -> ThrallLaw)
                     try { ReaverLaw.NoteCaptives(ReaverLaw.RaidGroup(__instance.AttackerSide != null ? __instance.AttackerSide.LeaderParty : null), Devastation.CapTakenAll - __state.Cap0); } catch { }   // WW1: thralle najezdzcow (tylko licznik)
+                    if (ss.Watch) { try { Summary(ss, __instance, Devastation.CapTakenAll - __state.Cap0); } catch (Exception e) { Stumble("Summary588", e); } }   // 588: rabunek gracza
                     if (ss.Done)
                     {
                         if (ss.Player) _dPWon++;                                  // E7/R2: kroki gracza policzone przy kazdym pelnym kroku (PlayerStepDone); mediana lordow - tylko AI
@@ -1003,6 +1025,7 @@ namespace Armoury
                                             "R", r, "O", o, "ITEMS", items, "GOLD", (int)ss.SGold, "DAYS_FOOD", lost, "FOOD", ate,
                                             "STANDING", Math.Max(0, n - burned), "N", n).ToString();
             if (!next) body += " " + VillageTexts.Make(VillageTexts.RaidStepNoMore).ToString();
+            try { string pl = PurseLine(ss); if (pl != null) body += "\n\n" + pl; } catch (Exception e) { Stumble("PurseLine588", e); }   // 588: kiesa wsi i wziete dotad
             string end = VillageTexts.Make(VillageTexts.RaidEnd).ToString();
             string nxt = null;
             if (next)
