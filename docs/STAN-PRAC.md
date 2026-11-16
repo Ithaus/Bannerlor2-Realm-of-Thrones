@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 16.11 - WGRANIE 270 (582 armia AI nie wybiera wsi chronionej okupem/przeprawa; 583 haki testu musztry; test at-269b czysty)
+
+- Armoury.dll e6f8997c = noc/scal-perki a12a5523 (269 + 582 + 583 po recenzjach). Kopie: .bak-2026-11-16-przed-wgranie270, Backup C: i D:. Testowy CrashScribe cs/CrashScribe-at-n393-hs.dll (c02cc975; zrodlo bannerlord-autotest/src/cs-at393 701d125) = aktualny CS z Mends.IsPreview + harness n392-hs.
+- Decyzja domyslna (noc 16.11): at-269b 220/220 dob, 21.8 s/dobe, 23 bledy cudze, NIEZGODNE 0, potkniec 0. Musztra gracza (581) po raz pierwszy sprawdzona autotestem: 574 za trudne - 2 sztuki testu nigdy nie wziete (pominiete 2409), 575 wymieniono na tansze 16 (wartosc oddanych 928 d -> wzietych 32 d, spadek pokrycia 0), 1H u jazdy 9/9 przy kopiach F1H (208 dob), T6 w zapasie 0, bilans ZGODNY. 582: pominiete przy ofertach armii okup do 24/dobe. Petle >=5 startow w 10 dob: 2 pary, obie pojedynczy lordowie (gra - Raider, nie 334e), z wznowieniami z pamieci 580 (postep nie ginie) - obserwowac.
+- Otwarte: IronSiege (334e) bez CrossingLaw.AimBlocks; 580b a oblezona wlasna twierdza (obserwowac); KS w autotescie wymaga recznego armoury-ks-auto.flag (nie zakladalem - flaga w grze Jeffa uruchomilaby KS).
+
 ## STAN 16.11 - WGRANIE 269 (579 liczniki 578, 580 pamiec przerwanego kroku rabunku, 580b armia AI nie porzuca rabunku, 581 autotest musztry gracza; test zbiorczy at-268b czysty)
 
 - Armoury.dll 7851fbbd = noc/scal-perki dd6b31a6 (268 + 579-581 po recenzjach). Kopie: .bak-2026-11-16-przed-wgranie269, Backup C: i D:. Nowy klucz RaidKeepsStepProgress (domyslnie true).
