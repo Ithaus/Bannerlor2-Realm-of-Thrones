@@ -468,11 +468,11 @@ namespace Armoury
                         var c = r.Last;
                         sb.Append(" | rozliczenie doby: kiesa ").Append(c.Purse).Append(" (podloga ").Append(c.Floor).Append(c.NoRefund ? ", bez zwrotu zoldu" : "").Append("), towar w jukach ").Append(c.Goods)
                           .Append(" (koszt ").Append(c.Cost).Append(", rynek ").Append(c.Market).Append(", ").Append(c.Kinds).Append(" rodzajow, ").Append(c.Units).Append(" szt., w tym zwierzeta i inne ")
-                          .Append(c.Other).Append("), wartosc ").Append(c.Worth)
+                          .Append(c.Other).Append(")").Append(c.ShipsN > 0 ? ", statki " + c.Ships + " (" + c.ShipsN + " szt., cena odkupu portu - 584)" : "").Append(", wartosc ").Append(c.Worth)
                           .Append(", kapital ").Append(c.Capital).Append(", wyplata ").Append(c.Payout).Append(r.LastBusy ? " (w bitwie albo rozwiazywana)" : "");
                     }
                     else sb.Append(" | rozliczenie doby: brak (rod gracza nie rozliczony od ostatniej linii albo klucz WYL)");
-                    sb.Append(" | teraz: kiesa ").Append(now.Purse).Append(", towar ").Append(now.Goods).Append(", wartosc ").Append(now.Worth)
+                    sb.Append(" | teraz: kiesa ").Append(now.Purse).Append(", towar ").Append(now.Goods).Append(now.ShipsN > 0 ? ", statki " + now.Ships + " (" + now.ShipsN + " szt.)" : "").Append(", wartosc ").Append(now.Worth)
                       .Append(" | dzis: sprzedaz ").Append(r.DSold).Append(" (myto ").Append(r.DToll).Append("), zakupy ").Append(r.DBought).Append(", zysk ze sprzedazy ").Append(r.DReal)
                       .Append(" | zold ").Append(r.DWage).Append(" zaplacil rod, doplata BK ").Append(r.DTop).Append(", brak rodu ").Append(r.DShort)
                       .Append(r.WageGuess ? " (zold z partii - SoldierPay bez rekordu)" : "").Append(r.DTick ? "" : " (bez rozliczenia rodu)")
@@ -495,9 +495,11 @@ namespace Armoury
                         if (wf < Today - 7) span = "Since it was formed";   // recenzja 307a / 307d: tylko okno z doba utworzenia tuz przed oknem 7 dob (WkFrom)
                         // recenzja 259: kapital - to, co karawana dostala (E3/7) albo kapital modelu; towar - nizsza z ceny zakupu i rynku; warunek wyplaty - oba warunki reguly
                         string capTxt = basis.CapE37 ? "the " + N(basis.Capital) + " it was given to trade with" : "its trading capital of " + N(basis.Capital);
-                        string txt = r.Name + " is worth " + N(basis.Worth) + " (coin " + N(basis.Purse) + ", goods " + N(basis.Goods) + " valued at the lower of what it paid and the market) - less than "
+                        // 584: statki po cenie odkupu portu w wartosci - w napisie tez (tylko gdy sa)
+                        string txt = r.Name + " is worth " + N(basis.Worth) + " (coin " + N(basis.Purse) + ", goods " + N(basis.Goods) + " valued at the lower of what it paid and the market"
+                                     + (basis.ShipsN > 0 ? ", ships " + N(basis.Ships) + " at what a port would pay" : "") + ") - less than "
                                      + capTxt + ". " + span + " it sold " + N(sold) + ", bought " + N(bought) + ", paid " + N(toll) + " in tolls; your clan paid its wages, "
-                                     + N(wg) + ", and topped up its purse with " + N(tp) + ". It sends you profit only once its coin and goods are worth more than " + N(basis.Capital)
+                                     + N(wg) + ", and topped up its purse with " + N(tp) + ". It sends you profit only once its coin and goods" + (basis.ShipsN > 0 ? " and ships" : "") + " are worth more than " + N(basis.Capital)
                                      + " and it holds more than " + N(basis.Floor) + " in coin for its wages.";
                         Log.Player(txt);
                         Log.Info(PP + "komunikat - ponizej kapitalu: karawana '" + r.Name + "' ponizej kapitalu " + low + " dob | " + txt);

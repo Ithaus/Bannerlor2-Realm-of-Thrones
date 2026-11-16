@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 584: statki karawany gracza tylko z nadwyzki ponad kapital albo gdy nie ma zadnego; statki w wartosci 259 po cenie odkupu portu - Armoury (CaravanSettle.Ships584.cs nowy, CaravanSettle.cs, CaravanSettle.Player.cs, Settings.cs, McmSettings.cs)
+
+**Problem:** Jeff 16.11 "i jak moja karawana? zarabia" -> zgoda "1. tak". Log `Armoury-2026-11-15_23-13-58.log`, Convoy of Amanda (morska, kapital 30 000): doba 109232 Pebbleton kiesa 25102 -> 15335 przy handlu -85 (l. 20563, brak 9544 poza dziennikiem); linia "Statki (181)" tej doby "karawany 4 / 9749" (l. 20906; inne doby 0-737) - karawana kupila statek za ok. 9,4 tys. 259 (wartosc = kiesa + towar) i dziennik 305a tego nie widza: karawana "ponizej kapitalu", 259 nic nie wyplaca, a przy kiesie > 10 000 gra kupi nastepny (do 3).
+
+**Przyczyna:** gra (dekompilacja 1.4.8): `CaravansCampaignBehavior.OnSettlementEntered` :700-703 -> `AdjustConvoyShips` :788 (port ma statki, kiesa > 10 000, statkow < `GetIdealShipNumber` = 3 - `NavalDLCShipLimitModel` :24-27) -> `BuyShips` :796-838 (lekkie, srednie dla elitarnej bez sredniego, wedlug `GetShipPriority`; kupno gdy 0.5 x kiesa >= `GetShipTradeValue(statek, port, karawana)`; zaplata `ChangeShipOwnerAction.ApplyByTrade` -> 181 do kasy portu). `NavalDLCShipCostModel.GetShipTradeValue`: kupujacy spoza rodu gracza placi 1% wartosci kadluba (`AIClansShipValueDiscountRatio` 0.01, `applyAiDiscount`), rod gracza pelne 1.5 x wartosc; odkup przez port (sprzedajacy mobilny, kupujacy osada) = 1.5 x wartosc x 0.3 - naprawa. Karawana gracza z kapitalem 30 000 od razu przekracza 10 000 i placi pelna cene; w `CaravanSettle*.cs` statkow nie bylo.
+
+**Zmiana:**
+- `CaravanSettle.Ships584.cs` (nowy): prefiks na `CaravansCampaignBehavior.AdjustConvoyShips(MobileParty, Town)` (`AccessTools.DeclaredMethod`, z `EnsureHooks` 259 w kampanii). Tylko karawana `ActualClan == Clan.PlayerClan` przy kluczu: ten sam warunek wejscia co gra (inaczej prefiks przepuszcza - gra i tak nic nie robi), potem kopia `BuyShips` (te same kandydaty, kolejnosc, regula 0.5 kiesy, flaga sredniego) z jednym warunkiem wiecej: kupno gdy (a) karawana nie ma zadnego statku, albo (b) cena <= wartosc - kapital (wartosc 259 ze statkami po cenie odkupu) i kiesa po zakupie >= podloga 259. Statek przeszedl, gdy `sh.Owner == caravan.Party` po `ApplyByTrade` (181 moze odrzucic). Wyjatek przed pierwszym kupnem - gra jak dotad; po kupnie - prefiks konczy (bez dokupow gry).
+- `ShipsValue(mp)`: suma `GetShipTradeValue(statek, karawana, siedziba albo biezace miasto)` (regula 181: 0.3 x cena - naprawa, ujemna = 0).
+- `CaravanSettle.Compute` (:211): `Calc.Ships/ShipsN`; wartosc = kiesa + towar + statki (tylko karawana rodu gracza przy kluczu; AI i lordowie bez zmian). Ta sama wartosc w wyplacie 259 (Formula), liczniku "ponizej kapitalu", linii 259 gracza ("statki X (n szt., cena odkupu portu - 584)", :471, :475) i komunikacie ponizej kapitalu (", ships X at what a port would pay", "coin and goods and ships", tylko gdy statki sa).
+- Dziennik 305a (transakcje dnia, przy CaravanPlayerDiary): "statek kupiony <nazwa> (<kadlub>) za Y w Z (pierwszy statek | z nadwyzki N)" / "zakup statku wstrzymany (brak nadwyzki ponad kapital) w Z: ... za Y, nadwyzka N (wartosc - kapital), kiesa, podloga" (raz na wjazd). Linia doby 259 swiata: "584 statki karawan gracza (sesja): kupione / pierwszy statek / wstrzymane"; start sesji: klucz i latka.
+- Klucz MCM `PlayerCaravanShipsFromSurplus` (TAK; Settings.cs + McmSettings.cs recznie, grupa 305a).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: `Compute` wolaja IncomePrefix 259 (wyplata i podglad), linia gracza, testy T1/T2 (`Formula(c.Worth, ...)` - ta sama wartosc, zgodne). Dla karawan spoza rodu gracza `Player584` false - wynik bajt w bajt jak dotad. `CapFloor` / `WorkCapFloor` (284, 285, 139) nie licza wartosci - bez zmian.
+- Kolizje: nikt inny nie latal `AdjustConvoyShips` / `BuyShips` (grep); 181 TradePrefix dalej obsluguje zaplate (wolamy to samo `ApplyByTrade`); `RefillConvoyTroops` (ArmsFromPeople) i `SellGoods` (284) bez zmian - prefiks zastepuje tylko wnetrze AdjustConvoyShips. `CaravanGoods` o4Sea (pomiar) bez zmian.
+- Zamknieta ekonomia: zadnego nowego zlota - kupno dalej kiesa -> kasa portu (181). Statek w wartosci podnosi wyplate 259 (kiesa -> rod) tylko o cene odkupu i tylko z monety ponad podloge.
+- AI: karawany AI placa 1% kadluba (ok. 100-150) - nie maja problemu, bez zmian.
+- Watpliwosc: startowe statki z szablonu (darmowe przy tworzeniu karawany) tez licza sie po cenie odkupu - 259 moze wczesniej wyplacic ok. 0.3 ceny takiego statku. Port wyceny = siedziba karawany (polityki krolestwa portu moga dac inna cene niz port faktycznej sprzedazy).
+- W grze: Convoy of Amanda ma statki (1 startowy + kupiony?) - linia 259 pokaze "statki X (n szt.)"; przy kiesie > 10 000 w porcie oczekiwane "zakup statku wstrzymany" (nadwyzka < cena), nie ubytek kiesy.
+- Build Armoury Release 0 bledow; md5 Armoury.dll 2d565a665825234038f75bfaca7ba3fb. NIE wgrane.
+
+**Status:** DO SPRAWDZENIA
+
 ## 583: narzedzia testu - testowy CrashScribe n393-hs z aktualnego zrodla (z podgladem 133a) + poprawki asercji autotestu musztry 581 (DrillAutotest581.cs, 2 haki w DrillKit.cs)
 
 **Problem:** autotest at-268b (`Armoury-2026-11-16_06-00-24.log`, analiza + sceptyk, A-P1..P4): linia "Musztra (autotest 581)" od doby 30 daje NIEZGODNE (189 linii) - "wymiana na tansze" 0, "1H u jazdy 0/9", "kopie F1H 0", "z listy gracza 0" przy 338 sztukach testu na liscie gracza; linia 848 "CrashScribe sprzed 133a - podglad ... WYLACZONE (papier)", 218 rozliczen "bez podgladu 1". Do tego "574 za trudne" rosnie rowno o 19 na dobe (proby z puli ludzi, nie kusze testu crossbow_e/crossbow_d), oddane 0; "1H po kopiach (doba 3) ... kopie F1H w zapasie 0"; dokladka dala na drzewca widly `peasant_pitchfork_1_t1` (crafting_template TwoHandedPolearm - bez F1H).

@@ -13049,6 +13049,10 @@ namespace Armoury
         [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
         public bool CaravanLossNotice { get; set; } = true;
 
+        [SettingPropertyBool("Player Caravan Ships From Surplus", HintText = "Your caravans buy a ship only with coin above their trading capital, or when they have no ship at all. Without this, a sea caravan with a large purse could spend half of it on a ship as soon as it reached a port. Ships count toward a caravan's worth at the price a port would pay for them. AI caravans are not affected. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
+        public bool PlayerCaravanShipsFromSurplus { get; set; } = true;
+
         [SettingPropertyBool("Banner Loss Break Ignores Morale", HintText = "with Banner Companies: a company that has lost a third of its men (half the base chance) and again when it has lost half (full chance) rolls to break even when its men's morale is still high - losses frighten men whatever the game's morale says. Veterans still hold far longer (the chance is divided by the morale resistance of their tier, and high morale keeps it at its lowest). Off = no roll at a third, and the roll at half is skipped while morale is 50 or more, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: fighting for life (305c)")]
         public bool BannerLossBreakIgnoresMorale { get; set; } = true;
@@ -17280,6 +17284,7 @@ namespace Armoury
             s.CaravanWagesSeparateLine = CaravanWagesSeparateLine;
             s.CaravanPlayerDiary = CaravanPlayerDiary;
             s.CaravanLossNotice = CaravanLossNotice;
+            s.PlayerCaravanShipsFromSurplus = PlayerCaravanShipsFromSurplus;
             s.BannerLossBreakIgnoresMorale = BannerLossBreakIgnoresMorale;
             s.CavalryPursuitNearVictim = CavalryPursuitNearVictim;
             s.CavalrySlowsForOwnFoot = CavalrySlowsForOwnFoot;

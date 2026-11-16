@@ -27,6 +27,7 @@ namespace Armoury
     ///   kapital = CaravanModel.GetInitialTradeGold(wlasciciel, morska, elitarna) (gracz 15 000 / 22 500 / 35 000 / 45 000, lord 10 000 / 17 500 / 30 000 / 40 000),
     ///             a gdy E3/7 dal karawanie mniej (zaplacone przez gracza, cena BK) - min(model, dane) (recenzja 259, rekordy arm_259_kapital);
     ///   wartosc = kiesa + towar (CaravanGoods.WorthOf: nizsza z kosztu z ksiegi E3-T1 i rynku; bez kosztu - wartosc x min(1, srednia indeksu));
+    ///             584: karawana rodu gracza (klucz PlayerCaravanShipsFromSurplus) + statki po cenie odkupu portu (CaravanSettle.Ships584.cs);
     ///   podloga = PartyGoldLowerThreshold (5 000 - prog doplaty BK i gry) + zold doby (BK sprawdza kiese PO zdjeciu zoldu; bez tego co dobe +200 BK i z
     ///             powrotem); gdy rod NIE zwraca zoldu (wodz z tytulem Lordship albo glowa rodu - PartyExpensesPrefix BK; bez BK) - 30 dni zoldu (E3-T2 KeepWageDays);
     ///   wyplata = max(0, min(wartosc - kapital, kiesa - podloga)) - tylko zarobione, nigdy towar przed sprzedaza, nic nie wraca od wlasciciela.
@@ -77,6 +78,7 @@ namespace Armoury
             lock (_lk) { ZeroDay(); _paidDay.Clear(); }
             lock (_funded) { _funded.Clear(); _fundImp = _fundImpBad = 0; _fundHad = false; }
             _sSt = _sDup = 0; _err.Clear(); _startDone = false;
+            _s584Buy = _s584Held = _s584First = 0;   // 584
             lock (_lk) { _d434BkN = 0; _d434BkV = 0; }   // 434
             LastPaid = LastPaidPlayer = 0;
             PlayerReset();
@@ -188,6 +190,7 @@ namespace Armoury
             public long Goods, Cost, Market, Worth, Other;
             public bool NoRefund;
             public int CapModel, Funded;          // recenzja 259: kapital z modelu gry i dany przez E3/7 (-1 - brak zapisu, kapital z modelu)
+            public long Ships; public int ShipsN;  // 584: statki karawany gracza po cenie odkupu portu (klucz PlayerCaravanShipsFromSurplus; inaczej 0)
             public bool CapE37 { get { return Funded >= 0; } }
         }
 
@@ -205,7 +208,8 @@ namespace Armoury
             c.NoRefund = NoRefund(mp);
             c.Floor = ms.ClanFinanceModel.PartyGoldLowerThreshold + (c.NoRefund ? CaravanGoods.KeepWageDays * c.Wage : c.Wage);
             c.Goods = CaravanGoods.WorthOf(mp, out c.Cost, out c.Market, out c.Kinds, out c.Units, out c.Other);
-            c.Worth = c.Purse + c.Goods;
+            if (Player584(mp)) c.Ships = ShipsValue(mp, out c.ShipsN);   // 584: tylko karawana rodu gracza; AI bez zmian
+            c.Worth = c.Purse + c.Goods + c.Ships;
             c.Payout = Formula(c.Worth, c.Capital, c.Purse, c.Floor);
             return c;
         }
@@ -536,6 +540,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("EnsureHooks(PartyExpensesPrefix)", e); }
             EnsureHooks305(miss);   // 305a: osobna linia zoldu karawan gracza (prefiks / postfiks wydatkow rodu, postfiks CalculatePartyWage) - po wykryciu _bkRefund
+            EnsureHooks584(miss);   // 584: statki karawany gracza tylko z nadwyzki ponad kapital (prefiks AdjustConvoyShips)
             _hookMiss = miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-";
         }
 
@@ -600,6 +605,7 @@ namespace Armoury
                       .Append(" | zastapione/zablokowane: gra 10% ").Append(_dVanN).Append(" (bylo by ").Append(_dVanV).Append("), BK przy wjezdzie ").Append(_dBkN)
                       .Append(" (bylo by ").Append(_dBkV).Append("), E3/9 ").Append(_dE39N).Append(", tydzien BK ").Append(_dWeekN)
                       .Append(" | drugie wywolanie w dobie ").Append(_dDup).Append(" (sesja ").Append(_sDup).Append(')')
+                      .Append(" | 584 statki karawan gracza (sesja): kupione ").Append(_s584Buy).Append(" (w tym pierwszy statek ").Append(_s584First).Append("), wstrzymane bez nadwyzki ").Append(_s584Held)
                       .Append(" | czas regul ").Append(ms.ToString("0.00", Inv)).Append(" ms (podgladow ").Append(_dReads).Append(')')
                       .Append(" | potkniecia ").Append(_dSt).Append(" (sesja ").Append(_sSt).Append(')');
                     int fundN; lock (_funded) fundN = _funded.Count;
@@ -697,6 +703,7 @@ namespace Armoury
                      + " | latki: AddIncomeFromParty (First, przed BK) " + Tn(_wIncome && first) + ", BK AddRealisticIncome " + Tn(_wBkIncome)
                      + ", BK OnWeeklyCaravanLedger " + Tn(_wBkWeek) + ", DailyTickClan gracza " + Tn(_wTick) + " (kolejnosc prefiksow: " + fn + "; brak: " + _hookMiss + ")"
                      + " | BK zwrot zoldu karawan rodu (PartyExpensesPrefix) " + Tn(_bkRefund)
+                     + " | 584 statki karawan gracza z nadwyzki ponad kapital: klucz " + (s.PlayerCaravanShipsFromSurplus ? "tak" : "nie") + ", latka AdjustConvoyShips " + Tn(_w584)
                      + " | Optym m105: latka na liscie znanych " + Tn(KingdomTreasury.KtKnows("Armoury:CaravanSettle.IncomePrefix"))
                      + " | rekordy z zapisu: karawan " + _impCars + ", warsztatow " + _impWs + " (bledne " + _impBad + (_impHad ? "" : "; brak klucza arm_259_majatek - liczniki od wczytania") + ")"
                      + " | regula: wyplata = min(wartosc - kapital, kiesa - podloga); kapital z CaravanModel.GetInitialTradeGold; podloga = PartyGoldLowerThreshold + zold doby"
