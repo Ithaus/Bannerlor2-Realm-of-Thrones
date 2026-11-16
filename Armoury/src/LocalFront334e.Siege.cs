@@ -267,7 +267,8 @@ namespace Armoury
                 {
                     if (BreakOn && me.IsRaid && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party) RaidBreak(party, me, partyThinkParams);
                     // 580b: wodz armii AI w rabunku wsi - ocena tej wsi w mysli (bez niej pierwsza mysl konczyla rabunek); po RaidBreak (blokada) - nie
-                    if (ArmyRaidOn && me.IsRaid && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party && party.Army != null && party.Army.LeaderParty == party && !RescueHunt.HostKeeps(party))
+                    // recenzja 580: tylko przy RaidBreak (BreakOn) - on pilnuje zagrozenia w trakcie rabunku; bez niego armia trzymalaby rabunek mimo odsieczy
+                    if (BreakOn && ArmyRaidOn && me.IsRaid && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party && party.Army != null && party.Army.LeaderParty == party && !RescueHunt.HostKeeps(party))
                         ArmyRaidKeep(party, me, partyThinkParams);
                 }
                 else

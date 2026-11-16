@@ -63,7 +63,9 @@ namespace Armoury
     ///    rabunek (FinalizeEvent), gdy najlepsza mysl nie jest rabunkiem tej wsi (u armii brak oferty w trakcie - 580b w LocalFront334e; takze odsiecz, spojnosc,
     ///    pokoj, gracz "End Raiding" przy 0 osadach). Przerwany krok (EndPre) zostawia przy wsi zrobiona czesc dla tej samej frakcji
     ///    do Today + RaidAlertMaxDays; nastepna sesja zaczyna pierwszy krok od niej (Prog = Struck = Done0, bez ponownego uderzenia), lup i RaidDamage licza tylko
-    ///    przyrost (DmgOf, u w Loot), punkty osady w skali poprzedniej sesji (Hp0 z pamieci, nigdy wyzej niz teraz). Pelny krok skresla pamiec wsi. Zapis k:.
+    ///    przyrost (DmgOf w ticku, u w Loot), punkty osady w skali poprzedniej sesji (Hp0 z pamieci, nigdy wyzej niz teraz). Pelny krok skresla pamiec wsi. Zapis k:.
+    ///    Recenzja 580: kara relacji gry idzie TYLKO przy AttackerVictory (CharacterRelationCampaignBehavior.OnRaidCompleted: winnerSide != Attacker -> nic),
+    ///    przerwana sesja nie placi nic - pelny krok (Win, PlayerStepDone) placi pelne RaidDamage 1 takze po wznowieniu.
     /// Zapis: sekcje r: (sesje) i c: (czujnosc) klucza arm_district przez VillageBook.Export/Import (brak = sesja od nowa z punktow gry). Wyjatek per sesja liczony;
     /// po MaxStumbles w jednej sesji - sesja oddana grze (bez globalnego wylacznika, CLAUDE.md 7). Reset w konstruktorze ArmouryBehavior.
     /// </summary>
@@ -114,8 +116,9 @@ namespace Armoury
             // rabuje sie osobno, jak w SideVillageVisit); NaN - nie policzony (AI, po wczytaniu) - Loot liczy wtedy teraz
             public double CacheSh = double.NaN;
             // 580 (RaidKeepsStepProgress): krok wznowiony z pamieci wsi. Done0 - ludzie przeszukani w poprzednich sesjach, wniesieni do BIEZACEGO kroku (juz uderzeni,
-            // lup i kara relacji za nich wydane wtedy - lup i RaidDamage tej sesji licza tylko przyrost ponad Done0); DmgOff - ta czesc kroku jako ulamek (kara relacji K3
-            // tej sesji = q - DmgOff, po pelnym kroku 1 - DmgOff); HitPrev - trafieni poprzednich sesji (tylko dlugosc czujnosci). Zapis w polach 32-34 wpisu r:.
+            // lup za nich wydany wtedy - lup i RaidDamage w ticku licza tylko przyrost ponad Done0); DmgOff - ta czesc kroku jako ulamek (RaidDamage w ticku = q - DmgOff:
+            // tempo rabunku gry AiMilitaryBehavior = RaidDamage / doby tej sesji; kara relacji po pelnym kroku zawsze 1 - recenzja 580, przerwanie kary nie placi;
+            // NextStep zeruje); HitPrev - trafieni poprzednich sesji (tylko dlugosc czujnosci). Zapis w polach 32-34 wpisu r:.
             public double Done0, DmgOff, HitPrev;
             public bool Resumed;                             // krok wznowiony z pamieci w tej sesji gry (bez dni zegara - przerwa miedzy sesjami nie jest praca)
             public string PairKey;                           // 580: para wodz-wies (licznik petli startow)
@@ -190,8 +193,9 @@ namespace Armoury
             _dMemSavedWork = _dMemResumedWork = _dMemCut = _dMemQ0 = 0.0;
         }
 
-        /// <summary>580: kara relacji gry (RaidDamage, K3) tej sesji - bez czesci kroku wniesionej z pamieci (za nia kara poszla przy przerwaniu poprzedniej sesji).
-        /// Bez wznowienia (DmgOff 0) dokladnie jak dotad: po >= 1 pelnym kroku gracza 1, inaczej postep kroku q.</summary>
+        /// <summary>580: RaidDamage w TICKU tej sesji - bez czesci kroku wniesionej z pamieci (gra liczy z niego tempo rabunku: RaidDamage / doby tej sesji).
+        /// Bez wznowienia (DmgOff 0) dokladnie jak dotad: po >= 1 pelnym kroku gracza 1, inaczej postep kroku q. Recenzja 580: NIE do kary relacji - przerwana sesja
+        /// kary nie placi (wynik Defender), wiec pelny krok (Win, PlayerStepDone) ustawia 1 wprost.</summary>
         private static float DmgOf(Sess ss, double q)
         {
             double off = Clamp01(ss.DmgOff);
@@ -303,7 +307,8 @@ namespace Armoury
         /// <summary>
         /// 580: przerwany krok (EndPre, sesja zaczeta, nie zakonczona) - zrobiona czesc kroku zostaje przy wsi dla tej samej frakcji (Fid) do doby Today + RaidAlertMaxDays.
         /// Zrobiona czesc = min(Prog, Work) - razem z czescia wniesiona z pamieci (Done0), bo krok jest jeden. Ludzie juz uderzeni (EndPre rozlicza reszte przed nami),
-        /// lup i kara relacji za nia wydane - wznowienie ich nie powtarza (Loot i DmgOf licza tylko przyrost). Okreg wypalony / krok bez pracy - nic do pamietania.
+        /// lup za nia wydany - wznowienie go nie powtarza (Loot liczy tylko przyrost); kara relacji przerwania nie dotyczy (wynik Defender) - placi pelny krok.
+        /// Okreg wypalony / krok bez pracy / krok juz zaliczony (stan decyzji gracza) - nic do pamietania.
         /// </summary>
         private static void Remember(Sess ss)
         {
@@ -311,10 +316,15 @@ namespace Armoury
             if (s == null || !s.RaidKeepsStepProgress || ss.BurnedOut || !(ss.Work > 0.0)) return;
             var st = ss.V != null ? ss.V.Settlement : null;
             if (st == null || BadId(st.StringId) || BadId(ss.Fid)) return;
+            // recenzja 580: krok juz zaliczony (stan decyzji gracza E7/R2 albo pelny postep) - nie pamietac, inaczej nastepna sesja spali wies bez pracy
+            if (ss.Ask || ss.Prog >= ss.Work - 1e-9) return;
             double done = Math.Min(ss.Prog, ss.Work);
             if (!(done > 1e-6)) return;
             int days = Math.Max(1, Math.Min(60, s.RaidAlertMaxDays));
-            _mem[st.StringId] = new Mem { Fid = ss.Fid, End = Today() + days, Done = done, Hp0 = ss.Hp0, LootDays = ss.LootDays, Hit = ss.Hit + ss.HitPrev };
+            // recenzja 580: po >= 1 pelnym kroku gracza sumy sesji (Hit, LootDays) obejmuja kroki juz spalone - pamiec bierze tylko biezacy krok
+            // (trafieni kroku SHit; dob lupienia kroku nie liczymy osobno - 0, mediana dni na osade i tak liczy tylko AI)
+            bool later = ss.Steps > 0;
+            _mem[st.StringId] = new Mem { Fid = ss.Fid, End = Today() + days, Done = done, Hp0 = ss.Hp0, LootDays = later ? 0.0 : ss.LootDays, Hit = later ? ss.SHit : ss.Hit + ss.HitPrev };
             _dMemSaved++; _dMemSavedWork += Math.Max(0.0, done - ss.Done0);
         }
 
@@ -523,7 +533,7 @@ namespace Armoury
             ss.Ask = false;
             if (ReferenceEquals(_ask, ss)) _ask = null;
             _setHp(st, 0f);
-            _setDmg(comp, DmgOf(ss, 1.0));                                   // 580: bez czesci kroku z pamieci (bez wznowienia 1 jak dotad)
+            _setDmg(comp, 1f);                                               // recenzja 580: pelna kara relacji (przerwana sesja jej nie placila - wynik Defender)
             if (me.BattleState != BattleState.AttackerVictory) _setBs(me, BattleState.AttackerVictory);
             st.Party.SetLevelMaskIsDirty();
         }
@@ -541,7 +551,7 @@ namespace Armoury
             ss.Ask = true; ss.Choice = 0; ss.AskFails = 0; ss.Shown = false;
             _ask = ss; _dAsk++;
             _setHp(st, ss.Hp0 * (float)(1.0 - PointsKeep));
-            _setDmg(comp, DmgOf(ss, 1.0));                                   // 580: po pelnym kroku 1 - DmgOff (bez wznowienia 1 jak dotad)
+            _setDmg(comp, 1f);                                               // recenzja 580: pelna kara relacji jak przed 580 (przerwanie nie placilo)
             return true;
         }
 
@@ -551,7 +561,7 @@ namespace Armoury
         {
             ss.Ask = false; ss.Choice = 0; ss.Shown = false;
             if (ReferenceEquals(_ask, ss)) _ask = null;
-            ss.Prog = 0.0; ss.Struck = 0.0; ss.PdPend = 0.0; ss.LootGiven = false; ss.Done0 = 0.0;   // 580: Done0 tylko w pierwszym kroku (DmgOff zostaje - kara sesji)
+            ss.Prog = 0.0; ss.Struck = 0.0; ss.PdPend = 0.0; ss.LootGiven = false; ss.Done0 = 0.0; ss.DmgOff = 0.0;   // 580: Done0/DmgOff tylko w pierwszym kroku (recenzja 580: takze przy M < 1, Steps bez zmian)
             ss.SHit = ss.SDead = ss.SFled = ss.SRef = ss.SCap = ss.SFoodBurn = ss.SFoodEat = 0.0;
             ss.SGold = ss.STake = ss.SBurn = 0;
             _setHp(st, 1f);
@@ -855,7 +865,7 @@ namespace Armoury
                     var att = __instance.AttackerSide;
                     bool lost = __instance.BattleState == BattleState.DefenderVictory || att == null || att.TroopCount <= 0;
                     if (!lost) Loot(ss, __instance);
-                    // kara relacji gry za zrobiona czesc (K3); E7/R2: po >= 1 pelnym kroku gracza zostaje 1 (osada juz spalona)
+                    // RaidDamage za zrobiona czesc (kara relacji gry K3 idzie tylko przy AttackerVictory - tu nie placi, recenzja 580); E7/R2: po >= 1 pelnym kroku 1
                     _setDmg(__instance, DmgOf(ss, ss.Work > 0.0 ? Math.Min(1.0, ss.Prog / ss.Work) : 0.0));   // 580: bez czesci z pamieci
                     // 580: zrobiona czesc kroku zostaje przy wsi (nastepna sesja tej frakcji zaczyna od niej); wlasny try - pamiec nie psuje rozliczenia
                     try { Remember(ss); } catch (Exception e) { Stumble("Remember", e); }
