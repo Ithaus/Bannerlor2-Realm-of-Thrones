@@ -314,7 +314,7 @@ namespace Armoury
                         {
                             pay = 0;
                             // klucz WYL albo karawana nierozliczana: gra placi 10% kiesy ponad 10 000 (AddIncomeFromParty, gdy BK pozwala) - ten sam wzor
-                            if (!Settled(mp) && mp.LeaderHero != __0.Leader && kv.Value > BkKeep && VanillaWould(mp, __0)) { pay = (kv.Value - BkKeep) / 10; r.DPayVan += pay; r.Paid += pay; WkAdd(_wk, _wkDay, 0, pay); }
+                            if (!Settled(mp) && mp.LeaderHero != __0.Leader && kv.Value > BkKeep && VanillaWould(mp, __0)) { pay = (kv.Value - BkKeep) / 10; r.DPayVan += pay; r.Paid += pay; WkAdd(_wk, _wkDay, 0, pay); Rec586(r, LedDep, -pay); }   // 586 (recenzja): wyplata gry 10% jako wplata, nie w reszcie (zold)
                         }
                         int wage, paid;
                         bool known = SoldierPay.PaidOf(mp, out wage, out paid);

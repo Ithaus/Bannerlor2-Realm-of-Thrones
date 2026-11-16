@@ -416,6 +416,7 @@ namespace Armoury
                 if (payee != null) GiveGoldAction.ApplyForPartyToCharacter(mp.Party, payee, amt, true);
                 else GiveGoldAction.ApplyForPartyToSettlement(mp.Party, _twins, amt, true);
                 long paid = Math.Max(0, purse0 - mp.PartyTradeGold);
+                if (paid > 0 && mp.IsCaravan) CaravanSettle.Flow586(mp, CaravanSettle.LedTwins, -paid);   // 586 (recenzja): dziennik kiesy karawany gracza (filtr w Flow586)
                 long got = (payee != null ? payee.Gold : (_twins.Town != null ? _twins.Town.Gold : 0)) - in0;
                 _tAsk += due; _tOut += paid; _tIn += got;
                 if (paid < due) { _tShort++; _tShortBy += due - paid; }

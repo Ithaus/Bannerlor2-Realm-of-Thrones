@@ -19,7 +19,8 @@ namespace Armoury
     ///   pozycji z BookBuy307 bez ruchu - inaczej dwa razy); statek - ShipsToPort181.T_PartyToChar (ChangeShipOwnerAction.ApplyByTrade, takze bez 584);
     ///   oplata BK za wjazd - prefiks / postfiks BKPartyBehavior.AddCaravanFees (BK :784-793: PartyTradeGold -= CaravanFee, do TradeTaxAccumulated miasta;
     ///   CaravanFee = ludzie + 200 x merkantylizm, obca frakcja bez paktu handlowego - EconomicData :138-161); jedzenie na droge - CaravanEscort (288);
-    ///   myto Tollgates - RealPayer.TollPost; Salvage - Perk510Gold.NavalEnteredPrefix; najem strazy - CaravanGuards285; doplata kowali 554 - CaravanSilver492;
+    ///   myto Tollgates - RealPayer.TollPost; Salvage - Perk510Gold.NavalEnteredPrefix; najem w karczmie (gra CheckRecruiting i straz 285) - RecruitmentCampaignBehavior.ApplyInternal (recenzja);
+    ///   myto u Blizniakow (karawana) - TwinsCrossing (recenzja); doplata kowali 554 - CaravanSilver492;
     ///   wplaty do wlasciciela - NoteDeposit (BK, E3/9, rozwiazanie) i E3-T2 (CaravanGoods.ProfitToOwners); wyplata 259 - PlayerCalc;
     ///   rozliczenie rodu (zold z kiesy / doplata BK do 5 000) - reszta zmiany kiesy w oknie DailyTickClan rodu gracza (TickPre / TickPost) po odjeciu wyplaty 259.
     /// KONTROLA: punkty kontrolne - wjazd do miasta (OnEntered305), wyjazd (OnLeft586), przed i po rozliczeniu rodu, linia doby; w kazdym zmiana kiesy od
@@ -32,14 +33,16 @@ namespace Armoury
     {
         // rodzaje ruchow kiesy (kolejnosc = kolejnosc w linii; kody zapisu nie moga sie zmieniac)
         internal const int LedSale = 0, LedToll = 1, LedBuy = 2, LedSponge = 3, LedShip = 4, LedBkFee = 5, LedFood = 6, LedTollgates = 7, LedSalvage = 8,
-                           LedGuards = 9, LedBonus = 10, LedDep = 11, LedPay259 = 12, LedClanOut = 13, LedClanIn = 14, LedN = 15;
+                           LedGuards = 9, LedBonus = 10, LedDep = 11, LedPay259 = 12, LedClanOut = 13, LedClanIn = 14, LedTwins = 15, LedN = 16;
         private static readonly string[] LedName = { "sprzedaz", "myto od sprzedazy", "zakupy", "gabka BK netto", "statki", "oplata BK za wjazd", "jedzenie na droge",
-                                                     "myto Tollgates", "Salvage", "najem strazy", "doplata kowali 554", "wplaty do wlasciciela", "wyplata 259",
-                                                     "zold z kiesy (rozliczenie rodu)", "doplata do kiesy (rozliczenie rodu)" };
-        private static readonly string[] LedCode = { "sale", "toll", "buy", "sponge", "ship", "bkfee", "food", "tollg", "salv", "guard", "bonus", "dep", "pay259", "clanout", "clanin" };
+                                                     "myto Tollgates", "Salvage", "najem w karczmie", "doplata kowali 554", "wplaty do wlasciciela", "wyplata 259",
+                                                     "zold z kiesy (rozliczenie rodu)", "doplata do kiesy (rozliczenie rodu)", "myto u Blizniakow" };
+        private static readonly string[] LedCode = { "sale", "toll", "buy", "sponge", "ship", "bkfee", "food", "tollg", "salv", "guard", "bonus", "dep", "pay259", "clanout", "clanin", "twins" };
 
-        private static bool _w586Fee;
-        private static string _w586Miss = "-";
+        private static bool _w586Fee, _w586Hire;
+        private static string _w586Miss = "-", _w586HireMiss = "-";
+        private static int _s586HireN, _s586HirePl;   // doba (linia 305a): werbunki karawan w karczmie (ApplyInternal), z ruchem kiesy karawany gracza
+        private static long _s586HireG;
         private static int _s586FeeN, _s586FeePl, _s586St, _s586StSess;   // doba (linia 305a): wywolania AddCaravanFees, z oplata karawany gracza; potkniecia
         private static long _s586FeeG;
 
@@ -67,6 +70,40 @@ namespace Armoury
                 else { _w586Miss = "BK AddCaravanFees"; miss.Add("BK AddCaravanFees (586)"); }
             }
             catch (Exception e) { _w586Miss = "BK AddCaravanFees (blad)"; miss.Add("BK AddCaravanFees (586, blad: " + e.Message + ")"); Stumble586("EnsureHooks586", e); }
+            // recenzja 586: werbunek w karczmie - gra (RecruitmentCampaignBehavior.CheckRecruiting co godzine i przy wjezdzie, karawana placi z kiesy w
+            // ApplyInternal: PartyTradeGold -= liczba x cena) i najem 285 (ta sama akcja ApplyRecruitMercenary -> ApplyInternal); zwrot za konia LevyGold
+            // (postfiks domyslny) biegnie przed naszym postfiksem (Priority.Last) - zapis netto calego werbunku
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.RecruitmentCampaignBehavior), "ApplyInternal");
+                var ps = m != null ? m.GetParameters() : null;
+                if (m != null && ps.Length >= 1 && ps[0].ParameterType == typeof(MobileParty))
+                {
+                    _harmony.Patch(m, prefix: new HarmonyMethod(typeof(CaravanSettle), nameof(HirePre586)) { priority = Priority.First },
+                                      postfix: new HarmonyMethod(typeof(CaravanSettle), nameof(HirePost586)) { priority = Priority.Last });
+                    _w586Hire = true;
+                }
+                else { _w586HireMiss = "RecruitmentCampaignBehavior.ApplyInternal"; miss.Add("RecruitmentCampaignBehavior.ApplyInternal (586)"); }
+            }
+            catch (Exception e) { _w586HireMiss = "ApplyInternal (blad)"; miss.Add("RecruitmentCampaignBehavior.ApplyInternal (586, blad: " + e.Message + ")"); Stumble586("EnsureHooks586(najem)", e); }
+        }
+
+        public static void HirePre586(MobileParty __0, out int __state)
+        {
+            __state = int.MinValue;
+            try { if (__0 != null && __0.IsCaravan && __0.ActualClan == Clan.PlayerClan) __state = __0.PartyTradeGold; } catch { __state = int.MinValue; }
+        }
+
+        public static void HirePost586(MobileParty __0, int __state)
+        {
+            if (__state == int.MinValue || __0 == null) return;
+            try
+            {
+                long d = (long)__0.PartyTradeGold - __state;
+                lock (_lk) { _s586HireN++; if (d != 0) { _s586HirePl++; _s586HireG -= d; } }
+                Flow586(__0, LedGuards, d);
+            }
+            catch (Exception e) { Stumble586("HirePost586", e); }
         }
 
         public static void FeePre586(MobileParty __0, out int __state)
@@ -122,7 +159,7 @@ namespace Armoury
                 {
                     r.Unk += unk; r.DUnk += unk; r.UnkN++;
                     string txt = "NIEZNANE " + Sg(unk) + " (586: kiesa " + r.CkPurse + " -> " + purse + ", zapisane ruchy " + Sg(rec) + "; od: " + r.CkWhere + ", do: " + where + ")";
-                    if (r.DTx.Count < TxMax) r.DTx.Add(txt); else r.DTxDrop++;
+                    r.DTx.Add(txt);   // recenzja 586: wpis NIEZNANE poza limitem TxMax (odcinek od - do jest celem dziennika; punktow kontrolnych w dobie kilka)
                 }
             }
             r.CkPurse = purse; r.CkRec = r.RecSum; r.CkWhere = where + " (doba " + Today + ")";
@@ -210,8 +247,9 @@ namespace Armoury
             lock (_lk)
             {
                 string t = " | dziennik kiesy (586): latka BK AddCaravanFees " + (_w586Fee ? "wpieta" : "BRAK (" + _w586Miss + ")") + ", wywolan " + _s586FeeN
-                           + ", oplat karawan gracza " + _s586FeePl + " (" + _s586FeeG + " zl), potkniecia " + _s586St + " (sesja " + _s586StSess + ")";
-                _s586FeeN = _s586FeePl = _s586St = 0; _s586FeeG = 0;
+                           + ", oplat karawan gracza " + _s586FeePl + " (" + _s586FeeG + " zl); latka najmu ApplyInternal " + (_w586Hire ? "wpieta" : "BRAK (" + _w586HireMiss + ")")
+                           + ", werbunkow karawan gracza " + _s586HireN + ", z ruchem kiesy " + _s586HirePl + " (" + _s586HireG + " zl); potkniecia " + _s586St + " (sesja " + _s586StSess + ")";
+                _s586FeeN = _s586FeePl = _s586St = 0; _s586FeeG = 0; _s586HireN = _s586HirePl = 0; _s586HireG = 0;
                 return t;
             }
         }

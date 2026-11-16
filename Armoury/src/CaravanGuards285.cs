@@ -305,7 +305,7 @@ namespace Armoury
                 got++; paid += Math.Max(0, g0 - mp.PartyTradeGold);
             }
             if (got > 0) { _hireVisits++; _hired += got; _hireCost += paid; }
-            if (paid > 0) CaravanSettle.Flow586(mp, CaravanSettle.LedGuards, -paid);   // 586: dziennik kiesy karawany gracza
+            // 586 (recenzja): zapis kiesy najmu w latce RecruitmentCampaignBehavior.ApplyInternal (CaravanSettle.HirePost586) - tu bez zapisu, inaczej dwa razy
         }
 
         /// <summary>ArmouryBehavior.OnDailyTick (po CaravanTrade284.Daily): linia "Straz karawan (285): dzien N" i zerowanie licznikow doby.</summary>
