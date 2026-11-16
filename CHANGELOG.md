@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 589: log podejscia wrogiego lorda do gracza - sily, armia, zadanie, odleglosc, z ktorej sie widzieli (tylko log) - Armoury (PlayerApproach589.cs nowy, NewLordKit.cs)
+
+**Problem:** Jeff 16.11: wrogi lord z zadaniem (pomoc w odbiciu zamku, obrona) "jedzie na slepo", choc sily gracza sa wieksze; gracz go napada i rozbija. Audyt (wf_826d0f68, `Armoury-2026-11-16_16-31-45.log`): linia `Bitwa gracza (159 P0, start spotkania)` ma tylko liczbe ludzi, "w armii TAK/NIE" i rozkaz AI - bez sily gracza, sily lorda, sily armii, doczepienia, odleglosci do wodza i odleglosci, z ktorej sie zobaczyli. Myles Mooton (19246) rozstrzygniety z innych linii (slepa plamka armii), Sara Cox (41219) i Jason Mallister (46857) - "brak dowodu", bo sily gracza i dystansu log nie zapisuje.
+
+**Przyczyna:** brak pomiaru - nic nie sledzi podejscia przed spotkaniem, a `NewLordKit.Describe` nie liczy sil ani stanu armii.
+
+**Zmiana (tylko log, zero zmiany zachowania):**
+- Nowy `PlayerApproach589` (TickEvent, watek glowny, co 0.1 h gry, nie w bitwie gracza): wrogie (wojna z frakcja gracza) partie lordow w 40 jedn. od gracza. Na lorda wpis: pierwszy pomiar "gracz widzi lorda" (SeeingRange gracza), "lord widzi gracza" (SeeingRange lorda), "w 3R" (9 jedn. - promien szukania inicjatywy gry), ostatni pomiar. Przy kazdym: odleglosc, ile godzin przed, krotki rozkaz AI i jego cel ("-> GRACZ"); przy "lord widzi" i "3R" takze sily. Wpis znika, gdy lord wyjdzie poza 40 jedn. (nowe podejscie = nowy wpis), przy zniszczeniu partii i w Reset (nowa kampania / wczytanie).
+- Sily: gracz (jak liczy gra: Army.EstimatedStrength wodza/doczepionego, inaczej Party.EstimatedStrength) i "ze swoimi w 2R" (partie tej samej frakcji w 6 jedn., niedoczepione, bez garnizonu/milicji/innej bitwy - przyblizenie num4/num7 gry bez wagi odleglosci); lord - Party.EstimatedStrength, "jak liczy gra", ze swoimi w 2R. Armia lorda: NIE / wodz / doczepiony / NIEDOCZEPIONY (wodz, odleglosc do wodza, Army.EstimatedStrength, slepa plamka: sila gracza w ocenie gry (AttachedTo ?? gracz, Army ?? Party) < sila armii -> "gra POMIJA gracza").
+- `NewLordKit.Describe` dla strony "wrog" (start spotkania i misja) dopisuje "| 589 podejscie: ..." i "| 589 teraz: odleglosc, zadanie (DefaultBehavior -> cel), krotko, sily".
+- Wyniku modelu (avoid/attack) NIE wolamy: `GetBestInitiativeBehavior` czysci statyczna liste `MobilePartyAi.DangerousPartiesAndTheirVecs` wspolna z watkami AI - wynikiem inicjatywy w logu jest krotki rozkaz (FleeToPoint / EngageParty -> GRACZ / GoToPoint) w chwilach pomiaru.
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: Describe dla "sojusznik" i dla linii doby (P0 "doba") bez zmian; ostatnia czesc linii 159 P0 to teraz 589 (zaden skrypt w repo ani autotest nie parsuje tej linii - sprawdzone grep). Wyjatki per partia liczone (potkniecia, Log.Error przy pierwszym miejscu i co 200), nic nie gasnie.
+- Kolizje: zadnej latki Harmony, zadnego zapisu stanu gry; odczyt lokatora (`StartFindingLocatablesAroundPosition`) w TickEvent jak 335/334e (watek glowny, poza watkami AI). `EstimatedStrength` odswieza cache gry (tak samo robi 223/335 w watku glownym).
+- Wydajnosc: jeden przeglad 40 jedn. wokol gracza co 0.1 h gry; SeeingRange lorda tylko dopoki nie ma wpisu "lord widzi"; sily (dwa przeglady 6 jedn.) tylko przy wpisie "lord widzi", "3R" i w linii bitwy. Setki partii swiata nie sa przegladane.
+- Granice pomiaru: lord z SeeingRange > 40 jedn. dostanie wpis "lord widzi" dopiero przy 40 (w logu widac jego zasieg); spotkanie w pierwszych 0.1 h po wczytaniu - "brak pomiaru". Sila "ze swoimi w 2R" to przyblizenie (gra wazy odlegloscia i liczy innych kandydatow), nie liczba z modelu.
+- Sprawdzic w logu: przy nastepnej bitwie z lordem linia "Bitwa gracza (159 P0, start spotkania)" ma "589 podejscie" z trzema progami i "589 teraz"; u czlonka armii w drodze - "NIEDOCZEPIONY ... gra POMIJA gracza" (przypadek Mylesa); brak bledow "PlayerApproach589." w logu.
+
+**Status:** DO SPRAWDZENIA (zbudowane, niewgrane).
+
 ## 588: podsumowanie rabunku gracza - ile wzial, z ilu w kiesie wsi, jaki procent - Armoury (DistrictRaid.cs, DistrictRaid.Summary588.cs, SideVillageVisit.Raid.cs, Settings.cs, McmSettings.cs)
 
 **Problem:** Jeff 16.11: "spladrowalem ruby fd sprawdz czy dostalem odpoweidnia ilsoc zlota" -> "ale ja chce wiem ile spladrowalem jaka to jest czesc ich kasy ile ma wioska?". Log `Armoury-2026-11-16_16-31-45.log`: krok skonczony komunikatem "Your men have plundered Ruby Ford: 1 of 196 settlements burned", nocny postoj dziala, ale nic nie mowi graczowi, ile zlota wzial ani z jakiej kiesy; linia doby E7/R1 sumuje wszystkie sesje swiata (dzien 109371: zloto z kiesy wsi 1495 zl, zabici 47, las 72, uchodzcy 2116 dla 5 sesji) - nie da sie oddzielic gracza od AI.

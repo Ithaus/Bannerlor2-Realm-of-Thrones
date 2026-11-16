@@ -153,6 +153,7 @@ namespace Armoury
         internal static void Reset()
         {
             _plans.Clear(); _savedPlans.Clear(); _stuck.Clear(); _savedStuck.Clear(); _born.Clear(); _savedBorn.Clear(); _lastHome.Clear(); _over.Clear(); _savedOver.Clear(); _quotes.Clear();
+            PlayerApproach589.Reset();   // 589
             _lastBattle = null; _lastBattleWhere = null; _importN = -1; _importBad = 0; _stumbles = 0; _err.Clear();
             ClearDay();
         }
@@ -329,6 +330,7 @@ namespace Armoury
             CampaignEvents.MobilePartyCreated.AddNonSerializedListener(owner, OnCreated);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(owner, OnDestroyed);
             CampaignEvents.MapEventStarted.AddNonSerializedListener(owner, OnMapEventStarted);
+            PlayerApproach589.RegisterEvents(owner);   // 589: pomiar podejscia wrogich lordow do gracza (co 0.1 h, watek glowny, tylko log)
         }
 
         private static void OnCreated(MobileParty mp)
@@ -1534,7 +1536,8 @@ namespace Armoury
                    + ", niegotowa przez zbroje " + (info != null && info.Low && info.ByBody ? "TAK" : "NIE")
                    + " | cel p9 " + ArmsFirst.TargetName(mp) + ", stoi: " + stuck + " | zloto wodza " + (lord != null ? lord.Gold.ToString(Inv) : "-")
                    + ", budzet AiGear " + b + " z potrzebnych " + need + (can ? "" : " - nie stac")
-                   + " | w armii " + (mp.Army != null ? "TAK (" + Nm(mp.Army.LeaderParty) + ")" : "NIE") + " | powstala " + born + " | AI " + ai + " | plan 159: " + plan;
+                   + " | w armii " + (mp.Army != null ? "TAK (" + Nm(mp.Army.LeaderParty) + ")" : "NIE") + " | powstala " + born + " | AI " + ai + " | plan 159: " + plan
+                   + (side == "wrog" ? PlayerApproach589.Describe(mp) : "");   // 589: podejscie do gracza, sily, armia, zadanie (tylko log)
         }
 
         // ------------------------------------------------------------ zapis (arm_159_kit)
