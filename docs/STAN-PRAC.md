@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 16.11 - WGRANIE 268 (576 dzialka lupu bez ekranu do zbrojowni gracza, 577 nocny postoj przy rabunku gracza, 578 postoj takze AI / wioski poboczne / cudza armia / 'about N days' z nocami), bez autotestu
+
+- Armoury.dll b1462113 = noc/scal-perki 00a613d0 (267 + 576 + 577 + 578 po recenzjach). Kopie: .bak-2026-11-16-przed-wgranie268, Backup C: i D:. Nowe klucze: LootShareToArmouryNoScreen, RaidNightHalt, RaidNightHaltAi (domyslnie true).
+- Do sprawdzenia: po bitwie bez ekranu lupu (wymuszenie zaopatrzenia, kryjowka, rabunek, szturm) komunikat 'Your share of the spoils (N pcs) went to your list...' i dzialka w oknie lupu; rabunek gracza 21-3 stoi ('Night falls...'/'Dawn...'), linia switu NocnyMarsz bez 'night without sleep'; AI: licznik postojow i przerwanych przez zagrozenie w linii switu, E7/R1 'dni zegara na osade' ok. 4/3 'dni na osade'; KRONIKA WOJEN - czy armie AI czesciej rozpadaja sie przy rabunku.
+
 ## STAN 15.11 - WGRANIE 267 (574 umiejetnosci w zestawie musztry, 575 najtansze + codzienna wymiana na tansze + lepsze wraca przed bitwa; decyzja Jeffa: wariant A - obie pule razem), bez autotestu
 
 - Armoury.dll 2e453560 = noc/scal-perki 3f71147f (266 + 574 + 575 po recenzjach; 65c0f6e8 tylko CHANGELOG). Kopie: .bak-2026-11-15-przed-wgranie267, Backup C: i D:. Nowe klucze DrillKitSkillCheck, DrillKitCheapestSwap (domyslnie true).
