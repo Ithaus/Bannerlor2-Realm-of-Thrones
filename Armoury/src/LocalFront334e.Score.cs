@@ -782,7 +782,8 @@ namespace Armoury
             if (k == null) return;
             string why;
             if (WarFront334.VetoedFor334e(k, v, out why)) { KeepX(1); return; }
-            // 582: wies po okupie tej frakcji / cel zablokowany przy przeprawie - ThinkPostfix RaidTribute / AimPostfix CrossingLaw i tak daja -1, nie podtrzymujemy
+            // 582: wies po okupie tej frakcji / cel zablokowany przy przeprawie - nie podtrzymujemy. ThinkPost (Last) idzie PO AimPostfix CrossingLaw (Normal) i ThinkPostfix
+            // RaidTribute (VeryLow), wiec ta ocena omijala oba sprawdzenia; ten filtr jest dla armii jedyna ochrona w mysli (druga - EncounterPrefix przy spotkaniu)
             if (RaidTribute.SparedNow(v, party.MapFaction) || CrossingLaw.AimBlocks(party, v)) { KeepX(4); return; }
             bool blocked;
             long w0 = Ts();
@@ -873,8 +874,9 @@ namespace Armoury
                 var v = cand[i].Key;
                 string why;
                 if (WarFront334.VetoedFor334e(k, v, out why)) { _dArmyRaidVeto++; continue; }   // teatr Polnocy / Wysp, 274, 326b - ThinkPost (Last) idzie po wetach
-                // 582: te same warunki co SvLater (342r) poza wetem wyzej - wies po okupie tej frakcji (RaidTribute.ThinkPostfix) i cel zablokowany przy przeprawie
-                // (CrossingLaw.AimPostfix) dostalyby -1 po tej ofercie i armia tracila rabunek w tej mysli; pomijamy przed tried++ (nie zjadaja 6 prob), bierzemy nastepna wies
+                // 582: te same warunki co SvLater (342r) poza wetem wyzej - wies po okupie tej frakcji i cel zablokowany przy przeprawie. ThinkPost (Last) idzie PO
+                // AimPostfix CrossingLaw (Normal) i ThinkPostfix RaidTribute (VeryLow), wiec ta oferta omijala oba sprawdzenia (armia szla pod wies, start zatrzymywal dopiero
+                // EncounterPrefix); ten filtr jest dla armii jedyna ochrona w mysli. Pomijamy przed tried++ (nie zjadaja 6 prob), bierzemy nastepna wies
                 if (RaidTribute.SparedNow(v, party.MapFaction)) { skTrib++; continue; }
                 if (CrossingLaw.AimBlocks(party, v)) { skAim++; continue; }
                 tried++;
