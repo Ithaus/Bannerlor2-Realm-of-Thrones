@@ -13053,6 +13053,10 @@ namespace Armoury
         [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
         public bool PlayerCaravanShipsFromSurplus { get; set; } = true;
 
+        [SettingPropertyBool("Player Caravan Horses Need Profit", HintText = "Your caravans keep horses and cattle bought cheap on leaving a town only if some town would pay more after toll and road costs; the rest is returned for a refund. They also stop selling horses below cost (unless short of coin, disbanding or held over 30 days). Pack animals and AI caravans unaffected. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
+        public bool PlayerCaravanHorsesNeedProfit { get; set; } = true;
+
         [SettingPropertyBool("Banner Loss Break Ignores Morale", HintText = "with Banner Companies: a company that has lost a third of its men (half the base chance) and again when it has lost half (full chance) rolls to break even when its men's morale is still high - losses frighten men whatever the game's morale says. Veterans still hold far longer (the chance is divided by the morale resistance of their tier, and high morale keeps it at its lowest). Off = no roll at a third, and the roll at half is skipped while morale is 50 or more, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: fighting for life (305c)")]
         public bool BannerLossBreakIgnoresMorale { get; set; } = true;
@@ -17285,6 +17289,7 @@ namespace Armoury
             s.CaravanPlayerDiary = CaravanPlayerDiary;
             s.CaravanLossNotice = CaravanLossNotice;
             s.PlayerCaravanShipsFromSurplus = PlayerCaravanShipsFromSurplus;
+            s.PlayerCaravanHorsesNeedProfit = PlayerCaravanHorsesNeedProfit;
             s.BannerLossBreakIgnoresMorale = BannerLossBreakIgnoresMorale;
             s.CavalryPursuitNearVictim = CavalryPursuitNearVictim;
             s.CavalrySlowsForOwnFoot = CavalrySlowsForOwnFoot;

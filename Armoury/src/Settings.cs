@@ -6080,6 +6080,8 @@ namespace Armoury
         public bool CaravanLossNotice = true;               // When one of your caravans is destroyed you get a message saying who destroyed it, near which settlement and how much coin and goods it carried at its last count; when it is gone without a battle, whether its purse came back to your clan. The mod log records the same. Off = no message, as before
         // 584 (16.11, Jeff "1. tak"): CaravanSettle.Ships584.cs - karawana gracza kupuje statek tylko z nadwyzki ponad kapital albo gdy nie ma zadnego; statki w wartosci 259 po cenie odkupu portu.
         public bool PlayerCaravanShipsFromSurplus = true;   // Your caravans buy a ship only with coin above their trading capital, or when they have no ship at all. Without this, a sea caravan with a large purse could spend half of it on a ship as soon as it reached a port. Ships count toward a caravan's worth at the price a port would pay for them. AI caravans are not affected. Off = as before
+        // 585 (16.11, Jeff "2. tak"): CaravanHorse585.cs - zwierzeta z gabki BK w karawanach gracza tylko z zyskiem osiagalnym; konie nie ponizej kosztu.
+        public bool PlayerCaravanHorsesNeedProfit = true;   // Your caravans keep horses and cattle bought cheap on leaving a town only if some town would pay more after toll and road costs; the rest is returned for a refund. They also stop selling horses below cost (unless short of coin, disbanding or held over 30 days). Pack animals and AI caravans unaffected. Off = as before
 
         // --- Battle: fighting for life (305c) ---
         // 305c (Jeff 31.10: "sprawdz bitwe ... jak mozesz podkrec AI i trudnosc zachowania AI"; zasada 25.10: kazdy walczy o zycie w granicach umiejetnosci

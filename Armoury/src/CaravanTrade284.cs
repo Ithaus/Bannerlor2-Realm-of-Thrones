@@ -1168,6 +1168,9 @@ namespace Armoury
                 var mp = __0.MobileParty;
                 if (mp == null || !mp.IsCaravan || !__1.IsSettlement || __1.Settlement == null || __1.Settlement.Town == null) return;
                 var it = __2.EquipmentElement.Item;
+                // 585 (klucz PlayerCaravanHorsesNeedProfit): kon karawany gracza (bez jucznych i bydla) - nie ponizej kosztu po mycie, wyjscia na stracie T1 bez zmian
+                int h585; double u585;
+                if (CaravanHorse585.SellGuard(mp, __1.Settlement, __2.EquipmentElement, ref __3, out h585, out u585)) { if (h585 > 0) Withhold(mp, __2.EquipmentElement, bk, h585, u585); return; }
                 if (it == null || !it.IsTradeGood || it.HasHorseComponent || it.ItemCategory == null || it.ItemCategory == DefaultItemCategories.PackAnimal) return;
                 if (!CaravanBulk.TradesForT1(mp) || MaterialOrders.HasContract(mp) || CaravanBulk.HasOrders(mp)) return;
                 if (CaravanBulk.Owns(it) && CaravanGoods.CostEstimated(mp, it)) return;   // surowiec masowy z kosztem z oszacowania - bez progu (jak CaravanBulk.Sell)
